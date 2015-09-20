@@ -1,9 +1,9 @@
 package main
 
 import (
-	"sync"
 	"image"
 	"math"
+	"sync"
 )
 
 type Window struct {
@@ -58,30 +58,29 @@ type Window struct {
 }
 
 func (w *Window) WinInit(clone *Window, r image.Rectangle) {
-	
-//	var r1, br image.Rectangle
-//	var f *File
-//	var rf *Reffont
-//	var rp []rune
-//	var nc int
 
-	
-	w.tag.w = w;
+	//	var r1, br image.Rectangle
+	//	var f *File
+	//	var rf *Reffont
+	//	var rp []rune
+	//	var nc int
+
+	w.tag.w = w
 	w.taglines = 1
 	w.tagexpand = true
 	w.body.w = w
-	
-//	WinId++
-//	w.id = WinId
-	
+
+	//	WinId++
+	//	w.id = WinId
+
 	w.ref.Inc()
 	if globalincref {
 		w.ref.Inc()
 	}
 	w.ctlfid = math.MaxUint64
 	w.utflastqid = -1
-//	r1 = r
-	
+	//	r1 = r
+
 	w.tagtop = r
 	w.tagtop.Max.Y = r.Min.Y + font.Height
 }

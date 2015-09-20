@@ -1,12 +1,10 @@
 package main
 
-import (
-
-)
+import ()
 
 type Timer struct {
-	dt int
+	dt     int
 	cancel int
-	c chan int
-	next *Timer
+	c      chan int
+	next   *Timer
 }

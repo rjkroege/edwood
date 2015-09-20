@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Lheader = []string {
+	Lheader = []string{
 		"New ",
 		"Cut ",
 		"Paste ",

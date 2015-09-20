@@ -3,28 +3,28 @@ package main
 import (
 	"image"
 	"math"
-	
+
 	"9fans.net/go/draw"
 )
 
 const (
-	Ldot = "."
+	Ldot   = "."
 	TABDIR = 3
 )
 
 var (
-	left1 = []rune { '{', '[', '(', '<', 0xab }
-	right1 = []rune { '}', ']', ')', '>', 0xbb };
-	left2 = []rune { '\n' };
-	left3 =  []rune { '\'', '"', '`' };
-	
-	left = [][]rune {
+	left1  = []rune{'{', '[', '(', '<', 0xab}
+	right1 = []rune{'}', ']', ')', '>', 0xbb}
+	left2  = []rune{'\n'}
+	left3  = []rune{'\'', '"', '`'}
+
+	left = [][]rune{
 		left1,
 		left2,
 		left3,
 	}
-	
-	right = [][]rune {
+
+	right = [][]rune{
 		right1,
 		left2,
 		left3,
@@ -35,26 +35,26 @@ type Text struct {
 	file *File
 	//fr Frame
 	reffont *Reffont
-	org uint
-	q0 uint
-	q1 uint
-	what int
+	org     uint
+	q0      uint
+	q1      uint
+	what    int
 	tabstop int
-	w *Window
+	w       *Window
 	scrollr image.Rectangle
-	lastsr image.Rectangle
-	all image.Rectangle
-	row *Row
-	col *Column
-	
-	iq1 uint
-	eq0 uint
-	cq0 uint
-	ncache int
+	lastsr  image.Rectangle
+	all     image.Rectangle
+	row     *Row
+	col     *Column
+
+	iq1         uint
+	eq0         uint
+	cq0         uint
+	ncache      int
 	ncachealloc int
-	cache []rune
-	nofill int
-	needundo int
+	cache       []rune
+	nofill      int
+	needundo    int
 }
 
 func NewText(f *File, r image.Rectangle, rf *Reffont, cols []*draw.Image) *Text {
@@ -62,7 +62,7 @@ func NewText(f *File, r image.Rectangle, rf *Reffont, cols []*draw.Image) *Text 
 	t.file = f
 	t.all = r
 	t.scrollr = r
-	t.scrollr.Max.X = r.Min.X+display.ScaleSize(12)
+	t.scrollr.Max.X = r.Min.X + display.ScaleSize(12)
 	t.lastsr = nullrect
 	r.Min.X += display.ScaleSize(12) + display.ScaleSize(4)
 	t.eq0 = math.MaxUint64
@@ -75,7 +75,7 @@ func NewText(f *File, r image.Rectangle, rf *Reffont, cols []*draw.Image) *Text 
 }
 
 func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
-	
+
 }
 
 func (t *Text) Resize(r image.Rectangle, keepextra int) int {

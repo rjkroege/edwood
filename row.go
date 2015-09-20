@@ -1,15 +1,15 @@
 package main
 
 import (
-	"sync"
 	"image"
+	"sync"
 )
 
 type Row struct {
-	lk *sync.Mutex
-	r image.Rectangle
-	tag Text
-	col **Column
+	lk   *sync.Mutex
+	r    image.Rectangle
+	tag  Text
+	col  **Column
 	ncol int
 }
 

@@ -9,11 +9,11 @@ const (
 )
 
 type Elog struct {
-	t    ElogType // Delete, Insert, Filename
-	q0   uint    // location of change (unused in f)
-	nd uint      // number of deleted characters
-	nr uint      // number of runes in string or filename
-	r    []rune
+	t  ElogType // Delete, Insert, Filename
+	q0 uint     // location of change (unused in f)
+	nd uint     // number of deleted characters
+	nr uint     // number of runes in string or filename
+	r  []rune
 }
 
 func (e *Elog) Term(f *File) {
