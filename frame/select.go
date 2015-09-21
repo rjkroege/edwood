@@ -1,4 +1,4 @@
-package frame 
+package frame
 
 import (
 	"9fans.net/go/draw"

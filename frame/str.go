@@ -7,7 +7,7 @@ const (
 )
 
 func roundup(n int) int {
-	return ((n+CHUNK) &^ (CHUNK-1))
+	return ((n + CHUNK) &^ (CHUNK - 1))
 }
 
 func (f *Frame) AllocStr(n uint) []byte {

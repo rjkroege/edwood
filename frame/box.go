@@ -10,8 +10,8 @@ func (f *Frame) addbox(bn, n uint64) {
 	if bn > uint64(f.nbox) {
 		panic("Frame.addbox")
 	}
-	if uint64(f.nbox) + n > uint64(f.nalloc) {
-		f.growbox(n+SLOP)
+	if uint64(f.nbox)+n > uint64(f.nalloc) {
+		f.growbox(n + SLOP)
 	}
 	for i := uint64(f.nbox); i >= bn; i-- {
 		f.box[i+n] = f.box[i]
@@ -25,9 +25,9 @@ func (f *Frame) closebox(n0, n1 int) {
 	}
 	n1++
 	for i := n1; i < f.nbox; i++ {
-		f.box[i - (n1 - n0)] = f.box[i]
+		f.box[i-(n1-n0)] = f.box[i]
 	}
-	f.nbox -= n1-n0
+	f.nbox -= n1 - n0
 }
 
 func (f *Frame) delbox(n0, n1 int) {
@@ -64,7 +64,7 @@ func (f *Frame) dupbox(bn uint64) {
 	}
 	f.addbox(bn, 1)
 	if f.box[bn].Nrune >= 0 {
-		p := f.AllocStr(nbyte(f.box[bn])+1)
+		p := f.AllocStr(nbyte(f.box[bn]) + 1)
 		copy(p, f.box[bn].Ptr)
 		f.box[bn+1].Ptr = p
 	}
@@ -84,33 +84,33 @@ func runeindex(p []byte, n uint64) int {
 }
 
 func (f *Frame) truncatebox(b *Frbox, n uint64) {
-	if b.Nrune < 0 || b.Nrune < n {
+	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
 	}
-	b.Nrune -= n
+	b.Nrune -= int(n)
 	b.Ptr[runeindex(b.Ptr, uint64(len(b.Ptr)))] = 0
-	b.Wid = uint64(f.Font.StringWidth(string(b.Ptr)))
+	b.Wid = f.Font.StringWidth(string(b.Ptr))
 }
 
 func (f *Frame) chopbox(b *Frbox, n uint64) {
-	if b.Nrune < 0 || b.Nrune < n {
+	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("chopbox")
 	}
 	i := runeindex(b.Ptr, n)
 	copy(b.Ptr, b.Ptr[i:])
-	b.Nrune -= n
-	b.Wid = uint64(f.Font.StringWidth(string(b.Ptr)))
+	b.Nrune -= int(n)
+	b.Wid = f.Font.StringWidth(string(b.Ptr))
 }
 
 func (f *Frame) splitbox(bn, n uint64) {
 	f.dupbox(bn)
-	f.truncatebox(f.box[bn], f.box[bn].Nrune-n)
+	f.truncatebox(f.box[bn], uint64(f.box[bn].Nrune-int(n)))
 	f.chopbox(f.box[bn+1], n)
 }
 
 func (f *Frame) mergebox(bn int) {
 	f.Insure(bn, nbyte(f.box[bn])+nbyte(f.box[bn+1])+1)
-	i := runeindex(f.box[bn].Ptr, f.box[bn].Nrune)
+	i := runeindex(f.box[bn].Ptr, uint64(f.box[bn].Nrune))
 	copy(f.box[bn].Ptr[i:], f.box[bn+1].Ptr)
 	f.box[bn].Wid += f.box[bn+1].Wid
 	f.box[bn].Nrune += f.box[bn+1].Nrune
@@ -118,7 +118,7 @@ func (f *Frame) mergebox(bn int) {
 }
 
 func (f *Frame) findbox(bn, p, q uint64) int {
-	for i := 0; bn < uint64(f.nbox) && p + uint64(nrune(f.box[i])) <= q; i++ {
+	for i := 0; bn < uint64(f.nbox) && p+uint64(nrune(f.box[i])) <= q; i++ {
 		p += uint64(nrune(f.box[i]))
 		bn++
 	}

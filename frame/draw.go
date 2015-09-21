@@ -1,8 +1,8 @@
 package frame
 
 import (
-	"image"
 	"9fans.net/go/draw"
+	"image"
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
