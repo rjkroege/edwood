@@ -1,7 +1,9 @@
 package main
 
 import (
-	_ "9fans.net/go/draw"
+	 "9fans.net/go/draw"
+	"github.com/ProjectSerenity/acme/frame"
+	"image"
 )
 
 const (
@@ -16,7 +18,7 @@ var (
 		"/lib/font/bit/lucm/unicode.9.font",
 	}
 
-	command *Command
+//	command *Command
 )
 
 func mousethread() {
@@ -48,5 +50,19 @@ func timefmt( /*Fmt* */ ) int {
 }
 
 func main() {
-
+	var cols [5]*draw.Image
+	errch := make(chan<- error)
+	display, err := draw.Init(errch, "", "acme", "1024x720")
+	if err != nil {
+		panic(err)
+	}
+	img, err := display.AllocImage(image.Rect(0, 0, 1024, 720), draw.RGB16, true, draw.Cyan)
+	if err != nil {
+		panic(err)
+	} 
+	f := frame.NewFrame(image.Rect(0, 0, 500, 600), display.DefaultFont, img, cols)
+	
+	for {
+		f.Tick(image.ZP, true)
+	}
 }

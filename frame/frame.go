@@ -43,8 +43,8 @@ type Frame struct {
 	modified     bool
 	tick         *draw.Image
 	tickback     *draw.Image
-	ticked       int
-	noredraw     int
+	ticked       bool
+	noredraw     bool
 	tickscale    int
 }
 
@@ -126,5 +126,5 @@ func (f *Frame) Clear(freeall bool) {
 		f.tickback = nil
 	}
 	f.box = nil
-	f.ticked = 0
+	f.ticked = false
 }
