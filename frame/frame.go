@@ -6,14 +6,14 @@ import (
 )
 
 const (
-	BACK = iota
-	HIGH
-	BORD
-	TEXT
-	HTEXT
-	NCOL
+	colBack = iota
+	colHigh
+	colBord
+	colText
+	colHText
+	nCol
 
-	FRTICKW = 3
+	frtickw = 3
 )
 
 type frbox struct {
@@ -28,7 +28,7 @@ type Frame struct {
 	Font         *draw.Font
 	Display      *draw.Display     // on which the frame is displayed
 	Background   *draw.Image       // on which the frame appears
-	Cols         [NCOL]*draw.Image // background and text colours
+	Cols         [nCol]*draw.Image // background and text colours
 	Rect         image.Rectangle   // in which the text appears
 	Entire       image.Rectangle   // size of full frame
 	Scroll       func(*Frame, int) // function provided by application
@@ -50,7 +50,7 @@ type Frame struct {
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NCOL]*draw.Image) *Frame {
+func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [nCol]*draw.Image) *Frame {
 	f := new(Frame)
 	f.Font = ft
 	f.Display = b.Display
@@ -66,7 +66,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NCOL]*draw.
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.tick == nil && f.Cols[BACK] != nil {
+	if f.tick == nil && f.Cols[colBack] != nil {
 		f.InitTick()
 	}
 	return f
@@ -75,7 +75,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NCOL]*draw.
 // InitTick
 func (f *Frame) InitTick() {
 	var err error
-	if f.Cols[BACK] == nil || f.Display == nil {
+	if f.Cols[colBack] == nil || f.Display == nil {
 		return
 	}
 
@@ -87,7 +87,7 @@ func (f *Frame) InitTick() {
 		f.tick.Free()
 	}
 
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*FRTICKW, ft.Height), b.Pix, false, draw.White)
+	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, ft.Height), b.Pix, false, draw.White)
 	if err != nil {
 		return
 	}
@@ -100,12 +100,12 @@ func (f *Frame) InitTick() {
 	}
 
 	// background colour
-	f.tick.Draw(f.tick.R, f.Cols[BACK], nil, image.Pt(0, 0))
+	f.tick.Draw(f.tick.R, f.Cols[colBack], nil, image.Pt(0, 0))
 	// vertical line
-	f.tick.Draw(image.Rect(f.tickscale*(FRTICKW/2), 0, f.tickscale*(FRTICKW/2+1), ft.Height), f.Display.Black, nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), ft.Height), f.Display.Black, nil, image.Pt(0, 0))
 	// box on each end
-	f.tick.Draw(image.Rect(0, 0, f.tickscale*FRTICKW, f.tickscale*FRTICKW), f.Cols[TEXT], nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*FRTICKW, f.tickscale*FRTICKW, ft.Height), f.Cols[TEXT], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[colText], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*frtickw, f.tickscale*frtickw, ft.Height), f.Cols[colText], nil, image.Pt(0, 0))
 }
 
 // SetRects
