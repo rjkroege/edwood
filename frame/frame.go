@@ -11,7 +11,7 @@ const (
 	colBord
 	colText
 	colHText
-	nCol
+	NumColours
 
 	frtickw = 3
 )
@@ -26,12 +26,12 @@ type frbox struct {
 
 type Frame struct {
 	Font         *draw.Font
-	Display      *draw.Display     // on which the frame is displayed
-	Background   *draw.Image       // on which the frame appears
-	Cols         [nCol]*draw.Image // background and text colours
-	Rect         image.Rectangle   // in which the text appears
-	Entire       image.Rectangle   // size of full frame
-	Scroll       func(*Frame, int) // function provided by application
+	Display      *draw.Display           // on which the frame is displayed
+	Background   *draw.Image             // on which the frame appears
+	Cols         [NumColours]*draw.Image // background and text colours
+	Rect         image.Rectangle         // in which the text appears
+	Entire       image.Rectangle         // size of full frame
+	Scroll       func(*Frame, int)       // function provided by application
 	box          []*frbox
 	p0, p1       uint64 // bounds of a selection
 	nbox, nalloc int
@@ -50,7 +50,7 @@ type Frame struct {
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [nCol]*draw.Image) *Frame {
+func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) *Frame {
 	f := new(Frame)
 	f.Font = ft
 	f.Display = b.Display
