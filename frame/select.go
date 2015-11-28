@@ -19,35 +19,35 @@ func region(a, b uint64) int {
 func (f *Frame) Select(mc draw.Mousectl) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
-	
+
 	f.modified = false
 	f.DrawSel(f.Ptofchar(f.p0), f.p0, f.p1, false)
 	p0 := f.Charofpt(mp)
 	p1 := p0
-	
+
 	f.p0 = p0
 	f.p1 = p1
-	
+
 	pt0 := f.Ptofchar(p0)
 	pt1 := f.Ptofchar(p1)
-	
+
 	f.DrawSel(pt0, p0, p1, true)
 	reg := 0
-	
+
 	var q uint64
 	for mc.Mouse.Buttons == b {
 		scrled := false
 		if f.Scroll != nil {
-			if mp.Y < f.R.Min.Y {
-				f.Scroll(f, -(f.R.Min.Y - mp.Y) / f.Font.Height - 1)
+			if mp.Y < f.Rect.Min.Y {
+				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.Height-1)
 				p0 = f.p1
 				p1 = f.p0
 				scrled = true
-			} else if mp.Y > f.R.Max.Y {
-				f.Scroll(f, (mp.Y - f.R.Max.Y) / f.Font.Height + 1)
+			} else if mp.Y > f.Rect.Max.Y {
+				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.Height+1)
 				p0 = f.p1
 				p1 = f.p0
-				scrled = true	
+				scrled = true
 			}
 			if scrled {
 				if reg != region(p1, p0) {
@@ -100,7 +100,7 @@ func (f *Frame) Select(mc draw.Mousectl) {
 			f.p0 = p1
 			f.p1 = p0
 		}
-		
+
 		if scrled {
 			f.Scroll(f, 0)
 		}
@@ -112,33 +112,33 @@ func (f *Frame) Select(mc draw.Mousectl) {
 		}
 		mp = mc.Mouse.Point
 	}
-	
+
 }
 
 func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	q0 := p0
 	q1 := p1
-	
+
 	q0.Y += f.Font.Height
 	q1.Y += f.Font.Height
-	
+
 	n := (p1.Y - p0.Y) / f.Font.Height
-	if f.B == nil {
+	if f.Background == nil {
 		panic("Frame.SelectPaint B == nil")
 	}
-	if p0.Y == f.R.Max.Y {
+	if p0.Y == f.Rect.Max.Y {
 		return
 	}
 	if n == 0 {
-		f.B.Draw(Rpt(p0, q1), col, nil, image.ZP)
+		f.Background.Draw(Rpt(p0, q1), col, nil, image.ZP)
 	} else {
-		if p0.X >= f.R.Max.X {
-			p0.X = f.R.Max.X - 1
+		if p0.X >= f.Rect.Max.X {
+			p0.X = f.Rect.Max.X - 1
 		}
-		f.B.Draw(image.Rect(p0.X, p0.Y, f.R.Max.X, q0.Y), col, nil, image.ZP)
+		f.Background.Draw(image.Rect(p0.X, p0.Y, f.Rect.Max.X, q0.Y), col, nil, image.ZP)
 		if n > 1 {
-			f.B.Draw(image.Rect(f.R.Min.X, q0.Y, f.R.Max.X, p1.Y), col, nil, image.ZP)
-		} 
-		f.B.Draw(image.Rect(f.R.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.ZP)
+			f.Background.Draw(image.Rect(f.Rect.Min.X, q0.Y, f.Rect.Max.X, p1.Y), col, nil, image.ZP)
+		}
+		f.Background.Draw(image.Rect(f.Rect.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.ZP)
 	}
 }

@@ -16,8 +16,8 @@ const (
 	FRTICKW = 3
 )
 
-type Frbox struct {
-	Wid    int
+type frbox struct {
+	Wid    int // in pixels
 	Nrune  int
 	Ptr    []byte
 	Bc     rune
@@ -26,28 +26,30 @@ type Frbox struct {
 
 type Frame struct {
 	Font         *draw.Font
-	Display      *draw.Display
-	B            *draw.Image
-	Cols         [NCOL]*draw.Image
-	R            image.Rectangle
-	Entire       image.Rectangle
-	Scroll       func(*Frame, int)
-	box          []*Frbox
-	p0, p1       uint64
+	Display      *draw.Display     // on which the frame is displayed
+	Background   *draw.Image       // on which the frame appears
+	Cols         [NCOL]*draw.Image // background and text colours
+	Rect         image.Rectangle   // in which the text appears
+	Entire       image.Rectangle   // size of full frame
+	Scroll       func(*Frame, int) // function provided by application
+	box          []*frbox
+	p0, p1       uint64 // bounds of a selection
 	nbox, nalloc int
-	maxtab       int
-	nchars       int
-	nlines       int
-	maxlines     int
+	maxtab       int // max size of a tab (in pixels)
+	nchars       int // number of runes in frame
+	nlines       int // number of lines with text
+	maxlines     int // total number of lines in frame
 	lastlinefull int
 	modified     bool
-	tick         *draw.Image
-	tickback     *draw.Image
+	tick         *draw.Image // typing tick
+	tickback     *draw.Image // image under tick
 	ticked       bool
 	noredraw     bool
-	tickscale    int
+	tickscale    int // tick scaling factor
 }
 
+// NewFrame creates a new Frame with Font ft, background image b, colours cols, and
+// of the size r
 func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NCOL]*draw.Image) *Frame {
 	f := new(Frame)
 	f.Font = ft
@@ -63,12 +65,14 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NCOL]*draw.
 	f.lastlinefull = 0
 	f.Cols = cols
 	f.SetRects(r, b)
+
 	if f.tick == nil && f.Cols[BACK] != nil {
 		f.InitTick()
 	}
 	return f
 }
 
+// InitTick
 func (f *Frame) InitTick() {
 	var err error
 	if f.Cols[BACK] == nil || f.Display == nil {
@@ -104,14 +108,16 @@ func (f *Frame) InitTick() {
 	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*FRTICKW, f.tickscale*FRTICKW, ft.Height), f.Cols[TEXT], nil, image.Pt(0, 0))
 }
 
+// SetRects
 func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
-	f.B = b
+	f.Background = b
 	f.Entire = r
-	f.R = r
-	f.R.Max.Y -= (r.Max.Y - r.Min.Y) % f.Font.Height
+	f.Rect = r
+	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % f.Font.Height
 	f.maxlines = (r.Max.Y - r.Min.Y) / f.Font.Height
 }
 
+// Clear
 func (f *Frame) Clear(freeall bool) {
 	if f.nbox != 0 {
 		f.delbox(0, f.nbox-1)

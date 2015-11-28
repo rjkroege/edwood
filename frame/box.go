@@ -55,7 +55,7 @@ func (f *Frame) freebox(n0, n1 int) {
 
 func (f *Frame) growbox(delta uint64) {
 	f.nalloc += int(delta)
-	f.box = append(f.box, make([]*Frbox, delta)...)
+	f.box = append(f.box, make([]*frbox, delta)...)
 }
 
 func (f *Frame) dupbox(bn uint64) {
@@ -64,7 +64,7 @@ func (f *Frame) dupbox(bn uint64) {
 	}
 	f.addbox(bn, 1)
 	if f.box[bn].Nrune >= 0 {
-		p := f.AllocStr(nbyte(f.box[bn]) + 1)
+		p := make([]byte, nbyte(f.box[bn])+1)
 		copy(p, f.box[bn].Ptr)
 		f.box[bn+1].Ptr = p
 	}
@@ -83,7 +83,7 @@ func runeindex(p []byte, n uint64) int {
 	return offs
 }
 
-func (f *Frame) truncatebox(b *Frbox, n uint64) {
+func (f *Frame) truncatebox(b *frbox, n uint64) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
 	}
@@ -92,7 +92,7 @@ func (f *Frame) truncatebox(b *Frbox, n uint64) {
 	b.Wid = f.Font.StringWidth(string(b.Ptr))
 }
 
-func (f *Frame) chopbox(b *Frbox, n uint64) {
+func (f *Frame) chopbox(b *frbox, n uint64) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("chopbox")
 	}

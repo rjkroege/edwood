@@ -15,8 +15,8 @@ var (
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 
 	var c rune
-	frame.R = f.R
-	frame.B = f.B
+	frame.Rect = f.Rect
+	frame.Background = f.Background
 	frame.Font = f.Font
 	frame.maxtab = f.maxtab
 	frame.nbox = 0
@@ -71,7 +71,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 			}
 			tmp[s] = 0
 			s++
-			p := f.AllocStr(uint(s))
+			p := make([]byte, s)
 			b = frame.box[nb]
 			b.Ptr = p
 			copy(b.Ptr, tmp[:s])
@@ -91,7 +91,7 @@ func (f *Frame) chop(pt image.Point, p uint64, bn int) {
 			panic("endofframe")
 		}
 		f.cklinewrap(&pt, b)
-		if pt.Y >= f.R.Max.Y {
+		if pt.Y >= f.Rect.Max.Y {
 			break
 		}
 		p += uint64(nrune(b))
@@ -107,10 +107,11 @@ func (f *Frame) chop(pt image.Point, p uint64, bn int) {
 type points struct {
 	pt0, pt1 image.Point
 }
+
 var nalloc = 0
 
 func (f *Frame) Insert(r []rune, p0 uint64) {
-	if p0 > uint64(f.nchars) || len(r) == 0 || f.B == nil {
+	if p0 > uint64(f.nchars) || len(r) == 0 || f.Background == nil {
 		return
 	}
 
@@ -150,15 +151,15 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	 *	pt1 is where it will be after the insertion
 	 * If pt1 goes off the rectangle, we can toss everything from there on
 	 */
-	npts := 0 
-	for ; pt1.X != pt0.X && pt1.Y != f.R.Max.Y && n0 < f.nbox; npts++ {
+	npts := 0
+	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < f.nbox; npts++ {
 		b := f.box[n0]
 		f.cklinewrap(&pt0, b)
 		f.cklinewrap0(&pt1, b)
 
 		if b.Nrune > 0 {
-			n := f.canfit(pt1, b)
-			if n == 0 {
+			n, fits := f.canfit(pt1, b)
+			if !fits {
 				panic("frame.canfit == 0")
 			}
 			if n != b.Nrune {
@@ -173,7 +174,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 		}
 		pts[npts].pt0 = pt0
 		pts[npts].pt1 = pt1
-		if pt1.Y == f.R.Max.Y {
+		if pt1.Y == f.Rect.Max.Y {
 			break
 		}
 		f.advance(&pt0, b)
@@ -182,21 +183,21 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 		n0++
 	}
 
-	if pt1.Y > f.R.Max.Y {
+	if pt1.Y > f.Rect.Max.Y {
 		panic("frame.Insert pt1 too far")
 	}
-	if pt1.Y == f.R.Max.Y && n0 < f.nbox {
+	if pt1.Y == f.Rect.Max.Y && n0 < f.nbox {
 		f.nchars -= f.strlen(n0)
 		f.delbox(n0, f.nbox-1)
 	}
 	if n0 == f.nbox {
 		div := f.Font.Height
-		if pt1.X > f.R.Min.X {
+		if pt1.X > f.Rect.Min.X {
 			div++
 		}
-		f.nlines = (pt1.Y-f.R.Min.Y)/div
+		f.nlines = (pt1.Y - f.Rect.Min.Y) / div
 	} else if pt1.Y != pt0.Y {
-		y := f.R.Max.Y
+		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.Height
 		q1 := pt1.Y + f.Font.Height
 		f.nlines += (q1 - q0) / f.Font.Height
@@ -204,16 +205,16 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 			f.chop(ppt1, p0, nn0)
 		}
 		if pt1.Y < y {
-			rect = f.R
+			rect = f.Rect
 			rect.Min.Y = q1
 			rect.Max.Y = y
 			if q1 < y {
-				f.B.Draw(rect, f.B, nil, image.Pt(f.R.Min.X, q0))
+				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
 			}
 			rect.Min = pt1
-			rect.Max.X = pt1.X + (f.R.Max.X - pt0.X)
+			rect.Max.X = pt1.X + (f.Rect.Max.X - pt0.X)
 			rect.Max.Y += q1
-			f.B.Draw(rect, f.B, nil, pt0)
+			f.Background.Draw(rect, f.Background, nil, pt0)
 		}
 	}
 
@@ -223,7 +224,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	 * The draw()s above moved everything down after the point they lined up.
 	 */
 	y := 0
-	if pt1.Y == f.R.Max.Y {
+	if pt1.Y == f.Rect.Max.Y {
 		y = pt1.Y
 	}
 	for n0 = n0 - 1; npts >= 0; n0-- {
@@ -236,12 +237,12 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 			rect.Max.X += b.Wid
 			rect.Max.Y += f.Font.Height
 
-			f.B.Draw(rect, f.B, nil, pts[npts].pt0)
+			f.Background.Draw(rect, f.Background, nil, pts[npts].pt0)
 			/* clear bit hanging off right */
 			if npts == 0 && pt.Y > pt0.Y {
 				rect.Min = opt0
 				rect.Max = opt0
-				rect.Max.X = f.R.Max.X
+				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.Height
 
 				if f.p0 <= cn0 && cn0 < f.p1 { /* b+1 is inside selection */
@@ -249,12 +250,12 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				} else {
 					col = f.Cols[BACK]
 				}
-				f.B.Draw(rect, col, nil, rect.Min)
+				f.Background.Draw(rect, col, nil, rect.Min)
 			} else if pt.Y < y {
 				rect.Min = pt
 				rect.Max = pt
 				rect.Min.X += b.Wid
-				rect.Max.X = f.R.Max.X
+				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.Height
 
 				if f.p0 <= cn0 && cn0 < f.p1 {
@@ -262,7 +263,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				} else {
 					col = f.Cols[BACK]
 				}
-				f.B.Draw(rect, col, nil, rect.Min)
+				f.Background.Draw(rect, col, nil, rect.Min)
 			}
 			y = pt.Y
 			cn0 -= uint64(b.Nrune)
@@ -271,8 +272,8 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 			rect.Max = pt
 			rect.Max.X += b.Wid
 			rect.Max.Y += f.Font.Height
-			if rect.Max.X >= f.R.Max.X {
-				rect.Max.X = f.R.Max.X
+			if rect.Max.X >= f.Rect.Max.X {
+				rect.Max.X = f.Rect.Max.X
 			}
 			cn0--
 			if f.p0 <= cn0 && cn0 < f.p1 {
@@ -282,9 +283,9 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				col = f.Cols[BACK]
 				tcol = f.Cols[TEXT]
 			}
-			f.B.Draw(rect, col, nil, rect.Min)
+			f.Background.Draw(rect, col, nil, rect.Min)
 			y = 0
-			if pt.X == f.R.Min.X {
+			if pt.X == f.Rect.Min.X {
 				y = pt.Y
 			}
 		}
@@ -306,7 +307,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 		f.box[nn0+n] = frame.box[n]
 	}
 
-	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.R.Min.X {
+	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--
 		ppt0.X -= f.box[nn0].Wid
 	}
