@@ -4,14 +4,14 @@ import (
 	"unicode/utf8"
 )
 
-const SLOP uint64 = 25
+const slop uint64 = 25
 
 func (f *Frame) addbox(bn, n uint64) {
 	if bn > uint64(f.nbox) {
 		panic("Frame.addbox")
 	}
 	if uint64(f.nbox)+n > uint64(f.nalloc) {
-		f.growbox(n + SLOP)
+		f.growbox(n + slop)
 	}
 	for i := uint64(f.nbox); i >= bn; i-- {
 		f.box[i+n] = f.box[i]

@@ -3,11 +3,11 @@ package frame
 import ()
 
 const (
-	CHUNK = 16
+	chunk = 16
 )
 
 func roundup(n int) int {
-	return ((n + CHUNK) &^ (CHUNK - 1))
+	return ((n + chunk) &^ (chunk - 1))
 }
 
 func (f *Frame) Insure(bn int, n uint) {
