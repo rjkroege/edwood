@@ -2,16 +2,12 @@
 package main
 
 import (
-	"9fans.net/go/draw"
 	"fmt"
 	"image"
 	"log"
+
+	"9fans.net/go/draw"
 )
-
-func watcher() {
-
-}
-
 
 
 // redraw is the view implementation
@@ -56,12 +52,15 @@ func main() {
 
 	fmt.Printf("background colour: %v\n ", back)
 
-	// get mouse positions
+	// get events.
 	mousectl := d.InitMouse()
-	redraw(d, false, myfont)
+	keyboardctl := d.InitKeyboard()
 
+	redraw(d, false, myfont)
 	for {
 		select {
+		case r := <- keyboardctl.C:
+			log.Println("got rune", r)
 		case <-mousectl.Resize:
 			redraw(d, true, myfont)
 		case m := <-mousectl.C:
