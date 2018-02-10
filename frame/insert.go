@@ -110,6 +110,11 @@ type points struct {
 
 var nalloc = 0
 
+// Insert inserts into Frame f starting at rune index p the runes between
+// r0 and r1. If a NUL (0) character is inserted, chaos will ensue. Tabs
+// and newlines are handled by the library, but all other characters,
+// including control characters, are just displayed. For example,
+// backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 uint64) {
 	if p0 > uint64(f.nchars) || len(r) == 0 || f.Background == nil {
 		return

@@ -52,6 +52,18 @@ type Frame struct {
 // of the size r
 func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) *Frame {
 	f := new(Frame)
+	f.Init(r, ft, b, cols)
+	return f
+}
+
+// Init prepares the Frame f so characters drawn in it will appear in the
+// single Font ft. It then calls SetRects and InitTick to initialize the
+// geometry for the Frame. The Image b is where the Frame is to be drawn;
+// Rectangle r defines the limit of the portion of the Image the text
+// will occupy. The Image pointer may be null, allowing the other
+// routines to be called to maintain the associated data structure in,
+// for example, an obscured window.
+func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
 	f.Font = ft
 	f.Display = b.Display
 	f.maxtab = 8 * ft.StringWidth("0")
@@ -72,7 +84,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 	return f
 }
 
-// InitTick
+// InitTick sets up the tick (e.g. cursor)
 func (f *Frame) InitTick() {
 	var err error
 	if f.Cols[colBack] == nil || f.Display == nil {
@@ -100,15 +112,15 @@ func (f *Frame) InitTick() {
 	}
 
 	// background colour
-	f.tick.Draw(f.tick.R, f.Cols[colBack], nil, image.Pt(0, 0))
+	f.tick.Draw(f.tick.R, f.Cols[ColBack], nil, image.Pt(0, 0))
 	// vertical line
 	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), ft.Height), f.Display.Black, nil, image.Pt(0, 0))
 	// box on each end
-	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[colText], nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*frtickw, f.tickscale*frtickw, ft.Height), f.Cols[colText], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[ColText], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*frtickw, f.tickscale*frtickw, ft.Height), f.Cols[ColText], nil, image.Pt(0, 0))
 }
 
-// SetRects
+// SetRects initializes the geometry of the frame.
 func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	f.Background = b
 	f.Entire = r
@@ -117,7 +129,20 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	f.maxlines = (r.Max.Y - r.Min.Y) / f.Font.Height
 }
 
-// Clear
+// Clear frees the internal structures associated with f, permitting
+// another Init or SetRects on the Frame. It does not clear the
+// associated display. If f is to be deallocated, the associated Font and
+// Image must be freed separately. The resize argument should be non-zero
+// if the frame is to be redrawn with a different font; otherwise the
+// frame will maintain some data structures associated with the font.
+//
+// /To resize a Frame, use Clear and Init and then Insert to recreate the
+// /display. If a Frame is being moved but not resized, that is, if the
+// /shape of its containing rectangle is unchanged, it is sufficient to
+// /use Draw to copy the containing rectangle from the old to the new
+// /location and then call SetRects to establish the new geometry. (It is
+// /unnecessary to call InitTick unless the font size has changed.) No
+// /redrawing is necessary.
 func (f *Frame) Clear(freeall bool) {
 	if f.nbox != 0 {
 		f.delbox(0, f.nbox-1)

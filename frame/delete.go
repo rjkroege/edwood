@@ -4,6 +4,8 @@ import (
 	"image"
 )
 
+// Delete deletes from the Frame the text between p0 and p1; p1 points at
+// the first rune beyond the deletion.
 func (f *Frame) Delete(p0, p1 uint64) int {
 	var r image.Rectangle
 
