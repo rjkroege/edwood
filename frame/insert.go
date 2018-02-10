@@ -251,9 +251,9 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				rect.Max.Y += f.Font.Height
 
 				if f.p0 <= cn0 && cn0 < f.p1 { /* b+1 is inside selection */
-					col = f.Cols[colHigh]
+					col = f.Cols[ColHigh]
 				} else {
-					col = f.Cols[colBack]
+					col = f.Cols[ColBack]
 				}
 				f.Background.Draw(rect, col, nil, rect.Min)
 			} else if pt.Y < y {
@@ -264,9 +264,9 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				rect.Max.Y += f.Font.Height
 
 				if f.p0 <= cn0 && cn0 < f.p1 {
-					col = f.Cols[colHigh]
+					col = f.Cols[ColHigh]
 				} else {
-					col = f.Cols[colBack]
+					col = f.Cols[ColBack]
 				}
 				f.Background.Draw(rect, col, nil, rect.Min)
 			}
@@ -282,11 +282,11 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 			}
 			cn0--
 			if f.p0 <= cn0 && cn0 < f.p1 {
-				col = f.Cols[colHigh]
-				tcol = f.Cols[colHText]
+				col = f.Cols[ColHigh]
+				tcol = f.Cols[ColHText]
 			} else {
-				col = f.Cols[colBack]
-				tcol = f.Cols[colText]
+				col = f.Cols[ColBack]
+				tcol = f.Cols[ColText]
 			}
 			f.Background.Draw(rect, col, nil, rect.Min)
 			y = 0
@@ -297,11 +297,11 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	}
 
 	if f.p0 < p0 && p0 <= f.p1 {
-		col = f.Cols[colHigh]
-		tcol = f.Cols[colHText]
+		col = f.Cols[ColHigh]
+		tcol = f.Cols[ColHText]
 	} else {
-		col = f.Cols[colBack]
-		tcol = f.Cols[colText]
+		col = f.Cols[ColBack]
+		tcol = f.Cols[ColText]
 	}
 
 	f.SelectPaint(ppt0, ppt1, col)

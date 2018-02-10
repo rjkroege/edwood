@@ -30,11 +30,11 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 uint64, issel bool) {
 	}
 
 	if issel {
-		back = f.Cols[colHigh]
-		text = f.Cols[colHText]
+		back = f.Cols[ColHigh]
+		text = f.Cols[ColHText]
 	} else {
-		back = f.Cols[colBack]
-		text = f.Cols[colText]
+		back = f.Cols[ColBack]
+		text = f.Cols[ColText]
 	}
 
 	f.drawsel0(pt, p0, p1, back, text)
@@ -114,16 +114,16 @@ func (f *Frame) Redraw() {
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), false)
 		}
-		f.drawsel0(f.Ptofchar(0), 0, uint64(f.nchars), f.Cols[colBack], f.Cols[colText])
+		f.drawsel0(f.Ptofchar(0), 0, uint64(f.nchars), f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), true)
 		}
 	}
 
 	pt = f.Ptofchar(0)
-	pt = f.drawsel0(pt, 0, f.p0, f.Cols[colBack], f.Cols[colText])
-	pt = f.drawsel0(pt, f.p0, f.p1, f.Cols[colHigh], f.Cols[colHText])
-	pt = f.drawsel0(pt, f.p1, uint64(f.nchars), f.Cols[colBack], f.Cols[colText])
+	pt = f.drawsel0(pt, 0, f.p0, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.drawsel0(pt, f.p0, f.p1, f.Cols[ColHigh], f.Cols[ColHText])
+	pt = f.drawsel0(pt, f.p1, uint64(f.nchars), f.Cols[ColBack], f.Cols[ColText])
 
 }
 

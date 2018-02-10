@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	colBack = iota
-	colHigh
-	colBord
-	colText
-	colHText
+	ColBack = iota
+	ColHigh
+	ColBord
+	ColText
+	ColHText
 	NumColours
 
 	frtickw = 3
@@ -78,16 +78,15 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.tick == nil && f.Cols[colBack] != nil {
+	if f.tick == nil && f.Cols[ColBack] != nil {
 		f.InitTick()
 	}
-	return f
 }
 
 // InitTick sets up the tick (e.g. cursor)
 func (f *Frame) InitTick() {
 	var err error
-	if f.Cols[colBack] == nil || f.Display == nil {
+	if f.Cols[ColBack] == nil || f.Display == nil {
 		return
 	}
 
