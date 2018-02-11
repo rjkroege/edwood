@@ -38,6 +38,8 @@ func (mf *Myframe) Resize(resized bool) {
 	// Trial...
 	mf.f.Insert([]rune("hello there"), 0)
 
+	mf.f.Redraw()
+
 	mf.f.Display.Flush()
 }
 

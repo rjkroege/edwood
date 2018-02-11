@@ -45,7 +45,7 @@ func showwindow(d *draw.Display, resized bool, f *MyFrame) {
 }
 */
 
-const margin = 10
+const margin = 20
 
 func main() {
 	log.Println("hello from framedemo\n")
@@ -76,7 +76,7 @@ func main() {
 	// TODO(rjk): Test that the window isn't too small.
 	mf := new(Myframe)
 
-	mf.f.Init(d.Image.R.Inset(margin), myfont, d.Image, textcols)
+	mf.f.Init(d.Image.R.Inset(margin), myfont, d.ScreenImage, textcols)
 
 	// get events.
 	mousectl := d.InitMouse()
