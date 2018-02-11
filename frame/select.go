@@ -5,7 +5,7 @@ import (
 	"image"
 )
 
-func region(a, b uint64) int {
+func region(a, b int) int {
 	if a < b {
 		return -1
 	}
@@ -34,7 +34,7 @@ func (f *Frame) Select(mc draw.Mousectl) {
 	f.DrawSel(pt0, p0, p1, true)
 	reg := 0
 
-	var q uint64
+	var q int
 	for mc.Mouse.Buttons == b {
 		scrled := false
 		if f.Scroll != nil {

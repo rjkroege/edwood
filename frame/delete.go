@@ -6,21 +6,21 @@ import (
 
 // Delete deletes from the Frame the text between p0 and p1; p1 points at
 // the first rune beyond the deletion.
-func (f *Frame) Delete(p0, p1 uint64) int {
+func (f *Frame) Delete(p0, p1 int) int {
 	var r image.Rectangle
 
-	if p0 <= uint64(f.nchars) || p0 == p1 || f.Background == nil {
+	if p0 <= f.nchars || p0 == p1 || f.Background == nil {
 		return 0
 	}
-	if p1 > uint64(f.nchars) {
-		p1 = uint64(f.nchars)
+	if p1 > f.nchars {
+		p1 = f.nchars
 	}
 	n0 := f.findbox(0, 0, p0)
 	if n0 == f.nbox {
 		panic("off end in Frame.Delete")
 	}
 
-	n1 := f.findbox(uint64(n0), p0, p1)
+	n1 := f.findbox(n0, p0, p1)
 	pt0 := f.ptofcharnb(p0, n0)
 	pt1 := f.Ptofchar(p1)
 
@@ -61,12 +61,12 @@ func (f *Frame) Delete(p0, p1 uint64) int {
 		if b.Nrune > 0 {
 			w0 := b.Wid
 			if n != b.Nrune {
-				f.splitbox(uint64(n1), uint64(n))
+				f.splitbox(n1, n)
 				b = f.box[n1]
 			}
 			r.Max.X += int(b.Wid)
 			f.Background.Draw(r, f.Background, nil, pt1)
-			cn1 += uint64(b.Nrune)
+			cn1 += b.Nrune
 
 			r.Min.X = r.Max.X
 			r.Max.X += int(w0 - b.Wid)
@@ -148,7 +148,7 @@ func (f *Frame) Delete(p0, p1 uint64) int {
 	if f.p0 == f.p1 {
 		f.Tick(f.Ptofchar(f.p0), true)
 	}
-	pt0 = f.Ptofchar(uint64(f.nchars))
+	pt0 = f.Ptofchar(f.nchars)
 	n := f.nlines
 	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.Height
 	if pt0.X > f.Rect.Min.X {

@@ -1,9 +1,11 @@
 package frame
 
 import (
-	"9fans.net/go/draw"
 	"image"
+	"log"
 	"unicode/utf8"
+
+	"9fans.net/go/draw"
 )
 
 var (
@@ -13,7 +15,6 @@ var (
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
-
 	var c rune
 	frame.Rect = f.Rect
 	frame.Background = f.Background
@@ -26,15 +27,25 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	delta := DELTA
 	nl := 0
 
+	// TODO(rjk): There are no boxes allocated?
+	log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
+
 	offs := 0
 	for nb := 0; offs < len(r) && nl <= f.maxlines; nb++ {
-		if nb == frame.nalloc {
-			frame.growbox(uint64(delta))
+		if nb >= len(frame.box) {
+			// We have no boxes on start. So add on demand.
+			// TODO(rjk): consider removing delta, DELTA, nalloc if possible
+			// This is not idiomatic.
+			frame.growbox(delta)
 			if delta < 10000 {
 				delta *= 2
 			}
 		}
 		b := frame.box[nb]
+		if b == nil {
+			b = new(frbox)
+			 frame.box[nb] = b
+		}
 		c = r[offs]
 		if c == '\t' || c == '\n' {
 			b.Bc = c
@@ -59,19 +70,22 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 				if c == '\t' || c == '\n' {
 					break
 				}
-				nr, rw := utf8.DecodeRune(tmp[s:])
-				r[offs] = nr
+				log.Println("slice s", s, "len", len(tmp))
+				rw := utf8.EncodeRune(tmp[s:], c)
 				if s+rw >= TMPSIZE {
 					break
 				}
 				w += frame.Font.RunesWidth(r[offs : offs+1])
 				offs++
-				s += w
+				s += rw
 				nr++
 			}
 			tmp[s] = 0
 			s++
 			p := make([]byte, s)
+			
+			log.Println(nb, len(frame.box), frame.box[0])
+
 			b = frame.box[nb]
 			b.Ptr = p
 			copy(b.Ptr, tmp[:s])
@@ -82,10 +96,10 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		frame.nbox++
 	}
 	f.cklinewrap0(ppt, frame.box[0])
-	return f._draw(*ppt)
+	return frame._draw(*ppt)
 }
 
-func (f *Frame) chop(pt image.Point, p uint64, bn int) {
+func (f *Frame) chop(pt image.Point, p,  bn int) {
 	for b := f.box[bn]; ; bn++ {
 		if bn >= f.nbox {
 			panic("endofframe")
@@ -94,7 +108,7 @@ func (f *Frame) chop(pt image.Point, p uint64, bn int) {
 		if pt.Y >= f.Rect.Max.Y {
 			break
 		}
-		p += uint64(nrune(b))
+		p += nrune(b)
 		f.advance(&pt, b)
 	}
 	f.nchars = int(p)
@@ -115,13 +129,18 @@ var nalloc = 0
 // and newlines are handled by the library, but all other characters,
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
-func (f *Frame) Insert(r []rune, p0 uint64) {
-	if p0 > uint64(f.nchars) || len(r) == 0 || f.Background == nil {
+func (f *Frame) Insert(r []rune, p0 int) {
+	log.Println("frame.Insert")
+
+	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
 	}
 
+	log.Println("frame.Insert, doing some work")
+
 	var rect image.Rectangle
 	var col, tcol *draw.Image
+	var b *frbox
 
 	pts := make([]points, 0)
 
@@ -133,7 +152,9 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	opt0 := pt0
 	pt1 := f.bxscan(r, &ppt0)
 	ppt1 := pt1
-	b := f.box[n0]
+
+	// I expect n0 to be 0. But... the array is empty.
+	log.Println("len of box", len(f.box), "n0", n0)
 
 	if n0 < f.nbox {
 		f.cklinewrap(&pt0, b)
@@ -168,7 +189,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				panic("frame.canfit == 0")
 			}
 			if n != b.Nrune {
-				f.splitbox(uint64(n0), uint64(n))
+				f.splitbox(n0, n)
 				b = f.box[n0]
 			}
 		}
@@ -184,7 +205,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 		}
 		f.advance(&pt0, b)
 		pt1.X += f.newwid(pt1, b)
-		cn0 += uint64(nrune(b))
+		cn0 += nrune(b)
 		n0++
 	}
 
@@ -232,6 +253,8 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	if pt1.Y == f.Rect.Max.Y {
 		y = pt1.Y
 	}
+	npts--
+	log.Println("npts", npts, "y", y)
 	for n0 = n0 - 1; npts >= 0; n0-- {
 		b := f.box[n0]
 		pt := pts[npts].pt1
@@ -271,7 +294,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				f.Background.Draw(rect, col, nil, rect.Min)
 			}
 			y = pt.Y
-			cn0 -= uint64(b.Nrune)
+			cn0 -= b.Nrune
 		} else {
 			rect.Min = pt
 			rect.Max = pt
@@ -294,6 +317,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 				y = pt.Y
 			}
 		}
+		npts--
 	}
 
 	if f.p0 < p0 && p0 <= f.p1 {
@@ -306,7 +330,7 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 
 	f.SelectPaint(ppt0, ppt1, col)
 	f.DrawText(ppt0, tcol, col)
-	f.addbox(uint64(nn0), uint64(frame.nbox))
+	f.addbox(nn0, frame.nbox)
 
 	for n := 0; n < frame.nbox; n++ {
 		f.box[nn0+n] = frame.box[n]
@@ -324,18 +348,21 @@ func (f *Frame) Insert(r []rune, p0 uint64) {
 	f.clean(ppt0, nn0, n0)
 	f.nchars += frame.nchars
 	if f.p0 >= p0 {
-		f.p0 += uint64(frame.nchars)
+		f.p0 += frame.nchars
 	}
-	if f.p0 >= uint64(f.nchars) {
-		f.p0 = uint64(f.nchars)
+	if f.p0 >= f.nchars {
+		f.p0 = f.nchars
 	}
 	if f.p1 >= p0 {
-		f.p1 += uint64(frame.nchars)
+		f.p1 += frame.nchars
 	}
-	if f.p1 >= uint64(f.nchars) {
-		f.p1 += uint64(f.nchars)
+	if f.p1 >= f.nchars {
+		f.p1 += f.nchars
 	}
 	if f.p0 == f.p1 {
 		f.Tick(f.Ptofchar(f.p0), true)
 	}
+
+	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
+
 }

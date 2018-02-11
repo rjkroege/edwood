@@ -1,11 +1,15 @@
 package frame
 
 import (
-	"9fans.net/go/draw"
 	"image"
+	"log"
+
+	"9fans.net/go/draw"
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
+
+	log.Println("DrawText")
 
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
@@ -17,7 +21,8 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 	}
 }
 
-func (f *Frame) DrawSel(pt image.Point, p0, p1 uint64, issel bool) {
+func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
+	log.Println("DrawSel")
 	var back, text *draw.Image
 
 	if f.ticked {
@@ -40,7 +45,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 uint64, issel bool) {
 	f.drawsel0(pt, p0, p1, back, text)
 }
 
-func (f *Frame) drawsel0(pt image.Point, p0, p1 uint64, back *draw.Image, text *draw.Image) image.Point {
+func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
+	log.Println("drawsel0")
 	p := 0
 	bi := 0
 	b := f.box[bi]
@@ -49,15 +55,15 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 uint64, back *draw.Image, text *
 	x := 0
 	var w int
 
-	for nb := 0; nb < f.nbox && p < int(p1); nb++ {
+	for nb := 0; nb < f.nbox && p < p1; nb++ {
 		nr := b.Nrune
 		if nr < 0 {
 			nr = 1
 		}
-		if p+nr <= int(p0) {
+		if p+nr <= p0 {
 			goto Continue
 		}
-		if p >= int(p0) {
+		if p >= p0 {
 			qt := pt
 			f.cklinewrap(&pt, b)
 			if pt.Y > qt.Y {
@@ -65,13 +71,13 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 uint64, back *draw.Image, text *
 			}
 		}
 		i = 0
-		if p < int(p0) {
+		if p < p0 {
 			i += len(b.Ptr[:int(p0)-p])
 			nr -= int(p0) - p
 			p = int(p0)
 		}
 		trim = false
-		if p+nr > int(p1) {
+		if p+nr > p1 {
 			nr -= (p + nr) - int(p1)
 			trim = true
 		}
@@ -106,6 +112,7 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 uint64, back *draw.Image, text *
 }
 
 func (f *Frame) Redraw() {
+	log.Println("Redraw")
 	ticked := false
 	var pt image.Point
 
@@ -114,7 +121,7 @@ func (f *Frame) Redraw() {
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), false)
 		}
-		f.drawsel0(f.Ptofchar(0), 0, uint64(f.nchars), f.Cols[ColBack], f.Cols[ColText])
+		f.drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), true)
 		}
@@ -123,11 +130,12 @@ func (f *Frame) Redraw() {
 	pt = f.Ptofchar(0)
 	pt = f.drawsel0(pt, 0, f.p0, f.Cols[ColBack], f.Cols[ColText])
 	pt = f.drawsel0(pt, f.p0, f.p1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.drawsel0(pt, f.p1, uint64(f.nchars), f.Cols[ColBack], f.Cols[ColText])
+	pt = f.drawsel0(pt, f.p1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 
 }
 
 func (f *Frame) _tick(pt image.Point, ticked bool) {
+	log.Println("_tick")
 	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
 		return
 	}
@@ -148,6 +156,7 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) Tick(pt image.Point, ticked bool) {
+	log.Println("Tick")
 	if f.tickscale != f.Display.ScaleSize(1) {
 		if f.ticked {
 			f._tick(pt, false)
@@ -158,6 +167,7 @@ func (f *Frame) Tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) _draw(pt image.Point) image.Point {
+	log.Println("_draw")
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap0(&pt, b)
@@ -173,7 +183,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 				break
 			}
 			if n != b.Nrune {
-				f.splitbox(uint64(nb), uint64(n))
+				f.splitbox(nb, n)
 				b = f.box[nb]
 			}
 			pt.X += b.Wid
@@ -190,6 +200,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 }
 
 func (f *Frame) strlen(nb int) int {
+	log.Println("strlen")
 	var n int
 	for n = 0; nb < f.nbox; nb++ {
 		n += nrune(f.box[nb])

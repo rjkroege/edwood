@@ -33,7 +33,7 @@ type Frame struct {
 	Entire       image.Rectangle         // size of full frame
 	Scroll       func(*Frame, int)       // function provided by application
 	box          []*frbox
-	p0, p1       uint64 // bounds of a selection
+	p0, p1       int // bounds of a selection
 	nbox, nalloc int
 	maxtab       int // max size of a tab (in pixels)
 	nchars       int // number of runes in frame
