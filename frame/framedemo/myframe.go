@@ -45,10 +45,7 @@ func (mf *Myframe) Resize(resized bool) {
 
 
 	mf.f.Insert([]rune("motext "), 1)
-	mf.f.Redraw()
 	mf.f.Display.Flush()
-	
-
 }
 
 // Insert adds a single rune to the frame at the cursor.

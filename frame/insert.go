@@ -331,7 +331,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	}
 
 	f.SelectPaint(ppt0, ppt1, col)
-	f.DrawText(ppt0, tcol, col)
+	frame.DrawText(ppt0, tcol, col)
 
 	// Actually add boxes.
 	f.addbox(nn0, frame.nbox)

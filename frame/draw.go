@@ -8,14 +8,14 @@ import (
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
-
-	log.Println("DrawText")
-
+	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap(&pt, b)
+		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
+
 		if !f.noredraw && b.Nrune >= 0 {
-			f.Background.String(pt, text, image.ZP, f.Font, string(b.Ptr))
+			f.Background.Bytes(pt, text, image.ZP, f.Font, b.Ptr[0:b.Nrune])
 		}
 		pt.X += b.Wid
 	}
