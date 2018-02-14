@@ -2,6 +2,7 @@ package frame
 
 import (
 	"image"
+	"log"
 	"unicode/utf8"
 )
 
@@ -125,4 +126,14 @@ func nrune(f *frbox) int {
 
 func Rpt(min, max image.Point) image.Rectangle {
 	return image.Rectangle{Min: min, Max: max}
+}
+
+// Logboxes shows the box model to the log for debugging convenience.
+func (f *Frame) Logboxes(message string) {
+	log.Println(message)
+	for i, b := range f.box {
+		if b != nil {
+			log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
+		}
+	}
 }

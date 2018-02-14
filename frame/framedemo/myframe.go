@@ -44,10 +44,7 @@ func (mf *Myframe) Resize(resized bool) {
 	mf.f.Display.Flush()
 
 
-	mf.f.Insert([]rune(" motext "), 1)
-
-	// I would expect "h motext ello there"
-
+	mf.f.Insert([]rune("motext "), 1)
 	mf.f.Redraw()
 	mf.f.Display.Flush()
 	

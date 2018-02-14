@@ -156,15 +156,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	// I expect n0 to be 0. But... the array is empty.
 	log.Println("len of box", len(f.box), "n0", n0)
-
-	for i, b := range f.box {
-		if b == nil {
-			log.Printf("box[%d] -> nil\n", i)
-		} else {
-			log.Printf("box[%d] -> %#v\n", i, string(b.Ptr))
-		}
-	}
-	
+	f.Logboxes("at start of insert")
 
 	if n0 < f.nbox {
 		f.cklinewrap(&pt0, f.box[n0])
@@ -347,15 +339,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.box[nn0+n] = frame.box[n]
 	}
 
-	log.Println("after adding")
-	for i, b := range f.box {
-		if b == nil {
-			log.Printf("box[%d] -> nil\n", i)
-		} else {
-			log.Printf("box[%d] -> %#v\n", i, string(b.Ptr))
-		}
-	}
-
+	f.Logboxes("after adding")
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--
@@ -367,6 +351,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0)
+	f.Logboxes("after clean")
 	f.nchars += frame.nchars
 	if f.p0 >= p0 {
 		f.p0 += frame.nchars
