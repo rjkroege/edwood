@@ -7,9 +7,11 @@ import (
 
 const slop  = 25
 
+// Brief commentary: the allocation conventions of the box datastructure are inconsistent and weird.
+
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
-	log.Println("addbox")
+	log.Println("addbox", bn, n)
 	if bn > f.nbox {
 		panic("Frame.addbox")
 	}
@@ -18,8 +20,6 @@ func (f *Frame) addbox(bn, n int) {
 		f.growbox(n + slop)
 	}
 
-	log.Println("bn", bn)
-
 	for i := f.nbox - 1; i >= bn; i-- {
 		log.Println("addbox: f.nbox", f.nbox, "i", i, "n", n, "i+n", i+n)
 		if f.box[i+n] == nil {
@@ -27,7 +27,6 @@ func (f *Frame) addbox(bn, n int) {
 		}
 		*f.box[i+n] = *f.box[i]
 	}
-
 	f.nbox += int(n)
 }
 
@@ -71,17 +70,28 @@ func (f *Frame) growbox(delta int) {
 	f.box = append(f.box, make([]*frbox, delta)...)
 }
 
+
 func (f *Frame) dupbox(bn int) {
-	log.Println("dupbox")
+	log.Println("dupbox", bn)
+
 	if f.box[bn].Nrune < 0 {
-		panic("dupbox")
+		panic("dupbox invalid Nrune")
 	}
+
+	cp := new(frbox)
+	*cp = *f.box[bn]
+
 	f.addbox(bn, 1)
-	if f.box[bn].Nrune >= 0 {
-		p := make([]byte, nbyte(f.box[bn])+1)
-		copy(p, f.box[bn].Ptr)
-		f.box[bn+1].Ptr = p
-	}
+
+	f.box[bn+1] = cp
+
+	log.Printf("dupbox bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
+
+//	if f.box[bn].Nrune >= 0 {
+//		p := make([]byte, nbyte(f.box[bn])+1)
+//		copy(p, f.box[bn].Ptr)
+//		f.box[bn+1].Ptr = p
+//	}
 }
 
 func runeindex(p []byte, n int) int {
@@ -97,30 +107,49 @@ func runeindex(p []byte, n int) int {
 	return offs
 }
 
-func (f *Frame) truncatebox(b *frbox, n int) {
+// fontmetrics lets tests mock the calls into draw for measuring the
+// width of UTF8 slices.
+type fontmetrics interface {
+	BytesWidth([]byte) int
+}
+
+// truncatebox drops the  last n characters without allocation.
+func (b *frbox) truncatebox(n int, m fontmetrics) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
 	}
 	b.Nrune -= n
-	b.Ptr[runeindex(b.Ptr, len(b.Ptr))] = 0
-	b.Wid = f.Font.StringWidth(string(b.Ptr))
+	b.Ptr = b.Ptr[0:runeindex(b.Ptr, b.Nrune)]
+	b.Wid = m.BytesWidth(b.Ptr)
 }
 
-func (f *Frame) chopbox(b *frbox, n int) {
+// truncatebox drops the  last n characters without allocation.
+func (f *Frame) truncatebox(b *frbox, n int) {
+	b.truncatebox(n, f.Font)
+}
+
+// chopbox removes the first n chars without allocation.
+func (b *frbox) chopbox(n int, m fontmetrics) {
 	if b.Nrune < 0 || b.Nrune < n {
 		panic("chopbox")
 	}
 	i := runeindex(b.Ptr, n)
-	copy(b.Ptr, b.Ptr[i:])
-	b.Nrune -= int(n)
-	b.Wid = f.Font.StringWidth(string(b.Ptr))
+	b.Ptr = b.Ptr[i:]
+	b.Nrune -= n
+	b.Wid = m.BytesWidth(b.Ptr)
+}
+
+// chopbox removes the first n chars without allocation.
+func (f *Frame) chopbox(b *frbox, n int) {
+	b.chopbox(n, f.Font)
 }
 
 func (f *Frame) splitbox(bn, n int) {
-	log.Println("splitbox")
+	log.Println("splitbox", bn, n)
 	f.dupbox(bn)
 	f.truncatebox(f.box[bn], f.box[bn].Nrune - n)
 	f.chopbox(f.box[bn+1], n)
+	log.Printf("splitbox end bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
 }
 
 func (f *Frame) mergebox(bn int) {
@@ -134,15 +163,16 @@ func (f *Frame) mergebox(bn int) {
 
 // findbox finds the box containing q and puts q on a box boundary.
 func (f *Frame) findbox(bn, p, q int) int {
-	log.Println("findbox", bn, p, q, )
+	log.Println("findbox", bn, p, q)
 
 	for i := 0; bn < f.nbox && p+nrune(f.box[i]) <= q; i++ {
 		p += nrune(f.box[i])
 		bn++
 	}
+
 	if p != q {
 		f.splitbox(bn, q-p)
 		bn++
 	}
-	return int(bn)
+	return bn
 }

@@ -16,12 +16,14 @@ var (
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	var c rune
+	
 	frame.Rect = f.Rect
 	frame.Background = f.Background
 	frame.Font = f.Font
 	frame.maxtab = f.maxtab
 	frame.nbox = 0
 	frame.nchars = 0
+	frame.box = []*frbox{}
 
 	copy(frame.Cols[:], f.Cols[:])
 	delta := DELTA
@@ -130,7 +132,7 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
-	log.Println("frame.Insert")
+	log.Printf("\n\n-----\nframe.Insert")
 
 	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
@@ -140,7 +142,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	var rect image.Rectangle
 	var col, tcol *draw.Image
-	var b *frbox
 
 	pts := make([]points, 0)
 
@@ -156,9 +157,18 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	// I expect n0 to be 0. But... the array is empty.
 	log.Println("len of box", len(f.box), "n0", n0)
 
+	for i, b := range f.box {
+		if b == nil {
+			log.Printf("box[%d] -> nil\n", i)
+		} else {
+			log.Printf("box[%d] -> %#v\n", i, string(b.Ptr))
+		}
+	}
+	
+
 	if n0 < f.nbox {
-		f.cklinewrap(&pt0, b)
-		f.cklinewrap0(&ppt1, b)
+		f.cklinewrap(&pt0, f.box[n0])
+		f.cklinewrap0(&ppt1, f.box[n0])
 	}
 	f.modified = true
 	/*
@@ -330,11 +340,22 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	f.SelectPaint(ppt0, ppt1, col)
 	f.DrawText(ppt0, tcol, col)
-	f.addbox(nn0, frame.nbox)
 
+	// Actually add boxes.
+	f.addbox(nn0, frame.nbox)
 	for n := 0; n < frame.nbox; n++ {
 		f.box[nn0+n] = frame.box[n]
 	}
+
+	log.Println("after adding")
+	for i, b := range f.box {
+		if b == nil {
+			log.Printf("box[%d] -> nil\n", i)
+		} else {
+			log.Printf("box[%d] -> %#v\n", i, string(b.Ptr))
+		}
+	}
+
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--

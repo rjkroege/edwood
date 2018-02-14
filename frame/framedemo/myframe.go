@@ -21,6 +21,9 @@ type Myframe struct {
 	offset int // the offset of the frame w.r.t. buffer. 
 }
 
+const motext = ` 2018/02/11 16:35:03 first box frame.frbox{Wid:112, Nrune:11, Ptr:[]uint8{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x0}, Bc:0, Minwid:0x0}, hello there`
+
+
 // must insert the size
 func (mf *Myframe) Resize(resized bool) {
 	log.Println("Myframe.Resize")
@@ -35,12 +38,20 @@ func (mf *Myframe) Resize(resized bool) {
 		nil, 
 		image.ZP)
 
-	// Trial...
+	// I could imagine doing this again? More draw ops?
 	mf.f.Insert([]rune("hello there"), 0)
+	mf.f.Redraw()
+	mf.f.Display.Flush()
+
+
+	mf.f.Insert([]rune(" motext "), 1)
+
+	// I would expect "h motext ello there"
 
 	mf.f.Redraw()
-
 	mf.f.Display.Flush()
+	
+
 }
 
 // Insert adds a single rune to the frame at the cursor.
