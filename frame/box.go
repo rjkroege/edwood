@@ -34,6 +34,7 @@ func (f *Frame) closebox(n0, n1 int) {
 	if n0 >= f.nbox || n1 >= f.nbox || n1 < n0 {
 		panic("Frame.closebox")
 	}
+	// TODO(rjk): Use copy.
 	n1++
 	for i := n1; i < f.nbox; i++ {
 		f.box[i-(n1-n0)] = f.box[i]
@@ -57,10 +58,8 @@ func (f *Frame) freebox(n0, n1 int) {
 		panic("Frame.freebox")
 	}
 	n1++
-	for i := n0; i < n1; i++ {
-		if f.box[i].Nrune >= 0 {
-			f.box[i].Ptr = nil
-		}
+	for i := n0;  i < n1; i++ {
+		f.box[i] = nil
 	}
 }
 
@@ -152,12 +151,24 @@ func (f *Frame) splitbox(bn, n int) {
 	log.Printf("splitbox end bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
 }
 
+// mergebox combines merge bn and bn+1
 func (f *Frame) mergebox(bn int) {
-	f.Insure(bn, nbyte(f.box[bn])+nbyte(f.box[bn+1])+1)
-	i := runeindex(f.box[bn].Ptr, f.box[bn].Nrune)
-	copy(f.box[bn].Ptr[i:], f.box[bn+1].Ptr)
+//	f.Insure(bn, nbyte(f.box[bn])+nbyte(f.box[bn+1])+1)
+//	i := runeindex(f.box[bn].Ptr, f.box[bn].Nrune)
+//	copy(f.box[bn].Ptr[i:], f.box[bn+1].Ptr)
+//	f.box[bn].Wid += f.box[bn+1].Wid
+//	f.box[bn].Nrune += f.box[bn+1].Nrune
+
+	b1n := f.box[bn].Nrune
+	b2n := f.box[bn+1].Nrune
+
+	b := make([]byte, 0, b1n + b2n)
+	b = append(b, f.box[bn].Ptr[0:b1n]...)
+	b = append(b, f.box[bn+1].Ptr[0:b2n]...)
+	f.box[bn].Ptr = b
+	f.box[bn].Nrune += b2n
 	f.box[bn].Wid += f.box[bn+1].Wid
-	f.box[bn].Nrune += f.box[bn+1].Nrune
+
 	f.delbox(bn+1, bn+1)
 }
 
