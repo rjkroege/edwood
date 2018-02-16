@@ -36,10 +36,14 @@ func (f *Frame) closebox(n0, n1 int) {
 	}
 	// TODO(rjk): Use copy.
 	n1++
+	
 	for i := n1; i < f.nbox; i++ {
 		f.box[i-(n1-n0)] = f.box[i]
 	}
 	f.nbox -= n1 - n0
+	for i := f.nbox; i < f.nbox + (n1 - n0); i++ {
+		f.box[i] = nil
+	}
 }
 
 func (f *Frame) delbox(n0, n1 int) {
@@ -58,6 +62,7 @@ func (f *Frame) freebox(n0, n1 int) {
 		panic("Frame.freebox")
 	}
 	n1++
+	log.Println("freebox", n0, n1)
 	for i := n0;  i < n1; i++ {
 		f.box[i] = nil
 	}
@@ -76,21 +81,19 @@ func (f *Frame) dupbox(bn int) {
 	if f.box[bn].Nrune < 0 {
 		panic("dupbox invalid Nrune")
 	}
-
+	
 	cp := new(frbox)
 	*cp = *f.box[bn]
 
 	f.addbox(bn, 1)
-
 	f.box[bn+1] = cp
 
-	log.Printf("dupbox bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
-
-//	if f.box[bn].Nrune >= 0 {
-//		p := make([]byte, nbyte(f.box[bn])+1)
-//		copy(p, f.box[bn].Ptr)
-//		f.box[bn+1].Ptr = p
-//	}
+	if f.box[bn].Nrune >= 0 {
+		log.Printf("dupbox bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
+		p := make([]byte, len(f.box[bn].Ptr))
+		copy(p, f.box[bn].Ptr)
+		f.box[bn+1].Ptr = p
+	}
 }
 
 func runeindex(p []byte, n int) int {
@@ -159,14 +162,14 @@ func (f *Frame) mergebox(bn int) {
 //	f.box[bn].Wid += f.box[bn+1].Wid
 //	f.box[bn].Nrune += f.box[bn+1].Nrune
 
-	b1n := f.box[bn].Nrune
-	b2n := f.box[bn+1].Nrune
+	b1n := len(f.box[bn].Ptr)
+	b2n := len(f.box[bn+1].Ptr)
 
 	b := make([]byte, 0, b1n + b2n)
 	b = append(b, f.box[bn].Ptr[0:b1n]...)
 	b = append(b, f.box[bn+1].Ptr[0:b2n]...)
 	f.box[bn].Ptr = b
-	f.box[bn].Nrune += b2n
+	f.box[bn].Nrune += f.box[bn+1].Nrune
 	f.box[bn].Wid += f.box[bn+1].Wid
 
 	f.delbox(bn+1, bn+1)

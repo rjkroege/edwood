@@ -15,7 +15,7 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.Background.Bytes(pt, text, image.ZP, f.Font, b.Ptr[0:b.Nrune])
+			f.Background.Bytes(pt, text, image.ZP, f.Font, b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -66,24 +66,35 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		if p >= p0 {
 			qt := pt
 			f.cklinewrap(&pt, b)
+			// fill in the end of a wrapped line
 			if pt.Y > qt.Y {
 				f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 			}
 		}
 		i = 0
 		if p < p0 {
+			// beginning of region: advance into box
 			i += len(b.Ptr[:int(p0)-p])
 			nr -= int(p0) - p
 			p = int(p0)
 		}
 		trim = false
 		if p+nr > p1 {
+			// end of region: trim box
 			nr -= (p + nr) - int(p1)
 			trim = true
 		}
+
 		if b.Nrune < 0 || nr == b.Nrune {
 			w = b.Wid
 		} else {
+			// Corresponds to the native code but does the wrong thing if frbox.Nrune is
+			// is actually the number of runes (as opposed to the number of bytes)
+			// In that case, this code and the code below would fail on UTF code points
+			// that are more than one byte each.
+			//
+			// Given that the native code in frdraw.c also has this issue, I'll revisit this
+			// problem later.
 			w = f.Font.StringWidth(string(b.Ptr[i : i+nr]))
 		}
 		x = pt.X + w
@@ -92,6 +103,7 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		}
 		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.Height), back, nil, pt)
 		if b.Nrune >= 0 {
+			// See comment above. Same issue applies.
 			f.Background.String(pt, text, image.ZP, f.Font, string(b.Ptr[i:i+nr]))
 		}
 		pt.X += w

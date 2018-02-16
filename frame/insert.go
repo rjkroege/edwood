@@ -82,8 +82,9 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 				s += rw
 				nr++
 			}
-			tmp[s] = 0
-			s++
+// not idiomatic.
+//			tmp[s] = 0
+//			s++
 			p := make([]byte, s)
 			
 			log.Println(nb, len(frame.box), frame.box[0])
@@ -143,7 +144,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	var rect image.Rectangle
 	var col, tcol *draw.Image
 
-	pts := make([]points, 0)
+	pts := make([]points, 0, 5)
 
 	n0 := f.findbox(0, 0, p0)
 	cn0 := p0
@@ -195,13 +196,13 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				b = f.box[n0]
 			}
 		}
-		if npts == nalloc {
-			pts = append(pts, make([]points, npts+DELTA)...)
-			nalloc += DELTA
-			b = f.box[n0]
-		}
-		pts[npts].pt0 = pt0
-		pts[npts].pt1 = pt1
+//		if npts == nalloc {
+//			pts = append(pts, make([]points, npts+DELTA)...)
+//			nalloc += DELTA
+//			b = f.box[n0]
+//		}
+
+		pts = append(pts, points{pt0, pt1})
 		if pt1.Y == f.Rect.Max.Y {
 			break
 		}

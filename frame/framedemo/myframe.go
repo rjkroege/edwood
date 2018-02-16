@@ -40,12 +40,22 @@ func (mf *Myframe) Resize(resized bool) {
 
 	// I could imagine doing this again? More draw ops?
 	mf.f.Insert([]rune("hello there"), 0)
-	mf.f.Redraw()
 	mf.f.Display.Flush()
-
 
 	mf.f.Insert([]rune("motext "), 1)
 	mf.f.Display.Flush()
+
+	mf.f.Insert([]rune("≤日本b≥"), 3)
+
+	// TODO(rjk): Redraw does the wrong thing. Fix that
+	// Redraw is not part of frame(3) interface (e.g. no frredraw)
+	// mf.f.Redraw()
+	mf.f.Display.Flush()
+
+//	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
+//	mf.f.Redraw()
+//	mf.f.Display.Flush()
+
 }
 
 // Insert adds a single rune to the frame at the cursor.
