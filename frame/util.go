@@ -87,7 +87,7 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 // TODO(rjk): broken. does not fix up the world correctly.
 // hypothesis: mergebox is broken
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
-	log.Println("clean")
+	log.Println("clean", n0, n1, f.Rect.Max.X)
 	c := f.Rect.Max.X
 	nb := 0
 	for nb = n0; nb < n1-1; nb++ {
@@ -119,16 +119,16 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	}
 }
 
-func nbyte(f *frbox) uint {
-	if f.Nrune < 0 {
-		return 1 // treat as single break character
-	} else {
-		return uint(f.Nrune)
-	}
+func nbyte(f *frbox) int {
+	return len(f.Ptr)
 }
 
 func nrune(f *frbox) int {
-	return len(f.Ptr)
+	if f.Nrune < 0 {
+		return 1
+	} else {
+		return f.Nrune
+	}
 }
 
 func Rpt(min, max image.Point) image.Rectangle {

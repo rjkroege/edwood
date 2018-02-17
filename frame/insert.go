@@ -15,6 +15,8 @@ var (
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
+	log.Println("bxscan starting")
+
 	var c rune
 	
 	frame.Rect = f.Rect
@@ -30,7 +32,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	nl := 0
 
 	// TODO(rjk): There are no boxes allocated?
-	log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
+	// log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
 
 	offs := 0
 	for nb := 0; offs < len(r) && nl <= f.maxlines; nb++ {
@@ -72,7 +74,6 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 				if c == '\t' || c == '\n' {
 					break
 				}
-				log.Println("slice s", s, "len", len(tmp))
 				rw := utf8.EncodeRune(tmp[s:], c)
 				if s+rw >= TMPSIZE {
 					break
@@ -134,6 +135,7 @@ var nalloc = 0
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
 	log.Printf("\n\n-----\nframe.Insert")
+	f.Logboxes("at very start of insert")
 
 	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
@@ -147,6 +149,9 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	pts := make([]points, 0, 5)
 
 	n0 := f.findbox(0, 0, p0)
+
+	f.Logboxes("at end of findbox")
+
 	cn0 := p0
 	nn0 := n0
 	pt0 := f.ptofcharnb(p0, n0)
@@ -157,7 +162,9 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	// I expect n0 to be 0. But... the array is empty.
 	log.Println("len of box", len(f.box), "n0", n0)
-	f.Logboxes("at start of insert")
+	f.Logboxes("f after bxscan")
+	log.Println("----")
+	frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
 		f.cklinewrap(&pt0, f.box[n0])

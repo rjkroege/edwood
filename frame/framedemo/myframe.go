@@ -47,14 +47,13 @@ func (mf *Myframe) Resize(resized bool) {
 
 	mf.f.Insert([]rune("≤日本b≥"), 3)
 
-	// TODO(rjk): Redraw does the wrong thing. Fix that
+	// TODO(rjk): Redraw does the wrong thing. Fix that if necessary.
 	// Redraw is not part of frame(3) interface (e.g. no frredraw)
 	// mf.f.Redraw()
 	mf.f.Display.Flush()
 
-//	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
-//	mf.f.Redraw()
-//	mf.f.Display.Flush()
+	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
+	mf.f.Display.Flush()
 
 }
 
