@@ -10,41 +10,6 @@ import (
 	"github.com/ProjectSerenity/acme/frame"
 )
 
-/*
-
-// redraw is the view implementation
-func showwindow(d *draw.Display, resized bool, f *MyFrame) {
-	if resized {
-		if err := d.Attach(draw.Refmesg); err != nil {
-			log.Fatalf("can't reattach to window: %v", err)
-		}
-
-
-		f.resize()
-
-
-	}
-
-
-	// I don't think this is necessary...
-
-	// draw coloured rects at mouse positions
-	// first param is the clip rectangle. which can be 0. meaning no clip?
-	var clipr image.Rectangle
-	fmt.Printf("empty clip? %v\n", clipr)
-	d.ScreenImage.Draw(clipr, d.White, nil, image.ZP)
-
-	// how do I know how big the display is?
-	//
-
-
-
-	// draw some text
-	d.ScreenImage.String(image.Pt(100,100), d.Black, image.ZP, myfont, "hello world")
-	d.Flush()
-}
-*/
-
 const margin = 20
 
 func main() {
@@ -82,13 +47,21 @@ func main() {
 	mousectl := d.InitMouse()
 	keyboardctl := d.InitKeyboard()
 
-// So, why don't I haz anything on screen?
-
 	mf.Resize(false)
 	for {
 		select {
 		case r := <-keyboardctl.C:
 			log.Println("got rune", r)
+			switch r {
+			case 6:
+				mf.Right()
+			case 2:
+				mf.Left()
+			case 8:
+				// delete.
+				// TODO(rjk): Invoke deletion here.
+			}
+			d.Flush()
 		case <-mousectl.Resize:
 			mf.Resize(true)
 		case m := <-mousectl.C:

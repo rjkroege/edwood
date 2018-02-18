@@ -23,6 +23,8 @@ type Myframe struct {
 
 const motext = ` 2018/02/11 16:35:03 first box frame.frbox{Wid:112, Nrune:11, Ptr:[]uint8{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x0}, Bc:0, Minwid:0x0}, hello there`
 
+// TODO(rjk): Add a function to create Myframe instances.
+
 
 // must insert the size
 func (mf *Myframe) Resize(resized bool) {
@@ -40,12 +42,15 @@ func (mf *Myframe) Resize(resized bool) {
 
 	// I could imagine doing this again? More draw ops?
 	mf.f.Insert([]rune("hello there"), 0)
+	mf.InsertString("hello there", 0)
 	mf.f.Display.Flush()
 
 	mf.f.Insert([]rune("motext "), 1)
+	mf.InsertString("motext ", 1)
 	mf.f.Display.Flush()
 
 	mf.f.Insert([]rune("≤日本b≥"), 3)
+	mf.InsertString("≤日本b≥", 3)
 
 	// TODO(rjk): Redraw does the wrong thing. Fix that if necessary.
 	// Redraw is not part of frame(3) interface (e.g. no frredraw)
@@ -53,37 +58,77 @@ func (mf *Myframe) Resize(resized bool) {
 	mf.f.Display.Flush()
 
 	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
+	mf.InsertString("Bytes draws the byte slice in the specified\nfont using SoverD on the image,", 8)
+
+	// Set the tick
+	mf.f.Tick(mf.f.Ptofchar(0), true)
+
 	mf.f.Display.Flush()
 
+	log.Println("starting buffer", string(mf.buffer))
+
+}
+
+// InsertString is a helper method to pre-populate the model with text.
+func (mf *Myframe) InsertString(s string, c int) {
+	oc := mf.cursor
+	mf.cursor = c
+	for _, r := range s {
+		mf.Insert(r)
+	}
+	mf.cursor = oc
 }
 
 // Insert adds a single rune to the frame at the cursor.
 func (my *Myframe) Insert(r rune) {
-		log.Println("Insert i no know how to dealz")
+	my.buffer = append(my.buffer, ' ')
+	copy(my.buffer[my.cursor+1:], my.buffer[my.cursor:])
+	my.buffer[my.cursor] = r
+	my.cursor++
+
+	log.Println("Insert no know how to updatez frame")
+
 }
 
 // Delete removes a single rune at the cursor.
 func (my *Myframe) Delete() {
-		log.Println("Deletei no know how to dealz")
+	if my.cursor < 1 {
+		return
+	}
+
+	copy(my.buffer[my.cursor-1:], my.buffer[my.cursor:])
+	my.buffer = my.buffer[0:len(my.buffer)-1]
+	my.cursor--
+
+
+	log.Println("Delete no know how to updatez frame")
 }
 
 // Up moves the cursor up a line if possible and adjusts the frame.
 func (my *Myframe) Up() {
-		log.Println("Upi no know how to dealz")
+	log.Println("Up no know how to dealz")
 }
 
 // Left moves the cursor to the left if possible.
-func (my *Myframe) Left() {
-		log.Println("Lefti no know how to dealz")
+func (mf *Myframe) Left() {
+	if mf.cursor > 0 {
+		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+		mf.cursor--
+		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	}
 }
 
 // Right moves the cursor to the right if possible.
-func (my *Myframe) Right() {
-		log.Println("Righti no know how to dealz")
+func (mf *Myframe) Right() {
+	if mf.cursor <=  len(mf.buffer) {
+		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+		mf.cursor++
+		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	}
 }
 
 // Down moves the cursor down if possible.
 func (my *Myframe) Down() {
-		log.Println("Downi no know how to dealz")
+	log.Println("Down no know how to dealz")
 }
 
