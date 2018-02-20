@@ -3,7 +3,9 @@ package frame
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
+
 
 func TestRunIndex(t *testing.T) {
 
@@ -34,13 +36,39 @@ func TestRunIndex(t *testing.T) {
 	}
 }
 
+const fixedwidth = 10
 
+// makeBox creates somewhat realistic test boxes in 10pt fixed width font.
 func makeBox(s string) *frbox {
-	return &frbox{
-		Wid: 0,
-		Nrune: strings.Count(s, "") - 1,
-		Ptr: []byte(s),
-		// Remaining fields mysterious.
+
+	r, _ := utf8.DecodeRuneInString(s)
+
+	switch s {
+	case "\t":
+		return &frbox{
+			Wid: 5000,
+			Nrune: -1,
+			Ptr: []byte(s),
+			Bc: r,
+			Minwid: 10,
+		}
+
+	case "\n":
+		return &frbox{
+			Wid: 5000,
+			Nrune: -1,
+			Ptr: []byte(s),
+			Bc: r,
+			Minwid: 0,
+		}
+	default:
+		nrune := strings.Count(s, "") - 1
+		return &frbox{
+			Wid: fixedwidth * nrune,
+			Nrune: nrune,
+			Ptr: []byte(s),
+			// Remaining fields not used.
+		}
 	}
 }
 
@@ -67,7 +95,7 @@ func TestTruncatebox(t *testing.T) {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
-		pb.truncatebox(ps.at, fakemetrics(10))
+		pb.truncatebox(ps.at, fakemetrics(fixedwidth))
 		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
@@ -93,7 +121,7 @@ func TestChopbox(t *testing.T) {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
-		pb.chopbox(ps.at, fakemetrics(10))
+		pb.chopbox(ps.at, fakemetrics(fixedwidth))
 		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
