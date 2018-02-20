@@ -134,8 +134,8 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
-	log.Printf("\n\n-----\nframe.Insert")
-	f.Logboxes("at very start of insert")
+//	log.Printf("\n\n-----\nframe.Insert")
+//	f.Logboxes("at very start of insert")
 
 	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
@@ -150,7 +150,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	n0 := f.findbox(0, 0, p0)
 
-	f.Logboxes("at end of findbox")
+//	f.Logboxes("at end of findbox")
 
 	cn0 := p0
 	nn0 := n0
@@ -161,10 +161,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	ppt1 := pt1
 
 	// I expect n0 to be 0. But... the array is empty.
-	log.Println("len of box", len(f.box), "n0", n0)
-	f.Logboxes("f after bxscan")
-	log.Println("----")
-	frame.Logboxes("frame after bxscan")
+//	log.Println("len of box", len(f.box), "n0", n0)
+//	f.Logboxes("f after bxscan")
+//	log.Println("----")
+//	frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
 		f.cklinewrap(&pt0, f.box[n0])
@@ -347,7 +347,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.box[nn0+n] = frame.box[n]
 	}
 
-	f.Logboxes("after adding")
+//	f.Logboxes("after adding")
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--
@@ -359,7 +359,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0)
-	f.Logboxes("after clean")
+//	f.Logboxes("after clean")
 	f.nchars += frame.nchars
 	if f.p0 >= p0 {
 		f.p0 += frame.nchars
@@ -377,6 +377,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.Tick(f.Ptofchar(f.p0), true)
 	}
 
-	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
+//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
 
 }

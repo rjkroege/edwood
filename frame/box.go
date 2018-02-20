@@ -11,7 +11,7 @@ const slop  = 25
 
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
-	log.Println("addbox", bn, n)
+//	log.Println("addbox", bn, n)
 	if bn > f.nbox {
 		panic("Frame.addbox")
 	}
@@ -21,7 +21,7 @@ func (f *Frame) addbox(bn, n int) {
 	}
 
 	for i := f.nbox - 1; i >= bn; i-- {
-		log.Println("addbox: f.nbox", f.nbox, "i", i, "n", n, "i+n", i+n)
+//		log.Println("addbox: f.nbox", f.nbox, "i", i, "n", n, "i+n", i+n)
 		if f.box[i+n] == nil {
 			f.box[i+n] = new(frbox)
 		}
@@ -62,7 +62,7 @@ func (f *Frame) freebox(n0, n1 int) {
 		panic("Frame.freebox")
 	}
 	n1++
-	log.Println("freebox", n0, n1)
+//	log.Println("freebox", n0, n1)
 	for i := n0;  i < n1; i++ {
 		f.box[i] = nil
 	}
