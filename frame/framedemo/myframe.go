@@ -41,23 +41,23 @@ func (mf *Myframe) Resize(resized bool) {
 		image.ZP)
 
 	// I could imagine doing this again? More draw ops?
-	mf.f.Insert([]rune("hello there"), 0)
+//	mf.f.Insert([]rune("hello there"), 0)
 	mf.InsertString("hello there", 0)
-	mf.f.Display.Flush()
+//	mf.f.Display.Flush()
 
-	mf.f.Insert([]rune("motext "), 1)
+//	mf.f.Insert([]rune("motext "), 1)
 	mf.InsertString("motext ", 1)
-	mf.f.Display.Flush()
+//	mf.f.Display.Flush()
 
-	mf.f.Insert([]rune("≤日本b≥"), 3)
+//	mf.f.Insert([]rune("≤日本b≥"), 3)
 	mf.InsertString("≤日本b≥", 3)
 
 	// TODO(rjk): Redraw does the wrong thing. Fix that if necessary.
 	// Redraw is not part of frame(3) interface (e.g. no frredraw)
 	// mf.f.Redraw()
-	mf.f.Display.Flush()
+//	mf.f.Display.Flush()
 
-	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
+//	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
 	mf.InsertString("Bytes draws the byte slice in the specified\nfont using SoverD on the image,", 8)
 
 	// Set the tick
@@ -65,7 +65,7 @@ func (mf *Myframe) Resize(resized bool) {
 
 	mf.f.Display.Flush()
 
-	log.Println("starting buffer", string(mf.buffer))
+	log.Printf("starting buffer %#v\n", string(mf.buffer))
 
 }
 
@@ -80,28 +80,33 @@ func (mf *Myframe) InsertString(s string, c int) {
 }
 
 // Insert adds a single rune to the frame at the cursor.
-func (my *Myframe) Insert(r rune) {
-	my.buffer = append(my.buffer, ' ')
-	copy(my.buffer[my.cursor+1:], my.buffer[my.cursor:])
-	my.buffer[my.cursor] = r
-	my.cursor++
+func (mf *Myframe) Insert(r rune) {
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 
-	log.Println("Insert no know how to updatez frame")
+	mf.f.Insert([]rune{r}, mf.cursor)
 
+	mf.buffer = append(mf.buffer, ' ')
+	copy(mf.buffer[mf.cursor+1:], mf.buffer[mf.cursor:])
+	mf.buffer[mf.cursor] = r
+	mf.cursor++
+
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
 }
 
 // Delete removes a single rune at the cursor.
-func (my *Myframe) Delete() {
-	if my.cursor < 1 {
+func (mf *Myframe) Delete() {
+	if mf.cursor < 1 {
 		return
 	}
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+	
+	mf.f.Delete(mf.cursor - 1, mf.cursor)
 
-	copy(my.buffer[my.cursor-1:], my.buffer[my.cursor:])
-	my.buffer = my.buffer[0:len(my.buffer)-1]
-	my.cursor--
+	copy(mf.buffer[mf.cursor-1:], mf.buffer[mf.cursor:])
+	mf.buffer = mf.buffer[0:len(mf.buffer)-1]
+	mf.cursor--
 
-
-	log.Println("Delete no know how to updatez frame")
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
 }
 
 // Up moves the cursor up a line if possible and adjusts the frame.

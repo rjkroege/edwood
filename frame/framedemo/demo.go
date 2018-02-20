@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"log"
 
@@ -13,8 +12,6 @@ import (
 const margin = 20
 
 func main() {
-	log.Println("hello from framedemo\n")
-
 	// Make the window.
 	d, err := draw.Init(nil, "", "framedemo", "")
 	if err != nil {
@@ -51,19 +48,21 @@ func main() {
 	for {
 		select {
 		case r := <-keyboardctl.C:
-			log.Println("got rune", r)
+			log.Println("----- got rune --------", r)
 			switch r {
 			case 6:
 				mf.Right()
 			case 2:
 				mf.Left()
 			case 8:
-				// delete.
-				// TODO(rjk): Invoke deletion here.
+				mf.Delete()
+			default:
+				mf.Insert(r)
 			}
 			d.Flush()
 		case <-mousectl.Resize:
 			mf.Resize(true)
+			d.Flush()
 		case m := <-mousectl.C:
 			// fmt.Printf("mouse field %v buttons %d\n", m, m.Buttons)
 
@@ -74,6 +73,4 @@ func main() {
 			}
 		}
 	}
-
-	fmt.Print("bye\n")
 }
