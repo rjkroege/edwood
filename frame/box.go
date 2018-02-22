@@ -11,7 +11,6 @@ const slop  = 25
 
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
-	log.Println("addbox", bn, n)
 	if bn > f.nbox {
 		panic("Frame.addbox")
 	}
@@ -20,7 +19,6 @@ func (f *Frame) addbox(bn, n int) {
 		f.growbox(n + slop)
 	}
 
-	log.Println("addbox", bn+n+1, bn+1, bn+n+1)
 	// TODO(rjk): This does some extra work becasue nbox != len(f.box)
 	// Use a slice and remove nbox and nalloc.
 	copy(f.box[bn+n:], f.box[bn:])

@@ -132,11 +132,8 @@ func TestChopbox(t *testing.T) {
 }
 
 func TestAddbox(t *testing.T) {
-
-//	zerobox := new(frbox)
 	hellobox := makeBox("hi")
 	worldbox := makeBox("world")	
-//	byebox := makeBox("bye")	
 
 	testvector := []struct {
 		name string
@@ -204,7 +201,6 @@ func TestAddbox(t *testing.T) {
 
 		// First part of box array must match the provided afterboxes slice.
 		for i, _ := range tv.afterboxes {
-			// t.Logf("%s [%d]  %#v", tv.name,  i, tv.frame.box[i])
 			if got, want := tv.frame.box[i], tv.afterboxes[i]; !reflect.DeepEqual(got, want) {
 				switch {
 				case got ==  nil && want != nil:
