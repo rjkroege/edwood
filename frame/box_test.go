@@ -322,3 +322,28 @@ func TestClosebox(t *testing.T) {
 		},
 	})
 }
+
+func TestDupbox(t *testing.T) {
+	hellobox := makeBox("hi")
+
+	stim := []TestStim{
+		{
+			"one element frame",
+			&Frame{
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{hellobox, nil},
+			},
+			func(f *Frame) { f.dupbox(0) },
+			2, 2,
+			[]*frbox{hellobox, hellobox},
+		},
+	}
+	comparecore(t, "TestDupbox", stim)
+
+	// Specifically must verify that the box string is different.
+	if stim[0].frame.box[0] == stim[0].frame.box[1] {
+		t.Errorf("dupbox failed to make a copy of the backing rune string")
+	}
+
+}
