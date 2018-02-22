@@ -270,3 +270,55 @@ func TestFreebox(t *testing.T) {
 		},
 	})
 }
+
+func TestClosebox(t *testing.T) {
+	hellobox := makeBox("hi")
+	worldbox := makeBox("world")
+
+	comparecore(t, "TestClosebox", []TestStim{
+		{
+			"one element frame",
+			&Frame{
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{hellobox, nil},
+			},
+			func(f *Frame) { f.closebox(0, 0) },
+			0, 2,
+			[]*frbox{nil},
+		},
+		{
+			"two element frame 0",
+			&Frame{
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{hellobox, worldbox},
+			},
+			func(f *Frame) { f.closebox(0, 0) },
+			1, 2,
+			[]*frbox{worldbox},
+		},
+		{
+			"two element frame 1",
+			&Frame{
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{hellobox, worldbox},
+			},
+			func(f *Frame) { f.closebox(1, 1) },
+			1, 2,
+			[]*frbox{hellobox},
+		},
+		{
+			"three element frame",
+			&Frame{
+				nbox:   3,
+				nalloc: 3,
+				box:    []*frbox{hellobox, worldbox, hellobox},
+			},
+			func(f *Frame) { f.closebox(1, 1) },
+			2, 3,
+			[]*frbox{hellobox, hellobox},
+		},
+	})
+}
