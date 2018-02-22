@@ -1,6 +1,7 @@
 package frame
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -130,4 +131,105 @@ func TestChopbox(t *testing.T) {
 
 }
 
-// TODO(rjk): test addbox
+func TestAddbox(t *testing.T) {
+
+//	zerobox := new(frbox)
+	hellobox := makeBox("hi")
+	worldbox := makeBox("world")	
+//	byebox := makeBox("bye")	
+
+	testvector := []struct {
+		name string
+		frame *Frame
+		bn int
+		n int
+		nbox int
+		nalloc int
+		afterboxes []*frbox
+		
+	} {
+		{
+			"empty frame",
+			&Frame{
+				nbox: 0,
+				nalloc:0,
+			},
+			0, 1,   1, 26,
+			[]*frbox{},
+		 },
+		{
+			"one element frame",
+			&Frame{
+				nbox: 1,
+				nalloc:2,
+				box: []*frbox{hellobox, nil},
+			},
+			0, 1,   2, 2,
+			[]*frbox{hellobox, hellobox},
+		 },
+		{
+			"two element frame",
+			&Frame{
+				nbox: 2,
+				nalloc:2,
+				box: []*frbox{hellobox, worldbox},
+			},
+			0, 1,   3, 28,
+			[]*frbox{hellobox, hellobox, worldbox},
+		 },
+		{
+			"two element frame",
+			&Frame{
+				nbox: 2,
+				nalloc:2,
+				box: []*frbox{hellobox, worldbox},
+			},
+			1, 1,   3, 28,
+			[]*frbox{hellobox, worldbox, worldbox},
+		 },
+	}
+
+	for _, tv := range testvector {   
+		tv.frame.addbox(tv.bn, tv.n)
+		if got, want := tv.frame.nbox, tv.nbox; got != want {
+			t.Errorf("%s: nbox got %d but want %d\n", tv.name, got, want)
+		}
+		if got, want := tv.frame.nalloc, tv.nalloc; got != want {
+			t.Errorf("%s: nalloc got %d but want %d\n", tv.name, got, want)
+		}
+
+		if tv.frame.box == nil {
+			t.Errorf("%s: ran add but did not succeed in creating boxex", tv.name)
+		}
+
+		// First part of box array must match the provided afterboxes slice.
+		for i, _ := range tv.afterboxes {
+			// t.Logf("%s [%d]  %#v", tv.name,  i, tv.frame.box[i])
+			if got, want := tv.frame.box[i], tv.afterboxes[i]; !reflect.DeepEqual(got, want) {
+				switch {
+				case got ==  nil && want != nil:
+					t.Errorf("%s: result box [%d] mismatch: got nil want %#v (%s)", tv.name, i, want, string(want.Ptr))
+				case got != nil && want == nil:
+					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want nil", tv.name, i, got, string(got.Ptr))
+				case got.Ptr == nil && want.Ptr == nil:
+					t.Errorf("%s: result box [%d] mismatch: got %#v (nil) want %#v (nil)", tv.name, i, got, want)
+				case got.Ptr == nil && want.Ptr != nil:
+					t.Errorf("%s: result box [%d] mismatch: got %#v (nil) want %#v (%s)", tv.name, i, got, want, string(want.Ptr))
+				case want.Ptr == nil && got.Ptr != nil:
+					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want %#v (nil)", tv.name, i, got, string(got.Ptr), want)
+				case want.Ptr != nil && got.Ptr != nil:
+					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want %#v (%s)", tv.name, i, got, string(got.Ptr), want, string(want.Ptr))
+				}
+			}
+		}
+
+		// Remaining part of box array must merely exist.
+		for i, b := range tv.frame.box[len(tv.afterboxes):] {
+			if b != nil {
+				t.Errorf("%s: result box [%d] should be nil", tv.name, i + len(tv.afterboxes))
+			}
+		}
+	}
+
+
+}
