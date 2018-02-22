@@ -23,7 +23,7 @@ func TestRunIndex(t *testing.T) {
 		{"a\x02日本b", 2, 2},
 		{"a\x02日本b", 3, 5},
 		{"a\x02日本b", 4, 8},
-		{"Kröeger", 3, 4},
+		{"Kröger", 3, 4},
 	}
 
 	for _, ps := range testvector {
@@ -131,22 +131,15 @@ func TestAddbox(t *testing.T) {
 	hellobox := makeBox("hi")
 	worldbox := makeBox("world")
 
-	testvector := []struct {
-		name       string
-		frame      *Frame
-		bn         int
-		n          int
-		nbox       int
-		nalloc     int
-		afterboxes []*frbox
-	}{
+	comparecore(t, "TestAddbox", []TestStim{
 		{
 			"empty frame",
 			&Frame{
 				nbox:   0,
 				nalloc: 0,
 			},
-			0, 1, 1, 26,
+			func(f *Frame) { f.addbox(0, 1) },
+			1, 26,
 			[]*frbox{},
 		},
 		{
@@ -156,7 +149,8 @@ func TestAddbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{hellobox, nil},
 			},
-			0, 1, 2, 2,
+			func(f *Frame) { f.addbox(0, 1) },
+			2, 2,
 			[]*frbox{hellobox, hellobox},
 		},
 		{
@@ -166,7 +160,8 @@ func TestAddbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
-			0, 1, 3, 28,
+			func(f *Frame) { f.addbox(0, 1) },
+			3, 28,
 			[]*frbox{hellobox, hellobox, worldbox},
 		},
 		{
@@ -176,22 +171,34 @@ func TestAddbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
-			1, 1, 3, 28,
+			func(f *Frame) { f.addbox(1, 1) },
+			3, 28,
 			[]*frbox{hellobox, worldbox, worldbox},
 		},
-	}
+	})
+}
 
+type TestStim struct {
+	name       string
+	frame      *Frame
+	stim       func(*Frame)
+	nbox       int
+	nalloc     int
+	afterboxes []*frbox
+}
+
+func comparecore(t *testing.T, prefix string, testvector []TestStim) {
 	for _, tv := range testvector {
-		tv.frame.addbox(tv.bn, tv.n)
+		tv.stim(tv.frame)
 		if got, want := tv.frame.nbox, tv.nbox; got != want {
-			t.Errorf("%s: nbox got %d but want %d\n", tv.name, got, want)
+			t.Errorf("%s-%s: nbox got %d but want %d\n", prefix, tv.name, got, want)
 		}
 		if got, want := tv.frame.nalloc, tv.nalloc; got != want {
-			t.Errorf("%s: nalloc got %d but want %d\n", tv.name, got, want)
+			t.Errorf("%s-%s: nalloc got %d but want %d\n", prefix, tv.name, got, want)
 		}
 
 		if tv.frame.box == nil {
-			t.Errorf("%s: ran add but did not succeed in creating boxex", tv.name)
+			t.Errorf("%s-%s: ran add but did not succeed in creating boxex", prefix, tv.name)
 		}
 
 		// First part of box array must match the provided afterboxes slice.
@@ -199,17 +206,17 @@ func TestAddbox(t *testing.T) {
 			if got, want := tv.frame.box[i], tv.afterboxes[i]; !reflect.DeepEqual(got, want) {
 				switch {
 				case got == nil && want != nil:
-					t.Errorf("%s: result box [%d] mismatch: got nil want %#v (%s)", tv.name, i, want, string(want.Ptr))
+					t.Errorf("%s-%s: result box [%d] mismatch: got nil want %#v (%s)", prefix, tv.name, i, want, string(want.Ptr))
 				case got != nil && want == nil:
-					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want nil", tv.name, i, got, string(got.Ptr))
+					t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want nil", prefix, tv.name, i, got, string(got.Ptr))
 				case got.Ptr == nil && want.Ptr == nil:
-					t.Errorf("%s: result box [%d] mismatch: got %#v (nil) want %#v (nil)", tv.name, i, got, want)
+					t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (nil)", prefix, tv.name, i, got, want)
 				case got.Ptr == nil && want.Ptr != nil:
-					t.Errorf("%s: result box [%d] mismatch: got %#v (nil) want %#v (%s)", tv.name, i, got, want, string(want.Ptr))
+					t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (%s)", prefix, tv.name, i, got, want, string(want.Ptr))
 				case want.Ptr == nil && got.Ptr != nil:
-					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want %#v (nil)", tv.name, i, got, string(got.Ptr), want)
+					t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (nil)", prefix, tv.name, i, got, string(got.Ptr), want)
 				case want.Ptr != nil && got.Ptr != nil:
-					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want %#v (%s)", tv.name, i, got, string(got.Ptr), want, string(want.Ptr))
+					t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (%s)", prefix, tv.name, i, got, string(got.Ptr), want, string(want.Ptr))
 				}
 			}
 		}
@@ -217,9 +224,49 @@ func TestAddbox(t *testing.T) {
 		// Remaining part of box array must merely exist.
 		for i, b := range tv.frame.box[len(tv.afterboxes):] {
 			if b != nil {
-				t.Errorf("%s: result box [%d] should be nil", tv.name, i+len(tv.afterboxes))
+				t.Errorf("%s-%s: result box [%d] should be nil", prefix, tv.name, i+len(tv.afterboxes))
 			}
 		}
 	}
+}
 
+func TestFreebox(t *testing.T) {
+	hellobox := makeBox("hi")
+	worldbox := makeBox("world")
+
+	comparecore(t, "TestFreebox", []TestStim{
+		{
+			"one element frame",
+			&Frame{
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{hellobox, nil},
+			},
+			func(f *Frame) { f.freebox(0, 0) },
+			1, 2,
+			[]*frbox{nil},
+		},
+		{
+			"two element frame 0",
+			&Frame{
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{hellobox, worldbox},
+			},
+			func(f *Frame) { f.freebox(0, 0) },
+			2, 2,
+			[]*frbox{nil, worldbox},
+		},
+		{
+			"two element frame 1",
+			&Frame{
+				nbox:   3,
+				nalloc: 3,
+				box:    []*frbox{hellobox, worldbox, hellobox},
+			},
+			func(f *Frame) { f.freebox(1, 1) },
+			3, 3,
+			[]*frbox{hellobox, nil, hellobox},
+		},
+	})
 }
