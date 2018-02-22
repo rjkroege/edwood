@@ -7,31 +7,29 @@ import (
 	"unicode/utf8"
 )
 
-
 func TestRunIndex(t *testing.T) {
 
 	testvector := []struct {
 		thestring string
-		arg int
-		want int
-	} {
-		{ "", 0, 0 },
-		{ "a\x02b", 0, 0 },
-		{ "a\x02b", 1, 1 },
-		{ "a\x02b", 2, 2 },
-		{ "a\x02日本b", 0, 0 },
-		{ "a\x02日本b", 1, 1 },
-		{ "a\x02日本b", 2, 2 },
-		{ "a\x02日本b", 3, 5 },
-		{ "a\x02日本b", 4, 8 },
-		{ "Kröeger", 3, 4 },
+		arg       int
+		want      int
+	}{
+		{"", 0, 0},
+		{"a\x02b", 0, 0},
+		{"a\x02b", 1, 1},
+		{"a\x02b", 2, 2},
+		{"a\x02日本b", 0, 0},
+		{"a\x02日本b", 1, 1},
+		{"a\x02日本b", 2, 2},
+		{"a\x02日本b", 3, 5},
+		{"a\x02日本b", 4, 8},
+		{"Kröeger", 3, 4},
 	}
-		
-	
+
 	for _, ps := range testvector {
 		b := ps.thestring
 
-		if got, want := runeindex([]byte(b),ps.arg), ps.want; got != want {
+		if got, want := runeindex([]byte(b), ps.arg), ps.want; got != want {
 			t.Errorf("comparing %#v at %d got %d, want %d", b, ps.arg, got, want)
 		}
 	}
@@ -47,27 +45,27 @@ func makeBox(s string) *frbox {
 	switch s {
 	case "\t":
 		return &frbox{
-			Wid: 5000,
-			Nrune: -1,
-			Ptr: []byte(s),
-			Bc: r,
+			Wid:    5000,
+			Nrune:  -1,
+			Ptr:    []byte(s),
+			Bc:     r,
 			Minwid: 10,
 		}
 
 	case "\n":
 		return &frbox{
-			Wid: 5000,
-			Nrune: -1,
-			Ptr: []byte(s),
-			Bc: r,
+			Wid:    5000,
+			Nrune:  -1,
+			Ptr:    []byte(s),
+			Bc:     r,
 			Minwid: 0,
 		}
 	default:
 		nrune := strings.Count(s, "") - 1
 		return &frbox{
-			Wid: fixedwidth * nrune,
+			Wid:   fixedwidth * nrune,
 			Nrune: nrune,
-			Ptr: []byte(s),
+			Ptr:   []byte(s),
 			// Remaining fields not used.
 		}
 	}
@@ -83,21 +81,20 @@ func TestTruncatebox(t *testing.T) {
 
 	testvector := []struct {
 		before string
-		after string
-		at int
-	} {
-		{ "ab", "a", 1 },
-		{ "abc", "a", 2 },
-		{ "a\x02日本b", "a", 4 },
+		after  string
+		at     int
+	}{
+		{"ab", "a", 1},
+		{"abc", "a", 2},
+		{"a\x02日本b", "a", 4},
 	}
-		
-	
+
 	for _, ps := range testvector {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
 		pb.truncatebox(ps.at, fakemetrics(fixedwidth))
-		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
+		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
 		}
@@ -109,21 +106,20 @@ func TestChopbox(t *testing.T) {
 
 	testvector := []struct {
 		before string
-		after string
-		at int
-	} {
-		{ "ab", "b", 1 },
-		{ "abc", "c", 2 },
-		{ "a\x02日本b", "本b",3 },
+		after  string
+		at     int
+	}{
+		{"ab", "b", 1},
+		{"abc", "c", 2},
+		{"a\x02日本b", "本b", 3},
 	}
-		
-	
+
 	for _, ps := range testvector {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
 		pb.chopbox(ps.at, fakemetrics(fixedwidth))
-		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
+		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
 		}
@@ -133,60 +129,59 @@ func TestChopbox(t *testing.T) {
 
 func TestAddbox(t *testing.T) {
 	hellobox := makeBox("hi")
-	worldbox := makeBox("world")	
+	worldbox := makeBox("world")
 
 	testvector := []struct {
-		name string
-		frame *Frame
-		bn int
-		n int
-		nbox int
-		nalloc int
+		name       string
+		frame      *Frame
+		bn         int
+		n          int
+		nbox       int
+		nalloc     int
 		afterboxes []*frbox
-		
-	} {
+	}{
 		{
 			"empty frame",
 			&Frame{
-				nbox: 0,
-				nalloc:0,
+				nbox:   0,
+				nalloc: 0,
 			},
-			0, 1,   1, 26,
+			0, 1, 1, 26,
 			[]*frbox{},
-		 },
+		},
 		{
 			"one element frame",
 			&Frame{
-				nbox: 1,
-				nalloc:2,
-				box: []*frbox{hellobox, nil},
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{hellobox, nil},
 			},
-			0, 1,   2, 2,
+			0, 1, 2, 2,
 			[]*frbox{hellobox, hellobox},
-		 },
+		},
 		{
 			"two element frame",
 			&Frame{
-				nbox: 2,
-				nalloc:2,
-				box: []*frbox{hellobox, worldbox},
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{hellobox, worldbox},
 			},
-			0, 1,   3, 28,
+			0, 1, 3, 28,
 			[]*frbox{hellobox, hellobox, worldbox},
-		 },
+		},
 		{
 			"two element frame",
 			&Frame{
-				nbox: 2,
-				nalloc:2,
-				box: []*frbox{hellobox, worldbox},
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{hellobox, worldbox},
 			},
-			1, 1,   3, 28,
+			1, 1, 3, 28,
 			[]*frbox{hellobox, worldbox, worldbox},
-		 },
+		},
 	}
 
-	for _, tv := range testvector {   
+	for _, tv := range testvector {
 		tv.frame.addbox(tv.bn, tv.n)
 		if got, want := tv.frame.nbox, tv.nbox; got != want {
 			t.Errorf("%s: nbox got %d but want %d\n", tv.name, got, want)
@@ -203,7 +198,7 @@ func TestAddbox(t *testing.T) {
 		for i, _ := range tv.afterboxes {
 			if got, want := tv.frame.box[i], tv.afterboxes[i]; !reflect.DeepEqual(got, want) {
 				switch {
-				case got ==  nil && want != nil:
+				case got == nil && want != nil:
 					t.Errorf("%s: result box [%d] mismatch: got nil want %#v (%s)", tv.name, i, want, string(want.Ptr))
 				case got != nil && want == nil:
 					t.Errorf("%s: result box [%d] mismatch: got %#v (%s) want nil", tv.name, i, got, string(got.Ptr))
@@ -222,10 +217,9 @@ func TestAddbox(t *testing.T) {
 		// Remaining part of box array must merely exist.
 		for i, b := range tv.frame.box[len(tv.afterboxes):] {
 			if b != nil {
-				t.Errorf("%s: result box [%d] should be nil", tv.name, i + len(tv.afterboxes))
+				t.Errorf("%s: result box [%d] should be nil", tv.name, i+len(tv.afterboxes))
 			}
 		}
 	}
-
 
 }
