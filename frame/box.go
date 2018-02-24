@@ -7,8 +7,6 @@ import (
 
 const slop  = 25
 
-// Brief commentary: the allocation conventions of the box datastructure are inconsistent and weird.
-
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
 	if bn > f.nbox {
@@ -57,7 +55,6 @@ func (f *Frame) freebox(n0, n1 int) {
 		panic("Frame.freebox")
 	}
 	n1++
-//	log.Println("freebox", n0, n1)
 	for i := n0;  i < n1; i++ {
 		f.box[i] = nil
 	}
@@ -71,8 +68,6 @@ func (f *Frame) growbox(delta int) {
 
 
 func (f *Frame) dupbox(bn int) {
-	log.Println("dupbox", bn)
-
 	if f.box[bn].Nrune < 0 {
 		panic("dupbox invalid Nrune")
 	}
@@ -84,7 +79,6 @@ func (f *Frame) dupbox(bn int) {
 	f.box[bn+1] = cp
 
 	if f.box[bn].Nrune >= 0 {
-		log.Printf("dupbox bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
 		p := make([]byte, len(f.box[bn].Ptr))
 		copy(p, f.box[bn].Ptr)
 		f.box[bn+1].Ptr = p
@@ -133,12 +127,6 @@ func (f *Frame) splitbox(bn, n int) {
 
 // mergebox combines bn and bn+1
 func (f *Frame) mergebox(bn int) {
-//	f.Insure(bn, nbyte(f.box[bn])+nbyte(f.box[bn+1])+1)
-//	i := runeindex(f.box[bn].Ptr, f.box[bn].Nrune)
-//	copy(f.box[bn].Ptr[i:], f.box[bn+1].Ptr)
-//	f.box[bn].Wid += f.box[bn+1].Wid
-//	f.box[bn].Nrune += f.box[bn+1].Nrune
-
 	b1n := len(f.box[bn].Ptr)
 	b2n := len(f.box[bn+1].Ptr)
 
