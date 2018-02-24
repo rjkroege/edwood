@@ -35,12 +35,12 @@ func (f *Frame) cklinewrap(p *image.Point, b *frbox) {
 	if b.Nrune < 0 {
 		if b.Minwid > byte(f.Rect.Max.X-p.X) {
 			p.X = f.Rect.Min.X
-			p.Y += f.Font.Height
+			p.Y += f.Font.DefaultHeight()
 		}
 	} else {
 		if b.Wid > f.Rect.Max.X-p.X {
 			p.X = f.Rect.Min.X
-			p.Y += f.Font.Height
+			p.Y += f.Font.DefaultHeight()
 		}
 	}
 }
@@ -48,14 +48,14 @@ func (f *Frame) cklinewrap(p *image.Point, b *frbox) {
 func (f *Frame) cklinewrap0(p *image.Point, b *frbox) {
 	if _, ok := f.canfit(*p, b); !ok {
 		p.X = f.Rect.Min.X
-		p.Y += f.Font.Height
+		p.Y += f.Font.DefaultHeight()
 	}
 }
 
 func (f *Frame) advance(p *image.Point, b *frbox) {
 	if b.Nrune < 0 && b.Bc == '\n' {
 		p.X = f.Rect.Min.X
-		p.Y += f.Font.Height
+		p.Y += f.Font.DefaultHeight()
 	} else {
 		p.X += b.Wid
 	}

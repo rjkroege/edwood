@@ -15,7 +15,7 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 //		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.Background.Bytes(pt, text, image.ZP, f.Font, b.Ptr)
+			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -101,10 +101,10 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		if x > f.Rect.Max.X {
 			x = f.Rect.Max.X
 		}
-		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.Height), back, nil, pt)
+		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
 		if b.Nrune >= 0 {
 			// See comment above. Same issue applies.
-			f.Background.String(pt, text, image.ZP, f.Font, string(b.Ptr[i:i+nr]))
+			f.Background.String(pt, text, image.ZP, f.Font.Impl(), string(b.Ptr[i:i+nr]))
 		}
 		pt.X += w
 	Continue:
@@ -153,7 +153,7 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 	}
 
 	pt.X -= f.tickscale
-	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.Height)
+	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.DefaultHeight())
 
 	if r.Max.X > f.Rect.Max.X {
 		r.Max.X = f.Rect.Max.X
@@ -202,7 +202,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 		} else {
 			if b.Bc == '\n' {
 				pt.X = f.Rect.Min.X
-				pt.Y += f.Font.Height
+				pt.Y += f.Font.DefaultHeight()
 			} else {
 				pt.X += f.newwid(pt, b)
 			}

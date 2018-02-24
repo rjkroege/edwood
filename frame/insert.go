@@ -227,16 +227,16 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.delbox(n0, f.nbox-1)
 	}
 	if n0 == f.nbox {
-		div := f.Font.Height
+		div := f.Font.DefaultHeight()
 		if pt1.X > f.Rect.Min.X {
 			div++
 		}
 		f.nlines = (pt1.Y - f.Rect.Min.Y) / div
 	} else if pt1.Y != pt0.Y {
 		y := f.Rect.Max.Y
-		q0 := pt0.Y + f.Font.Height
-		q1 := pt1.Y + f.Font.Height
-		f.nlines += (q1 - q0) / f.Font.Height
+		q0 := pt0.Y + f.Font.DefaultHeight()
+		q1 := pt1.Y + f.Font.DefaultHeight()
+		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
 		if f.nlines > f.maxlines {
 			f.chop(ppt1, p0, nn0)
 		}
@@ -273,7 +273,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 			rect.Min = pt
 			rect.Max = rect.Min
 			rect.Max.X += b.Wid
-			rect.Max.Y += f.Font.Height
+			rect.Max.Y += f.Font.DefaultHeight()
 
 			f.Background.Draw(rect, f.Background, nil, pts[npts].pt0)
 			/* clear bit hanging off right */
@@ -281,7 +281,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Min = opt0
 				rect.Max = opt0
 				rect.Max.X = f.Rect.Max.X
-				rect.Max.Y += f.Font.Height
+				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.p0 <= cn0 && cn0 < f.p1 { /* b+1 is inside selection */
 					col = f.Cols[ColHigh]
@@ -294,7 +294,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max = pt
 				rect.Min.X += b.Wid
 				rect.Max.X = f.Rect.Max.X
-				rect.Max.Y += f.Font.Height
+				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.p0 <= cn0 && cn0 < f.p1 {
 					col = f.Cols[ColHigh]
@@ -309,7 +309,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 			rect.Min = pt
 			rect.Max = pt
 			rect.Max.X += b.Wid
-			rect.Max.Y += f.Font.Height
+			rect.Max.Y += f.Font.DefaultHeight()
 			if rect.Max.X >= f.Rect.Max.X {
 				rect.Max.X = f.Rect.Max.X
 			}

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"9fans.net/go/draw"
 )
 
 func TestRunIndex(t *testing.T) {
@@ -71,13 +73,30 @@ func makeBox(s string) *frbox {
 	}
 }
 
-type fakemetrics int
+type Fakemetrics int
 
-func (w fakemetrics) BytesWidth([]byte) int {
-	return int(w)
+func (w Fakemetrics) BytesWidth(s []byte) int {
+	return int(w) * (strings.Count(string(s), "") - 1)
+}
+
+func (w Fakemetrics) 	DefaultHeight() int { return 13 }
+
+func (w Fakemetrics) 	Impl() *draw.Font { return nil }
+
+func (w Fakemetrics) 	StringWidth(s string) int { 
+	return int(w) * (strings.Count(s, "") - 1)
+}
+
+func (w Fakemetrics) 	RunesWidth(r []rune) int {
+	return len(r) * int(w)
 }
 
 func TestTruncatebox(t *testing.T) {
+	frame := &Frame{
+		Font: Fakemetrics(fixedwidth),
+		nbox:   0,
+		nalloc: 0,
+	}
 
 	testvector := []struct {
 		before string
@@ -93,16 +112,25 @@ func TestTruncatebox(t *testing.T) {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
-		pb.truncatebox(ps.at, fakemetrics(fixedwidth))
+		frame.truncatebox(pb, ps.at)
 		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
+		}
+
+		if ab.Wid != pb.Wid {
+			t.Errorf("wrong width: got %d, want %d for %s", pb.Wid, ab.Wid,  string(pb.Ptr))
 		}
 	}
 
 }
 
 func TestChopbox(t *testing.T) {
+	frame := &Frame{
+		Font: Fakemetrics(fixedwidth),
+		nbox:   0,
+		nalloc: 0,
+	}
 
 	testvector := []struct {
 		before string
@@ -118,10 +146,14 @@ func TestChopbox(t *testing.T) {
 		pb := makeBox(ps.before)
 		ab := makeBox(ps.after)
 
-		pb.chopbox(ps.at, fakemetrics(fixedwidth))
+		frame.chopbox(pb, ps.at)
 		if ab.Nrune != pb.Nrune || string(ab.Ptr) != string(pb.Ptr) {
 			t.Errorf("truncating %#v (%#v) at %d failed to provide %#v. Gave %#v (%s)\n",
 				makeBox(ps.before), ps.before, ps.at, ps.after, pb, string(pb.Ptr))
+		}
+
+		if ab.Wid != pb.Wid {
+			t.Errorf("wrong width: got %d, want %d for %s", pb.Wid, ab.Wid,  string(pb.Ptr))
 		}
 	}
 
@@ -346,4 +378,38 @@ func TestDupbox(t *testing.T) {
 		t.Errorf("dupbox failed to make a copy of the backing rune string")
 	}
 
+}
+
+func TestSplitbox(t *testing.T) {
+//	hiworlbdox := makeBox("hiworld")
+	hibox := makeBox("hi")
+	worldbox := makeBox("world")
+//	zerobox := makeBox("")
+
+	comparecore(t, "TestSplitbox", []TestStim{
+		{
+			"one element frame",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{ makeBox("hiworld"), nil},
+			},
+			func(f *Frame) { f.splitbox(0, 2) },
+			2, 2,
+			[]*frbox{ hibox, worldbox },
+		}, 
+		{
+			"two element frame 1",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   2,
+				nalloc: 3,
+				box:    []*frbox{worldbox,  makeBox("hiworld"), nil},
+			},
+			func(f *Frame) { f.splitbox(1, 2) },
+			3, 3,
+			[]*frbox{ worldbox, hibox, worldbox },
+		},
+	})
 }

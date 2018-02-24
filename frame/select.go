@@ -39,12 +39,12 @@ func (f *Frame) Select(mc draw.Mousectl) {
 		scrled := false
 		if f.Scroll != nil {
 			if mp.Y < f.Rect.Min.Y {
-				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.Height-1)
+				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
 				p0 = f.p1
 				p1 = f.p0
 				scrled = true
 			} else if mp.Y > f.Rect.Max.Y {
-				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.Height+1)
+				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
 				p0 = f.p1
 				p1 = f.p0
 				scrled = true
@@ -119,10 +119,10 @@ func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	q0 := p0
 	q1 := p1
 
-	q0.Y += f.Font.Height
-	q1.Y += f.Font.Height
+	q0.Y += f.Font.DefaultHeight()
+	q1.Y += f.Font.DefaultHeight()
 
-	n := (p1.Y - p0.Y) / f.Font.Height
+	n := (p1.Y - p0.Y) / f.Font.DefaultHeight()
 	if f.Background == nil {
 		panic("Frame.SelectPaint B == nil")
 	}

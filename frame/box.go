@@ -104,52 +104,36 @@ func runeindex(p []byte, n int) int {
 	return offs
 }
 
-// fontmetrics lets tests mock the calls into draw for measuring the
-// width of UTF8 slices.
-type fontmetrics interface {
-	BytesWidth([]byte) int
-}
-
 // truncatebox drops the  last n characters without allocation.
-func (b *frbox) truncatebox(n int, m fontmetrics) {
+func (f *Frame) truncatebox(b * frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
 	}
 	b.Nrune -= n
 	b.Ptr = b.Ptr[0:runeindex(b.Ptr, b.Nrune)]
-	b.Wid = m.BytesWidth(b.Ptr)
-}
-
-// truncatebox drops the  last n characters without allocation.
-func (f *Frame) truncatebox(b *frbox, n int) {
-	b.truncatebox(n, f.Font)
+	b.Wid = f.Font.BytesWidth(b.Ptr)
 }
 
 // chopbox removes the first n chars without allocation.
-func (b *frbox) chopbox(n int, m fontmetrics) {
+func (f *Frame) chopbox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < n {
 		panic("chopbox")
 	}
 	i := runeindex(b.Ptr, n)
 	b.Ptr = b.Ptr[i:]
 	b.Nrune -= n
-	b.Wid = m.BytesWidth(b.Ptr)
-}
-
-// chopbox removes the first n chars without allocation.
-func (f *Frame) chopbox(b *frbox, n int) {
-	b.chopbox(n, f.Font)
+	b.Wid = f.Font.BytesWidth(b.Ptr)
 }
 
 func (f *Frame) splitbox(bn, n int) {
-	log.Println("splitbox", bn, n)
+	f.Logboxes("splitbox -- start")
 	f.dupbox(bn)
 	f.truncatebox(f.box[bn], f.box[bn].Nrune - n)
 	f.chopbox(f.box[bn+1], n)
-	log.Printf("splitbox end bn[%d] = %#v, bn+1[%d] = %#v\n", bn, string(f.box[bn].Ptr), bn+1, string(f.box[bn+1].Ptr))
+	f.Logboxes("splitbox -- end")
 }
 
-// mergebox combines merge bn and bn+1
+// mergebox combines bn and bn+1
 func (f *Frame) mergebox(bn int) {
 //	f.Insure(bn, nbyte(f.box[bn])+nbyte(f.box[bn+1])+1)
 //	i := runeindex(f.box[bn].Ptr, f.box[bn].Nrune)

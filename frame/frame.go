@@ -24,8 +24,30 @@ type frbox struct {
 	Minwid byte
 }
 
+// fontmetrics lets tests mock the calls into draw for measuring the
+// width of UTF8 slices.
+type Fontmetrics interface {
+	BytesWidth([]byte) int
+	DefaultHeight() int
+	Impl() *draw.Font
+	StringWidth(string) int
+	RunesWidth(r []rune) int
+}
+
+type frfont struct {
+	draw.Font
+}
+
+func (ff *frfont) DefaultHeight() int {
+	return ff.Font.Height
+}
+
+func (ff *frfont) Impl() *draw.Font {
+	return &ff.Font
+}
+
 type Frame struct {
-	Font         *draw.Font
+	Font         Fontmetrics
 	Display      *draw.Display           // on which the frame is displayed
 	Background   *draw.Image             // on which the frame appears
 	Cols         [NumColours]*draw.Image // background and text colours
@@ -64,7 +86,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 // routines to be called to maintain the associated data structure in,
 // for example, an obscured window.
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
-	f.Font = ft
+	f.Font = &frfont{*ft}
 	f.Display = b.Display
 	f.maxtab = 8 * ft.StringWidth("0")
 	f.nbox = 0
@@ -98,7 +120,8 @@ func (f *Frame) InitTick() {
 		f.tick.Free()
 	}
 
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, ft.Height), b.Pix, false, draw.White)
+	height := ft.DefaultHeight()
+	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.White)
 	if err != nil {
 		return
 	}
@@ -113,19 +136,20 @@ func (f *Frame) InitTick() {
 	// background colour
 	f.tick.Draw(f.tick.R, f.Cols[ColBack], nil, image.Pt(0, 0))
 	// vertical line
-	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), ft.Height), f.Display.Black, nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Black, nil, image.Pt(0, 0))
 	// box on each end
 	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[ColText], nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, ft.Height-f.tickscale*frtickw, f.tickscale*frtickw, ft.Height), f.Cols[ColText], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Cols[ColText], nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
 func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
+	height := f.Font.DefaultHeight()
 	f.Background = b
 	f.Entire = r
 	f.Rect = r
-	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % f.Font.Height
-	f.maxlines = (r.Max.Y - r.Min.Y) / f.Font.Height
+	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
+	f.maxlines = (r.Max.Y - r.Min.Y) / height
 }
 
 // Clear frees the internal structures associated with f, permitting

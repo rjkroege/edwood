@@ -61,7 +61,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 
 		r.Min = pt0
 		r.Max = pt0
-		r.Max.Y += f.Font.Height
+		r.Max.Y += f.Font.DefaultHeight()
 
 		if b.Nrune > 0 {
 			w0 := b.Wid
@@ -110,9 +110,10 @@ func (f *Frame) Delete(p0, p1 int) int {
 		}
 
 		if n1 < f.nbox {
-			q0 := pt0.Y + f.Font.Height
-			q1 := pt1.Y + f.Font.Height
-			q2 := pt2.Y + f.Font.Height
+			height := f.Font.DefaultHeight()
+			q0 := pt0.Y + height
+			q1 := pt1.Y + height
+			q2 := pt2.Y + height
 
 			if q2 > f.Rect.Max.Y {
 				q2 = f.Rect.Max.Y
@@ -155,7 +156,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	}
 	pt0 = f.Ptofchar(f.nchars)
 	n := f.nlines
-	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.Height
+	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
 	if pt0.X > f.Rect.Min.X {
 		f.nlines++
 	}
