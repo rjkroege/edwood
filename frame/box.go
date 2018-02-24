@@ -98,7 +98,7 @@ func runeindex(p []byte, n int) int {
 	return offs
 }
 
-// truncatebox drops the  last n characters without allocation.
+// truncatebox drops the  last n characters from box b without allocation.
 func (f *Frame) truncatebox(b * frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
@@ -108,7 +108,7 @@ func (f *Frame) truncatebox(b * frbox, n int) {
 	b.Wid = f.Font.BytesWidth(b.Ptr)
 }
 
-// chopbox removes the first n chars without allocation.
+// chopbox removes the first n chars from box b without allocation.
 func (f *Frame) chopbox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < n {
 		panic("chopbox")
@@ -119,13 +119,14 @@ func (f *Frame) chopbox(b *frbox, n int) {
 	b.Wid = f.Font.BytesWidth(b.Ptr)
 }
 
+// splitbox duplicates box [bn] and divides it at rune n into prefix and suffix boxes.
 func (f *Frame) splitbox(bn, n int) {
 	f.dupbox(bn)
 	f.truncatebox(f.box[bn], f.box[bn].Nrune - n)
 	f.chopbox(f.box[bn+1], n)
 }
 
-// mergebox combines bn and bn+1
+// mergebox combines boxes bn and bn+1
 func (f *Frame) mergebox(bn int) {
 	b1n := len(f.box[bn].Ptr)
 	b2n := len(f.box[bn+1].Ptr)
@@ -140,11 +141,12 @@ func (f *Frame) mergebox(bn int) {
 	f.delbox(bn+1, bn+1)
 }
 
-// findbox finds the box containing q and puts q on a box boundary.
+// findbox finds the box containing q and puts q on a box boundary starting from
+// rune p in box bn.
 func (f *Frame) findbox(bn, p, q int) int {
 	log.Println("findbox", bn, p, q)
 
-	for i := 0; bn < f.nbox && p+nrune(f.box[i]) <= q; i++ {
+	for i := bn; bn < f.nbox && p+nrune(f.box[i]) <= q; i++ {
 		p += nrune(f.box[i])
 		bn++
 	}
