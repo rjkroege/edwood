@@ -448,3 +448,64 @@ func TestSplitbox(t *testing.T) {
 		},
 	})
 }
+
+func TestMergebox(t *testing.T) {
+	hibox := makeBox("hi")
+	worldbox := makeBox("world")
+	hiworldbox := makeBox("hiworld")
+	zerobox := makeBox("")
+
+	comparecore(t, "TestMergebox", []TestStim{
+		{
+			"two -> 1",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{ hibox, worldbox},
+			},
+			func(f *Frame) { f.mergebox(0) },
+			1, 2,
+			[]*frbox{ hiworldbox },
+		}, 
+		{
+			"two null -> 1",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{ hibox, zerobox},
+			},
+			func(f *Frame) { f.mergebox(0) },
+			1, 2,
+			[]*frbox{ hibox },
+		}, 
+		{
+			"three -> 2",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   3,
+				nalloc: 3,
+				box:    []*frbox{ makeBox("hi"), worldbox, hibox},
+			},
+			func(f *Frame) { f.mergebox(0) },
+			2, 3,
+			[]*frbox{ hiworldbox, hibox },
+		}, 
+		{
+			"three -> 1",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   3,
+				nalloc: 3,
+				box:    []*frbox{ makeBox("hi"), makeBox("world"), makeBox("hi")},
+			},
+			func(f *Frame) {
+				f.mergebox(1)
+				f.mergebox(0)
+			},
+			1, 3,
+			[]*frbox{ makeBox("hiworldhi") },
+		}, 
+	})
+}

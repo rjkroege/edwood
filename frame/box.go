@@ -126,11 +126,9 @@ func (f *Frame) chopbox(b *frbox, n int) {
 }
 
 func (f *Frame) splitbox(bn, n int) {
-	f.Logboxes("splitbox -- start")
 	f.dupbox(bn)
 	f.truncatebox(f.box[bn], f.box[bn].Nrune - n)
 	f.chopbox(f.box[bn+1], n)
-	f.Logboxes("splitbox -- end")
 }
 
 // mergebox combines bn and bn+1
