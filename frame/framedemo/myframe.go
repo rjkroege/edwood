@@ -102,7 +102,9 @@ func (mf *Myframe) Delete() {
 	
 	mf.f.Delete(mf.cursor - 1, mf.cursor)
 
-	copy(mf.buffer[mf.cursor-1:], mf.buffer[mf.cursor:])
+	if mf.cursor < len(mf.buffer) {
+		copy(mf.buffer[mf.cursor-1:], mf.buffer[mf.cursor:])
+	}
 	mf.buffer = mf.buffer[0:len(mf.buffer)-1]
 	mf.cursor--
 

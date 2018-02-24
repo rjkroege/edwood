@@ -97,11 +97,9 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 			nb < n1-1 &&
 			f.box[nb+1].Nrune >= 0 &&
 			pt.X+f.box[nb].Wid+f.box[nb+1].Wid < c {
-				log.Printf("before merge: [%d] %#v [%d] %#v\n",
-					nb, string(f.box[nb].Ptr), nb+1, string(f.box[nb+1].Ptr))
+			f.Logboxes("--- clean: before merge")
 			f.mergebox(nb)
-				log.Printf("after merge: [%d] %#v [%d] %#v\n",
-					nb, string(f.box[nb].Ptr), nb+1, string(f.box[nb+1].Ptr))
+			f.Logboxes("--- clean: after merge")
 			n1--
 			b = f.box[nb]
 		}
