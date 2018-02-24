@@ -1,7 +1,6 @@
 package frame
 
 import (
-	"log"
 	"unicode/utf8"
 )
 
@@ -144,8 +143,6 @@ func (f *Frame) mergebox(bn int) {
 // findbox finds the box containing q and puts q on a box boundary starting from
 // rune p in box bn.
 func (f *Frame) findbox(bn, p, q int) int {
-	log.Println("findbox", bn, p, q)
-
 	for i := bn; bn < f.nbox && p+nrune(f.box[i]) <= q; i++ {
 		p += nrune(f.box[i])
 		bn++
