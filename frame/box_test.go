@@ -381,10 +381,9 @@ func TestDupbox(t *testing.T) {
 }
 
 func TestSplitbox(t *testing.T) {
-//	hiworlbdox := makeBox("hiworld")
 	hibox := makeBox("hi")
 	worldbox := makeBox("world")
-//	zerobox := makeBox("")
+	zerobox := makeBox("")
 
 	comparecore(t, "TestSplitbox", []TestStim{
 		{
@@ -410,6 +409,42 @@ func TestSplitbox(t *testing.T) {
 			func(f *Frame) { f.splitbox(1, 2) },
 			3, 3,
 			[]*frbox{ worldbox, hibox, worldbox },
+		},
+		{
+			"one element 0, 0",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{makeBox("hi"), nil},
+			},
+			func(f *Frame) { f.splitbox(0, 0) },
+			2, 2,
+			[]*frbox{ zerobox, hibox},
+		},
+		{
+			"one element 0, 2",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{makeBox("hi"), nil},
+			},
+			func(f *Frame) { f.splitbox(0, 2) },
+			2, 2,
+			[]*frbox{  hibox, zerobox},
+		},
+		{
+			"one element 0, 2",
+			&Frame{
+				Font: Fakemetrics(fixedwidth),
+				nbox:   1,
+				nalloc: 2,
+				box:    []*frbox{makeBox("hi"), nil},
+			},
+			func(f *Frame) { f.splitbox(0, 2) },
+			2, 2,
+			[]*frbox{  hibox, zerobox},
 		},
 	})
 }
