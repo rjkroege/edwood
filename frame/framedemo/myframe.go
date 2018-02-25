@@ -42,15 +42,15 @@ func (mf *Myframe) Resize(resized bool) {
 
 	// I could imagine doing this again? More draw ops?
 //	mf.f.Insert([]rune("hello there"), 0)
-	mf.InsertString("hello there", 0)
+//	mf.InsertString("hello there", 0)
 //	mf.f.Display.Flush()
 
 //	mf.f.Insert([]rune("motext "), 1)
-	mf.InsertString("motext ", 1)
+//	mf.InsertString("motext ", 1)
 //	mf.f.Display.Flush()
 
 //	mf.f.Insert([]rune("≤日本b≥"), 3)
-	mf.InsertString("≤日本b≥", 3)
+//	mf.InsertString("≤日本b≥", 3)
 
 	// TODO(rjk): Redraw does the wrong thing. Fix that if necessary.
 	// Redraw is not part of frame(3) interface (e.g. no frredraw)
@@ -58,7 +58,10 @@ func (mf *Myframe) Resize(resized bool) {
 //	mf.f.Display.Flush()
 
 //	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
-	mf.InsertString("Bytes draws the byte slice in the specified\nfont using SoverD on the image,", 8)
+//	mf.InsertString("Bytes draws the byte slice in the specified\nfont using SoverD on the image,", 8)
+	
+	mf.InsertString("ab", 0)
+
 
 	// Set the tick
 	mf.f.Tick(mf.f.Ptofchar(0), true)
@@ -139,3 +142,6 @@ func (my *Myframe) Down() {
 	log.Println("Down no know how to dealz")
 }
 
+func (my *Myframe) Logboxes() {
+	my.f.Logboxes("-- current boxes --")
+}

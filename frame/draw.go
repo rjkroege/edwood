@@ -2,13 +2,13 @@ package frame
 
 import (
 	"image"
-	"log"
+//	"log"
 
 	"9fans.net/go/draw"
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
-	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
+//	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap(&pt, b)

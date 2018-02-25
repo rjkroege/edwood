@@ -15,7 +15,7 @@ var (
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
-	log.Println("bxscan starting")
+//	log.Println("bxscan starting")
 
 	var c rune
 	
@@ -134,14 +134,14 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
-//	log.Printf("\n\n-----\nframe.Insert")
+	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
 //	f.Logboxes("at very start of insert")
 
 	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
 	}
 
-	log.Println("frame.Insert, doing some work")
+//	log.Println("frame.Insert, doing some work")
 
 	var rect image.Rectangle
 	var col, tcol *draw.Image
@@ -358,7 +358,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	if n0 < f.nbox-1 {
 		n0++
 	}
-	f.clean(ppt0, nn0, n0)
+	f.clean(ppt0, nn0, n0 + 1)
 //	f.Logboxes("after clean")
 	f.nchars += frame.nchars
 	if f.p0 >= p0 {

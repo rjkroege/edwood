@@ -10,9 +10,9 @@ import (
 // in the region of the screen between pt and the right edge of the
 // text-containing region. Returned values have several cases. 
 // 
-// If b has width, retruns true and the index of the first  rune known
-// to not fit.
-// If b has no width, use minwidth instead.
+// If b has width, returns the index of the first  rune known
+// to not fit and true if more thna 0 runes fit.
+// If b has no width, use minwidth instead of width.
 func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	left := f.Rect.Max.X - pt.X
 	if b.Nrune < 0 {
@@ -91,10 +91,11 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 	return x - pt.X
 }
 
-// TODO(rjk): broken. does not fix up the world correctly.
-// hypothesis: mergebox is broken
+// TODO(rjk): broken. does not fix up the world correctly?
+// clean merges boxes where possible over boxes [n0, n1)
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
-	log.Println("clean", n0, n1, f.Rect.Max.X)
+	log.Println("clean", pt, n0, n1, f.Rect.Max.X)
+//	f.Logboxes("--- clean: starting ---")
 	c := f.Rect.Max.X
 	nb := 0
 	for nb = n0; nb < n1-1; nb++ {
@@ -104,9 +105,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 			nb < n1-1 &&
 			f.box[nb+1].Nrune >= 0 &&
 			pt.X+f.box[nb].Wid+f.box[nb+1].Wid < c {
-			f.Logboxes("--- clean: before merge")
 			f.mergebox(nb)
-			f.Logboxes("--- clean: after merge")
 			n1--
 			b = f.box[nb]
 		}
@@ -122,6 +121,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	if pt.Y >= f.Rect.Max.Y {
 		f.lastlinefull = 1
 	}
+//	f.Logboxes("--- clean: end")
 }
 
 func nbyte(f *frbox) int {

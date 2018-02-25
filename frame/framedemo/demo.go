@@ -56,6 +56,8 @@ func main() {
 				mf.Left()
 			case 8:
 				mf.Delete()
+			case 16:
+				mf.Logboxes()
 			default:
 				mf.Insert(r)
 			}
