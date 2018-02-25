@@ -174,6 +174,7 @@ func TestAddbox(t *testing.T) {
 			1, 26,
 			[]*frbox{},
 			0,
+			false,
 		},
 		{
 			"one element frame",
@@ -186,6 +187,7 @@ func TestAddbox(t *testing.T) {
 			2, 2,
 			[]*frbox{hellobox, hellobox},
 			0,
+			false,
 		},
 		{
 			"two element frame",
@@ -198,6 +200,7 @@ func TestAddbox(t *testing.T) {
 			3, 28,
 			[]*frbox{hellobox, hellobox, worldbox},
 			0,
+			false,
 		},
 		{
 			"two element frame",
@@ -210,6 +213,7 @@ func TestAddbox(t *testing.T) {
 			3, 28,
 			[]*frbox{hellobox, worldbox, worldbox},
 			0,
+			false,
 		},
 	})
 }
@@ -217,23 +221,30 @@ func TestAddbox(t *testing.T) {
 type TestStim struct {
 	name       string
 	frame      *Frame
-	stim       func(*Frame) int
+	stim       func(*Frame) (int, bool)
 	nbox       int
 	nalloc     int
 	afterboxes []*frbox
 	result int
+	boolresult bool
 }
 
-func r0(of  func (*Frame)) (func(*Frame) int) {
-	return func(f *Frame) int {
+func r0(of  func (*Frame)) (func(*Frame) (int, bool)) {
+	return func(f *Frame) (int , bool ){
 		of(f)
-		return 0
+		return 0, false
+	}
+}
+
+func r1(of func (*Frame) int) (func (*Frame) (int, bool)) {
+	return func(f *Frame) (int , bool ){
+		return of(f), false
 	}
 }
 
 func comparecore(t *testing.T, prefix string, testvector []TestStim) {
 	for _, tv := range testvector {
-		result := tv.stim(tv.frame)
+		result, boolresult  := tv.stim(tv.frame)
 		if got, want := tv.frame.nbox, tv.nbox; got != want {
 			t.Errorf("%s-%s: nbox got %d but want %d\n", prefix, tv.name, got, want)
 		}
@@ -243,6 +254,9 @@ func comparecore(t *testing.T, prefix string, testvector []TestStim) {
 
 		if got, want := result, tv.result; got != want {
 			t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, tv.name, got, want)
+		}
+		if got, want := boolresult, tv.boolresult; got != want {
+			t.Errorf("%s-%s: running stim bool got %v but want %v\n", prefix, tv.name, got, want)
 		}
 
 		if tv.frame.box == nil {
@@ -294,6 +308,7 @@ func TestFreebox(t *testing.T) {
 			1, 2,
 			[]*frbox{nil},
 			0,
+			false,
 		},
 		{
 			"two element frame 0",
@@ -306,6 +321,7 @@ func TestFreebox(t *testing.T) {
 			2, 2,
 			[]*frbox{nil, worldbox},
 			0,
+			false,
 		},
 		{
 			"two element frame 1",
@@ -318,6 +334,7 @@ func TestFreebox(t *testing.T) {
 			3, 3,
 			[]*frbox{hellobox, nil, hellobox},
 			0,
+			false,
 		},
 	})
 }
@@ -338,6 +355,7 @@ func TestClosebox(t *testing.T) {
 			0, 2,
 			[]*frbox{nil},
 			0,
+			false,
 		},
 		{
 			"two element frame 0",
@@ -350,6 +368,7 @@ func TestClosebox(t *testing.T) {
 			1, 2,
 			[]*frbox{worldbox},
 			0,
+			false,
 		},
 		{
 			"two element frame 1",
@@ -362,6 +381,7 @@ func TestClosebox(t *testing.T) {
 			1, 2,
 			[]*frbox{hellobox},
 			0,
+			false,
 		},
 		{
 			"three element frame",
@@ -374,6 +394,7 @@ func TestClosebox(t *testing.T) {
 			2, 3,
 			[]*frbox{hellobox, hellobox},
 			0,
+			false,
 		},
 	})
 }
@@ -393,6 +414,7 @@ func TestDupbox(t *testing.T) {
 			2, 2,
 			[]*frbox{hellobox, hellobox},
 			0,
+			false,
 		},
 	}
 	comparecore(t, "TestDupbox", stim)
@@ -422,6 +444,7 @@ func TestSplitbox(t *testing.T) {
 			2, 2,
 			[]*frbox{ hibox, worldbox },
 			0,
+			false,
 		}, 
 		{
 			"two element frame 1",
@@ -435,6 +458,7 @@ func TestSplitbox(t *testing.T) {
 			3, 3,
 			[]*frbox{ worldbox, hibox, worldbox },
 			0,
+			false,
 		},
 		{
 			"one element 0, 0",
@@ -448,6 +472,7 @@ func TestSplitbox(t *testing.T) {
 			2, 2,
 			[]*frbox{ zerobox, hibox},
 			0,
+			false,
 		},
 		{
 			"one element 0, 2",
@@ -461,6 +486,7 @@ func TestSplitbox(t *testing.T) {
 			2, 2,
 			[]*frbox{  hibox, zerobox},
 			0,
+			false,
 		},
 		{
 			"one element 0, 2",
@@ -474,6 +500,7 @@ func TestSplitbox(t *testing.T) {
 			2, 2,
 			[]*frbox{  hibox, zerobox},
 			0,
+			false,
 		},
 	})
 }
@@ -497,6 +524,7 @@ func TestMergebox(t *testing.T) {
 			1, 2,
 			[]*frbox{ hiworldbox },
 			0,
+			false,
 		}, 
 		{
 			"two null -> 1",
@@ -510,6 +538,7 @@ func TestMergebox(t *testing.T) {
 			1, 2,
 			[]*frbox{ hibox },
 			0,
+			false,
 		}, 
 		{
 			"three -> 2",
@@ -523,6 +552,7 @@ func TestMergebox(t *testing.T) {
 			2, 3,
 			[]*frbox{ hiworldbox, hibox },
 			0,
+			false,
 		}, 
 		{
 			"three -> 1",
@@ -539,6 +569,7 @@ func TestMergebox(t *testing.T) {
 			1, 3,
 			[]*frbox{ makeBox("hiworldhi") },
 			0,
+			false,
 		}, 
 	})
 }
@@ -558,10 +589,11 @@ func TestFindbox(t *testing.T) {
 				nalloc: 1,
 				box:    []*frbox{ makeBox("hiworld")},
 			},
-			func(f *Frame) int { return f.findbox(0, 0, 2) },
+			r1(func(f *Frame) int { return f.findbox(0, 0, 2) }),
 			2, 27,
 			[]*frbox{ hibox, worldbox },
 			1,
+			false,
 		}, 
 		{
 			"find at beginning",
@@ -571,10 +603,11 @@ func TestFindbox(t *testing.T) {
 				nalloc: 1,
 				box:    []*frbox{ makeBox("hiworld")},
 			},
-			func(f *Frame) int { return f.findbox(0, 0, 0) },
+			r1(func(f *Frame) int { return f.findbox(0, 0, 0) }),
 			1, 1,
 			[]*frbox{ hiworldbox },
 			0,
+			false,
 		}, 
 		{
 			"find at edge",
@@ -584,10 +617,11 @@ func TestFindbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{ makeBox("hi"), makeBox("world") },
 			},
-			func(f *Frame) int { return f.findbox(0, 0, 2) },
+			r1(func(f *Frame) int { return f.findbox(0, 0, 2) }),
 			2, 2,
 			[]*frbox{ hibox, worldbox },
 			1,
+			false,
 		}, 
 		{
 			"find continuing",
@@ -597,10 +631,11 @@ func TestFindbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{ makeBox("hi"), makeBox("world") },
 			},
-			func(f *Frame) int { return f.findbox(1, 0, 2) },
+			r1(func(f *Frame) int { return f.findbox(1, 0, 2) }),
 			3, 28,
 			[]*frbox{ hibox, makeBox("wo"), makeBox("rld") },
 			2,
+			false,
 		}, 
 		{
 			"find in empty",
@@ -610,10 +645,11 @@ func TestFindbox(t *testing.T) {
 				nalloc: 2,
 				box:    []*frbox{ nil, nil },
 			},
-			func(f *Frame) int { return f.findbox(0, 0, 0) },
+			r1(func(f *Frame) int { return f.findbox(0, 0, 0) }),
 			0, 2,
 			[]*frbox{  },
 			0,
+			false,
 		}, 
 	})
 }

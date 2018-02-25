@@ -6,6 +6,13 @@ import (
 	"unicode/utf8"
 )
 
+// canfit measures the b's string contents and determines if it fits
+// in the region of the screen between pt and the right edge of the
+// text-containing region. Returned values have several cases. 
+// 
+// If b has width, retruns true and the index of the first  rune known
+// to not fit.
+// If b has no width, use minwidth instead.
 func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	left := f.Rect.Max.X - pt.X
 	if b.Nrune < 0 {
