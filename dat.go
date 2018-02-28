@@ -2,12 +2,7 @@ package main
 
 import (
 	"9fans.net/go/draw"
-	"bytes"
-	"fmt"
 	"image"
-	"io/ioutil"
-	"os"
-	"os/user"
 	"sync"
 	"unicode/utf8"
 )
@@ -35,12 +30,12 @@ const (
 	QWxdata
 	QMAX
 
-	Blockincr = 256
-	MaxBlock  = 8 * 1024
+//	Blockincr = 256
+//	MaxBlock  = 8 * 1024
 	NRange    = 10
-	Infinity  = 0x7FFFFFFF
+//	Infinity  = 0x7FFFFFFF
 
-	STACK = 65536
+//	STACK = 65536
 
 	Empty    = 0
 	Null     = '-'
@@ -57,6 +52,7 @@ const (
 )
 
 var (
+	// TODO(rjk): Move elsewhere.
 	blist *Block
 
 	globalincref bool
@@ -127,107 +123,6 @@ var (
 
 type Range struct {
 	q0, q1 int
-}
-
-type Block struct {
-	addr uint   // disk address in bytes
-	n    uint   // number of used runes in block
-	next *Block // pointer to next in free list
-}
-
-type Disk struct {
-	fd   *os.File
-	addr uint
-	free [MaxBlock/Blockincr + 1]*Block
-}
-
-func NewDisk() *Disk {
-	d := new(Disk)
-	u, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-	tmp, err := ioutil.TempFile("/tmp", fmt.Sprintf("X%d.%.4sacme", os.Getpid(), u.Username))
-	if err != nil {
-		panic(err)
-	}
-	d.fd = tmp
-	return d
-}
-
-func ntosize(n uint) (uint, uint) {
-	if n > MaxBlock {
-		panic("internal error: ntosize")
-	}
-	size := n
-	if size&(Blockincr-1) != 0 {
-		size += Blockincr - (size & (Blockincr - 1))
-	}
-
-	// last bucket holds blocks of exactly Maxblock
-	ip := size / Blockincr
-	return size, ip
-}
-
-func (d *Disk) NewBlock(n uint) *Block {
-	size, i := ntosize(n)
-	b := d.free[i]
-	if b != nil {
-		d.free[i] = b.next
-	} else {
-		if blist == nil {
-			bl := new(Block)
-			blist = bl
-			for j := 0; j < 100-1; j++ {
-				bl.next = new(Block)
-				bl = bl.next
-			}
-		}
-		b = blist
-		blist = b.next
-		b.addr = d.addr
-		d.addr += size
-	}
-	b.n = n
-	return b
-}
-
-func (d *Disk) Release(b *Block) {
-	_, i := ntosize(b.n)
-	b.next = d.free[i]
-	d.free[i] = b
-}
-
-func (d *Disk) Read(b *Block, r []rune, n uint) {
-	if n > b.n {
-		panic("internal error: disk.Read")
-	}
-	// this is a simplified way of checking that b.n < MaxBlock
-	_, _ = ntosize(b.n)
-	buf := make([]byte, n)
-	if m, err := d.fd.ReadAt(buf, int64(b.addr)); err != nil {
-		panic(err)
-	} else if m != len(r) {
-		panic("read error from temp file")
-	}
-	copy(r, bytes.Runes(buf))
-}
-
-func (d *Disk) Write(bp **Block, r []rune, n uint) {
-	bl := *bp
-	size, _ := ntosize(bl.n)
-	nsize, _ := ntosize(n)
-	if size != nsize {
-		d.Release(bl)
-		bl = d.NewBlock(n)
-		*bp = bl
-	}
-	if m, err := d.fd.WriteAt([]byte(string(r)), int64(bl.addr)); err != nil {
-		panic(err)
-	} else if m != len(r) {
-		panic("write error to temp file")
-	}
-	bl.n = n
 }
 
 type Command struct {
