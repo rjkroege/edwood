@@ -23,12 +23,15 @@ type Block struct {
 	next *Block // pointer to next in free list
 }
 
+// Disk is a singleton managing the file that Acme blocks. Blocks
+// are sized from 256B to 8K in 256B increments.
 type Disk struct {
 	fd   *os.File
 	addr uint
-	free [MaxBlock/Blockincr + 1]*Block
+	free [MaxBlock/Blockincr + 1]*Block	// Block pointers bucketed by size.
 }
 
+// NewDisk creates a new backing on-disk file for Acme's paging.
 func NewDisk() *Disk {
 	// tmp, err := ioutil.TempFile("/tmp", fmt.Sprintf("X%d.%.4sacme", os.Getpid(), u.Username))
 	tmp, err := ioutil.TempFile("", "acme")
@@ -40,6 +43,10 @@ func NewDisk() *Disk {
 	}
 }
 
+
+// ntosize computes the size of block to hold n bytes where n must be 
+// MaxBlock and the index into the bucket array. The 0-th bucket holds
+// only 0-length blocks.
 func ntosize(n uint) (uint, uint) {
 	if n > MaxBlock {
 		panic("internal error: ntosize")
