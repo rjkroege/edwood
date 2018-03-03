@@ -57,17 +57,17 @@ type Frame struct {
 	box          []*frbox
 	p0, p1       int // bounds of a selection
 	nbox, nalloc int
-	maxtab       int // max size of a tab (in pixels)
-	nchars       int // number of runes in frame
-	nlines       int // number of lines with text
-	maxlines     int // total number of lines in frame
-	lastlinefull int
-	modified     bool
-	tick         *draw.Image // typing tick
-	tickback     *draw.Image // image under tick
-	ticked       bool
-	noredraw     bool
-	tickscale    int // tick scaling factor
+	MaxTab       int // max size of a tab (in pixels)
+	NChars       int // number of runes in frame
+	NLines       int // number of lines with text
+	MaxLines     int // total number of lines in frame
+	LastLineFull int
+	Modified     bool
+	TickImage         *draw.Image // typing tick
+	TickBack     *draw.Image // image under tick
+	Ticked       bool
+	NoRedraw     bool
+	TickScale    int // TickImage scaling factor
 }
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
@@ -88,58 +88,58 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
 	f.Font = &frfont{*ft}
 	f.Display = b.Display
-	f.maxtab = 8 * ft.StringWidth("0")
+	f.MaxTab = 8 * ft.StringWidth("0")
 	f.nbox = 0
 	f.nalloc = 0
-	f.nchars = 0
-	f.nlines = 0
+	f.NChars = 0
+	f.NLines = 0
 	f.p0 = 0
 	f.p1 = 0
 	f.box = nil
-	f.lastlinefull = 0
+	f.LastLineFull = 0
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.tick == nil && f.Cols[ColBack] != nil {
+	if f.TickImage == nil && f.Cols[ColBack] != nil {
 		f.InitTick()
 	}
 }
 
-// InitTick sets up the tick (e.g. cursor)
+// InitTick sets up the TickImage (e.g. cursor)
 func (f *Frame) InitTick() {
 	var err error
 	if f.Cols[ColBack] == nil || f.Display == nil {
 		return
 	}
 
-	f.tickscale = f.Display.ScaleSize(1)
+	f.TickScale = f.Display.ScaleSize(1)
 	b := f.Display.ScreenImage
 	ft := f.Font
 
-	if f.tick != nil {
-		f.tick.Free()
+	if f.TickImage != nil {
+		f.TickImage.Free()
 	}
 
 	height := ft.DefaultHeight()
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.White)
+	f.TickImage, err = f.Display.AllocImage(image.Rect(0, 0, f.TickScale*frtickw, height), b.Pix, false, draw.White)
 	if err != nil {
 		return
 	}
 
-	f.tickback, err = f.Display.AllocImage(f.tick.R, b.Pix, false, draw.White)
+	f.TickBack, err = f.Display.AllocImage(f.TickImage.R, b.Pix, false, draw.White)
 	if err != nil {
-		f.tick.Free()
-		f.tick = nil
+		f.TickImage.Free()
+		f.TickImage = nil
 		return
 	}
 
 	// background colour
-	f.tick.Draw(f.tick.R, f.Cols[ColBack], nil, image.Pt(0, 0))
+	f.TickImage.Draw(f.TickImage.R, f.Cols[ColBack], nil, image.Pt(0, 0))
 	// vertical line
-	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Black, nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(f.TickScale*(frtickw/2), 0, f.TickScale*(frtickw/2+1), height), f.Display.Black, nil, image.Pt(0, 0))
 	// box on each end
-	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[ColText], nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Cols[ColText], nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(0, 0, f.TickScale*frtickw, f.TickScale*frtickw), f.Cols[ColText], nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(0, height-f.TickScale*frtickw, f.TickScale*frtickw, height), f.Cols[ColText], nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
@@ -149,7 +149,7 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	f.Entire = r
 	f.Rect = r
 	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
-	f.maxlines = (r.Max.Y - r.Min.Y) / height
+	f.MaxLines = (r.Max.Y - r.Min.Y) / height
 }
 
 // Clear frees the internal structures associated with f, permitting
@@ -174,11 +174,11 @@ func (f *Frame) Clear(freeall bool) {
 		f.box = nil
 	}
 	if freeall {
-		f.tick.Free()
-		f.tickback.Free()
-		f.tick = nil
-		f.tickback = nil
+		f.TickImage.Free()
+		f.TickBack.Free()
+		f.TickImage = nil
+		f.TickBack = nil
 	}
 	f.box = nil
-	f.ticked = false
+	f.Ticked = false
 }

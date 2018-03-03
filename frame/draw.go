@@ -8,13 +8,13 @@ import (
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
-	//	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
+//	log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap(&pt, b)
-		//		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
+//		log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
-		if !f.noredraw && b.Nrune >= 0 {
+		if !f.NoRedraw && b.Nrune >= 0 {
 			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
 		}
 		pt.X += b.Wid
@@ -25,7 +25,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
 	//	log.Println("DrawSel")
 	var back, text *draw.Image
 
-	if f.ticked {
+	if f.Ticked {
 		f.Tick(f.Ptofchar(f.p0), false)
 	}
 
@@ -129,11 +129,11 @@ func (f *Frame) Redraw() {
 	var pt image.Point
 
 	if f.p0 == f.p1 {
-		ticked = f.ticked
+		ticked = f.Ticked
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), false)
 		}
-		f.drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
+		f.drawsel0(f.Ptofchar(0), 0, f.NChars, f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), true)
 		}
@@ -142,35 +142,35 @@ func (f *Frame) Redraw() {
 	pt = f.Ptofchar(0)
 	pt = f.drawsel0(pt, 0, f.p0, f.Cols[ColBack], f.Cols[ColText])
 	pt = f.drawsel0(pt, f.p0, f.p1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.drawsel0(pt, f.p1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.drawsel0(pt, f.p1, f.NChars, f.Cols[ColBack], f.Cols[ColText])
 
 }
 
 func (f *Frame) _tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
-	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
+	if f.Ticked == ticked || f.TickImage == nil || !pt.In(f.Rect) {
 		return
 	}
 
-	pt.X -= f.tickscale
-	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.DefaultHeight())
+	pt.X -= f.TickScale
+	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.TickScale, pt.Y+f.Font.DefaultHeight())
 
 	if r.Max.X > f.Rect.Max.X {
 		r.Max.X = f.Rect.Max.X
 	}
 	if ticked {
-		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.tick, nil, image.ZP)
+		f.TickBack.Draw(f.TickBack.R, f.Background, nil, pt)
+		f.Background.Draw(r, f.TickImage, nil, image.ZP)
 	} else {
-		f.Background.Draw(r, f.tickback, nil, image.ZP)
+		f.Background.Draw(r, f.TickBack, nil, image.ZP)
 	}
-	f.ticked = ticked
+	f.Ticked = ticked
 }
 
 func (f *Frame) Tick(pt image.Point, ticked bool) {
-	//	log.Println("Tick")
-	if f.tickscale != f.Display.ScaleSize(1) {
-		if f.ticked {
+//	log.Println("Tick")
+	if f.TickScale != f.Display.ScaleSize(1) {
+		if f.Ticked {
 			f._tick(pt, false)
 		}
 		f.InitTick()
@@ -184,7 +184,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 		b := f.box[nb]
 		f.cklinewrap0(&pt, b)
 		if pt.Y == f.Rect.Max.Y {
-			f.nchars -= f.strlen(nb)
+			f.NChars -= f.strlen(nb)
 			f.delbox(nb, f.nbox-1)
 			break
 		}

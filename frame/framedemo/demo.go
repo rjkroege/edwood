@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"9fans.net/go/draw"
-	"github.com/ProjectSerenity/acme/frame"
+	"github.com/paul-lalonde/acme/frame"
 )
 
 const margin = 20
@@ -28,7 +28,7 @@ func main() {
 	textcols[frame.ColHText] = d.Black
 
 	// TODO(rjk): Use a font that always is available.
-	fontname := "/mnt/font/SourceSansPro-Regular/13a/font"
+	fontname := "/mnt/font/Go-Regular/13a/font"
 	myfont, err := d.OpenFont(fontname)
 	if err != nil {
 		log.Fatalln("Couldn't open font", fontname, "because", err)

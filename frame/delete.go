@@ -11,11 +11,11 @@ func (f *Frame) Delete(p0, p1 int) int {
 	log.Println("Delete")
 	var r image.Rectangle
 
-	if p0 >= f.nchars || p0 == p1 || f.Background == nil {
+	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
 		return 0
 	}
-	if p1 > f.nchars {
-		p1 = f.nchars
+	if p1 > f.NChars {
+		p1 = f.NChars
 	}
 
 	log.Println("Delete is doing something")
@@ -36,7 +36,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	nn0 := n0
 	ppt0 := pt0
 	f.freebox(n0, n1-1)
-	f.modified = true
+	f.Modified = true
 
 	/*
 	 * Invariants:
@@ -150,15 +150,15 @@ func (f *Frame) Delete(p0, p1 int) int {
 		f.p0 = p0
 	}
 
-	f.nchars -= int(p1 - p0)
+	f.NChars -= int(p1 - p0)
 	if f.p0 == f.p1 {
 		f.Tick(f.Ptofchar(f.p0), true)
 	}
-	pt0 = f.Ptofchar(f.nchars)
-	n := f.nlines
-	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
+	pt0 = f.Ptofchar(f.NChars)
+	n := f.NLines
+	f.NLines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
 	if pt0.X > f.Rect.Min.X {
-		f.nlines++
+		f.NLines++
 	}
-	return n - f.nlines
+	return n - f.NLines
 }

@@ -20,7 +20,7 @@ func (f *Frame) Select(mc draw.Mousectl) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
 
-	f.modified = false
+	f.Modified = false
 	f.DrawSel(f.Ptofchar(f.p0), f.p0, f.p1, false)
 	p0 := f.Charofpt(mp)
 	p1 := p0
@@ -92,7 +92,7 @@ func (f *Frame) Select(mc draw.Mousectl) {
 			p1 = q
 			pt1 = qt
 		}
-		f.modified = false
+		f.Modified = false
 		if p0 < p1 {
 			f.p0 = p0
 			f.p1 = p1

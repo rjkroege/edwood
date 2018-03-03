@@ -1,10 +1,15 @@
 package main
 
 import (
-	"9fans.net/go/draw"
+	"fmt"
 	"image"
+	"runtime/debug"
+	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/paul-lalonde/acme/frame"
+	"9fans.net/go/draw"
 )
 
 const (
@@ -34,6 +39,7 @@ const (
 	//	Infinity  = 0x7FFFFFFF
   
 	//	STACK = 65536
+	EVENTSIZE = 256
 
 	Empty    = 0
 	Null     = '-'
@@ -47,6 +53,12 @@ const (
 	Collecting = 2
 
 	NCOL = 5
+
+	// Always apply display scalesize to these.
+	Border = 2
+	ButtonBorder = 2
+	Scrollwid = 12
+	Scrollgap = 8
 )
 
 var (
@@ -56,12 +68,13 @@ var (
 
 	display     *draw.Display
 	screen      *draw.Image
-	font        *draw.Font
+	tagfont        *draw.Font
 	mouse       *draw.Mouse
 	mousectl    *draw.Mousectl
 	keyboardctl *draw.Keyboardctl
 
-	reffont   Reffont
+	reffont   *draw.Font
+	reffonts   [2]*draw.Font
 	modbutton *draw.Image
 	colbutton *draw.Image
 	button    *draw.Image
@@ -79,8 +92,8 @@ var (
 	typetext  *Text
 	barttext  *Text
 
-	bartflag          int
-	swapscrollbuttons int
+	bartflag          bool
+	swapscrollbuttons bool
 	activewin         *Window
 	activecol         *Column
 	snarfbuf          Buffer
@@ -88,9 +101,10 @@ var (
 	fsyspid           int
 	cputype           string
 	objtype           string
+	home 	string
 	acmeshell         string
-	tagcols           [NCOL]*draw.Image
-	textcols          [NCOL]*draw.Image
+	tagcolors           [frame.NumColours]*draw.Image
+	textcolors          [frame.NumColours]*draw.Image
 	wdir              string
 	editing           bool
 	erroutfd          int
@@ -114,6 +128,8 @@ var (
 	cwarn      chan uint
 
 	editoutlk *sync.Mutex
+
+	WinId int = 0
 )
 
 type Range struct {
@@ -170,11 +186,6 @@ type Xfid struct {
 	flushed bool
 }
 
-type Reffont struct {
-	ref Ref
-	f   *draw.Font
-}
-
 type RangeSet [NRange]Range
 
 type Dirlist struct {
@@ -199,9 +210,19 @@ type Expand struct {
 type Ref int
 
 func (r *Ref) Inc() {
-	*r++
+	*r++ 
 }
 
 func (r *Ref) Dec() {
 	*r--
+}
+
+func Unimpl() {
+	stack := strings.Split(string(debug.Stack()), "\n")
+	for i, l := range stack {
+		if l == "main.Unimpl()" {
+			fmt.Printf("Unimplemented: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3]," \t"))
+			break
+		}
+	}
 }

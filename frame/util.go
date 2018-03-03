@@ -85,8 +85,8 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 		pt.X = f.Rect.Min.X
 		x = pt.X
 	}
-	x += f.maxtab
-	x -= (x - f.Rect.Min.X) % f.maxtab
+	x += f.MaxTab
+	x -= (x - f.Rect.Min.X) % f.MaxTab
 	if x-pt.X < int(b.Minwid) || x > c {
 		x = pt.X + int(b.Minwid)
 	}
@@ -119,9 +119,9 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 		f.cklinewrap(&pt, b)
 		f.advance(&pt, f.box[nb])
 	}
-	f.lastlinefull = 0
+	f.LastLineFull = 0
 	if pt.Y >= f.Rect.Max.Y {
-		f.lastlinefull = 1
+		f.LastLineFull = 1
 	}
 	//	f.Logboxes("--- clean: end")
 }

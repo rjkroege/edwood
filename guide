@@ -1,0 +1,23 @@
+{ x/->/c/./
+x/TRUE/c/true/
+x/FALSE/c/false/
+s/for\((.*)\)/for \1 /g
+x/if/+-s/if\((.*)\)/if \1 /g
+}
+
+,x/[^a-zA-Z]+tick[^a-zA-Z]+/x/tick/c/TickImage
+}
+Edit X/frame\/.*\.go/{
+,x/maxlines/c/MaxLines/
+,x/maxtab/c/MaxTab/
+,x/nchars/c/NChars/
+,x/nlines/c/NLines/
+,x/lastlinefull/c/LastLineFull/
+,x/modified/c/Modified/
+,x/tickback/c/TickBack/
+,x/noredraw/c/NoRedraw/
+,x/ticked/c/Ticked/
+,x/tickscale/c/TickScale/
+}
+
+X/.*atch.*/
