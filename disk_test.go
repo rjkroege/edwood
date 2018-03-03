@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 /*
 func TestNewBlock(t *testing.T) {
 
@@ -12,26 +11,25 @@ func TestNewBlock(t *testing.T) {
 	defer disk.fd.Name().Remove()
 
 
-	
+
 
 
 }
 */
 
-
 func TestNtosize(t *testing.T) {
 
 	testvector := []struct {
-		n uint
+		n  uint
 		sz uint
 		ip uint
 	}{
-		{ MaxBlock, MaxBlock, 32 },
-		{ 255, 256, 1 },
-		{ 1, 256, 1 },
-		{ 256, 256, 1 },
-		{ 257, 512, 2 },
-		{ 0, 0, 0 },
+		{MaxBlock, MaxBlock, 32},
+		{255, 256, 1},
+		{1, 256, 1},
+		{256, 256, 1},
+		{257, 512, 2},
+		{0, 0, 0},
 	}
 
 	for _, tv := range testvector {

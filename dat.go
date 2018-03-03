@@ -30,12 +30,12 @@ const (
 	QWxdata
 	QMAX
 
-//	Blockincr = 256
-//	MaxBlock  = 8 * 1024
-	NRange    = 10
-//	Infinity  = 0x7FFFFFFF
+	//	Blockincr = 256
+	//	MaxBlock  = 8 * 1024
+	NRange = 10
+	//	Infinity  = 0x7FFFFFFF
 
-//	STACK = 65536
+	//	STACK = 65536
 
 	Empty    = 0
 	Null     = '-'

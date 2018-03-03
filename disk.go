@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
-//	"os/user"
+	//	"os/user"
 )
 
-
 const (
-	MaxBlock  = 8 * 1024	
+	MaxBlock  = 8 * 1024
 	Blockincr = 256
 )
 
-
 type Block struct {
-	addr uint   // disk address in bytes
+	addr uint // disk address in bytes
 
 	// NB: in the C version, these are in a union together. Only one is
 	// used at a time.
@@ -28,7 +26,7 @@ type Block struct {
 type Disk struct {
 	fd   *os.File
 	addr uint
-	free [MaxBlock/Blockincr + 1]*Block	// Block pointers bucketed by size.
+	free [MaxBlock/Blockincr + 1]*Block // Block pointers bucketed by size.
 }
 
 // NewDisk creates a new backing on-disk file for Acme's paging.
@@ -38,13 +36,12 @@ func NewDisk() *Disk {
 	if err != nil {
 		panic(err)
 	}
-	return &Disk {
+	return &Disk{
 		fd: tmp,
 	}
 }
 
-
-// ntosize computes the size of block to hold n bytes where n must be 
+// ntosize computes the size of block to hold n bytes where n must be
 // MaxBlock and the index into the bucket array. The 0-th bucket holds
 // only 0-length blocks.
 func ntosize(n uint) (uint, uint) {
