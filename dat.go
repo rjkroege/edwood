@@ -30,10 +30,10 @@ const (
 	QWxdata
 	QMAX
 
-	NRange    = 10
-//	Infinity  = 0x7FFFFFFF
-
-//	STACK = 65536
+	NRange = 10
+	//	Infinity  = 0x7FFFFFFF
+  
+	//	STACK = 65536
 
 	Empty    = 0
 	Null     = '-'

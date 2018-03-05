@@ -1,7 +1,7 @@
 package main
 
 import (
-	 "9fans.net/go/draw"
+	"9fans.net/go/draw"
 	"github.com/ProjectSerenity/acme/frame"
 	"image"
 )
@@ -59,9 +59,9 @@ func main() {
 	img, err := display.AllocImage(image.Rect(0, 0, 1024, 720), draw.RGB16, true, draw.Cyan)
 	if err != nil {
 		panic(err)
-	} 
+	}
 	f := frame.NewFrame(image.Rect(0, 0, 500, 600), display.DefaultFont, img, cols)
-	
+
 	for {
 		f.Tick(image.ZP, true)
 	}

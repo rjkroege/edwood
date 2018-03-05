@@ -102,7 +102,7 @@ func (t *Text) BsInsert(q0 uint, r []rune, n uint, tofile bool, nrp *int) uint {
 	return 0
 }
 
-func (t *Text) Insert(q0 uint, r []rune, n uint, tofile bool) {
+func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
 
 }
 
@@ -119,7 +119,8 @@ func (t *Text) Delete(q0, q1 uint, tofile bool) {
 }
 
 func (t *Text) Constrain(q0, q1 uint, p0, p1 *uint) {
-
+	*p0 = minu(q0, t.file.b.nc)
+	*p1 = minu(q1, t.file.b.nc)
 }
 
 func (t *Text) ReadRune(q uint) rune {

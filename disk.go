@@ -36,8 +36,8 @@ type Block struct {
 type Disk struct {
 	fd    *os.File
 	addr  uint
-	free  [MaxBlock/Blockincr + 1]*Block // disk-backed blocks bucketed by size
-	blist *Block                         // empty block objects
+	free  [MaxBlock/Blockincr + 1]*Block // Disk-backed blocks bucketed by size
+	blist *Block                         // Empty block objects
 }
 
 // NewDisk creates a new backing on-disk file for Acme's paging.
