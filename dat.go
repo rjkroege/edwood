@@ -30,11 +30,9 @@ const (
 	QWxdata
 	QMAX
 
-	//	Blockincr = 256
-	//	MaxBlock  = 8 * 1024
 	NRange = 10
 	//	Infinity  = 0x7FFFFFFF
-
+  
 	//	STACK = 65536
 
 	Empty    = 0
@@ -52,9 +50,6 @@ const (
 )
 
 var (
-	// TODO(rjk): Move elsewhere.
-	blist *Block
-
 	globalincref bool
 	seq          uint
 	maxtab       uint /*size of a tab, in units of the '0' character */

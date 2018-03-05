@@ -1,11 +1,21 @@
 package main
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
-	//	"os/user"
+	"log"
+	"reflect"
+	"unsafe"
 )
+
+// Acme stores blocks as (raw) runes. This does not align well with how Go
+// works where the language (rightly) tries to make sure that we don't do
+// non-portable C things.
+//
+// I have switched this to Acme-style raw rune handling to avoid multiple
+// copies and rune to byte conversion. This seems better in keeping with how
+// Acme actually should work. However, this is not perhaps the right way
+// to do it. It might be better to always store files in UTF8 (ideally as strings).
 
 const (
 	MaxBlock  = 8 * 1024
@@ -24,9 +34,10 @@ type Block struct {
 // Disk is a singleton managing the file that Acme blocks. Blocks
 // are sized from 256B to 8K in 256B increments.
 type Disk struct {
-	fd   *os.File
-	addr uint
-	free [MaxBlock/Blockincr + 1]*Block // Block pointers bucketed by size.
+	fd    *os.File
+	addr  uint
+	free  [MaxBlock/Blockincr + 1]*Block // Disk-backed blocks bucketed by size
+	blist *Block                         // Empty block objects
 }
 
 // NewDisk creates a new backing on-disk file for Acme's paging.
@@ -64,16 +75,17 @@ func (d *Disk) NewBlock(n uint) *Block {
 	if b != nil {
 		d.free[i] = b.next
 	} else {
-		if blist == nil {
+		if d.blist == nil {
+			// TODO(rjk): Is allocating 1/time really a perf bottleneck in go?
 			bl := new(Block)
-			blist = bl
+			d.blist = bl
 			for j := 0; j < 100-1; j++ {
 				bl.next = new(Block)
 				bl = bl.next
 			}
 		}
-		b = blist
-		blist = b.next
+		b = d.blist
+		d.blist = b.next
 		b.addr = d.addr
 		d.addr += size
 	}
@@ -87,19 +99,39 @@ func (d *Disk) Release(b *Block) {
 	d.free[i] = b
 }
 
+// TODO(rjk): Remove the n? Return an error?
 func (d *Disk) Read(b *Block, r []rune, n uint) {
 	if n > b.n {
 		panic("internal error: disk.Read")
 	}
 	// this is a simplified way of checking that b.n < MaxBlock
 	_, _ = ntosize(b.n)
-	buf := make([]byte, n)
-	if m, err := d.fd.ReadAt(buf, int64(b.addr)); err != nil {
-		panic(err)
-	} else if m != len(r) {
-		panic("read error from temp file")
+
+	// Test prior to defeating type safety.
+	if n > uint(len(r)) {
+		panic("internal error: disk Read, n greater than r")
 	}
-	copy(r, bytes.Runes(buf))
+
+	uby, sz := makeAliasByteArray(r, n)
+	if m, err := d.fd.ReadAt(uby, int64(b.addr)); err != nil {
+		panic(err)
+	} else if m != sz*int(n) {
+		panic("read error from temp file, m !=  sz * n ")
+	}
+}
+
+func makeAliasByteArray(r []rune, un uint) ([]byte, int) {
+	n := int(un)
+	sz := int(unsafe.Sizeof(' '))
+	rhdr := (*reflect.SliceHeader)(unsafe.Pointer(&r))
+
+	uby := make([]byte, 0)
+	bhdr := (*reflect.SliceHeader)(unsafe.Pointer(&uby))
+	bhdr.Data = rhdr.Data
+	bhdr.Len = sz * n
+	bhdr.Cap = sz * n
+
+	return uby, sz
 }
 
 func (d *Disk) Write(bp **Block, r []rune, n uint) {
@@ -111,9 +143,17 @@ func (d *Disk) Write(bp **Block, r []rune, n uint) {
 		bl = d.NewBlock(n)
 		*bp = bl
 	}
-	if m, err := d.fd.WriteAt([]byte(string(r)), int64(bl.addr)); err != nil {
+
+	// Test prior to defeating type safety.
+	if n > uint(len(r)) {
+		panic("internal error: disk Write, n greater than r")
+	}
+
+	uby, sz := makeAliasByteArray(r, n)
+	if m, err := d.fd.WriteAt(uby, int64(bl.addr)); err != nil {
 		panic(err)
-	} else if m != len(r) {
+	} else if m != int(n)*sz {
+		log.Println("write mismatch", m, int(n)*sz)
 		panic("write error to temp file")
 	}
 	bl.n = n
