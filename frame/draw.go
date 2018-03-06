@@ -2,17 +2,17 @@ package frame
 
 import (
 	"image"
-//	"log"
+	//	"log"
 
 	"9fans.net/go/draw"
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
-//	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
+	//	log.Println("DrawText at", pt, "noredraw", f.noredraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap(&pt, b)
-//		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
+		//		log.Printf("box [%d] %#v pt %v noredraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.noredraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
 			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
@@ -22,7 +22,7 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 }
 
 func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
-//	log.Println("DrawSel")
+	//	log.Println("DrawSel")
 	var back, text *draw.Image
 
 	if f.ticked {
@@ -46,7 +46,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
 }
 
 func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
-//	log.Println("drawsel0")
+	//	log.Println("drawsel0")
 	p := 0
 	bi := 0
 	b := f.box[bi]
@@ -124,7 +124,7 @@ func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 }
 
 func (f *Frame) Redraw() {
-//	log.Println("Redraw")
+	//	log.Println("Redraw")
 	ticked := false
 	var pt image.Point
 
@@ -147,7 +147,7 @@ func (f *Frame) Redraw() {
 }
 
 func (f *Frame) _tick(pt image.Point, ticked bool) {
-//	log.Println("_tick")
+	//	log.Println("_tick")
 	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
 		return
 	}
@@ -168,7 +168,7 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) Tick(pt image.Point, ticked bool) {
-//	log.Println("Tick")
+	//	log.Println("Tick")
 	if f.tickscale != f.Display.ScaleSize(1) {
 		if f.ticked {
 			f._tick(pt, false)
@@ -179,7 +179,7 @@ func (f *Frame) Tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) _draw(pt image.Point) image.Point {
-//	log.Println("_draw")
+	//	log.Println("_draw")
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		f.cklinewrap0(&pt, b)
@@ -212,7 +212,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 }
 
 func (f *Frame) strlen(nb int) int {
-//	log.Println("strlen")
+	//	log.Println("strlen")
 	var n int
 	for n = 0; nb < f.nbox; nb++ {
 		n += nrune(f.box[nb])

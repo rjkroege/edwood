@@ -24,7 +24,7 @@ type frbox struct {
 	Minwid byte
 }
 
-// fontmetrics lets tests mock the calls into draw for measuring the
+// Fontmetrics lets tests mock the calls into draw for measuring the
 // width of UTF8 slices.
 type Fontmetrics interface {
 	BytesWidth([]byte) int
