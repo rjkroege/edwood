@@ -29,7 +29,7 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 
 	w := 0
 	o := 0
-	for nr := 0; nr < b.Nrune ; nr ++ {
+	for nr := 0; nr < b.Nrune; nr++ {
 		_, w = utf8.DecodeRune(b.Ptr[o:])
 		left -= f.Font.StringWidth(string(b.Ptr[o : o+w]))
 		if left < 0 {
