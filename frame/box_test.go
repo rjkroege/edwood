@@ -39,6 +39,8 @@ func TestRunIndex(t *testing.T) {
 		{"a\x02日本b", 3, 5},
 		{"a\x02日本b", 4, 8},
 		{"Kröger", 3, 4},
+		{"本a", 1, 3},
+
 	}
 
 	for _, ps := range testvector {

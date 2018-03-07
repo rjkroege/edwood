@@ -123,5 +123,25 @@ func TestCanfit(t *testing.T) {
 			0,
 			false,
 		},
+		BoxModelTest{
+			"multi-glyph box, doesn't fit",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				nbox:   1,
+				nalloc: 1,
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{makeBox("本a")},
+			},
+			func(f *Frame) (int, bool) {
+				a, b := f.canfit(image.Pt(10+57 - 11, 15), f.box[0])
+				return a, b
+			},
+			1,1,
+			[]*frbox{makeBox("本a")},
+			// 10 + 14 + 40 = 64. less than 67.
+			1,
+			true,
+		},
+
 	})
 }
