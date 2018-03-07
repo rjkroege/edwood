@@ -80,6 +80,28 @@ func comparecore(t *testing.T, prefix string, testvector []BoxTester) {
 	}
 }
 
+// expectedboxesequal tests that the expected box slice afterboxes equals the
+// computed box found in frame. prefix and name describe the test and i is the
+// box index.
+func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *Frame, afterboxes []*frbox) {
+	if got, want := frame.box[i], afterboxes[i]; !reflect.DeepEqual(got, want) {
+		switch {
+		case got == nil && want != nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got nil want %#v (%s)", prefix, name, i, want, string(want.Ptr))
+		case got != nil && want == nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want nil", prefix, name, i, got, string(got.Ptr))
+		case got.Ptr == nil && want.Ptr == nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (nil)", prefix, name, i, got, want)
+		case got.Ptr == nil && want.Ptr != nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (%s)", prefix, name, i, got, want, string(want.Ptr))
+		case want.Ptr == nil && got.Ptr != nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (nil)", prefix, name, i, got, string(got.Ptr), want)
+		case want.Ptr != nil && got.Ptr != nil:
+			t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (%s)", prefix, name, i, got, string(got.Ptr), want, string(want.Ptr))
+		}
+	}
+}
+
 // testcore checks if the frame's box model matches the provided afterboxes, nbox, nalloc. Use this to implement Verify methods.
 func testcore(t *testing.T, prefix, name string, frame *Frame, nbox, nalloc int, afterboxes []*frbox) {
 	if got, want := frame.nbox, nbox; got != want {
@@ -94,22 +116,7 @@ func testcore(t *testing.T, prefix, name string, frame *Frame, nbox, nalloc int,
 
 	// First part of box array must match the provided afterboxes slice.
 	for i := range afterboxes {
-		if got, want := frame.box[i], afterboxes[i]; !reflect.DeepEqual(got, want) {
-			switch {
-			case got == nil && want != nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got nil want %#v (%s)", prefix, name, i, want, string(want.Ptr))
-			case got != nil && want == nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want nil", prefix, name, i, got, string(got.Ptr))
-			case got.Ptr == nil && want.Ptr == nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (nil)", prefix, name, i, got, want)
-			case got.Ptr == nil && want.Ptr != nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got %#v (nil) want %#v (%s)", prefix, name, i, got, want, string(want.Ptr))
-			case want.Ptr == nil && got.Ptr != nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (nil)", prefix, name, i, got, string(got.Ptr), want)
-			case want.Ptr != nil && got.Ptr != nil:
-				t.Errorf("%s-%s: result box [%d] mismatch: got %#v (%s) want %#v (%s)", prefix, name, i, got, string(got.Ptr), want, string(want.Ptr))
-			}
-		}
+		expectedboxesequal(t, prefix, name, i, frame, afterboxes)
 	}
 
 	// Remaining part of box array must merely exist.
