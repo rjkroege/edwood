@@ -93,7 +93,7 @@ func testcore(t *testing.T, prefix, name string, frame *Frame, nbox, nalloc int,
 	}
 
 	// First part of box array must match the provided afterboxes slice.
-	for i, _ := range afterboxes {
+	for i := range afterboxes {
 		if got, want := frame.box[i], afterboxes[i]; !reflect.DeepEqual(got, want) {
 			switch {
 			case got == nil && want != nil:
