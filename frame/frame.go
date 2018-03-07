@@ -17,10 +17,10 @@ const (
 )
 
 type frbox struct {
-	Wid    int // In pixels. Fixed large size for layout box.
-	Nrune  int // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
+	Wid    int    // In pixels. Fixed large size for layout box.
+	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
 	Ptr    []byte // UTF-8 string in this box.
-	Bc     rune // The kind of special layout box: '\n' or '\t'
+	Bc     rune   // The kind of special layout box: '\n' or '\t'
 	Minwid byte
 }
 

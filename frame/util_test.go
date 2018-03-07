@@ -133,15 +133,14 @@ func TestCanfit(t *testing.T) {
 				box:    []*frbox{makeBox("本a")},
 			},
 			func(f *Frame) (int, bool) {
-				a, b := f.canfit(image.Pt(10+57 - 11, 15), f.box[0])
+				a, b := f.canfit(image.Pt(10+57-11, 15), f.box[0])
 				return a, b
 			},
-			1,1,
+			1, 1,
 			[]*frbox{makeBox("本a")},
 			// 10 + 14 + 40 = 64. less than 67.
 			1,
 			true,
 		},
-
 	})
 }

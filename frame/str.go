@@ -1,7 +1,5 @@
 package frame
 
-import ()
-
 const (
 	chunk = 16
 )
