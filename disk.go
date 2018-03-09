@@ -2,8 +2,8 @@ package main
 
 import (
 	"io/ioutil"
-	"os"
 	"log"
+	"os"
 	"reflect"
 	"unsafe"
 )

@@ -15,15 +15,16 @@ var (
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
-//	log.Println("bxscan starting")
+	//	log.Println("bxscan starting")
 
 	var c rune
-	
+
 	frame.Rect = f.Rect
 	frame.Background = f.Background
 	frame.Font = f.Font
 	frame.maxtab = f.maxtab
 	frame.nbox = 0
+	frame.nalloc = 0
 	frame.nchars = 0
 	frame.box = []*frbox{}
 
@@ -48,7 +49,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		b := frame.box[nb]
 		if b == nil {
 			b = new(frbox)
-			 frame.box[nb] = b
+			frame.box[nb] = b
 		}
 		c = r[offs]
 		if c == '\t' || c == '\n' {
@@ -83,11 +84,11 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 				s += rw
 				nr++
 			}
-// not idiomatic.
-//			tmp[s] = 0
-//			s++
+			// not idiomatic.
+			//			tmp[s] = 0
+			//			s++
 			p := make([]byte, s)
-			
+
 			log.Println(nb, len(frame.box), frame.box[0])
 
 			b = frame.box[nb]
@@ -103,7 +104,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	return frame._draw(*ppt)
 }
 
-func (f *Frame) chop(pt image.Point, p,  bn int) {
+func (f *Frame) chop(pt image.Point, p, bn int) {
 	for b := f.box[bn]; ; bn++ {
 		if bn >= f.nbox {
 			panic("endofframe")
@@ -135,13 +136,13 @@ var nalloc = 0
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
 	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
-//	f.Logboxes("at very start of insert")
+	//	f.Logboxes("at very start of insert")
 
 	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return
 	}
 
-//	log.Println("frame.Insert, doing some work")
+	//	log.Println("frame.Insert, doing some work")
 
 	var rect image.Rectangle
 	var col, tcol *draw.Image
@@ -150,7 +151,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 
 	n0 := f.findbox(0, 0, p0)
 
-//	f.Logboxes("at end of findbox")
+	//	f.Logboxes("at end of findbox")
 
 	cn0 := p0
 	nn0 := n0
@@ -161,10 +162,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	ppt1 := pt1
 
 	// I expect n0 to be 0. But... the array is empty.
-//	log.Println("len of box", len(f.box), "n0", n0)
-//	f.Logboxes("f after bxscan")
-//	log.Println("----")
-//	frame.Logboxes("frame after bxscan")
+	//	log.Println("len of box", len(f.box), "n0", n0)
+	//	f.Logboxes("f after bxscan")
+	//	log.Println("----")
+	//	frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
 		f.cklinewrap(&pt0, f.box[n0])
@@ -203,11 +204,11 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				b = f.box[n0]
 			}
 		}
-//		if npts == nalloc {
-//			pts = append(pts, make([]points, npts+DELTA)...)
-//			nalloc += DELTA
-//			b = f.box[n0]
-//		}
+		//		if npts == nalloc {
+		//			pts = append(pts, make([]points, npts+DELTA)...)
+		//			nalloc += DELTA
+		//			b = f.box[n0]
+		//		}
 
 		pts = append(pts, points{pt0, pt1})
 		if pt1.Y == f.Rect.Max.Y {
@@ -347,7 +348,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.box[nn0+n] = frame.box[n]
 	}
 
-//	f.Logboxes("after adding")
+	//	f.Logboxes("after adding")
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--
@@ -358,8 +359,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	if n0 < f.nbox-1 {
 		n0++
 	}
-	f.clean(ppt0, nn0, n0 + 1)
-//	f.Logboxes("after clean")
+	f.clean(ppt0, nn0, n0+1)
+	//	f.Logboxes("after clean")
 	f.nchars += frame.nchars
 	if f.p0 >= p0 {
 		f.p0 += frame.nchars
@@ -377,6 +378,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.Tick(f.Ptofchar(f.p0), true)
 	}
 
-//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
+	//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
 
 }

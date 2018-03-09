@@ -8,8 +8,8 @@ import (
 
 // canfit measures the b's string contents and determines if it fits
 // in the region of the screen between pt and the right edge of the
-// text-containing region. Returned values have several cases. 
-// 
+// text-containing region. Returned values have several cases.
+//
 // If b has width, returns the index of the first  rune known
 // to not fit and true if more thna 0 runes fit.
 // If b has no width, use minwidth instead of width.
@@ -28,12 +28,14 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	}
 
 	w := 0
-	for nr := 0; nr < len(b.Ptr); nr += w {
-		_, w = utf8.DecodeRune(b.Ptr[nr:])
-		left -= f.Font.StringWidth(string(b.Ptr[nr : nr+1]))
+	o := 0
+	for nr := 0; nr < b.Nrune; nr++ {
+		_, w = utf8.DecodeRune(b.Ptr[o:])
+		left -= f.Font.StringWidth(string(b.Ptr[o : o+w]))
 		if left < 0 {
 			return nr, nr != 0
 		}
+		o += w
 	}
 	return 0, false
 }
@@ -95,7 +97,7 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 // clean merges boxes where possible over boxes [n0, n1)
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	log.Println("clean", pt, n0, n1, f.Rect.Max.X)
-//	f.Logboxes("--- clean: starting ---")
+	//	f.Logboxes("--- clean: starting ---")
 	c := f.Rect.Max.X
 	nb := 0
 	for nb = n0; nb < n1-1; nb++ {
@@ -121,7 +123,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	if pt.Y >= f.Rect.Max.Y {
 		f.lastlinefull = 1
 	}
-//	f.Logboxes("--- clean: end")
+	//	f.Logboxes("--- clean: end")
 }
 
 func nbyte(f *frbox) int {

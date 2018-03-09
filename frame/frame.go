@@ -17,14 +17,14 @@ const (
 )
 
 type frbox struct {
-	Wid    int // In pixels. Fixed large size for layout box.
-	Nrune  int // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
+	Wid    int    // In pixels. Fixed large size for layout box.
+	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
 	Ptr    []byte // UTF-8 string in this box.
-	Bc     rune // The kind of special layout box: '\n' or '\t'
+	Bc     rune   // The kind of special layout box: '\n' or '\t'
 	Minwid byte
 }
 
-// fontmetrics lets tests mock the calls into draw for measuring the
+// Fontmetrics lets tests mock the calls into draw for measuring the
 // width of UTF8 slices.
 type Fontmetrics interface {
 	BytesWidth([]byte) int

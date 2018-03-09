@@ -4,7 +4,7 @@ import (
 	"unicode/utf8"
 )
 
-const slop  = 25
+const slop = 25
 
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
@@ -28,12 +28,12 @@ func (f *Frame) closebox(n0, n1 int) {
 	}
 	// TODO(rjk): Use copy.
 	n1++
-	
+
 	for i := n1; i < f.nbox; i++ {
 		f.box[i-(n1-n0)] = f.box[i]
 	}
 	f.nbox -= n1 - n0
-	for i := f.nbox; i < f.nbox + (n1 - n0); i++ {
+	for i := f.nbox; i < f.nbox+(n1-n0); i++ {
 		f.box[i] = nil
 	}
 }
@@ -54,7 +54,7 @@ func (f *Frame) freebox(n0, n1 int) {
 		panic("Frame.freebox")
 	}
 	n1++
-	for i := n0;  i < n1; i++ {
+	for i := n0; i < n1; i++ {
 		f.box[i] = nil
 	}
 }
@@ -65,12 +65,11 @@ func (f *Frame) growbox(delta int) {
 	f.box = append(f.box, make([]*frbox, delta)...)
 }
 
-
 func (f *Frame) dupbox(bn int) {
 	if f.box[bn].Nrune < 0 {
 		panic("dupbox invalid Nrune")
 	}
-	
+
 	cp := new(frbox)
 	*cp = *f.box[bn]
 
@@ -98,7 +97,7 @@ func runeindex(p []byte, n int) int {
 }
 
 // truncatebox drops the  last n characters from box b without allocation.
-func (f *Frame) truncatebox(b * frbox, n int) {
+func (f *Frame) truncatebox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		panic("truncatebox")
 	}
@@ -121,7 +120,7 @@ func (f *Frame) chopbox(b *frbox, n int) {
 // splitbox duplicates box [bn] and divides it at rune n into prefix and suffix boxes.
 func (f *Frame) splitbox(bn, n int) {
 	f.dupbox(bn)
-	f.truncatebox(f.box[bn], f.box[bn].Nrune - n)
+	f.truncatebox(f.box[bn], f.box[bn].Nrune-n)
 	f.chopbox(f.box[bn+1], n)
 }
 
@@ -130,7 +129,7 @@ func (f *Frame) mergebox(bn int) {
 	b1n := len(f.box[bn].Ptr)
 	b2n := len(f.box[bn+1].Ptr)
 
-	b := make([]byte, 0, b1n + b2n)
+	b := make([]byte, 0, b1n+b2n)
 	b = append(b, f.box[bn].Ptr[0:b1n]...)
 	b = append(b, f.box[bn+1].Ptr[0:b2n]...)
 	f.box[bn].Ptr = b
