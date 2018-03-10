@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"unicode"
 )
 
 func min(a, b int) int {
@@ -24,7 +25,12 @@ func max(a, b int) int {
 	return b
 }
 
-func region(a, b int) int {
+func abs(x int) int { 
+	if x < 0 { return -x }
+	return x
+}
+
+func region(a, b uint) int {
 	if a < b {
 		return -1
 	}
@@ -61,4 +67,17 @@ func restoremouse(w *Window) bool {
 		return true
 	}
 	return false
+}
+
+func isalnum(c rune) bool {
+	return unicode.IsNumber(c) || unicode.IsLetter(c)
+}
+
+func runestrchr(s []rune, r rune) int {
+	for ret, sr := range s {
+		if sr == r {
+			return ret
+		}
+	}
+	return -1
 }

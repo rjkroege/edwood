@@ -11,7 +11,7 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 //	log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 //		log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.NoRedraw && b.Nrune >= 0 {
@@ -48,74 +48,64 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
 func (f *Frame) DrawSel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
 	//	log.Println("drawsel0")
 	p := 0
-	bi := 0
-	b := f.box[bi]
+	nb := 0
+	nr := 0
+	var b *frbox
 	trim := false
-	i := 0
 	x := 0
 	var w int
 
-	for nb := 0; nb < f.nbox && p < p1; nb++ {
-		nr := b.Nrune
+	for nb = 0; nb < f.nbox && p < p1; nb++ {
+		b = f.box[nb]
+		p += nr
+
+		nr = b.Nrune
 		if nr < 0 {
 			nr = 1
 		}
 		if p+nr <= p0 {
-			goto Continue
+			continue
 		}
 		if p >= p0 {
 			qt := pt
-			f.cklinewrap(&pt, b)
+			pt = f.cklinewrap(pt, b)
 			// fill in the end of a wrapped line
 			if pt.Y > qt.Y {
 				f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 			}
 		}
-		i = 0
+		runes := []rune(string(b.Ptr))
 		if p < p0 {
-			// beginning of region: advance into box
-			i += len(b.Ptr[:int(p0)-p])
-			nr -= int(p0) - p
-			p = int(p0)
+			runes = runes[p0 - p:]
+			nr -= p0 - p
+			p = p0
 		}
 		trim = false
 		if p+nr > p1 {
 			// end of region: trim box
-			nr -= (p + nr) - int(p1)
+			nr -= (p + nr) - p1
 			trim = true
 		}
 
 		if b.Nrune < 0 || nr == b.Nrune {
 			w = b.Wid
 		} else {
-			// Corresponds to the native code but does the wrong thing if frbox.Nrune is
-			// is actually the number of runes (as opposed to the number of bytes)
-			// In that case, this code and the code below would fail on UTF code points
-			// that are more than one byte each.
-			//
-			// Given that the native code in frdraw.c also has this issue, I'll revisit this
-			// problem later.
-			w = f.Font.StringWidth(string(b.Ptr[i : i+nr]))
+			w = f.Font.RunesWidth(runes[:nr])
 		}
 		x = pt.X + w
 		if x > f.Rect.Max.X {
 			x = f.Rect.Max.X
 		}
-		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
+		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()),  back, nil, pt)
 		if b.Nrune >= 0 {
-			// See comment above. Same issue applies.
-			f.Background.String(pt, text, image.ZP, f.Font.Impl(), string(b.Ptr[i:i+nr]))
+			f.Background.Runes(pt, text, image.ZP, f.Font.Impl(), runes[:nr])
 		}
 		pt.X += w
-	Continue:
-		bi++
-		b = f.box[bi]
-		p += nr
 	}
 
-	if p1 > p0 && bi > 0 && bi < f.nbox && f.box[bi-1].Nrune > 0 && !trim {
+	if p1 > p0 && nb > 0 && nb < f.nbox && f.box[nb].Nrune > 0 && !trim {
 		qt := pt
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		if pt.Y > qt.Y {
 			f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
@@ -182,7 +172,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 	//	log.Println("_draw")
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
-		f.cklinewrap0(&pt, b)
+		pt = f.cklinewrap0(pt, b)
 		if pt.Y == f.Rect.Max.Y {
 			f.NChars -= f.strlen(nb)
 			f.delbox(nb, f.nbox-1)

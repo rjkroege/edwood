@@ -197,7 +197,7 @@ func main() {
 }
 
 func readfile(c *Column, filename string) {
-	w := c.Add(nil, nil, -1)
+	w := c.Add(nil, nil, 0)
 	abspath, _ := filepath.Abs(filename)
 	w.SetName(abspath)
 	w.body.Load(0, filename, true)

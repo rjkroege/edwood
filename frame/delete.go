@@ -51,8 +51,8 @@ func (f *Frame) Delete(p0, p1 int) int {
 	cn1 := p1
 
 	for pt1.X != pt0.X && n1 < f.nbox {
-		f.cklinewrap0(&pt0, b)
-		f.cklinewrap(&pt1, b)
+		pt0 = f.cklinewrap0(pt0, b)
+		pt1 = f.cklinewrap(pt1, b)
 		n, fits := f.canfit(pt0, b)
 
 		if !fits {

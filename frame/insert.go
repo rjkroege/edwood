@@ -55,7 +55,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		c = r[offs]
 		if c == '\t' || c == '\n' {
 			b.Bc = c
-			b.Wid = 5000
+			b.Wid = 5000 // TODO(flux): This won't be wide enough for 8k screens
 			if c == '\n' {
 				b.Minwid = 0
 				nl++
@@ -101,7 +101,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		}
 		frame.nbox++
 	}
-	f.cklinewrap0(ppt, frame.box[0])
+	*ppt = f.cklinewrap0(*ppt, frame.box[0])
 	return frame._draw(*ppt)
 }
 
@@ -110,7 +110,7 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		if bn >= f.nbox {
 			panic("endofframe")
 		}
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		if pt.Y >= f.Rect.Max.Y {
 			break
 		}
@@ -169,8 +169,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	//	frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
-		f.cklinewrap(&pt0, f.box[n0])
-		f.cklinewrap0(&ppt1, f.box[n0])
+		pt0 = f.cklinewrap(pt0, f.box[n0])
+		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
 	}
 	f.Modified = true
 	/*
@@ -192,8 +192,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	npts := 0
 	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < f.nbox; npts++ {
 		b := f.box[n0]
-		f.cklinewrap(&pt0, b)
-		f.cklinewrap0(&pt1, b)
+		pt0 = f.cklinewrap(pt0, b)
+		pt1 = f.cklinewrap0(pt1, b)
 
 		if b.Nrune > 0 {
 			n, fits := f.canfit(pt1, b)

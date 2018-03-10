@@ -40,25 +40,29 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	return 0, false
 }
 
-func (f *Frame) cklinewrap(p *image.Point, b *frbox) {
+func (f *Frame) cklinewrap(p image.Point, b *frbox)(ret image.Point) {
+	ret = p
 	if b.Nrune < 0 {
-		if b.Minwid > byte(f.Rect.Max.X-p.X) {
-			p.X = f.Rect.Min.X
-			p.Y += f.Font.DefaultHeight()
+		if int(b.Minwid) > f.Rect.Max.X-p.X {
+			ret.X = f.Rect.Min.X
+			ret.Y = p.Y + f.Font.DefaultHeight()
 		}
 	} else {
 		if b.Wid > f.Rect.Max.X-p.X {
-			p.X = f.Rect.Min.X
-			p.Y += f.Font.DefaultHeight()
+			ret.X = f.Rect.Min.X
+			ret.Y = p.Y + f.Font.DefaultHeight()
 		}
 	}
+	return ret
 }
 
-func (f *Frame) cklinewrap0(p *image.Point, b *frbox) {
-	if _, ok := f.canfit(*p, b); !ok {
-		p.X = f.Rect.Min.X
-		p.Y += f.Font.DefaultHeight()
+func (f *Frame) cklinewrap0(p image.Point, b *frbox)(ret image.Point) {
+	ret = p
+	if _, ok := f.canfit(p, b); !ok {
+		ret.X = f.Rect.Min.X
+		ret.Y = p.Y + f.Font.DefaultHeight()
 	}
+	return ret
 }
 
 func (f *Frame) advance(p *image.Point, b *frbox) {
@@ -102,7 +106,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	nb := 0
 	for nb = n0; nb < n1-1; nb++ {
 		b := f.box[nb]
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		for f.box[nb].Nrune >= 0 &&
 			nb < n1-1 &&
 			f.box[nb+1].Nrune >= 0 &&
@@ -116,7 +120,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 
 	for ; nb < f.nbox; nb++ {
 		b := f.box[nb]
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		f.advance(&pt, f.box[nb])
 	}
 	f.LastLineFull = 0
