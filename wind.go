@@ -273,7 +273,23 @@ func (w *Window) Undo(isundo bool) {
 }
 
 func (w *Window) SetName(name string) {
+        Lslashguide := "/guide"
+        LplusErrors := "+Errors"
 
+        t := &w.body;
+        if(t.file.name == name) {
+                return
+        }
+        w.isscratch = false;
+        if strings.HasSuffix(name, Lslashguide) || strings.HasSuffix(name, LplusErrors) {
+                w.isscratch = true
+        }
+        t.file.SetName(name)
+
+        for _, te := range t.file.text {
+                te.w.SetTag()
+                te.w.isscratch = w.isscratch
+        }
 }
 
 func (w *Window) Type(t *Text, r rune) {

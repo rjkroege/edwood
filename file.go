@@ -67,8 +67,12 @@ func (f *File) Undelete(delta *Buffer, p0, p1 uint) {
 Unimpl()
 }
 
-func (f *File) SetName(name string, n int) {
-Unimpl()
+func (f *File) SetName(name string) {
+	if(f.seq > 0) {
+		// f.UnsetName(f, &f.delta) TODO(flux): Undo
+	}
+	f.name = name
+	f.unread = true
 }
 
 func (f *File) UnsetName(delta *Buffer) {
