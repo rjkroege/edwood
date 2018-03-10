@@ -35,7 +35,7 @@ type Fontmetrics interface {
 }
 
 type frfont struct {
-	draw.Font
+	*draw.Font
 }
 
 func (ff *frfont) DefaultHeight() int {
@@ -43,7 +43,7 @@ func (ff *frfont) DefaultHeight() int {
 }
 
 func (ff *frfont) Impl() *draw.Font {
-	return &ff.Font
+	return ff.Font
 }
 
 type Frame struct {
@@ -86,7 +86,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 // routines to be called to maintain the associated data structure in,
 // for example, an obscured window.
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
-	f.Font = &frfont{*ft}
+	f.Font = &frfont{ft}
 	f.Display = b.Display
 	f.MaxTab = 8 * ft.StringWidth("0")
 	f.nbox = 0
