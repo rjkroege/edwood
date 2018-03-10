@@ -60,7 +60,7 @@ func (mf *Myframe) Resize(resized bool) {
 //	mf.f.Insert([]rune("Bytes draws the byte slice in the specified\nfont using SoverD on the image,"), 8)
 //	mf.InsertString("Bytes draws the byte slice in the specified\nfont using SoverD on the image,", 8)
 	
-	mf.InsertString("ab", 0)
+//	mf.InsertString("ab", 0)
 
 
 	// Set the tick

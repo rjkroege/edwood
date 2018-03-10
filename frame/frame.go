@@ -158,7 +158,8 @@ func (f *Frame) InitTick() {
 	}
 
 	height := ft.DefaultHeight()
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.White)
+
+	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix,  false, draw.Transparent)
 	if err != nil {
 		return
 	}
@@ -169,14 +170,14 @@ func (f *Frame) InitTick() {
 		f.tick = nil
 		return
 	}
+	f.tickback.Draw( f.tickback.R, f.Cols[ColBack], nil, image.ZP)
 
-	// background colour
-	f.tick.Draw(f.tick.R, f.Cols[ColBack], nil, image.Pt(0, 0))
+	f.tick.Draw(f.tick.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Black, nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Cols[ColText], nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Cols[ColText], nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tick.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.

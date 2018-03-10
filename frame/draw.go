@@ -2,7 +2,6 @@ package frame
 
 import (
 	"image"
-	//	"log"
 
 	"9fans.net/go/draw"
 )
@@ -146,6 +145,7 @@ func (f *Frame) Redraw() {
 
 }
 
+// TODO(rjk): Change name to tick
 func (f *Frame) _tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
 	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
@@ -158,15 +158,19 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 	if r.Max.X > f.Rect.Max.X {
 		r.Max.X = f.Rect.Max.X
 	}
+
 	if ticked {
 		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.tick, nil, image.ZP)
+		f.Background.Draw(r, f.Display.Black , f.tick, image.ZP) // draws an alpha-blended box
 	} else {
+		// There is an issue with tick management
 		f.Background.Draw(r, f.tickback, nil, image.ZP)
 	}
 	f.ticked = ticked
 }
 
+// Tick draws (if up is non-zero) or removes (if up is zero) the tick
+// at the screen position indicated by pt.
 func (f *Frame) Tick(pt image.Point, ticked bool) {
 	//	log.Println("Tick")
 	if f.tickscale != f.Display.ScaleSize(1) {
