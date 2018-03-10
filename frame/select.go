@@ -16,7 +16,7 @@ func region(a, b int) int {
 }
 
 // called when mouse 1 is down
-func (f *Frame) Select(mc draw.Mousectl) {
+func (f *Frame) Select(mc *draw.Mousectl) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
 

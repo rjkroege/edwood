@@ -66,6 +66,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 
 	pt = f.grid(pt)
 	qt := f.Rect.Min
+	b = f.box[0]
 
 	for bn = 0; bn < f.nbox && qt.Y < pt.Y; bn++ {
 		b = f.box[bn]
