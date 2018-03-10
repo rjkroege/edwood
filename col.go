@@ -18,11 +18,11 @@ type Column struct {
 	safe bool
 }
 
-func (c *Column)nw() int {
+func (c *Column) nw() int {
 	return len(c.w)
 }
 
-func (c *Column)Init(r image.Rectangle) *Column {
+func (c *Column) Init(r image.Rectangle) *Column {
 	if c == nil {
 		c = &Column{}
 	}
@@ -41,7 +41,7 @@ func (c *Column)Init(r image.Rectangle) *Column {
 	c.tag.Insert(0, Lheader, true)
 	c.tag.SetSelect(c.tag.file.b.nc(), c.tag.file.b.nc())
 	display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
-display.Flush()
+	display.Flush()
 	c.safe = true
 	return c
 }
@@ -61,7 +61,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect.Max.Y + display.ScaleSize(Border)
 	if y < r.Min.Y && c.nw() > 0 { // Steal half the last window
-		v = c.w[c.nw() - 1]
+		v = c.w[c.nw()-1]
 		y = v.body.fr.Rect.Min.Y + v.body.fr.Rect.Dx()/2
 	}
 	// Which window will we land on?
@@ -72,7 +72,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			break
 		}
 	}
-	buggered := false 	// historical variable name
+	buggered := false // historical variable name
 	if c.nw() > 0 {
 		if windex < c.nw() {
 			windex++
@@ -90,14 +90,14 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			}
 			c.Grow(v, 1)
 		}
-		
+
 		/*
 		 * figure out where to split v to make room for w
 		 */
-	
+
 		/* new window stops where next window begins */
 		if windex < c.nw() {
-			ymax = c.w[windex].r.Min.Y-display.ScaleSize(Border)
+			ymax = c.w[windex].r.Min.Y - display.ScaleSize(Border)
 		} else {
 			ymax = c.r.Max.Y
 		}
@@ -106,7 +106,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		y = max(y, v.tagtop.Max.Y+display.ScaleSize(Border))
 
 		/* new window must start early enough to end before ymax */
-		y = min(y, ymax - minht)
+		y = min(y, ymax-minht)
 
 		/* if y is too small, too many windows in column */
 		if y < v.tagtop.Max.Y+display.ScaleSize(Border) {
@@ -121,9 +121,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		y = min(y, ymax-(v.tag.fr.Font.DefaultHeight()*v.taglines+v.body.fr.Font.DefaultHeight()+display.ScaleSize(Border)+1))
 		r1.Max.Y = min(y, v.body.fr.Rect.Min.Y+v.body.fr.NLines*v.body.fr.Font.DefaultHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
-		r1.Max.Y = r1.Min.Y+display.ScaleSize(Border)
+		r1.Max.Y = r1.Min.Y + display.ScaleSize(Border)
 		display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
-		
+
 		/*
 		 * leave r with w's coordinates
 		 */
@@ -148,23 +148,23 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		c.Resize(c.r)
 	}
 	savemouse(w)
-	display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3,3)))
+	display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3, 3)))
 	barttext = &w.body
 	return w
 }
 
 func (c *Column) Close(w *Window, dofree bool) {
-Unimpl()
+	Unimpl()
 
 }
 
 func (c *Column) CloseAll() {
-Unimpl()
+	Unimpl()
 
 }
 
 func (c *Column) MouseBut() {
-Unimpl()
+	Unimpl()
 
 }
 
@@ -178,31 +178,31 @@ func (c *Column) Resize(r image.Rectangle) {
 	r1.Max.Y += display.ScaleSize(Border)
 	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
 	r1.Max.Y = r.Max.Y
-	for i:=0; i<c.nw(); i++ {
+	for i := 0; i < c.nw(); i++ {
 		w := c.w[i]
 		w.maxlines = 0
 		if i == c.nw()-1 {
 			r1.Max.Y = r.Max.Y
 		} else {
-			r1.Max.Y = r1.Min.Y+(w.r.Dy()+display.ScaleSize(Border))*r.Dy()/c.r.Dy()
+			r1.Max.Y = r1.Min.Y + (w.r.Dy()+display.ScaleSize(Border))*r.Dy()/c.r.Dy()
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y + display.ScaleSize(Border)+tagfont.Height)
+		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+display.ScaleSize(Border)+tagfont.Height)
 		r2 := r1
-		r2.Max.Y = r2.Min.Y+display.ScaleSize(Border)
+		r2.Max.Y = r2.Min.Y + display.ScaleSize(Border)
 		display.ScreenImage.Draw(r2, display.Black, nil, image.ZP)
 		r1.Min.Y = r2.Max.Y
-		r1.Min.Y = w.Resize(r1, false, i==c.nw()-1)
+		r1.Min.Y = w.Resize(r1, false, i == c.nw()-1)
 	}
 	c.r = r
 }
 
 func cmp(a, b interface{}) int {
-Unimpl()
+	Unimpl()
 	return 0
 }
 
 func (c *Column) Sort() {
-Unimpl()
+	Unimpl()
 
 }
 
@@ -213,7 +213,7 @@ func (c *Column) Grow(w *Window, but int) {
 	var windex int
 
 	for windex = range c.w {
-		if(c.w[windex] == w) {
+		if c.w[windex] == w {
 			break
 		}
 	}
@@ -221,8 +221,8 @@ func (c *Column) Grow(w *Window, but int) {
 		panic("can't find window") // TODO(flux): implement counterpart to the C version's error()
 	}
 
- 	cr := c.r
-	if but < 0 {	/* make sure window fills its own space properly */
+	cr := c.r
+	if but < 0 { /* make sure window fills its own space properly */
 		r := w.r
 		if windex == int(c.nw()-1) || !c.safe {
 			r.Max.Y = cr.Max.Y
@@ -233,16 +233,16 @@ func (c *Column) Grow(w *Window, but int) {
 		return
 	}
 	cr.Min.Y = c.w[0].r.Min.Y
-	if but == 3 {	/* Switch to full size window */
+	if but == 3 { /* Switch to full size window */
 		if windex != 0 {
 			v = c.w[0]
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		display.ScreenImage.Draw(cr, textcolors[frame.ColBack], nil, image.ZP);
-		w.Resize(cr, false, true);
-		for i:=1; i<c.nw(); i++ {
-			c.w[i].body.fr.MaxLines = 0;
+		display.ScreenImage.Draw(cr, textcolors[frame.ColBack], nil, image.ZP)
+		w.Resize(cr, false, true)
+		for i := 1; i < c.nw(); i++ {
+			c.w[i].body.fr.MaxLines = 0
 		}
 		c.safe = false
 		return
@@ -252,38 +252,40 @@ func (c *Column) Grow(w *Window, but int) {
 	nl := make([]int, c.nw())
 	ny := make([]int, c.nw())
 	tot := 0
-	for j:=0; j<c.nw(); j++{
-		l := c.w[j].taglines-1 + c.w[j].body.fr.MaxLines; // TODO(flux): This taglines subtraction (for scrolling tags) assumes tags take the same number of pixels height as the body lines.  This is clearly false.
+	for j := 0; j < c.nw(); j++ {
+		l := c.w[j].taglines - 1 + c.w[j].body.fr.MaxLines // TODO(flux): This taglines subtraction (for scrolling tags) assumes tags take the same number of pixels height as the body lines.  This is clearly false.
 		nl[j] = l
 		tot += l
 	}
 	/* approximate new #lines for this window */
-	if but == 2 {	/* as big as can be */
-		for i:=range nl { nl[i] = 0 }
+	if but == 2 { /* as big as can be */
+		for i := range nl {
+			nl[i] = 0
+		}
 		goto Pack
 	}
-	{	// Scope for nnl & dln
-		nnl := min(onl + max(min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
+	{ // Scope for nnl & dln
+		nnl := min(onl+max(min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
 		if nnl < w.taglines-1+w.maxlines {
-			nnl = (w.taglines-1+w.maxlines + nnl)/2
+			nnl = (w.taglines - 1 + w.maxlines + nnl) / 2
 		}
 		if nnl == 0 {
 			nnl = 2
 		}
-		dnl := nnl - onl;
+		dnl := nnl - onl
 		/* compute new #lines for each window */
-		for k:=1; k<c.nw(); k++{
+		for k := 1; k < c.nw(); k++ {
 			/* prune from later window */
-			j := windex+k
-			if j<c.nw() && nl[j] != 0{
+			j := windex + k
+			if j < c.nw() && nl[j] != 0 {
 				l := min(dnl, max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
 				dnl -= l
 			}
 			/* prune from earlier window */
-			j = windex-k
-			if j>=0 && nl[j] != 0{
+			j = windex - k
+			if j >= 0 && nl[j] != 0 {
 				l := min(dnl, max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
@@ -291,14 +293,14 @@ func (c *Column) Grow(w *Window, but int) {
 			}
 		}
 	}
-    Pack:
+Pack:
 	/* pack everyone above */
 	y1 := cr.Min.Y
-	for j:=0; j<windex; j++{
+	for j := 0; j < windex; j++ {
 		v = c.w[j]
 		r := v.r
 		r.Min.Y = y1
-		r.Max.Y = y1+ v.tagtop.Dy()
+		r.Max.Y = y1 + v.tagtop.Dy()
 		if nl[j] != 0 {
 			r.Max.Y += 1 + nl[j]*v.body.fr.Font.DefaultHeight()
 		}
@@ -309,11 +311,11 @@ func (c *Column) Grow(w *Window, but int) {
 	}
 	/* scan to see new size of everyone below */
 	y2 := c.r.Max.Y
-	for j:=c.nw()-1; j>windex; j-- {
+	for j := c.nw() - 1; j > windex; j-- {
 		v = c.w[j]
 		r := v.r
-		r.Min.Y = y2-v.tagtop.Dy()
-		if nl[j] != 0{
+		r.Min.Y = y2 - v.tagtop.Dy()
+		if nl[j] != 0 {
 			r.Min.Y -= 1 + nl[j]*v.body.fr.Font.DefaultHeight()
 		}
 		r.Min.Y -= display.ScaleSize(Border)
@@ -326,7 +328,7 @@ func (c *Column) Grow(w *Window, but int) {
 	r.Max.Y = y2
 	h := w.body.fr.Font.DefaultHeight() // TODO(flux) Is this the right frame font height to use?
 	if r.Dy() < w.tagtop.Dy()+1+h+display.ScaleSize(Border) {
-		r.Max.Y = r.Min.Y + w.tagtop.Dy()+1+h+display.ScaleSize(Border)
+		r.Max.Y = r.Min.Y + w.tagtop.Dy() + 1 + h + display.ScaleSize(Border)
 	}
 	/* draw window */
 	r.Max.Y = w.Resize(r, c.safe, true)
@@ -334,22 +336,22 @@ func (c *Column) Grow(w *Window, but int) {
 		r.Min.Y = r.Max.Y
 		r.Max.Y += display.ScaleSize(Border)
 		display.ScreenImage.Draw(r, display.Black, nil, image.ZP)
-		for j:=windex+1; j<c.nw(); j++ {
-			ny[j] -= (y2-r.Max.Y)
+		for j := windex + 1; j < c.nw(); j++ {
+			ny[j] -= (y2 - r.Max.Y)
 		}
 	}
 	/* pack everyone below */
 	y1 = r.Max.Y
-	for j:=windex+1; j<c.nw(); j++ {
+	for j := windex + 1; j < c.nw(); j++ {
 		v = c.w[j]
 		r = v.r
 		r.Min.Y = y1
-		r.Max.Y = y1+v.tagtop.Dy()
+		r.Max.Y = y1 + v.tagtop.Dy()
 		if nl[j] != 0 {
 			r.Max.Y += 1 + nl[j]*v.body.fr.Font.DefaultHeight()
 		}
-		y1 = v.Resize(r, c.safe, j==c.nw()-1)
-		if j < c.nw()-1 {	/* no border on last window */
+		y1 = v.Resize(r, c.safe, j == c.nw()-1)
+		if j < c.nw()-1 { /* no border on last window */
 			r.Min.Y = y1
 			r.Max.Y += display.ScaleSize(Border)
 			display.ScreenImage.Draw(r, display.Black, nil, image.ZP)
@@ -361,7 +363,7 @@ func (c *Column) Grow(w *Window, but int) {
 }
 
 func (c *Column) DragWin(w *Window, but uint) {
-Unimpl()
+	Unimpl()
 
 }
 
@@ -388,6 +390,6 @@ func (c *Column) Which(p image.Point) *Text {
 }
 
 func (c *Column) Clean() int {
-Unimpl()
+	Unimpl()
 	return 0
 }

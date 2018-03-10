@@ -6,14 +6,14 @@ import (
 )
 
 type File struct {
-	b         Buffer
-	delta     Buffer
-	epsilon   Buffer
-	elogbuf   *Buffer
-	elog      Elog
-	name      string //[]rune
-	qidpath   string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
-	mtime     int64
+	b       Buffer
+	delta   Buffer
+	epsilon Buffer
+	elogbuf *Buffer
+	elog    Elog
+	name    string //[]rune
+	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
+	mtime   int64
 	// dev       int
 	unread    bool
 	editclean bool
@@ -23,7 +23,7 @@ type File struct {
 	curtext *Text
 	text    []*Text
 	dumpid  int
-	
+
 	sha1 [sha1.Size]byte // Used to check if the file has changed on disk since loaded
 }
 
@@ -39,7 +39,7 @@ func (f *File) AddText(t *Text) *File {
 }
 
 func (f *File) DelText(t *Text) {
-Unimpl()
+	Unimpl()
 }
 
 func (f *File) Insert(p0 uint, s []rune) {
@@ -49,26 +49,26 @@ func (f *File) Insert(p0 uint, s []rune) {
 	if f.seq > 0 {
 		// f.Uninsert(&f.delta, p0, len(s))  TODO(flux): Here we start dealing with Undo operations
 	}
-	f.b.Insert(p0, s);
+	f.b.Insert(p0, s)
 	if len(s) != 0 {
 		f.mod = true
 	}
 }
 
 func (f *File) Uninsert(delta *Buffer, q0, ns uint) {
-Unimpl()
+	Unimpl()
 }
 
 func (f *File) Delete(p0, p1 uint) {
-Unimpl()
+	Unimpl()
 }
 
 func (f *File) Undelete(delta *Buffer, p0, p1 uint) {
-Unimpl()
+	Unimpl()
 }
 
 func (f *File) SetName(name string) {
-	if(f.seq > 0) {
+	if f.seq > 0 {
 		// f.UnsetName(f, &f.delta) TODO(flux): Undo
 	}
 	f.name = name
@@ -76,72 +76,72 @@ func (f *File) SetName(name string) {
 }
 
 func (f *File) UnsetName(delta *Buffer) {
-Unimpl()
+	Unimpl()
 }
 
 func NewFile(filename string) *File {
 	return &File{
-	b:        NewBuffer(),
-/*	delta     Buffer
-	epsilon   Buffer
-*/
-	elog: MakeElog(),
-	name:      filename,
-//	qidpath   uint64
-//	mtime     uint64
-//	dev       int
-	unread: true,
-	editclean: true,
-//	seq       int
-	mod:      false,
+		b: NewBuffer(),
+		/*	delta     Buffer
+			epsilon   Buffer
+		*/
+		elog: MakeElog(),
+		name: filename,
+		//	qidpath   uint64
+		//	mtime     uint64
+		//	dev       int
+		unread:    true,
+		editclean: true,
+		//	seq       int
+		mod: false,
 
-	curtext: nil,
-	text: []*Text{},
-//	ntext   int
-//	dumpid  int
+		curtext: nil,
+		text:    []*Text{},
+		//	ntext   int
+		//	dumpid  int
 	}
 }
 
 func NewTagFile() *File {
 
 	return &File{
-	b:        NewBuffer(),
-/*	delta     Buffer
-	epsilon   Buffer
-*/
-	elog: MakeElog(),
-	name:      "",
-//	qidpath   uint64
-//	mtime     uint64
-//	dev       int
-	unread: true,
-	editclean: true,
-//	seq       int
-	mod:      false,
+		b: NewBuffer(),
+		/*	delta     Buffer
+			epsilon   Buffer
+		*/
+		elog: MakeElog(),
+		name: "",
+		//	qidpath   uint64
+		//	mtime     uint64
+		//	dev       int
+		unread:    true,
+		editclean: true,
+		//	seq       int
+		mod: false,
 
-//	curtext *Text
-//	text    **Text
-//	ntext   int
-//	dumpid  int
+		//	curtext *Text
+		//	text    **Text
+		//	ntext   int
+		//	dumpid  int
 	}
 }
 
 func (f *File) RedoSeq() uint {
-Unimpl()
+	Unimpl()
 	return 0
 }
 
 func (f *File) Undo(isundo bool, q0p, q1p *uint) {
-Unimpl()
+	Unimpl()
 }
 
 func (f *File) Reset() {
-Unimpl()
+	Unimpl()
 
 }
 
 func (f *File) Close() {
-Unimpl()
+	Unimpl()
 
 }
 

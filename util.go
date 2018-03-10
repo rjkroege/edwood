@@ -20,10 +20,9 @@ func minu(a, b uint) uint {
 func max(a, b int) int {
 	if a > b {
 		return a
-	} 
+	}
 	return b
 }
-
 
 func region(a, b int) int {
 	if a < b {
@@ -43,7 +42,7 @@ func warning(md *MntDir, s string, args ...interface{}) {
 
 var (
 	prevmouse image.Point
-	mousew *Window
+	mousew    *Window
 )
 
 func clearmouse() {
@@ -56,7 +55,7 @@ func savemouse(w *Window) {
 }
 
 func restoremouse(w *Window) bool {
-	defer func(){mousew = nil}()
+	defer func() { mousew = nil }()
 	if mousew != nil && mousew == w {
 		display.MoveTo(prevmouse)
 		return true

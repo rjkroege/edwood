@@ -9,7 +9,6 @@ import (
 
 type Buffer []rune
 
-
 func NewBuffer() Buffer { return []rune{} }
 
 func (b *Buffer) Insert(q0 uint, r []rune) {
@@ -50,7 +49,7 @@ func (b *Buffer) Read(q0, n uint) (r []rune) {
 		panic("internal error: Buffer.Read")
 	}
 
-	return (*b)[q0:q0+n]
+	return (*b)[q0 : q0+n]
 }
 
 func (b *Buffer) Close() {

@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"log"
 	"image"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,14 +28,13 @@ var (
 		"/lib/font/bit/lucm/unicode.9.font",
 	}
 
-	command *Command
+	command           *Command
 	swapscrollButtons bool
 )
 
 func timefmt( /*Fmt* */ ) int {
 	return 0
 }
-
 
 func main2() {
 	var cols [5]*draw.Image
@@ -54,7 +53,6 @@ func main2() {
 		f.Tick(image.ZP, true)
 	}
 }
-
 
 // var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
@@ -87,11 +85,11 @@ func main() {
 	bartflag = *bartflagflag
 	swapscrollbuttons = *swapscrollbuttonsflag
 
-	cputype = os.Getenv("cputype");
-	objtype = os.Getenv("objtype");
-	home = os.Getenv("HOME");
-	acmeshell = os.Getenv("acmeshell");
-	p := os.Getenv("tabstop");
+	cputype = os.Getenv("cputype")
+	objtype = os.Getenv("objtype")
+	home = os.Getenv("HOME")
+	acmeshell = os.Getenv("acmeshell")
+	p := os.Getenv("tabstop")
 	if p != "" {
 		mt, _ := strconv.ParseInt(p, 10, 32)
 		maxtab = uint(mt)
@@ -114,7 +112,7 @@ func main() {
 	wdir, _ = os.Getwd()
 
 	var err error
-	display, err = draw.Init(nil, fontnames[0], "acme", *winsize) // TODO(flux): 
+	display, err = draw.Init(nil, fontnames[0], "acme", *winsize) // TODO(flux):
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,9 +125,9 @@ func main() {
 	tagfont = display.DefaultFont
 
 	// TODO(flux)
-	iconinit();
-//	timerinit()
-//	rxinit();
+	iconinit()
+	//	timerinit()
+	//	rxinit();
 
 	// cplumb = make(chan *Plumbmsg) TODO(flux): There must be a plumber library in go...
 	// cwait = make(chan Waitmsg)
@@ -142,7 +140,7 @@ func main() {
 	cexit = make(chan int)
 	cerr = make(chan string)
 	cedit = make(chan int)
-	cwarn = make(chan uint)	/* TODO(flux): (really chan(unit)[1]) */
+	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
 
 	mousectl = display.InitMouse()
 	mouse = &mousectl.Mouse
@@ -162,7 +160,7 @@ func main() {
 			if len(files) == 0 {
 				ncol = 2
 			} else {
-				ncol = (len(files) + (WindowsPerCol - 1))/WindowsPerCol
+				ncol = (len(files) + (WindowsPerCol - 1)) / WindowsPerCol
 				if ncol < 2 {
 					ncol = 2
 				}
@@ -225,8 +223,8 @@ func fontget(fix int, save bool, setfont bool, name string) (font *draw.Font) {
 	if font, ok = fontCache[name]; !ok {
 		f, err := display.OpenFont(name)
 		if err != nil {
-			warning(nil, "can't open font file %s: %r\n", name);
-			return nil;
+			warning(nil, "can't open font file %s: %r\n", name)
+			return nil
 		}
 		fontCache[name] = f
 		font = f
@@ -255,7 +253,7 @@ func iconinit() {
 		textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Yellowgreen)
 		textcolors[frame.ColText] = display.Black
 		textcolors[frame.ColHText] = display.Black
- 	}
+	}
 
 	// ...
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), tagfont.Height+1)
@@ -264,13 +262,13 @@ func iconinit() {
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
 
-	r = button.R;
-	modbutton, _ = display.AllocImage(r, display.ScreenImage.Pix,  false, draw.Notacolor)
+	r = button.R
+	modbutton, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Notacolor)
 	modbutton.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	tmp, _ := display.AllocImage(image.Rect(0,0,1,1), display.ScreenImage.Pix, true, draw.Medblue);
+	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Medblue)
 	modbutton.Draw(r, tmp, nil, image.ZP)
 
 	r = button.R
@@ -278,7 +276,7 @@ func iconinit() {
 
 	but2col, _ = display.AllocImage(r, display.ScreenImage.Pix, true, 0xAA0000FF)
 	but3col, _ = display.AllocImage(r, display.ScreenImage.Pix, true, 0x006600FF)
-	
+
 }
 
 func ismtpt(filename string) bool {
@@ -304,7 +302,8 @@ func mousethread() {
 			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
 			iconinit()
 			row.Resize(display.ScreenImage.R)
-		case mousectl.Mouse = <-mousectl.C: MovedMouse(mousectl.Mouse)
+		case mousectl.Mouse = <-mousectl.C:
+			MovedMouse(mousectl.Mouse)
 		}
 	}
 }
@@ -315,38 +314,43 @@ func MovedMouse(m draw.Mouse) {
 
 	t := row.Which(m.Point)
 
-	if (t!=mousetext && t!=nil && t.w!=nil  &&
-		(mousetext==nil || mousetext.w==nil || t.w.id!=mousetext.w.id)) {
+	if t != mousetext && t != nil && t.w != nil &&
+		(mousetext == nil || mousetext.w == nil || t.w.id != mousetext.w.id) {
 		// xfidlog(t.w, "focus");  TODO(flux)
 	}
 
-	if t!=mousetext && mousetext!=nil && mousetext.w!=nil {
+	if t != mousetext && mousetext != nil && mousetext.w != nil {
 		mousetext.w.Lock('M')
 		mousetext.eq0 = ^0
 		mousetext.w.Commit(mousetext)
 		mousetext.w.Unlock()
 	}
-	mousetext = t;
+	mousetext = t
 	if t == nil {
 		return
 	}
-	w := t.w;
-	if t==nil || m.Buttons==0  {
+	w := t.w
+	if t == nil || m.Buttons == 0 {
 		return
 	}
 	but := uint(0)
 	switch m.Buttons {
-	case 1: but = 1
-	case 2: but = 2
-	case 4: but = 3
+	case 1:
+		but = 1
+	case 2:
+		but = 2
+	case 4:
+		but = 3
 	}
-	barttext = t;
-	if t.what==Body && m.Point.In(t.scrollr) {
+	barttext = t
+	if t.what == Body && m.Point.In(t.scrollr) {
 		if but != 0 {
 			if swapscrollButtons {
 				switch but {
-				case 1: but = 3
-				case 3: but = 1
+				case 1:
+					but = 3
+				case 3:
+					but = 1
 				}
 			}
 			w.Lock('M')
@@ -357,9 +361,9 @@ func MovedMouse(m draw.Mouse) {
 		return
 	}
 	/* scroll Buttons, wheels, etc. */
-	if w != nil && (m.Buttons & (8|16)) != 0{
-		if m.Buttons & 8 != 0{
-			but = Kscrolloneup;
+	if w != nil && (m.Buttons&(8|16)) != 0 {
+		if m.Buttons&8 != 0 {
+			but = Kscrolloneup
 		} else {
 			but = Kscrollonedown
 		}
@@ -374,7 +378,7 @@ func MovedMouse(m draw.Mouse) {
 			switch t.what {
 			case Columntag:
 				row.DragCol(t.col, but)
-			case Tag: 
+			case Tag:
 				t.col.DragWin(t.w, but)
 				if t.w != nil {
 					barttext = &t.w.body
@@ -388,17 +392,17 @@ func MovedMouse(m draw.Mouse) {
 	}
 	if m.Buttons != 0 {
 		if w != nil {
-			w.Lock('M');
+			w.Lock('M')
 			defer w.Unlock()
 		}
 		t.eq0 = ^0
 		if w != nil {
-			w.Commit(t);
+			w.Commit(t)
 		} else {
 			t.Commit(true)
 		}
 		switch {
-		case  m.Buttons & 1 != 0:
+		case m.Buttons&1 != 0:
 			t.Select()
 			if w != nil {
 				w.SetTag()
@@ -406,23 +410,23 @@ func MovedMouse(m draw.Mouse) {
 			argtext = t
 			seltext = t
 			if t.col != nil {
-				activecol = t.col	/* button 1 only */
+				activecol = t.col /* button 1 only */
 			}
-			if t.w!=nil && t==&t.w.body {
+			if t.w != nil && t == &t.w.body {
 				activewin = t.w
 			}
-		case m.Buttons & 2 != 0: 
+		case m.Buttons&2 != 0:
 			if q0, q1, argt, ok := t.Select2(); ok {
 				execute(t, q0, q1, false, argt)
 			}
-		case m.Buttons & 4 != 0: 
+		case m.Buttons&4 != 0:
 			if q0, q1, ok := t.Select3(); ok {
 				look3(t, q0, q1, false)
 			}
 		}
 		return
 	}
- 	return
+	return
 }
 
 func keyboardthread() {
@@ -444,4 +448,3 @@ func newwindowthread() {
 func plumbproc() {
 
 }
-
