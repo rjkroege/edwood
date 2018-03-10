@@ -178,8 +178,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 * insertion is complete. pt0 is current location of insertion position
 	 * (p0); pt1 is terminal point (without line wrap) of insertion.
 	 */
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), false)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
 	/*
@@ -285,7 +285,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.p0 <= cn0 && cn0 < f.p1 { /* b+1 is inside selection */
+				if f.P0 <= cn0 && cn0 < f.P1 { /* b+1 is inside selection */
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -298,7 +298,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.p0 <= cn0 && cn0 < f.p1 {
+				if f.P0 <= cn0 && cn0 < f.P1 {
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -316,7 +316,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 			}
 			cn0--
-			if f.p0 <= cn0 && cn0 < f.p1 {
+			if f.P0 <= cn0 && cn0 < f.P1 {
 				col = f.Cols[ColHigh]
 				tcol = f.Cols[ColHText]
 			} else {
@@ -332,7 +332,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		npts--
 	}
 
-	if f.p0 < p0 && p0 <= f.p1 {
+	if f.P0 < p0 && p0 <= f.P1 {
 		col = f.Cols[ColHigh]
 		tcol = f.Cols[ColHText]
 	} else {
@@ -363,20 +363,20 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	f.clean(ppt0, nn0, n0 + 1)
 //	f.Logboxes("after clean")
 	f.NChars += frame.NChars
-	if f.p0 >= p0 {
-		f.p0 += frame.NChars
+	if f.P0 >= p0 {
+		f.P0 += frame.NChars
 	}
-	if f.p0 >= f.NChars {
-		f.p0 = f.NChars
+	if f.P0 >= f.NChars {
+		f.P0 = f.NChars
 	}
-	if f.p1 >= p0 {
-		f.p1 += frame.NChars
+	if f.P1 >= p0 {
+		f.P1 += frame.NChars
 	}
-	if f.p1 >= f.NChars {
-		f.p1 += f.NChars
+	if f.P1 >= f.NChars {
+		f.P1 += f.NChars
 	}
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), true)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), true)
 	}
 
 	//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))

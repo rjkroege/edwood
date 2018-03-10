@@ -29,8 +29,8 @@ func (f *Frame) Delete(p0, p1 int) int {
 	pt0 := f.ptofcharnb(p0, n0)
 	pt1 := f.Ptofchar(p1)
 
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), false)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
 	nn0 := n0
@@ -85,7 +85,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 				r.Max.X = f.Rect.Max.X
 			}
 			col := f.Cols[ColBack]
-			if f.p0 <= cn1 && cn1 < f.p1 {
+			if f.P0 <= cn1 && cn1 < f.P1 {
 				col = f.Cols[ColHigh]
 			}
 			f.Background.Draw(r, col, nil, pt0)
@@ -138,21 +138,21 @@ func (f *Frame) Delete(p0, p1 int) int {
 		f.clean(ppt0, nn0, n0)
 	}
 
-	if f.p1 > p1 {
-		f.p1 -= p1 - p0
-	} else if f.p1 > p0 {
-		f.p1 = p0
+	if f.P1 > p1 {
+		f.P1 -= p1 - p0
+	} else if f.P1 > p0 {
+		f.P1 = p0
 	}
 
-	if f.p0 > p1 {
-		f.p0 -= p1 - p0
-	} else if f.p0 > p0 {
-		f.p0 = p0
+	if f.P0 > p1 {
+		f.P0 -= p1 - p0
+	} else if f.P0 > p0 {
+		f.P0 = p0
 	}
 
 	f.NChars -= int(p1 - p0)
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), true)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), true)
 	}
 	pt0 = f.Ptofchar(f.NChars)
 	n := f.NLines

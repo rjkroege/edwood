@@ -21,12 +21,12 @@ func (f *Frame) Select(mc draw.Mousectl) {
 	b := mc.Mouse.Buttons
 
 	f.Modified = false
-	f.DrawSel(f.Ptofchar(f.p0), f.p0, f.p1, false)
+	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
 	p0 := f.Charofpt(mp)
 	p1 := p0
 
-	f.p0 = p0
-	f.p1 = p1
+	f.P0 = p0
+	f.P1 = p1
 
 	pt0 := f.Ptofchar(p0)
 	pt1 := f.Ptofchar(p1)
@@ -40,13 +40,13 @@ func (f *Frame) Select(mc draw.Mousectl) {
 		if f.Scroll != nil {
 			if mp.Y < f.Rect.Min.Y {
 				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
-				p0 = f.p1
-				p1 = f.p0
+				p0 = f.P1
+				p1 = f.P0
 				scrled = true
 			} else if mp.Y > f.Rect.Max.Y {
 				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
-				p0 = f.p1
-				p1 = f.p0
+				p0 = f.P1
+				p1 = f.P0
 				scrled = true
 			}
 			if scrled {
@@ -94,11 +94,11 @@ func (f *Frame) Select(mc draw.Mousectl) {
 		}
 		f.Modified = false
 		if p0 < p1 {
-			f.p0 = p0
-			f.p1 = p1
+			f.P0 = p0
+			f.P1 = p1
 		} else {
-			f.p0 = p1
-			f.p1 = p0
+			f.P0 = p1
+			f.P1 = p0
 		}
 
 		if scrled {

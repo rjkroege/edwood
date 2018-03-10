@@ -55,7 +55,7 @@ type Frame struct {
 	Entire       image.Rectangle         // size of full frame
 	Scroll       func(*Frame, int)       // function provided by application
 	box          []*frbox
-	p0, p1       int // bounds of a selection
+	P0, P1       int // bounds of a selection
 	nbox, nalloc int
 	MaxTab       int // max size of a tab (in pixels)
 	NChars       int // number of runes in frame
@@ -93,8 +93,8 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.nalloc = 0
 	f.NChars = 0
 	f.NLines = 0
-	f.p0 = 0
-	f.p1 = 0
+	f.P0 = 0
+	f.P1 = 0
 	f.box = nil
 	f.LastLineFull = 0
 	f.Cols = cols
