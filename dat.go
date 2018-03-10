@@ -59,11 +59,17 @@ const (
 	ButtonBorder = 2
 	Scrollwid = 12
 	Scrollgap = 8
+
+
+
+	KF = 0xF000 // Start of private unicode space
+	Kscrolloneup = KF|0x20
+	Kscrollonedown = KF|0x21
 )
 
 var (
 	globalincref bool
-	seq          uint
+	seq          int
 	maxtab       uint /*size of a tab, in units of the '0' character */
 
 	display     *draw.Display

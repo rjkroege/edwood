@@ -12,6 +12,10 @@ func (r Buffer)Index(set []rune) int {
 }
 
 func (r Buffer)Eq(s Buffer) bool {
+	return runeEq(r, s)
+}
+
+func runeEq(r, s []rune) bool {
 	if len(s) != len(r) {
 		return false
 	}
@@ -23,17 +27,19 @@ func (r Buffer)Eq(s Buffer) bool {
 	return true
 }
 
-func runesplitN(buf []rune, sep rune, nl int) [][]rune {
+func runesplitN(buf []rune, sep []rune, nl int) [][]rune {
 	linestart := 0
 	lines := [][]rune{}
 	for i, r := range buf {
-		if r == sep {
+		for _, se := range sep {
+		if r == se {
 			line := append(buf[linestart:i], rune('\n'))
 			lines = append(lines, line)
 			linestart = i+1
 		}
 		if len(lines) >= nl {
 			break
+		}
 		}
 	}
 	if linestart != len(buf) {

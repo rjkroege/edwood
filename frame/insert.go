@@ -136,7 +136,7 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
-	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
+	//log.Printf("\n\n-----\nframe.Insert: %s", string(r))
 	//	f.Logboxes("at very start of insert")
 
 	if p0 > f.NChars || len(r) == 0 || f.Background == nil {

@@ -147,56 +147,62 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	if buggered {
 		c.Resize(c.r)
 	}
-	// savemouse(w) // TODO(flux): Mouse?
-	// mousectl.Moveto(w.tag.Scrollr.Max.Add(image.Point(3,3)))
+	savemouse(w)
+	display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3,3)))
 	barttext = &w.body
 	return w
 }
 
 func (c *Column) Close(w *Window, dofree bool) {
+Unimpl()
 
 }
 
 func (c *Column) CloseAll() {
+Unimpl()
 
 }
 
 func (c *Column) MouseBut() {
+Unimpl()
 
 }
 
 func (c *Column) Resize(r image.Rectangle) {
-	// clearmouse() // TODO(flux) Mouse?
+	clearmouse()
 	r1 := r
-	r1.Max.Y = r1.Min.Y + c.tag.fr.Font.DefaultHeight()
-	c.tag.Resize(r1, true) // And draw the tag
+	r1.Max.Y = r1.Min.Y + c.tag.fr.Font.Impl().Height
+	c.tag.Resize(r1, true)
 	display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
-	r1.Min.Y = r1.Max.Y // Walk past the tag
+	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += display.ScaleSize(Border)
 	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
 	r1.Max.Y = r.Max.Y
-	for i, win := range c.w {
-		win.maxlines = 0
-		if i == len(c.w)-1 {
+	for i:=0; i<c.nw(); i++ {
+		w := c.w[i]
+		w.maxlines = 0
+		if i == c.nw()-1 {
 			r1.Max.Y = r.Max.Y
 		} else {
-			r1.Max.Y = r1.Min.Y + (win.r.Dx() + display.ScaleSize(Border))*r.Dy()/c.r.Dy()
+			r1.Max.Y = r1.Min.Y+(w.r.Dy()+display.ScaleSize(Border))*r.Dy()/c.r.Dy()
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y + display.ScaleSize(Border) + tagfont.Height)
+		r1.Max.Y = max(r1.Max.Y, r1.Min.Y + display.ScaleSize(Border)+tagfont.Height)
 		r2 := r1
-		r2.Max.Y = r2.Max.Y + display.ScaleSize(Border)
+		r2.Max.Y = r2.Min.Y+display.ScaleSize(Border)
 		display.ScreenImage.Draw(r2, display.Black, nil, image.ZP)
 		r1.Min.Y = r2.Max.Y
-		r1.Min.Y = win.Resize(r1, false, i == len(c.w)-1)
+		r1.Min.Y = w.Resize(r1, false, i==c.nw()-1)
 	}
 	c.r = r
 }
 
 func cmp(a, b interface{}) int {
+Unimpl()
 	return 0
 }
 
 func (c *Column) Sort() {
+Unimpl()
 
 }
 
@@ -351,17 +357,37 @@ func (c *Column) Grow(w *Window, but int) {
 		}
 	}
 	c.safe = true
-	// winmousebut(w); TODO(flux): Mouse?
+	w.MouseBut()
 }
 
-func (c *Column) DragWin(w *Window, but int) {
+func (c *Column) DragWin(w *Window, but uint) {
+Unimpl()
 
 }
 
 func (c *Column) Which(p image.Point) *Text {
+	if !p.In(c.r) {
+		return nil
+	}
+	if p.In(c.tag.all) {
+		return &c.tag
+	}
+	for _, w := range c.w {
+		if p.In(w.r) {
+			if p.In(w.tagtop) || p.In(w.tag.all) {
+				return &w.tag
+			}
+			/* exclude partial line at bottom */
+			if p.X >= w.body.scrollr.Max.X && p.Y >= w.body.fr.Rect.Max.Y {
+				return nil
+			}
+			return &w.body
+		}
+	}
 	return nil
 }
 
 func (c *Column) Clean() int {
+Unimpl()
 	return 0
 }

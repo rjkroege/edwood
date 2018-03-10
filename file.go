@@ -146,6 +146,8 @@ Unimpl()
 }
 
 func (f *File) Mark() {
-Unimpl()
-
+	if f.epsilon.nc() != 0 {
+		f.epsilon.Delete(0, f.epsilon.nc())
+	}
+	f.seq = seq
 }

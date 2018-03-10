@@ -6,8 +6,11 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"fmt"
 
 	"9fans.net/go/draw"
 	"github.com/paul-lalonde/acme/frame"
@@ -26,31 +29,8 @@ var (
 	}
 
 	command *Command
+	swapscrollButtons bool
 )
-
-func mousethread() {
-
-}
-
-func keyboardthread() {
-
-}
-
-func waitthread() {
-
-}
-
-func xfidallocthread() {
-
-}
-
-func newwindowthread() {
-
-}
-
-func plumbproc() {
-
-}
 
 func timefmt( /*Fmt* */ ) int {
 	return 0
@@ -94,6 +74,8 @@ var mainpid int
 func main() {
 
 	// rfork(RFENVG|RFNAMEG); TODO(flux): I'm sure these are vitally(?) important.
+
+	runtime.GOMAXPROCS(7)
 
 	flag.Parse()
 	ncol = *ncolflag
@@ -162,6 +144,9 @@ func main() {
 	cedit = make(chan int)
 	cwarn = make(chan uint)	/* TODO(flux): (really chan(unit)[1]) */
 
+	mousectl = display.InitMouse()
+	mouse = &mousectl.Mouse
+
 	// startplumbing() // TODO(flux): plumbing
 	// fsysinit()  // TODO(flux): I don't even have a clue to the design of Fsys here.
 
@@ -205,7 +190,12 @@ func main() {
 	}
 	display.Flush()
 
-for {}
+	// After row is initialized
+	go mousethread()
+
+	select {
+	case <-cexit:
+	}
 }
 
 func readfile(c *Column, filename string) {
@@ -298,3 +288,160 @@ func ismtpt(filename string) bool {
 
 	return strings.HasPrefix(filename, mtpt) && (mtpt[len(mtpt)-1] == '/' || filename[len(mtpt)] == '/' || len(filename) == len(mtpt))
 }
+
+func mousethread() {
+	runtime.LockOSThread()
+
+	for {
+		// TODO(flux) lock row and flush warnings?
+
+		select {
+		case <-mousectl.Resize:
+			if err := display.Attach(draw.Refnone); err != nil {
+				panic("failed to attach to window")
+			}
+			fmt.Println("RESIZE!")
+			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
+			iconinit()
+			row.Resize(display.ScreenImage.R)
+		case mousectl.Mouse = <-mousectl.C: MovedMouse(mousectl.Mouse)
+		}
+	}
+}
+
+func MovedMouse(m draw.Mouse) {
+	row.lk.Lock()
+	defer row.lk.Unlock()
+
+	t := row.Which(m.Point)
+
+	if (t!=mousetext && t!=nil && t.w!=nil  &&
+		(mousetext==nil || mousetext.w==nil || t.w.id!=mousetext.w.id)) {
+		// xfidlog(t.w, "focus");  TODO(flux)
+	}
+
+	if t!=mousetext && mousetext!=nil && mousetext.w!=nil {
+		mousetext.w.Lock('M')
+		mousetext.eq0 = ^0
+		mousetext.w.Commit(mousetext)
+		mousetext.w.Unlock()
+	}
+	mousetext = t;
+	if t == nil {
+		return
+	}
+	w := t.w;
+	if t==nil || m.Buttons==0  {
+		return
+	}
+	but := uint(0)
+	switch m.Buttons {
+	case 1: but = 1
+	case 2: but = 2
+	case 4: but = 3
+	}
+	barttext = t;
+	if t.what==Body && m.Point.In(t.scrollr) {
+		if but != 0 {
+			if swapscrollButtons {
+				switch but {
+				case 1: but = 3
+				case 3: but = 1
+				}
+			}
+			w.Lock('M')
+			defer w.Unlock()
+			t.eq0 = ^0
+			t.Scroll(but)
+		}
+		return
+	}
+	/* scroll Buttons, wheels, etc. */
+	if w != nil && (m.Buttons & (8|16)) != 0{
+		if m.Buttons & 8 != 0{
+			but = Kscrolloneup;
+		} else {
+			but = Kscrollonedown
+		}
+		w.Lock('M')
+		defer w.Unlock()
+		t.eq0 = ^0
+		t.Type(rune(but))
+		return
+	}
+	if m.Point.In(t.scrollr) {
+		if but != 0 {
+			switch t.what {
+			case Columntag:
+				row.DragCol(t.col, but)
+			case Tag: 
+				t.col.DragWin(t.w, but)
+				if t.w != nil {
+					barttext = &t.w.body
+				}
+			}
+			if t.col != nil {
+				activecol = t.col
+			}
+		}
+		return
+	}
+	if m.Buttons != 0 {
+		if w != nil {
+			w.Lock('M');
+			defer w.Unlock()
+		}
+		t.eq0 = ^0
+		if w != nil {
+			w.Commit(t);
+		} else {
+			t.Commit(true)
+		}
+		switch {
+		case  m.Buttons & 1 != 0:
+			t.Select()
+			if w != nil {
+				w.SetTag()
+			}
+			argtext = t
+			seltext = t
+			if t.col != nil {
+				activecol = t.col	/* button 1 only */
+			}
+			if t.w!=nil && t==&t.w.body {
+				activewin = t.w
+			}
+		case m.Buttons & 2 != 0: 
+			if q0, q1, argt, ok := t.Select2(); ok {
+				execute(t, q0, q1, false, argt)
+			}
+		case m.Buttons & 4 != 0: 
+			if q0, q1, ok := t.Select3(); ok {
+				look3(t, q0, q1, false)
+			}
+		}
+		return
+	}
+ 	return
+}
+
+func keyboardthread() {
+
+}
+
+func waitthread() {
+
+}
+
+func xfidallocthread() {
+
+}
+
+func newwindowthread() {
+
+}
+
+func plumbproc() {
+
+}
+

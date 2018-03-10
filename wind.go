@@ -11,7 +11,7 @@ import (
 )
 
 type Window struct {
-	lk   *sync.Mutex
+	lk   sync.Mutex
 	ref  Ref
 	tag  Text
 	body Text
@@ -177,8 +177,8 @@ func (w *Window) TagLines(r image.Rectangle) int {
 }
 
 func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
-	// mouseintag := mouse.xy.In(w.tag.all)
-	// mouseinbody := mouse.xy.In(w.body.all) // TODO(flux): Mouse
+	mouseintag := mouse.Point.In(w.tag.all)
+	mouseinbody := mouse.Point.In(w.body.all) 
 
 	w.tagtop = r
 	w.tagtop.Max.Y = r.Min.Y + tagfont.Height
@@ -200,19 +200,17 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.tagsafe = true;
 
 		// If mouse is in tag, pull up as tag closes. 
-/* TODO(flux): Mouse
-		if(mouseintag && !ptinrect(mouse.xy, w.tag.all)){
-			p = mouse.xy;
-			p.y = w.tag.all.Max.Y-3;
-			moveto(mousectl, p);
+		if mouseintag && !mouse.Point.In(w.tag.all) {
+			p := mouse.Point;
+			p.Y = w.tag.all.Max.Y-3;
+			display.MoveTo(p);
 		}
 		// If mouse is in body, push down as tag expands. 
-		if(mouseinbody && ptinrect(mouse.xy, w.tag.all)){
-			p = mouse.xy;
-			p.y = w.tag.all.Max.Y+3;
-			moveto(mousectl, p);
+		if mouseinbody && mouse.Point.In(w.tag.all) {
+			p := mouse.Point;
+			p.Y = w.tag.all.Max.Y+3;
+			display.MoveTo(p);
 		}
-*/
 	}
 	// Redraw body
 	r1 = r
@@ -245,14 +243,18 @@ func (w *Window) Lock1(owner int) {
 }
 
 func (w *Window) Lock(owner int) {
-
+	w.owner = owner
+	w.lk.Lock()
 }
 
 func (w *Window) Unlock() {
-
+	w.owner = 0
+	w.lk.Unlock()
 }
 
 func (w *Window) MouseBut() {
+	display.MoveTo(w.tag.scrollr.Min.Add( 
+		image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
 
 }
 
@@ -390,7 +392,26 @@ func (w *Window) SetTag() {
 }
 
 func (w *Window) Commit(t *Text) {
-
+	t.Commit(true)
+	f := t.file
+	if len(f.text) > 1 {
+		for _, te := range f.text {
+			te.Commit(false);	/* no-op for t */
+		}
+	}
+	if t.what == Body {
+		return
+	}
+	r := w.tag.file.b.Read(0, w.tag.file.b.nc())
+	filename := string(runesplitN(r, []rune(" \t"), 1)[0])
+	if filename != w.body.file.name {
+		seq++
+		w.body.file.Mark()
+		w.body.file.mod = true
+		w.dirty = true
+		w.SetName(filename)
+		w.SetTag()
+	}
 }
 
 func (w *Window) AddIncl(r string, n int) {

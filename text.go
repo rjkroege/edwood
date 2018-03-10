@@ -64,7 +64,7 @@ type Text struct {
 	col     *Column
 
 	iq1         uint
-	eq0         uint
+	eq0         int
 	cq0         uint
 	ncache      int
 	ncachealloc int
@@ -83,7 +83,7 @@ func (t *Text)Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumCol
 	t.scrollr.Max.X = r.Min.X + display.ScaleSize(Scrollwid)
 	t.lastsr = nullrect
 	r.Min.X += display.ScaleSize(Scrollwid) + display.ScaleSize(Scrollgap)
-	t.eq0 = math.MaxUint64
+	t.eq0 = math.MaxInt64
 	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
@@ -390,12 +390,7 @@ func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
 	}
 }
 
-func (t *Text) TypeCommit() {
-Unimpl()
-
-}
-
-func (t *Text)typecommit(){
+func (t *Text)TypeCommit(){
 	if t.w != nil {
 		t.w.Commit(t)
 	} else {
@@ -408,11 +403,11 @@ func (t *Text) Fill() {
 		return
 	}
 	if(t.ncache > 0) {
-		t.typecommit()
+		t.TypeCommit()
 	}
 	
 	nl := t.fr.MaxLines-t.fr.NLines;
-	lines := runesplitN(t.file.b[t.org+uint(t.fr.NChars):], rune('\n'), nl)
+	lines := runesplitN(t.file.b[t.org+uint(t.fr.NChars):], []rune("\n"), nl)
 	for _, s := range lines {
 		t.fr.Insert(s, t.fr.NChars);
 		if t.fr.LastLineFull != 0 {
@@ -550,9 +545,15 @@ Unimpl()
 	return 0
 }
 
-func (t *Text) Select3(q0, q1 *uint) int {
+func (t *Text) Select2()(q0, q1 uint, tp *Text, ret bool) {
 Unimpl()
-	return 0
+	return 0,0,nil,false
+}
+
+
+func (t *Text) Select3()(q0, q1 uint, r bool) {
+Unimpl()
+	return 0,0,false
 }
 
 func (t *Text) DoubleClick(q0, q1 *uint) {

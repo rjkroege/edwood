@@ -85,50 +85,97 @@ func (row *Row) Add(c *Column, x int) *Column {
 	c.row = row
 	c.tag.row = row
 	row.col = append(row.col, c)
-	//clearmouse() // TODO(flux): Mouse?  weird
+	clearmouse()
 	return c
 }
 
 func (r *Row) Resize(rect image.Rectangle) {
-
+	or := row.r
+	deltax := rect.Min.X - or.Min.X
+	row.r = rect
+	r1 := rect
+	r1.Max.Y = r1.Min.Y + tagfont.Height
+	row.tag.Resize(r1, true)
+	r1.Min.Y = r1.Max.Y
+	r1.Max.Y += display.ScaleSize(Border)
+	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+	rect.Min.Y = r1.Max.Y
+	r1 = rect
+	r1.Max.X = r1.Min.X
+	for i:=uint(0); i<row.ncol(); i++ {
+		c := row.col[i]
+		r1.Min.X = r1.Max.X
+		/* the test should not be necessary, but guarantee we don't lose a pixel */
+		if i == row.ncol()-1 {
+			r1.Max.X = rect.Max.X
+		} else {
+			r1.Max.X = (c.r.Max.X-or.Min.X)*rect.Dx()/or.Dx() + deltax
+		}
+		if i > 0 {
+			r2 := r1
+			r2.Max.X = r2.Min.X+display.ScaleSize(Border)
+			display.ScreenImage.Draw(r2, display.Black, nil, image.ZP)
+			r1.Min.X = r2.Max.X
+		}
+		c.Resize(r1)
+	}
 }
 
-func (r *Row) DragCol(c *Column, _0 int) {
-
+func (r *Row) DragCol(c *Column, _ uint) {
+Unimpl()
 }
 
 func (r *Row) Close(c *Column, dofree bool) {
-
+Unimpl()
 }
 
 func (r *Row) WhichCol(p image.Point) *Column {
+	for i:=uint(0); i<row.ncol(); i++ {
+		c := row.col[i];
+		if p.In(c.r) {
+			return c
+		}
+	}
 	return nil
 }
 
 func (r *Row) Which(p image.Point) *Text {
+	if p.In(row.tag.all) {
+		return &row.tag
+	}
+	c := row.WhichCol(p);
+	if c != nil {
+		return c.Which(p)
+	}
 	return nil
 }
 
 func (r *Row) Type(n string, p image.Point) *Text {
+Unimpl()
 	return nil
 }
 
 func (r *Row) Clean() int {
+Unimpl()
 	return 0
 }
 
 func (r *Row) Dump(file string) {
+Unimpl()
 
 }
 
 func (r *Row) LoadFonts(file string) {
+Unimpl()
 
 }
 
 func (r *Row) Load(file string, initing bool) error {
+Unimpl()
 	return nil
 }
 
 func AllWindows(f func(*Window, interface{}), arg interface{}) {
+Unimpl()
 
 }
