@@ -206,7 +206,7 @@ func (c *Column) Grow(w *Window, but int) {
 
 	var windex int
 
-	for windex := range c.w {
+	for windex = range c.w {
 		if(c.w[windex] == w) {
 			break
 		}
