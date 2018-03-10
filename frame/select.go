@@ -5,6 +5,20 @@ import (
 	"image"
 )
 
+// SetSelectionExtent sets the rune offsets of the selection maintained
+// by the Frame. p0 and p1 must be values that could be returned by Charofpt.
+// TODO(rjk): It is conceivable that we don't need this. It seems like an egregious
+// abstraction violation that it exists.
+func (f *Frame) SetSelectionExtent(p0, p1 int) {
+	f.p0, f.p1 = p0, p1
+}
+
+// GetSelectionExtent returns the rune offsets of the selection maintained by
+// the Frame.
+func (f *Frame) GetSelectionExtent() (int, int) {
+	return f.p0, f.p1
+}
+
 func region(a, b int) int {
 	if a < b {
 		return -1

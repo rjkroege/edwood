@@ -46,28 +46,65 @@ func (ff *frfont) Impl() *draw.Font {
 	return &ff.Font
 }
 
+// Maxtab sets the maximum size of a tab in pixels.
+func (f *Frame) Maxtab(m int) {
+	f.maxtab = m
+}
+
+// FrameFillStatus is a snapshot of the capacity of the Frame.
+type FrameFillStatus struct {
+	Nchars   int
+	Nlines   int
+	Maxlines int
+}
+
+// GetFrameFillStatus returns a snapshot of the capacity of the frame.
+func (f *Frame) GetFrameFillStatus() FrameFillStatus {
+	return FrameFillStatus{
+		Nchars:   f.nchars,
+		Nlines:   f.nlines,
+		Maxlines: f.maxlines,
+	}
+}
+
 type Frame struct {
-	Font         Fontmetrics
-	Display      *draw.Display           // on which the frame is displayed
-	Background   *draw.Image             // on which the frame appears
-	Cols         [NumColours]*draw.Image // background and text colours
-	Rect         image.Rectangle         // in which the text appears
-	Entire       image.Rectangle         // size of full frame
-	Scroll       func(*Frame, int)       // function provided by application
-	box          []*frbox
-	p0, p1       int // bounds of a selection
+	// TODO(rjk): Remove public access if possible.
+	Font       Fontmetrics
+	Display    *draw.Display           // on which the frame is displayed
+	Background *draw.Image             // on which the frame appears
+	Cols       [NumColours]*draw.Image // background and text colours
+	Rect       image.Rectangle         // in which the text appears
+	Entire     image.Rectangle         // size of full frame
+
+	// TODO(rjk): Figure out what.
+	Scroll func(*Frame, int) // function provided by application
+
+	box []*frbox // the boxes of text in this frame.
+	// TODO(rjk): This shouldn't exist. box is a slice and can manage this itself.
+	// private
 	nbox, nalloc int
-	maxtab       int // max size of a tab (in pixels)
-	nchars       int // number of runes in frame
-	nlines       int // number of lines with text
-	maxlines     int // total number of lines in frame
+
+	p0, p1 int // bounds of the selection
+	maxtab int // max size of a tab (in pixels)
+	nchars int // number of runes in frame
+	nlines int // number of lines with text
+	// TODO(rjk): figure out what to do about this for multiple line fonts.
+	maxlines int // total number of lines in frame
+
+	// TODO(rjk): make a bool
+	// ro. Doesn't need a getter. Used only with frinsert and frdelete. Return from there.
 	lastlinefull int
-	modified     bool
-	tick         *draw.Image // typing tick
-	tickback     *draw.Image // image under tick
-	ticked       bool
-	noredraw     bool
-	tickscale    int // tick scaling factor
+
+	modified bool
+	tick     *draw.Image // typing tick
+	tickback *draw.Image // image under tick
+
+	// TODO(rjk): Expose. public ro
+	ticked bool
+
+	// TODO(rjk): Expose public rw.
+	noredraw  bool
+	tickscale int // tick scaling factor
 }
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
