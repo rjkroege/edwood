@@ -159,7 +159,7 @@ func (f *Frame) InitTick() {
 
 	height := ft.DefaultHeight()
 
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix,  false, draw.Transparent)
+	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
@@ -170,7 +170,7 @@ func (f *Frame) InitTick() {
 		f.tick = nil
 		return
 	}
-	f.tickback.Draw( f.tickback.R, f.Cols[ColBack], nil, image.ZP)
+	f.tickback.Draw(f.tickback.R, f.Cols[ColBack], nil, image.ZP)
 
 	f.tick.Draw(f.tick.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line

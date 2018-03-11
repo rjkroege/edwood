@@ -145,8 +145,7 @@ func (f *Frame) Redraw() {
 
 }
 
-// TODO(rjk): Change name to tick
-func (f *Frame) _tick(pt image.Point, ticked bool) {
+func (f *Frame) tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
 	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
 		return
@@ -161,7 +160,7 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 
 	if ticked {
 		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.Display.Black , f.tick, image.ZP) // draws an alpha-blended box
+		f.Background.Draw(r, f.Display.Black, f.tick, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
 		f.Background.Draw(r, f.tickback, nil, image.ZP)
@@ -175,11 +174,11 @@ func (f *Frame) Tick(pt image.Point, ticked bool) {
 	//	log.Println("Tick")
 	if f.tickscale != f.Display.ScaleSize(1) {
 		if f.ticked {
-			f._tick(pt, false)
+			f.tick(pt, false)
 		}
 		f.InitTick()
 	}
-	f._tick(pt, ticked)
+	f.tick(pt, ticked)
 }
 
 func (f *Frame) _draw(pt image.Point) image.Point {
