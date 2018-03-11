@@ -96,7 +96,7 @@ type Frame struct {
 	lastlinefull int
 
 	modified bool
-	tick     *draw.Image // typing tick
+	tickimage     *draw.Image // typing tick
 	tickback *draw.Image // image under tick
 
 	// TODO(rjk): Expose. public ro
@@ -153,31 +153,31 @@ func (f *Frame) InitTick() {
 	b := f.Display.ScreenImage
 	ft := f.Font
 
-	if f.tick != nil {
-		f.tick.Free()
+	if f.tickimage != nil {
+		f.tickimage.Free()
 	}
 
 	height := ft.DefaultHeight()
 
-	f.tick, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
 
-	f.tickback, err = f.Display.AllocImage(f.tick.R, b.Pix, false, draw.White)
+	f.tickback, err = f.Display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
 	if err != nil {
-		f.tick.Free()
-		f.tick = nil
+		f.tickimage.Free()
+		f.tickimage = nil
 		return
 	}
 	f.tickback.Draw(f.tickback.R, f.Cols[ColBack], nil, image.ZP)
 
-	f.tick.Draw(f.tick.R, f.Display.Transparent, nil, image.Pt(0, 0))
+	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.tick.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.tick.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
-	f.tick.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
@@ -212,9 +212,9 @@ func (f *Frame) Clear(freeall bool) {
 		f.box = nil
 	}
 	if freeall {
-		f.tick.Free()
+		f.tickimage.Free()
 		f.tickback.Free()
-		f.tick = nil
+		f.tickimage = nil
 		f.tickback = nil
 	}
 	f.box = nil

@@ -147,7 +147,7 @@ func (f *Frame) Redraw() {
 
 func (f *Frame) tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
-	if f.ticked == ticked || f.tick == nil || !pt.In(f.Rect) {
+	if f.ticked == ticked || f.tickimage == nil || !pt.In(f.Rect) {
 		return
 	}
 
@@ -160,7 +160,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 
 	if ticked {
 		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.Display.Black, f.tick, image.ZP) // draws an alpha-blended box
+		f.Background.Draw(r, f.Display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
 		f.Background.Draw(r, f.tickback, nil, image.ZP)
