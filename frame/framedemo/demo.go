@@ -50,14 +50,18 @@ func main() {
 		case r := <-keyboardctl.C:
 			log.Println("----- got rune --------", r)
 			switch r {
-			case 6:
+			case 6:	// ^f
 				mf.Right()
-			case 2:
+			case 2:	// ^b
 				mf.Left()
-			case 8:
+			case 8:	// ^h (delete key)
 				mf.Delete()
-			case 16:
+			case 16:	// ^p
+				// TODO(rjk): Should go up.
 				mf.Logboxes()
+			case 7:	// ^g
+				// Generate some text.
+				mf.InsertString(generateParagraphs(1, 8, "\n"), mf.cursor)
 			default:
 				mf.Insert(r)
 			}

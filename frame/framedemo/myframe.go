@@ -79,7 +79,10 @@ func (mf *Myframe) InsertString(s string, c int) {
 	for _, r := range s {
 		mf.Insert(r)
 	}
+
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 	mf.cursor = oc
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
 }
 
 // Insert adds a single rune to the frame at the cursor.
@@ -130,7 +133,7 @@ func (mf *Myframe) Left() {
 
 // Right moves the cursor to the right if possible.
 func (mf *Myframe) Right() {
-	if mf.cursor <=  len(mf.buffer) {
+	if mf.cursor <  len(mf.buffer) {
 		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 		mf.cursor++
 		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
