@@ -137,7 +137,7 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.tick == nil && f.Cols[ColBack] != nil {
+	if f.tickimage == nil && f.Cols[ColBack] != nil {
 		f.InitTick()
 	}
 }

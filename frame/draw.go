@@ -41,10 +41,10 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
 		text = f.Cols[ColText]
 	}
 
-	f.drawsel0(pt, p0, p1, back, text)
+	f.Drawsel0(pt, p0, p1, back, text)
 }
 
-func (f *Frame) drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
+func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
 	//	log.Println("drawsel0")
 	p := 0
 	bi := 0
@@ -132,16 +132,16 @@ func (f *Frame) Redraw() {
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), false)
 		}
-		f.drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
+		f.Drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
 			f.Tick(f.Ptofchar(f.p0), true)
 		}
 	}
 
 	pt = f.Ptofchar(0)
-	pt = f.drawsel0(pt, 0, f.p0, f.Cols[ColBack], f.Cols[ColText])
-	pt = f.drawsel0(pt, f.p0, f.p1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.drawsel0(pt, f.p1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.Drawsel0(pt, 0, f.p0, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.Drawsel0(pt, f.p0, f.p1, f.Cols[ColHigh], f.Cols[ColHText])
+	pt = f.Drawsel0(pt, f.p1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 
 }
 
