@@ -175,7 +175,10 @@ func (r *Row) Load(file string, initing bool) error {
 	return nil
 }
 
-func AllWindows(f func(*Window, interface{}), arg interface{}) {
-	Unimpl()
-
+func (r *Row) AllWindows(f func(*Window, interface{}), arg interface{}) {
+	for _, c := range r.col {
+		for _, w := range c.w {
+			f(w, arg)
+		}
+	}
 }

@@ -12,8 +12,10 @@ import (
 	"github.com/paul-lalonde/acme/frame"
 )
 
+type QID uint
+
 const (
-	Qdir int = iota
+	Qdir QID = iota
 	Qacme
 	Qcons
 	Qconsctl
@@ -21,6 +23,7 @@ const (
 	Qeditout
 	Qindex
 	Qlabel
+	Qlog
 	Qnew
 	QWaddr
 	QWbody
@@ -34,7 +37,9 @@ const (
 	QWtag
 	QWxdata
 	QMAX
+)
 
+const (
 	NRange = 10
 	//	Infinity  = 0x7FFFFFFF
 
@@ -110,16 +115,16 @@ var (
 	tagcolors         [frame.NumColours]*draw.Image
 	textcolors        [frame.NumColours]*draw.Image
 	wdir              string
-	editing           bool
+	editing           int = Inactive
 	erroutfd          int
-	messagesize       int
+	messagesize       int = MaxBlock + 32
 	globalautoindent  bool
 	dodollarsigns     bool
 	mtpt              string
 
 	//	cplumb chan *Plumbmsg
 	//	cwait chan Waitmsg
-	ccommand   chan Command
+	ccommand   chan *Command
 	ckill      chan []rune
 	cxfidalloc chan *Xfid
 	cxfidfree  chan *Xfid
@@ -153,7 +158,7 @@ type Command struct {
 type DirTab struct {
 	name string
 	t    byte
-	qid  uint
+	qid  QID
 	perm uint
 }
 

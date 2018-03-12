@@ -131,7 +131,7 @@ func main() {
 
 	// cplumb = make(chan *Plumbmsg) TODO(flux): There must be a plumber library in go...
 	// cwait = make(chan Waitmsg)
-	ccommand = make(chan Command)
+	ccommand = make(chan *Command)
 	ckill = make(chan []rune)
 	cxfidalloc = make(chan *Xfid)
 	cxfidfree = make(chan *Xfid)

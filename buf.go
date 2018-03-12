@@ -48,8 +48,9 @@ func (b *Buffer) Read(q0, n uint) (r []rune) {
 	if !(q0 <= uint(len(*b)) && q0+n <= uint(len(*b))) {
 		panic("internal error: Buffer.Read")
 	}
-
-	return (*b)[q0 : q0+n]
+	r = make([]rune, n)
+	copy(r, (*b)[q0:q0+n])
+	return r
 }
 
 func (b *Buffer) Close() {

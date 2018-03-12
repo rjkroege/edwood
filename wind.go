@@ -37,13 +37,13 @@ type Window struct {
 	eventx Xfid
 	events string
 
-	nevents     int
-	owner       int
-	maxlines    int
-	dirnames    []string
-	widths      []int
-	putseq      int
-	nincl       int
+	nevents  int
+	owner    int
+	maxlines int
+	dirnames []string
+	widths   []int
+	putseq   int
+	//nincl       int
 	incl        []string
 	reffont     *draw.Font
 	ctrllock    *sync.Mutex
@@ -78,7 +78,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.tagsafe = true
 	w.tagexpand = true
 	w.body.w = w
-
+	w.incl = []string{}
 	WinId++
 	w.id = WinId
 

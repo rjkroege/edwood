@@ -3,8 +3,8 @@ x/TRUE/c/true/
 x/FALSE/c/false/
 x/display.black/c/display.Black/
 x/ ZP/c/ image.ZP/
-x/for/+-s/for\((.*)\)/for \1 /g
-x/if/+-s/if\((.*)\)/if \1 /g
+x/[^a-zA-Z0-9_]for/+-s/for\((.*)\)/for \1 /g
+x/[^a-zA-Z0-9_]if/+-s/if\((.*)\)/if \1 /g
 x/[^a-zA-Z_0-9](max|min)\.[xy]/{ x/m/c/M/
 		x/\.y/c/.Y
 		x/\.x/c/.X
@@ -13,8 +13,44 @@ x/[^a-zA-Z_0-9]Border([^a-zA-Z_0-9]|\n)/y/[^a-zA-Z_0-9]/g/./{
 	i/display.ScaleSize(/
 	a/)/
 	}
+}"
+
+// rewrite struct decl from C to Go
+,x/struct [a-zA-Z0-9_]+(.*)\n{([^}]*\n)+};/{
+	s/^	*([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+);(.*)/	\3	\2\1	\4/g
+	s/struct ([a-zA-Z0-9_]+)((.*\n)+){/type \1 struct {\2/
+	x/};/c/}\n/
 }
-"
+
+,x/[^a-zA-Z_0-9]uchar[^a-zA-Z_0-9]/x/[a-zA-Z0-9_]+/c/byte
+,x/[^a-zA-Z_0-9]short[^a-zA-Z_0-9]/x/[a-zA-Z0-9_]+/c/int
+,x/[^a-zA-Z_0-9]char[^a-zA-Z_0-9]/x/[a-zA-Z0-9_]+/c/byte
+
+// function decls.
+,s/^([a-zA-Z0-9_]+)\n([a-zA-Z0-9_]+)(\(.*)\n{/func \2 \3 (\1) {/g
+,x/^func.*\([^)]*\)/x/\([^)]*\)/{
+	x/\(void\)/c/()
+	y/,/s/([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+)/\3 \2 \1/
+}
+
+,x/\/\*.*\*\//{
+	x/\/\*/c/\/\/
+	x/\*\//d
+}
+
+var decls
+s/([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+)/\3 \2 \1/g
+// Member function call
+s/([a-zA-Z0-9_]+)\(&?([a-zA-Z0-9_.]+),?/\2.\1(/
+// enum to go const
+,x/enum [a-zA-Z0-9_]+(.*)\n{([^}]*\n)+};/{
+
+x/$/i/},
+
+
+x/^	*([a-zA-Z0-9_]+)[ 	]/p
+
+
 Watch go build '-gcflags=all=-N -l' .
 ,x/[^a-zA-Z]+tick[^a-zA-Z]+/x/tick/c/TickImage
 }
@@ -33,3 +69,5 @@ Edit X/frame\/.*\.go/{
 
 X/.*atch.*/
 x/ {.*}/d
+Watch go build '-gcflags=all=-N -l' .
+/Users/plalonde/plan9port/src/libframe

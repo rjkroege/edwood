@@ -25,8 +25,10 @@ func max(a, b int) int {
 	return b
 }
 
-func abs(x int) int { 
-	if x < 0 { return -x }
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
 	return x
 }
 
@@ -44,6 +46,10 @@ func warning(md *MntDir, s string, args ...interface{}) {
 	// TODO(flux): Port to actually output to the error window
 	_ = md
 	fmt.Printf(s, args...)
+}
+
+func acmeerror(s string, err error) error {
+	panic(fmt.Sprintf("acme: %s: %v\n", s, err))
 }
 
 var (
@@ -77,6 +83,15 @@ func runestrchr(s []rune, r rune) int {
 	for ret, sr := range s {
 		if sr == r {
 			return ret
+		}
+	}
+	return -1
+}
+
+func utfrune(s []rune, r int) int {
+	for i, c := range s {
+		if c == rune(r) {
+			return i
 		}
 	}
 	return -1
