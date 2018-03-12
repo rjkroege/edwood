@@ -18,6 +18,7 @@ type Myframe struct {
 
 	buffer []rune
 	cursor int // a position at which we can insert text into the backing buffer.
+	cursordown int // down point for a selection drag
 	offset int // the offset of the frame w.r.t. buffer. 
 }
 
@@ -147,4 +148,51 @@ func (my *Myframe) Down() {
 
 func (my *Myframe) Logboxes() {
 	my.f.Logboxes("-- current boxes --")
+}
+
+func (mf *Myframe) MouseDown(pt image.Point) {
+	// This does not do the right thing if there is an existing selection.
+	log.Println("MouseDown hiding cursor")
+	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+	nc := mf.f.Charofpt(pt)
+	mf.f.Tick(mf.f.Ptofchar(nc), false)
+	mf.cursordown = nc
+	mf.cursor = nc
+
+	log.Println("MouseDown", mf.cursordown, mf.cursor)
+	selpt := mf.f.Ptofchar(mf.cursordown)
+	mf.f.DrawSel(selpt, mf.cursordown, mf.cursor, true)
+}
+
+func (mf Myframe) MouseMove(pt image.Point) {
+	nc := mf.f.Charofpt(pt)
+
+	// rationalize the cursor position. cursordown will be smaller
+	if nc < mf.cursordown {
+		mf.cursor = mf.cursordown
+		mf.cursordown = nc
+	} else {
+		mf.cursor = nc
+	}
+	log.Println("MouseMove", mf.cursordown, mf.cursor)
+
+	selpt := mf.f.Ptofchar(mf.cursordown)
+	mf.f.DrawSel(selpt, mf.cursordown, mf.cursor, true)
+}
+
+func (mf *Myframe) MouseUp(pt image.Point) {
+	nc := mf.f.Charofpt(pt)
+
+	// rationalize the cursor position. cursordown will be smaller
+	if nc < mf.cursordown {
+		mf.cursor = mf.cursordown
+		mf.cursordown = nc
+	} else {
+		mf.cursor = nc
+	}
+
+	log.Println("MouseUp", mf.cursordown, mf.cursor)
+
+	selpt := mf.f.Ptofchar( mf.cursordown)
+	mf.f.DrawSel(selpt, mf.cursordown, mf.cursor, true)
 }

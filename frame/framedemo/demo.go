@@ -44,6 +44,8 @@ func main() {
 	mousectl := d.InitMouse()
 	keyboardctl := d.InitKeyboard()
 
+	mousedown := false
+
 	mf.Resize(false)
 	for {
 		select {
@@ -70,13 +72,27 @@ func main() {
 			mf.Resize(true)
 			d.Flush()
 		case m := <-mousectl.C:
-			// fmt.Printf("mouse field %v buttons %d\n", m, m.Buttons)
-
-			if m.Buttons&1 == 1 {
-				// TODO(rjkroege): insert code here to do some drawing and stuff.
-				d.ScreenImage.Draw(image.Rect(m.X, m.Y, m.X+10, m.Y+10), d.Black, nil, image.ZP)
-				d.Flush()
+			// log.Printf("mouse field %v buttons %d\n", m, m.Buttons)
+			
+			switch {
+			case m.Buttons&1 == 1 && !mousedown:
+				mousedown = true
+				mf.MouseDown(image.Pt(m.X, m.Y))
+			case m.Buttons&1 == 1 && mousedown:
+				mf.MouseMove(image.Pt(m.X, m.Y))
+			case m.Buttons&1 == 0 && mousedown:
+				mousedown = false
+				mf.MouseUp(image.Pt(m.X, m.Y))
 			}
+
+//			if m.Buttons&1 == 1 {
+//				// TODO(rjkroege): insert code here to do some drawing and stuff.
+//				d.ScreenImage.Draw(image.Rect(m.X, m.Y, m.X+10, m.Y+10), d.Black, nil, image.ZP)
+//				d.Flush()
+//			}
+
+			
+
 		}
 	}
 }
