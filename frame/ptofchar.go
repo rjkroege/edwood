@@ -78,6 +78,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 	}
 
 	for ; bn < f.nbox && qt.X <= pt.X; bn++ {
+		b = f.box[bn]
 		f.cklinewrap(&qt, b)
 		if qt.Y > pt.Y {
 			break
