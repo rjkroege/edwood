@@ -16,6 +16,7 @@ const (
 	frtickw = 3
 )
 
+// TODO(rjk): no need for this to have public fields
 type frbox struct {
 	Wid    int    // In pixels. Fixed large size for layout box.
 	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
@@ -95,9 +96,9 @@ type Frame struct {
 	// ro. Doesn't need a getter. Used only with frinsert and frdelete. Return from there.
 	lastlinefull int
 
-	modified bool
-	tickimage     *draw.Image // typing tick
-	tickback *draw.Image // image under tick
+	modified  bool
+	tickimage *draw.Image // typing tick
+	tickback  *draw.Image // image under tick
 
 	// TODO(rjk): Expose. public ro
 	ticked bool
