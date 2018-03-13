@@ -3,16 +3,16 @@ package main
 // TODO(flux): This is a hideous singleton.  Refactor into a type?
 import (
 	"errors"
-	//	"os"
+	"os"
 	//	"os/user"
 	"sync"
 
 	"9fans.net/go/plan9"
-	//"github.com/rminnich/go9p"
+	//"github.com/mortdeus/go9p"
 )
 
 var (
-	sfd int
+	sfd *os.File
 )
 
 const (
@@ -92,38 +92,27 @@ var (
 )
 
 func fsysinit() {
-	Unimpl()
-}
-
-/*
-	var (
-	 p [2]int;
-	)
-
 	initfcall();
-	reader, writer, err := os.Pipe()
+	reader, writer, err := os.Pipe() 
 	if err != nil {
 		acmeerror("can't create pipe", err);
 	}
-	if post9pservice(p[0], "acme", mtpt) < 0 {
-		acmeerror("can't post service");
+	if post9pservice(reader, "acme", mtpt) < 0 {// TODO(flux) I may have messed up whether to give post9pservice the reader or the writer end
+		acmeerror("can't post service", nil);
 	}
-	sfd = p[1];
-	fmtinstall('F', fcallfmt);
-	u, err := user.Current()
-	if err != nil {
-		username = u
-	}
-	proccreate(fsysproc, nil, Splan9.TACK);
-}
-*/
+	sfd = writer;
+	username = getuser()
 
-func fsysproc(v interface{}) {
+	go fsysproc()
+}
+
+func fsysproc() {
 	Unimpl()
 	return
 }
+/*
 
-/*	int n;
+	int n;
 	Xfid *x;
 	Fid *f;
 	Fcall t;

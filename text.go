@@ -748,7 +748,7 @@ func (t *Text) SetSelect(q0, q1 uint) {
 		return
 	}
 	if p0 > p1 {
-		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%ud q1=%ud t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.NChars))
+		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.NChars))
 	}
 	/* screen disagrees with desired selection */
 	if uint(t.fr.P1) <= p0 || p1 <= uint(t.fr.P0) || p0 == p1 || uint(t.fr.P1) == uint(t.fr.P0) {
