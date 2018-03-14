@@ -36,7 +36,7 @@ type Window struct {
 
 	col    *Column
 	eventx *Xfid
-	events string
+	events []byte
 
 	nevents  int
 	owner    int
@@ -414,11 +414,12 @@ func (w *Window) Commit(t *Text) {
 	}
 }
 
-func (w *Window) AddIncl(r string, n int) {
-
+func (w *Window) AddIncl(r string) {
+Unimpl()
 }
 
 func (w *Window) Clean(conservative bool) int {
+Unimpl()
 	return 0
 }
 
@@ -437,5 +438,5 @@ func (w *Window) CtlPrint(fonts bool) string {
 }
 
 func (w *Window) Event(fmt string, args ...interface{}) {
-
+Unimpl()
 }

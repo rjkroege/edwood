@@ -6,6 +6,7 @@ import (
 	"image"
 	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -1059,4 +1060,13 @@ func (t *Text) SetOrigin(org uint, exact bool) {
 func (t *Text) Reset() {
 	Unimpl()
 
+}
+
+func (t *Text)DirName()  (string) {
+	if t==nil || t.w==nil {
+		return "."
+	}
+	b := t.w.tag.file.b.Read(0, t.w.tag.file.b.nc());
+	spl := strings.SplitN(string(b), " ", 1)[0]
+	return filepath.Dir(spl) 
 }

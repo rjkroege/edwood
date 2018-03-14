@@ -613,9 +613,14 @@ func expand (Text *t, uint q0, uint q1, Expand *e) (int) {
 	e.q1 = q1;
 	return q1 > q0;
 }
+*/
 
-Window*
-lookfile(Rune *s, int n)
+
+func lookfile(s string) *Window {
+Unimpl()
+return nil
+}
+/*
 {
 	int i, j, k;
 	Window *w;
@@ -643,9 +648,7 @@ lookfile(Rune *s, int n)
 	return nil;
 }
 
-Window*
-lookid(int id, int dump)
-{
+func lookid (int id, int dump) (Window*) {
 	int i, j;
 	Window *w;
 	Column *c;
@@ -664,9 +667,7 @@ lookid(int id, int dump)
 }
 
 
-Window*
-openfile(Text *t, Expand *e)
-{
+func openfile (Text *t, Expand *e) (Window*) {
 	Range r;
 	Window *w, *ow;
 	int eval, i, n;

@@ -992,44 +992,34 @@ func xfidruneread(x *Xfid, t *Text, q0 uint, q1 uint) int {
 }
 */
 func xfideventread(x *Xfid, w *Window) {
-	Unimpl()
-}
+	var fc plan9.Fcall
 
-/*
-	Fcall fc;
-	int i, n;
-
-	i = 0;
+	i := 0;
 	x.flushed = false;
-	while(w.nevents == 0){
-		if i {
-			if !x.flushed
-				respond(x, &fc, "window shut down");
+	for(len(w.events) == 0){ // TODO(flux): Yes, that seems to be the case.  I suspect the response message makes an event?
+		if i!=0 {
+			if !x.flushed {
+				respond(x, &fc, fmt.Errorf("window shut down"));
+			}
 			return;
 		}
 		w.eventx = x;
 		w.Unlock();
-		recvp(x.c);
+		<-x.c
 		w.Lock('F');
 		i++;
 	}
 
-	n = w.nevents;
-	if n > x.fcall.count
-		n = x.fcall.count;
-	fc.count = n;
-	fc.data = w.events;
-	respond(x, &fc, nil);
-	w.nevents -= n;
-	if w.nevents {
-		memmove(w.events, w.events+n, w.nevents);
-		w.events = erealloc(w.events, w.nevents);
-	}else{
-		free(w.events);
-		w.events = nil;
+	n := uint32(len(w.events))
+	if n > x.fcall.Count{
+		n = x.fcall.Count;
 	}
+	fc.Count = n;
+	fc.Data = w.events; // TODO(flux) the original doesn't make  copy, so I'm guessing respond consumes ahead of the copy below.
+	respond(x, &fc, nil);
+	copy(w.events[0:], w.events[n:])
 }
-*/
+
 func xfidindexread(x *Xfid) {
 	Unimpl()
 }
