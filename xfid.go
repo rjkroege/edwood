@@ -378,8 +378,8 @@ func xfidread(x *Xfid) {
 	w.Unlock()
 }
 
-func shouldscroll(t *Text, q0 uint, qid int) bool {
-	if qid == int(Qcons) {
+func shouldscroll(t *Text, q0 uint, qid uint64) bool {
+	if qid == Qcons {
 		return true
 	}
 	return t.org <= q0 && q0 <= t.org+uint(t.fr.NChars)
@@ -409,25 +409,24 @@ func fullrunewrite(x *Xfid) []rune {
 }
 
 func xfidwrite(x *Xfid) {
-	Unimpl()
-}
+var (
+	fc plan9.Fcall
+	c int
+	eval bool
+	r []rune
+	a Range
+	t *Text
+	q0, tq0, tq1, nb uint
+	err error
+)
 
-/*
-	Fcall fc;
-	int c, qid, nb, nr, eval;
-	char buf[64], *err;
-	Window *w;
-	Rune *r;
-	Range a;
-	Text *t;
-	uint q0, tq0, tq1;
-
-	qid = FILE(x.f.qid);
-	w = x.f.w;
-	if w {
+	qid := FILE(x.f.qid);
+	w := x.f.w;
+	if w != nil {
 		c = 'F';
-		if qid==QWtag || qid==QWbody
+		if qid==QWtag || qid==QWbody {
 			c = 'E';
+		}
 		w.Lock(c);
 		if w.col == nil {
 			w.Unlock();
@@ -435,27 +434,62 @@ func xfidwrite(x *Xfid) {
 			return;
 		}
 	}
-	x.fcall.data[x.fcall.count] = 0;
+
+	BodyTag := func() { // Trimmed from the switch below.
+		r := fullrunewrite(x);
+		if len(r) != 0{
+			w.Commit(t);
+			if qid == QWwrsel {
+				q0 = uint(w.wrselrange.q1);
+				if q0 > t.file.b.nc() {
+					q0 = t.file.b.nc()
+				}
+			}else {
+				q0 = t.file.b.nc();
+			}
+			if qid == QWtag {
+				t.Insert(q0, r, true);
+			} else{
+				if w.nomark == false {
+					seq++;
+					t.file.Mark();
+				}
+				q, nr := t.BsInsert(q0, r, true);// TODO(flux): BsInsert returns nr?
+				q0 = q
+				t.SetSelect(t.q0, t.q1);	// insert could leave it somewhere else
+				if qid!=QWwrsel && shouldscroll(t, q0, qid) {
+					t.Show(q0+uint(nr), q0+uint(nr), true);
+				}
+				t.ScrDraw();
+			}
+			w.SetTag();
+			if qid == QWwrsel {
+				w.wrselrange.q1 += len(r);
+			}
+		}
+		fc.Count = x.fcall.Count;
+		respond(x, &fc, nil);
+	}
+
+	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
 	switch(qid){
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X');
 		t=&w.body;
-		goto BodyTag;
+		BodyTag()
 
 	case Qlabel:
-		fc.count = x.fcall.count;
+		fc.Count = x.fcall.Count;
 		respond(x, &fc, nil);
-		break;
 
 	case QWaddr:
-		x.fcall.data[x.fcall.count] = 0;
-		r = bytetorune(x.fcall.data, &nr);
+		//x.fcall.Data[x.fcall.Count] = 0;// null-terminate. unneeded
+		r = []rune(string(x.fcall.Data))
 		t = &w.body;
-		wincommit(w, t);
+		w.Commit(t);
 		eval = true;
-		a = address(false, t, w.limit, w.addr, r, 0, nr, rgetc, &eval, (uint*)&nb);
-		free(r);
-		if nb < nr {
+		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, uint(len(r)));
+		if nb < uint(len(r)) {
 			respond(x, &fc, Ebadaddr);
 			break;
 		}
@@ -464,36 +498,35 @@ func xfidwrite(x *Xfid) {
 			break;
 		}
 		w.addr = a;
-		fc.count = x.fcall.count;
+		fc.Count = x.fcall.Count;
 		respond(x, &fc, nil);
 		break;
 
 	case Qeditout:
 	case QWeditout:
 		r = fullrunewrite(x);
-		nr = len(r)
-		if w
-			err = edittext(w, w.wrselrange.q1, r, nr);
-		else
-			err = edittext(nil, 0, r, nr);
-		free(r);
+		if w != nil {
+			err = edittext(w, w.wrselrange.q1, r);
+		} else {
+			err = edittext(nil, 0, r);
+		}
 		if err != nil {
 			respond(x, &fc, err);
 			break;
 		}
-		fc.count = x.fcall.count;
+		fc.Count = x.fcall.Count;
 		respond(x, &fc, nil);
 		break;
 
 	case QWerrors:
 		w = errorwinforwin(w);
 		t = &w.body;
-		goto BodyTag;
+		BodyTag()
 
 	case QWbody:
 	case QWwrsel:
 		t = &w.body;
-		goto BodyTag;
+		BodyTag()
 
 	case QWctl:
 		xfidctlwrite(x, w);
@@ -502,93 +535,60 @@ func xfidwrite(x *Xfid) {
 	case QWdata:
 		a = w.addr;
 		t = &w.body;
-		wincommit(w, t);
-		if a.q0>t.file.b.nc || a.q1>t.file.b.nc {
+		w.Commit(t);
+		if a.q0>int(t.file.b.nc()) || a.q1>int(t.file.b.nc()) {
 			respond(x, &fc, Eaddr);
 			break;
 		}
-		r = runemalloc(x.fcall.count);
-		cvttorunes(x.fcall.data, x.fcall.count, r, &nb, &nr, nil);
+		r := []rune(string(x.fcall.Data[0:x.fcall.Count]))
 		if w.nomark == false {
 			seq++;
-			filemark(t.file);
+			t.file.Mark();
 		}
-		q0 = a.q0;
-		if a.q1 > q0 {
-			textdelete(t, q0, a.q1, true);
-			w.addr.q1 = q0;
+		q0 = uint(a.q0);
+		if a.q1 > int(q0) {
+			t.Delete(q0, uint(a.q1), true);
+			w.addr.q1 = int(q0);
 		}
 		tq0 = t.q0;
 		tq1 = t.q1;
-		textinsert(t, q0, r, nr, true);
-		if tq0 >= q0
-			tq0 += nr;
-		if tq1 >= q0
-			tq1 += nr;
-		textsetselect(t, tq0, tq1);
-		if shouldscroll(t, q0, qid)
-			textshow(t, q0+nr, q0+nr, 0);
-		textscrdraw(t);
-		winsettag(w);
-		free(r);
-		w.addr.q0 += nr;
+		t.Insert(q0, r, true);
+		if tq0 >= q0 {
+			tq0 += uint(len(r));
+		}
+		if tq1 >= q0 {
+			tq1 += uint(len(r));
+		}
+		t.SetSelect(tq0, tq1);
+		if shouldscroll(t, q0, qid) {
+			t.Show(q0+uint(len(r)), q0+uint(len(r)), false);
+		}
+		t.ScrDraw();
+		w.SetTag();
+		w.addr.q0 += len(r);
 		w.addr.q1 = w.addr.q0;
-		fc.count = x.fcall.count;
+		fc.Count = x.fcall.Count;
 		respond(x, &fc, nil);
-		break;
 
 	case QWevent:
 		xfideventwrite(x, w);
-		break;
 
 	case QWtag:
 		t = &w.tag;
-		goto BodyTag;
-
-	BodyTag:
-		r = fullrunewrite(x);
-		nr = len(r)
-		if nr > 0 {
-			wincommit(w, t);
-			if qid == QWwrsel {
-				q0 = w.wrselrange.q1;
-				if q0 > t.file.b.nc
-					q0 = t.file.b.nc;
-			}else
-				q0 = t.file.b.nc;
-			if qid == QWtag
-				textinsert(t, q0, r, nr, true);
-			else{
-				if w.nomark == false {
-					seq++;
-					filemark(t.file);
-				}
-				q0 = textbsinsert(t, q0, r, nr, true, &nr);
-				textsetselect(t, t.q0, t.q1);	// insert could leave it somewhere else
-				if qid!=QWwrsel && shouldscroll(t, q0, qid)
-					textshow(t, q0+nr, q0+nr, 1);
-				textscrdraw(t);
-			}
-			winsettag(w);
-			if qid == QWwrsel
-				w.wrselrange.q1 += nr;
-			free(r);
-		}
-		fc.count = x.fcall.count;
-		respond(x, &fc, nil);
-		break;
+		BodyTag()
 
 	default:
-		sprint(buf, "unknown qid %d in write", qid);
-		respond(x, &fc, buf);
-		break;
+		respond(x, &fc, fmt.Errorf("unknown qid %d in write", qid));
 	}
-	if w
+	if w != nil{
 		w.Unlock();
+	}
 }
 
 func xfidctlwrite (x * Xfid, w * Window) () {
-	Fcall fc;
+Unimpl()
+}
+/*	Fcall fc;
 	int i, m, n, nb, nr, nulls;
 	Rune *r;
 	char *err, *p, *pp, *q, *e;
@@ -788,8 +788,11 @@ out:
 	if scrdraw
 		textscrdraw(&w.body);
 }
-
+*/
 func xfideventwrite (x * Xfid, w * Window) () {
+Unimpl()
+}
+/*
 	Fcall fc;
 	int m, n;
 	Rune *r;
@@ -884,7 +887,7 @@ func xfidutfread(x *Xfid, t *Text, q1 uint, qid int) {
 	int m, n, nr, nb;
 
 	w = t.w;
-	wincommit(w, t);
+	w, t.Commit();
 	off = x.fcall.offset;
 	r = fbufalloc();
 	b = fbufalloc();
@@ -948,7 +951,7 @@ func xfidruneread(x *Xfid, t *Text, q0 uint, q1 uint) int {
 	int i, rw, m, n, nr, nb;
 
 	w = t.w;
-	wincommit(w, t);
+	w, t.Commit();
 	r = fbufalloc();
 	b = fbufalloc();
 	b1 = fbufalloc();

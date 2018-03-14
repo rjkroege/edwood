@@ -351,10 +351,53 @@ func (t *Text) Backnl(p uint, n uint) uint {
 	return p
 }
 
-func (t *Text) BsInsert(q0 uint, r []rune, n uint, tofile bool, nrp *int) uint {
+func (t *Text) BsInsert(q0 uint, r []rune, tofile bool) (q uint, nrp int) {
 	Unimpl()
-	return 0
+	return 0, 0
 }
+/*
+	Rune *bp, *tp, *up;
+	int i, initial;
+
+	if(t->what == Tag){	// can't happen but safety first: mustn't backspace over file name 
+    Err:
+		textinsert(t, q0, r, n, tofile);
+		*nrp = n;
+		return q0;
+	}
+	bp = r;
+	for(i=0; i<n; i++)
+		if(*bp++ == '\b'){
+			--bp;
+			initial = 0;
+			tp = runemalloc(n);
+			runemove(tp, r, i);
+			up = tp+i;
+			for(; i<n; i++){
+				*up = *bp++;
+				if(*up == '\b')
+					if(up == tp)
+						initial++;
+					else
+						--up;
+				else
+					up++;
+			}
+			if(initial){
+				if(initial > q0)
+					initial = q0;
+				q0 -= initial;
+				textdelete(t, q0, q0+initial, tofile);
+			}
+			n = up-tp;
+			textinsert(t, q0, tp, n, tofile);
+			free(tp);
+			*nrp = n;
+			return q0;
+		}
+	goto Err;
+}
+*/
 
 func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
 	if tofile && t.ncache != 0 {
