@@ -45,7 +45,7 @@ const (
 
 	//	STACK = 65536
 	EVENTSIZE = 256
-	BUFSIZE = MaxBlock + plan9.IOHDRSZ
+	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
 
 	Empty    = 0
 	Null     = '-'
@@ -174,6 +174,7 @@ type MntDir struct {
 }
 
 const MaxFid = math.MaxUint32
+
 type Fid struct {
 	fid    uint32
 	busy   bool

@@ -615,11 +615,11 @@ func expand (Text *t, uint q0, uint q1, Expand *e) (int) {
 }
 */
 
-
 func lookfile(s string) *Window {
-Unimpl()
-return nil
+	Unimpl()
+	return nil
 }
+
 /*
 {
 	int i, j, k;

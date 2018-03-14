@@ -409,185 +409,186 @@ func fullrunewrite(x *Xfid) []rune {
 }
 
 func xfidwrite(x *Xfid) {
-var (
-	fc plan9.Fcall
-	c int
-	eval bool
-	r []rune
-	a Range
-	t *Text
-	q0, tq0, tq1, nb uint
-	err error
-)
+	var (
+		fc               plan9.Fcall
+		c                int
+		eval             bool
+		r                []rune
+		a                Range
+		t                *Text
+		q0, tq0, tq1, nb uint
+		err              error
+	)
 
-	qid := FILE(x.f.qid);
-	w := x.f.w;
+	qid := FILE(x.f.qid)
+	w := x.f.w
 	if w != nil {
-		c = 'F';
-		if qid==QWtag || qid==QWbody {
-			c = 'E';
+		c = 'F'
+		if qid == QWtag || qid == QWbody {
+			c = 'E'
 		}
-		w.Lock(c);
+		w.Lock(c)
 		if w.col == nil {
-			w.Unlock();
-			respond(x, &fc, Edel);
-			return;
+			w.Unlock()
+			respond(x, &fc, Edel)
+			return
 		}
 	}
 
 	BodyTag := func() { // Trimmed from the switch below.
-		r := fullrunewrite(x);
-		if len(r) != 0{
-			w.Commit(t);
+		r := fullrunewrite(x)
+		if len(r) != 0 {
+			w.Commit(t)
 			if qid == QWwrsel {
-				q0 = uint(w.wrselrange.q1);
+				q0 = uint(w.wrselrange.q1)
 				if q0 > t.file.b.nc() {
 					q0 = t.file.b.nc()
 				}
-			}else {
-				q0 = t.file.b.nc();
+			} else {
+				q0 = t.file.b.nc()
 			}
 			if qid == QWtag {
-				t.Insert(q0, r, true);
-			} else{
+				t.Insert(q0, r, true)
+			} else {
 				if w.nomark == false {
-					seq++;
-					t.file.Mark();
+					seq++
+					t.file.Mark()
 				}
-				q, nr := t.BsInsert(q0, r, true);// TODO(flux): BsInsert returns nr?
+				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
-				t.SetSelect(t.q0, t.q1);	// insert could leave it somewhere else
-				if qid!=QWwrsel && shouldscroll(t, q0, qid) {
-					t.Show(q0+uint(nr), q0+uint(nr), true);
+				t.SetSelect(t.q0, t.q1) // insert could leave it somewhere else
+				if qid != QWwrsel && shouldscroll(t, q0, qid) {
+					t.Show(q0+uint(nr), q0+uint(nr), true)
 				}
-				t.ScrDraw();
+				t.ScrDraw()
 			}
-			w.SetTag();
+			w.SetTag()
 			if qid == QWwrsel {
-				w.wrselrange.q1 += len(r);
+				w.wrselrange.q1 += len(r)
 			}
 		}
-		fc.Count = x.fcall.Count;
-		respond(x, &fc, nil);
+		fc.Count = x.fcall.Count
+		respond(x, &fc, nil)
 	}
 
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
-	switch(qid){
+	switch qid {
 	case Qcons:
-		w = errorwin(x.f.mntdir, 'X');
-		t=&w.body;
+		w = errorwin(x.f.mntdir, 'X')
+		t = &w.body
 		BodyTag()
 
 	case Qlabel:
-		fc.Count = x.fcall.Count;
-		respond(x, &fc, nil);
+		fc.Count = x.fcall.Count
+		respond(x, &fc, nil)
 
 	case QWaddr:
 		//x.fcall.Data[x.fcall.Count] = 0;// null-terminate. unneeded
 		r = []rune(string(x.fcall.Data))
-		t = &w.body;
-		w.Commit(t);
-		eval = true;
-		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, uint(len(r)));
+		t = &w.body
+		w.Commit(t)
+		eval = true
+		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, uint(len(r)))
 		if nb < uint(len(r)) {
-			respond(x, &fc, Ebadaddr);
-			break;
+			respond(x, &fc, Ebadaddr)
+			break
 		}
 		if !eval {
-			respond(x, &fc, Eaddr);
-			break;
+			respond(x, &fc, Eaddr)
+			break
 		}
-		w.addr = a;
-		fc.Count = x.fcall.Count;
-		respond(x, &fc, nil);
-		break;
+		w.addr = a
+		fc.Count = x.fcall.Count
+		respond(x, &fc, nil)
+		break
 
 	case Qeditout:
 	case QWeditout:
-		r = fullrunewrite(x);
+		r = fullrunewrite(x)
 		if w != nil {
-			err = edittext(w, w.wrselrange.q1, r);
+			err = edittext(w, w.wrselrange.q1, r)
 		} else {
-			err = edittext(nil, 0, r);
+			err = edittext(nil, 0, r)
 		}
 		if err != nil {
-			respond(x, &fc, err);
-			break;
+			respond(x, &fc, err)
+			break
 		}
-		fc.Count = x.fcall.Count;
-		respond(x, &fc, nil);
-		break;
+		fc.Count = x.fcall.Count
+		respond(x, &fc, nil)
+		break
 
 	case QWerrors:
-		w = errorwinforwin(w);
-		t = &w.body;
+		w = errorwinforwin(w)
+		t = &w.body
 		BodyTag()
 
 	case QWbody:
 	case QWwrsel:
-		t = &w.body;
+		t = &w.body
 		BodyTag()
 
 	case QWctl:
-		xfidctlwrite(x, w);
-		break;
+		xfidctlwrite(x, w)
+		break
 
 	case QWdata:
-		a = w.addr;
-		t = &w.body;
-		w.Commit(t);
-		if a.q0>int(t.file.b.nc()) || a.q1>int(t.file.b.nc()) {
-			respond(x, &fc, Eaddr);
-			break;
+		a = w.addr
+		t = &w.body
+		w.Commit(t)
+		if a.q0 > int(t.file.b.nc()) || a.q1 > int(t.file.b.nc()) {
+			respond(x, &fc, Eaddr)
+			break
 		}
 		r := []rune(string(x.fcall.Data[0:x.fcall.Count]))
 		if w.nomark == false {
-			seq++;
-			t.file.Mark();
+			seq++
+			t.file.Mark()
 		}
-		q0 = uint(a.q0);
+		q0 = uint(a.q0)
 		if a.q1 > int(q0) {
-			t.Delete(q0, uint(a.q1), true);
-			w.addr.q1 = int(q0);
+			t.Delete(q0, uint(a.q1), true)
+			w.addr.q1 = int(q0)
 		}
-		tq0 = t.q0;
-		tq1 = t.q1;
-		t.Insert(q0, r, true);
+		tq0 = t.q0
+		tq1 = t.q1
+		t.Insert(q0, r, true)
 		if tq0 >= q0 {
-			tq0 += uint(len(r));
+			tq0 += uint(len(r))
 		}
 		if tq1 >= q0 {
-			tq1 += uint(len(r));
+			tq1 += uint(len(r))
 		}
-		t.SetSelect(tq0, tq1);
+		t.SetSelect(tq0, tq1)
 		if shouldscroll(t, q0, qid) {
-			t.Show(q0+uint(len(r)), q0+uint(len(r)), false);
+			t.Show(q0+uint(len(r)), q0+uint(len(r)), false)
 		}
-		t.ScrDraw();
-		w.SetTag();
-		w.addr.q0 += len(r);
-		w.addr.q1 = w.addr.q0;
-		fc.Count = x.fcall.Count;
-		respond(x, &fc, nil);
+		t.ScrDraw()
+		w.SetTag()
+		w.addr.q0 += len(r)
+		w.addr.q1 = w.addr.q0
+		fc.Count = x.fcall.Count
+		respond(x, &fc, nil)
 
 	case QWevent:
-		xfideventwrite(x, w);
+		xfideventwrite(x, w)
 
 	case QWtag:
-		t = &w.tag;
+		t = &w.tag
 		BodyTag()
 
 	default:
-		respond(x, &fc, fmt.Errorf("unknown qid %d in write", qid));
+		respond(x, &fc, fmt.Errorf("unknown qid %d in write", qid))
 	}
-	if w != nil{
-		w.Unlock();
+	if w != nil {
+		w.Unlock()
 	}
 }
 
-func xfidctlwrite (x * Xfid, w * Window) () {
-Unimpl()
+func xfidctlwrite(x *Xfid, w *Window) {
+	Unimpl()
 }
+
 /*	Fcall fc;
 	int i, m, n, nb, nr, nulls;
 	Rune *r;
@@ -789,9 +790,10 @@ out:
 		textscrdraw(&w.body);
 }
 */
-func xfideventwrite (x * Xfid, w * Window) () {
-Unimpl()
+func xfideventwrite(x *Xfid, w *Window) {
+	Unimpl()
 }
+
 /*
 	Fcall fc;
 	int m, n;
@@ -997,29 +999,29 @@ func xfidruneread(x *Xfid, t *Text, q0 uint, q1 uint) int {
 func xfideventread(x *Xfid, w *Window) {
 	var fc plan9.Fcall
 
-	i := 0;
-	x.flushed = false;
-	for(len(w.events) == 0){ // TODO(flux): Yes, that seems to be the case.  I suspect the response message makes an event?
-		if i!=0 {
+	i := 0
+	x.flushed = false
+	for len(w.events) == 0 { // TODO(flux): Yes, that seems to be the case.  I suspect the response message makes an event?
+		if i != 0 {
 			if !x.flushed {
-				respond(x, &fc, fmt.Errorf("window shut down"));
+				respond(x, &fc, fmt.Errorf("window shut down"))
 			}
-			return;
+			return
 		}
-		w.eventx = x;
-		w.Unlock();
+		w.eventx = x
+		w.Unlock()
 		<-x.c
-		w.Lock('F');
-		i++;
+		w.Lock('F')
+		i++
 	}
 
 	n := uint32(len(w.events))
-	if n > x.fcall.Count{
-		n = x.fcall.Count;
+	if n > x.fcall.Count {
+		n = x.fcall.Count
 	}
-	fc.Count = n;
-	fc.Data = w.events; // TODO(flux) the original doesn't make  copy, so I'm guessing respond consumes ahead of the copy below.
-	respond(x, &fc, nil);
+	fc.Count = n
+	fc.Data = w.events // TODO(flux) the original doesn't make  copy, so I'm guessing respond consumes ahead of the copy below.
+	respond(x, &fc, nil)
 	copy(w.events[0:], w.events[n:])
 }
 

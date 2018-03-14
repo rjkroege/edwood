@@ -40,7 +40,7 @@ type ElogOperation struct {
 
 func MakeElog() Elog {
 	return Elog{[]ElogOperation{
-		ElogOperation{Null, 0, 0, []rune{}}, // Sentinel
+		{Null, 0, 0, []rune{}}, // Sentinel
 	}, false,
 	}
 }

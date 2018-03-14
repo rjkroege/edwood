@@ -355,11 +355,12 @@ func (t *Text) BsInsert(q0 uint, r []rune, tofile bool) (q uint, nrp int) {
 	Unimpl()
 	return 0, 0
 }
+
 /*
 	Rune *bp, *tp, *up;
 	int i, initial;
 
-	if(t->what == Tag){	// can't happen but safety first: mustn't backspace over file name 
+	if(t->what == Tag){	// can't happen but safety first: mustn't backspace over file name
     Err:
 		textinsert(t, q0, r, n, tofile);
 		*nrp = n;
@@ -1105,11 +1106,11 @@ func (t *Text) Reset() {
 
 }
 
-func (t *Text)DirName()  (string) {
-	if t==nil || t.w==nil {
+func (t *Text) DirName() string {
+	if t == nil || t.w == nil {
 		return "."
 	}
-	b := t.w.tag.file.b.Read(0, t.w.tag.file.b.nc());
+	b := t.w.tag.file.b.Read(0, t.w.tag.file.b.nc())
 	spl := strings.SplitN(string(b), " ", 1)[0]
-	return filepath.Dir(spl) 
+	return filepath.Dir(spl)
 }

@@ -55,32 +55,32 @@ var (
 )
 
 var dirtab []*DirTab = []*DirTab{
-	&DirTab{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
-	&DirTab{"acme", plan9.QTDIR, Qacme, 0500 | plan9.DMDIR},
-	&DirTab{"cons", plan9.QTFILE, Qcons, 0600},
-	&DirTab{"consctl", plan9.QTFILE, Qconsctl, 0000},
-	&DirTab{"draw", plan9.QTDIR, Qdraw, 0000 | plan9.DMDIR}, // to suppress graphics progs started in acme
-	&DirTab{"editout", plan9.QTFILE, Qeditout, 0200},
-	&DirTab{"index", plan9.QTFILE, Qindex, 0400},
-	&DirTab{"label", plan9.QTFILE, Qlabel, 0600},
-	&DirTab{"log", plan9.QTFILE, Qlog, 0400},
-	&DirTab{"new", plan9.QTDIR, Qnew, 0500 | plan9.DMDIR},
+	{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
+	{"acme", plan9.QTDIR, Qacme, 0500 | plan9.DMDIR},
+	{"cons", plan9.QTFILE, Qcons, 0600},
+	{"consctl", plan9.QTFILE, Qconsctl, 0000},
+	{"draw", plan9.QTDIR, Qdraw, 0000 | plan9.DMDIR}, // to suppress graphics progs started in acme
+	{"editout", plan9.QTFILE, Qeditout, 0200},
+	{"index", plan9.QTFILE, Qindex, 0400},
+	{"label", plan9.QTFILE, Qlabel, 0600},
+	{"log", plan9.QTFILE, Qlog, 0400},
+	{"new", plan9.QTDIR, Qnew, 0500 | plan9.DMDIR},
 	//	{ nil, }
 }
 
 var dirtabw []*DirTab = []*DirTab{
-	&DirTab{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
-	&DirTab{"addr", plan9.QTFILE, QWaddr, 0600},
-	&DirTab{"body", plan9.QTAPPEND, QWbody, 0600 | plan9.DMAPPEND},
-	&DirTab{"ctl", plan9.QTFILE, QWctl, 0600},
-	&DirTab{"data", plan9.QTFILE, QWdata, 0600},
-	&DirTab{"editout", plan9.QTFILE, QWeditout, 0200},
-	&DirTab{"errors", plan9.QTFILE, QWerrors, 0200},
-	&DirTab{"event", plan9.QTFILE, QWevent, 0600},
-	&DirTab{"rdsel", plan9.QTFILE, QWrdsel, 0400},
-	&DirTab{"wrsel", plan9.QTFILE, QWwrsel, 0200},
-	&DirTab{"tag", plan9.QTAPPEND, QWtag, 0600 | plan9.DMAPPEND},
-	&DirTab{"xdata", plan9.QTFILE, QWxdata, 0600},
+	{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
+	{"addr", plan9.QTFILE, QWaddr, 0600},
+	{"body", plan9.QTAPPEND, QWbody, 0600 | plan9.DMAPPEND},
+	{"ctl", plan9.QTFILE, QWctl, 0600},
+	{"data", plan9.QTFILE, QWdata, 0600},
+	{"editout", plan9.QTFILE, QWeditout, 0200},
+	{"errors", plan9.QTFILE, QWerrors, 0200},
+	{"event", plan9.QTFILE, QWevent, 0600},
+	{"rdsel", plan9.QTFILE, QWrdsel, 0400},
+	{"wrsel", plan9.QTFILE, QWwrsel, 0200},
+	{"tag", plan9.QTAPPEND, QWtag, 0600 | plan9.DMAPPEND},
+	{"xdata", plan9.QTFILE, QWxdata, 0600},
 	//	{ nil, }
 }
 

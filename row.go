@@ -50,7 +50,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 	}
 	/* look for column we'll land on */
 	var colidx int
-	for colidx, _ = range row.col {
+	for colidx = range row.col {
 		d = row.col[colidx]
 		if x < d.r.Max.X {
 			break
