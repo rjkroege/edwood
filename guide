@@ -15,8 +15,12 @@ x/[^a-zA-Z_0-9]Border([^a-zA-Z_0-9]|\n)/y/[^a-zA-Z_0-9]/g/./{
 	}
 }"
 
+,s/winclose\(([^)]+)\)/\1.Close()/g
+,s/winlock\(([^)]+)\)/\1.Lock()/g
+,s/winunlock\(([^)]+)\)/\1.Unlock()/g
+
 // rewrite struct decl from C to Go
-,x/struct [a-zA-Z0-9_]+(.*)\n{([^}]*\n)+};/{
+x/struct [a-zA-Z0-9_]+(.*)\n{([^}]*\n)+};/{
 	s/^	*([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+);(.*)/	\3	\2\1	\4/g
 	s/struct ([a-zA-Z0-9_]+)((.*\n)+){/type \1 struct {\2/
 	x/};/c/}\n/
@@ -27,17 +31,22 @@ x/[^a-zA-Z_0-9]Border([^a-zA-Z_0-9]|\n)/y/[^a-zA-Z_0-9]/g/./{
 ,x/[^a-zA-Z_0-9]char[^a-zA-Z_0-9]/x/[a-zA-Z0-9_]+/c/byte
 
 // function decls.
-,s/^([a-zA-Z0-9_]+)\n([a-zA-Z0-9_]+)(\(.*)\n{/func \2 \3 (\1) {/g
+,s/^([a-zA-Z0-9_]+\*?)\n([a-zA-Z0-9_]+)(\(.*)\n{/func \2 \3 (\1) {/g
 ,x/^func.*\([^)]*\)/x/\([^)]*\)/{
 	x/\(void\)/c/()
 	y/,/s/([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+)/\3 \2 \1/
 }
+
+// var decls
+s/^[ 	]*([a-zA-Z0-9_]+)[ 	]+(\*?)(.*);/	\3 \2\1/g
 
 ,x/\/\*.*\*\//{
 	x/\/\*/c/\/\/
 	x/\*\//d
 }
 
+,s/qlock\(&([^)]+)\)/\1.Lock()/g
+,s/qunlock\(&([^)]+)\)/\1.Unlock()/g
 var decls
 s/([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+)/\3 \2 \1/g
 // Member function call

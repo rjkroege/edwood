@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 type Buffer []rune
@@ -64,4 +65,8 @@ func (b *Buffer) Reset() {
 
 func (b *Buffer) nc() uint {
 	return uint(len(*b))
+}
+
+func fbufalloc() []rune {
+	return make([]rune, BUFSIZE/utf8.UTFMax)
 }

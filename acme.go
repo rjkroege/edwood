@@ -135,10 +135,10 @@ func main() {
 	ckill = make(chan []rune)
 	cxfidalloc = make(chan *Xfid)
 	cxfidfree = make(chan *Xfid)
-	cnewwindow = make(chan chan interface{})
+	cnewwindow = make(chan *Window)
 	mouseexit0 = make(chan int)
 	cexit = make(chan int)
-	cerr = make(chan string)
+	cerr = make(chan error)
 	cedit = make(chan int)
 	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
 
@@ -190,6 +190,7 @@ func main() {
 
 	// After row is initialized
 	go mousethread()
+	go xfidallocthread(display)
 
 	select {
 	case <-cexit:
@@ -437,7 +438,31 @@ func waitthread() {
 
 }
 
-func xfidallocthread() {
+// maintain a linked list of Xfid
+// TODO(flux): It would be more idiomatic to prep one up front, and block on sending
+// it instead of using a send and a receive to get one.
+// Frankly, it would be more idiomatic to let the GC take care of them,
+// though that would require an exit signal in xfidctl.
+func xfidallocthread(d *draw.Display) {
+	xfree := (*Xfid)(nil)
+	for {
+		select {
+		case <-cxfidalloc:
+			x := xfree
+			if x != nil {
+				xfree = x.next
+			} else {
+				x = &Xfid{}
+				x.c = make(chan func(*Xfid))
+				go xfidctl(x, d)
+			}
+			cxfidalloc <- x
+		case x := <-cxfidfree:
+			x.next = xfree
+			xfree = x
+			break
+		}
+	}
 
 }
 

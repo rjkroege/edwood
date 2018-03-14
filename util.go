@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"os"
 	"unicode"
 )
 
@@ -48,8 +49,9 @@ func warning(md *MntDir, s string, args ...interface{}) {
 	fmt.Printf(s, args...)
 }
 
-func acmeerror(s string, err error) error {
-	panic(fmt.Sprintf("acme: %s: %v\n", s, err))
+func acmeerror(s string, err error) {
+	fmt.Fprintf(os.Stderr, "acme: %s: %v\n", s, err)
+	// panic(fmt.Sprintf(os.Stderr, "acme: %s: %v\n", s, err))
 }
 
 var (

@@ -3,19 +3,19 @@ package main
 import (
 	"fmt"
 	"image"
+	"math"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
+	"9fans.net/go/plan9"
 	"github.com/paul-lalonde/acme/frame"
 )
 
-type QID uint
-
 const (
-	Qdir QID = iota
+	Qdir uint64 = iota
 	Qacme
 	Qcons
 	Qconsctl
@@ -45,6 +45,7 @@ const (
 
 	//	STACK = 65536
 	EVENTSIZE = 256
+	BUFSIZE = MaxBlock + plan9.IOHDRSZ
 
 	Empty    = 0
 	Null     = '-'
@@ -117,7 +118,7 @@ var (
 	wdir              string
 	editing           int = Inactive
 	erroutfd          int
-	messagesize       int = MaxBlock + 32
+	messagesize       int = MaxBlock + plan9.IOHDRSZ
 	globalautoindent  bool
 	dodollarsigns     bool
 	mtpt              string
@@ -128,11 +129,11 @@ var (
 	ckill      chan []rune
 	cxfidalloc chan *Xfid
 	cxfidfree  chan *Xfid
-	cnewwindow chan chan interface{}
+	cnewwindow chan *Window
 	mouseexit0 chan int
 	mouseexit1 chan int
 	cexit      chan int
-	cerr       chan string
+	cerr       chan error
 	cedit      chan int
 	cwarn      chan uint
 
@@ -158,12 +159,12 @@ type Command struct {
 type DirTab struct {
 	name string
 	t    byte
-	qid  QID
+	qid  uint64
 	perm uint
 }
 
 type MntDir struct {
-	id    int
+	id    int64
 	ref   int
 	dir   string
 	ndir  int
@@ -172,26 +173,28 @@ type MntDir struct {
 	incl  []string
 }
 
+const MaxFid = math.MaxUint32
 type Fid struct {
-	fid  int
-	busy int
-	open int
-	//qid Qid
+	fid    uint32
+	busy   bool
+	open   bool
+	qid    plan9.Qid
 	w      *Window
 	dir    *DirTab
 	next   *Fid
 	mntdir *MntDir
 	nrpart int
 	rpart  [utf8.UTFMax]byte
+	logoff int
 }
 
 type Xfid struct {
-	arg interface{}
-	//	fcall Fcall
-	next    *Xfid
-	c       chan func(*Xfid)
-	f       *Fid
-	buf     []byte
+	arg   interface{}
+	fcall plan9.Fcall
+	next  *Xfid
+	c     chan func(*Xfid)
+	f     *Fid
+	//buf     []byte
 	flushed bool
 }
 
@@ -234,4 +237,16 @@ func Unimpl() {
 			break
 		}
 	}
+}
+
+func WIN(q plan9.Qid) int {
+	return int(((uint(q.Path)) >> 8) & 0xFFFFFF)
+}
+
+func FILE(q plan9.Qid) uint64 {
+	return uint64(q.Path & 0xff)
+}
+
+func QID(id int, q uint64) uint64 {
+	return uint64(id<<8) | q
 }

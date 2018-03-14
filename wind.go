@@ -2,7 +2,8 @@ package main
 
 import (
 	"image"
-	"math"
+	"os"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -28,13 +29,13 @@ type Window struct {
 	addr  Range
 	limit Range
 
-	nopen     [QMAX]bool
+	nopen     [QMAX]byte
 	nomark    bool
-	wselrange Range
-	rdselfd   int
+	wrselrange Range
+	rdselfd   *os.File
 
 	col    *Column
-	eventx Xfid
+	eventx *Xfid
 	events string
 
 	nevents  int
@@ -47,7 +48,7 @@ type Window struct {
 	incl        []string
 	reffont     *draw.Font
 	ctrllock    *sync.Mutex
-	ctlfid      uint
+	ctlfid      uint32
 	dumpstr     string
 	dumpdir     string
 	dumpid      int
@@ -82,7 +83,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	WinId++
 	w.id = WinId
 
-	w.ctlfid = math.MaxUint64
+	w.ctlfid = MaxFid
 	w.utflastqid = -1
 	r1 := r
 
@@ -421,8 +422,18 @@ func (w *Window) Clean(conservative bool) int {
 	return 0
 }
 
-func (w *Window) CtlPrint(buf string, fonts int) string {
-	return ""
+func (w *Window) CtlPrint(fonts bool) string {
+	isdir := 0
+	if w.isdir { isdir = 1 }
+	dirty := 0
+	if w.dirty { dirty = 1 }
+	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.file.b.nc(),
+		w.body.file.b.nc(), isdir, dirty);
+	if fonts {
+		return fmt.Sprintf("%s%11d %q %11d ", buf, w.body.fr.Rect.Dx(), 
+			w.body.font.Name, w.body.fr.MaxTab);
+	}
+	return buf;
 }
 
 func (w *Window) Event(fmt string, args ...interface{}) {

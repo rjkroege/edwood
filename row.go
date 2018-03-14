@@ -182,3 +182,17 @@ func (r *Row) AllWindows(f func(*Window, interface{}), arg interface{}) {
 		}
 	}
 }
+
+func (r *Row) LookupWin(id int, dump bool) *Window {
+	for _, c := range r.col {
+		for _, w := range c.w {
+			if dump && w.dumpid == id {
+				return w
+			}
+			if !dump && w.id == id {
+				return w
+			}
+		}
+	}
+	return nil
+}
