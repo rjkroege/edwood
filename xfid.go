@@ -78,342 +78,336 @@ out:
 }
 
 func xfidopen(x *Xfid) {
-var (
-	fc plan9.Fcall
-	w *Window
-	t *Text
-	n int
-	q0, q1 uint
-	q uint64
-)
+	var (
+		fc     plan9.Fcall
+		w      *Window
+		t      *Text
+		n      int
+		q0, q1 uint
+		q      uint64
+	)
 
-	w = x.f.w;
-	t = &w.body;
-	q = FILE(x.f.qid);
+	w = x.f.w
+	t = &w.body
+	q = FILE(x.f.qid)
 	if w != nil {
-		w.Lock('E');
-		switch(q){
+		w.Lock('E')
+		switch q {
 		case QWaddr:
-			if  w.nopen[q] == 0 {
-				w.addr = Range{0,0}
-				w.limit = Range{-1,-1}
+			if w.nopen[q] == 0 {
+				w.addr = Range{0, 0}
+				w.limit = Range{-1, -1}
 			}
 			w.nopen[q]++
-		case QWdata: fallthrough
+		case QWdata:
+			fallthrough
 		case QWxdata:
-			w.nopen[q]++;
+			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
-				if !w.isdir && w.col!=nil {
-					w.filemenu = false;
-					w.SetTag();
+				if !w.isdir && w.col != nil {
+					w.filemenu = false
+					w.SetTag()
 				}
 			}
 			w.nopen[q]++
 		case QWrdsel:
-			 //* Use a temporary file.
-			 //* A pipe would be the obvious, but we can't afford the
-			 //* broken pipe notification.  Using the code to read QWbody
-			 //* is n², which should probably also be fixed.  Even then,
-			 //* though, we'd need to squirrel away the data in case it's
-			 //* modified during the operation, e.g. by |sort
+			//* Use a temporary file.
+			//* A pipe would be the obvious, but we can't afford the
+			//* broken pipe notification.  Using the code to read QWbody
+			//* is n², which should probably also be fixed.  Even then,
+			//* though, we'd need to squirrel away the data in case it's
+			//* modified during the operation, e.g. by |sort
 			if w.rdselfd != nil {
-				w.Unlock();
-				respond(x, &fc, Einuse);
-				return;
+				w.Unlock()
+				respond(x, &fc, Einuse)
+				return
 			}
 			var err error
 			w.rdselfd, err = ioutil.TempFile("", "acme")
 			if err != nil {
-				w.Unlock();
-				respond(x, &fc, fmt.Errorf("can't create temp file"));
-				return;
+				w.Unlock()
+				respond(x, &fc, fmt.Errorf("can't create temp file"))
+				return
 			}
-			w.nopen[q]++;
-			q0 = t.q0;
-			q1 = t.q1;
-			for(q0 < q1){
+			w.nopen[q]++
+			q0 = t.q0
+			q1 = t.q1
+			for q0 < q1 {
 				n = int(q1 - q0)
 				if n > BUFSIZE/utf8.UTFMax {
-					n = BUFSIZE/utf8.UTFMax
+					n = BUFSIZE / utf8.UTFMax
 				}
-				r := t.file.b.Read(q0, uint(n));
+				r := t.file.b.Read(q0, uint(n))
 				s := string(r)
 				n, err = w.rdselfd.Write([]byte(s))
-				if  err != nil || n != len(s) {
-					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err));
-					break;
+				if err != nil || n != len(s) {
+					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
+					break
 				}
 				q0 += uint(n)
 			}
 		case QWwrsel:
-			w.nopen[q]++;
-			seq++;
-			t.file.Mark();
-			cut(t, t, nil, false, true, nil, 0);
+			w.nopen[q]++
+			seq++
+			t.file.Mark()
+			cut(t, t, nil, false, true, nil, 0)
 			w.wrselrange = Range{int(t.q1), int(t.q1)}
-			w.nomark = true;
+			w.nomark = true
 		case QWeditout:
 			if editing == Inactive {
-				w.Unlock();
-				respond(x, &fc, Eperm);
-				return;
+				w.Unlock()
+				respond(x, &fc, Eperm)
+				return
 			}
 
 			// TODO(flux): Need a better mechanism for editoutlk
-		//	if !w.editoutlk.CanLock() {
-		//		w.Unlock();
-		//		respond(x, &fc, Einuse);
-		//		return;
-		//	}
-			w.wrselrange = Range{int(t.q1), int(t.q1)};
-			break;
+			//	if !w.editoutlk.CanLock() {
+			//		w.Unlock();
+			//		respond(x, &fc, Einuse);
+			//		return;
+			//	}
+			w.wrselrange = Range{int(t.q1), int(t.q1)}
+			break
 		}
-		w.Unlock();
-	}else{
-		switch(q){
+		w.Unlock()
+	} else {
+		switch q {
 		case Qlog:
-			xfidlogopen(x);
+			xfidlogopen(x)
 		case Qeditout:
 			// TODO(flux) CanLock doesn't exist :-(
-		//	if !editoutlk.CanLock() {
-		//		respond(x, &fc, Einuse);
-		//		return;
-		//	}
+			//	if !editoutlk.CanLock() {
+			//		respond(x, &fc, Einuse);
+			//		return;
+			//	}
 		}
 	}
-	fc.Qid = x.f.qid;
-	fc.Iounit = uint32(messagesize-plan9.IOHDRSZ)
-	x.f.open = true;
-	respond(x, &fc, nil);
+	fc.Qid = x.f.qid
+	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ)
+	x.f.open = true
+	respond(x, &fc, nil)
 }
 
 func xfidclose(x *Xfid) {
-var(
-	fc plan9.Fcall
-	w *Window
-	q uint64
-	t *Text
-)
-	w = x.f.w;
-	x.f.busy = false;
-	x.f.w = nil;
+	var (
+		fc plan9.Fcall
+		w  *Window
+		q  uint64
+		t  *Text
+	)
+	w = x.f.w
+	x.f.busy = false
+	x.f.w = nil
 	if x.f.open == false {
 		if w != nil {
-			w.Close();
+			w.Close()
 		}
-		respond(x, &fc, nil);
-		return;
+		respond(x, &fc, nil)
+		return
 	}
 
-	q = FILE(x.f.qid);
-	x.f.open = false;
+	q = FILE(x.f.qid)
+	x.f.open = false
 	if w != nil {
-		w.Lock('E');
-		switch(q){
+		w.Lock('E')
+		switch q {
 		case QWctl:
-			if w.ctlfid!=MaxFid && w.ctlfid==x.f.fid {
+			if w.ctlfid != MaxFid && w.ctlfid == x.f.fid {
 				w.ctlfid = MaxFid
-				w.ctrllock.Unlock();
+				w.ctrllock.Unlock()
 			}
-			break;
+			break
 		case QWdata:
 		case QWxdata:
-			w.nomark = false;
+			w.nomark = false
 			// fall through
 		case QWaddr:
-		case QWevent:	// BUG: do we need to shut down Xfid?
+		case QWevent: // BUG: do we need to shut down Xfid?
 			w.nopen[q]--
 			if w.nopen[q] == 0 {
 				if q == QWdata || q == QWxdata {
-					w.nomark = false;
+					w.nomark = false
 				}
-				if q==QWevent && !w.isdir && w.col!=nil {
-					w.filemenu = true;
-					w.SetTag();
+				if q == QWevent && !w.isdir && w.col != nil {
+					w.filemenu = true
+					w.SetTag()
 				}
 				if q == QWevent {
-					w.dumpstr = "";
-					w.dumpdir = "";
+					w.dumpstr = ""
+					w.dumpdir = ""
 				}
 			}
-			break;
+			break
 		case QWrdsel:
 			w.rdselfd.Close()
-			w.rdselfd = nil;
-			break;
+			w.rdselfd = nil
+			break
 		case QWwrsel:
-			w.nomark = false;
-			t = &w.body;
+			w.nomark = false
+			t = &w.body
 			// before: only did this if !w.noscroll, but that didn't seem right in practice
-			t.Show(minu(uint(w.wrselrange.q0), t.file.b.nc()), minu(uint(w.wrselrange.q1), t.file.b.nc()), true);
-			t.ScrDraw();
-			break;
+			t.Show(minu(uint(w.wrselrange.q0), t.file.b.nc()), minu(uint(w.wrselrange.q1), t.file.b.nc()), true)
+			t.ScrDraw()
+			break
 		case QWeditout:
-			w.editoutlk.Unlock();
-			break;
+			w.editoutlk.Unlock()
+			break
 		}
-		w.Unlock();
-		w.Close();
-	} else{
-		switch(q){
+		w.Unlock()
+		w.Close()
+	} else {
+		switch q {
 		case Qeditout:
-			editoutlk.Unlock();
-			break;
+			editoutlk.Unlock()
+			break
 		}
 	}
-	respond(x, &fc, nil);
+	respond(x, &fc, nil)
 }
 
 func xfidread(x *Xfid) {
-var (
-	fc plan9.Fcall
-	n int
-	b string
-	buf string
-	w *Window
-)
-	q := FILE(x.f.qid);
-	w = x.f.w;
+	var (
+		fc  plan9.Fcall
+		n   int
+		b   string
+		buf string
+		w   *Window
+	)
+	q := FILE(x.f.qid)
+	w = x.f.w
 	if w == nil {
-		fc.Count = 0;
-		switch(q){
+		fc.Count = 0
+		switch q {
 		case Qcons:
 		case Qlabel:
-			break;
+			break
 		case Qindex:
-			xfidindexread(x);
-			return;
+			xfidindexread(x)
+			return
 		case Qlog:
-			xfidlogread(x);
-			return;
+			xfidlogread(x)
+			return
 		default:
-			warning(nil, "unknown qid %d\n", q);
-			break;
+			warning(nil, "unknown qid %d\n", q)
+			break
 		}
-		respond(x, &fc, nil);
-		return;
+		respond(x, &fc, nil)
+		return
 	}
-	w.Lock('F');
+	w.Lock('F')
 	if w.col == nil {
-		w.Unlock();
-		respond(x, &fc, Edel);
-		return;
+		w.Unlock()
+		respond(x, &fc, Edel)
+		return
 	}
-	off := x.fcall.Offset;
-	switch(q){
+	off := x.fcall.Offset
+	switch q {
 	case QWaddr:
-		w.body.Commit(true);
-		clampaddr(w);
-		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1);
-		n = len(buf);
+		w.body.Commit(true)
+		clampaddr(w)
+		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
+		n = len(buf)
 		if off > uint64(n) {
-			off = uint64(n);
+			off = uint64(n)
 		}
 		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n)-off)
+			x.fcall.Count = uint32(uint64(n) - off)
 		}
-		fc.Count = x.fcall.Count;
+		fc.Count = x.fcall.Count
 		fc.Data = []byte(buf[off:])
-		respond(x, &fc, nil);
+		respond(x, &fc, nil)
 	case QWbody:
-		xfidutfread(x, &w.body, w.body.file.b.nc(), int(QWbody));
+		xfidutfread(x, &w.body, w.body.file.b.nc(), int(QWbody))
 
 	case QWctl:
-		b = w.CtlPrint(true);
-		n = len(b);
+		b = w.CtlPrint(true)
+		n = len(b)
 		if off > uint64(n) {
-			off = uint64(n);
+			off = uint64(n)
 		}
 		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n)-off)
+			x.fcall.Count = uint32(uint64(n) - off)
 		}
-		fc.Count = x.fcall.Count;
+		fc.Count = x.fcall.Count
 		fc.Data = []byte(buf[off:])
-		respond(x, &fc, nil);
+		respond(x, &fc, nil)
 
 	case QWevent:
-		xfideventread(x, w);
+		xfideventread(x, w)
 
 	case QWdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > int(w.body.file.b.nc()) {
-			respond(x, &fc, Eaddr);
-			break;
+			respond(x, &fc, Eaddr)
+			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), w.body.file.b.nc());
-		w.addr.q1 = w.addr.q0;
+		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), w.body.file.b.nc())
+		w.addr.q1 = w.addr.q0
 
 	case QWxdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > int(w.body.file.b.nc()) {
-			respond(x, &fc, Eaddr);
-			break;
+			respond(x, &fc, Eaddr)
+			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), uint(w.addr.q1));
+		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), uint(w.addr.q1))
 
 	case QWtag:
-		xfidutfread(x, &w.tag, w.tag.file.b.nc(), int(QWtag));
+		xfidutfread(x, &w.tag, w.tag.file.b.nc(), int(QWtag))
 
 	case QWrdsel:
-		w.rdselfd.Seek(int64(off), 0);
-		n := x.fcall.Count;
+		w.rdselfd.Seek(int64(off), 0)
+		n := x.fcall.Count
 		if n > BUFSIZE {
-			n = BUFSIZE;
+			n = BUFSIZE
 		}
 		b := make([]byte, n)
-		nread, err := w.rdselfd.Read(b);
+		nread, err := w.rdselfd.Read(b)
 		n = uint32(nread)
 		if err != nil || n < 0 {
 			respond(x, &fc, fmt.Errorf("I/O error in temp file: %v", err))
-			break;
+			break
 		}
-		fc.Count = n;
-		fc.Data = b;
-		respond(x, &fc, nil);
+		fc.Count = n
+		fc.Data = b
+		respond(x, &fc, nil)
 	default:
-		respond(x, &fc, fmt.Errorf("unknown qid %d in read", q)); // TODO(flux) compare to the C code - there's a bug and leaks buf, not even passing it.
+		respond(x, &fc, fmt.Errorf("unknown qid %d in read", q)) // TODO(flux) compare to the C code - there's a bug and leaks buf, not even passing it.
 	}
-	w.Unlock();
+	w.Unlock()
 }
 
-func shouldscroll (t * Text, q0  uint, qid  int) (bool) {
+func shouldscroll(t *Text, q0 uint, qid int) bool {
 	if qid == int(Qcons) {
-		return true;
+		return true
 	}
-	return t.org <= q0 && q0 <= t.org+uint(t.fr.NChars);
+	return t.org <= q0 && q0 <= t.org+uint(t.fr.NChars)
 }
 
-/*
-func fullrunewrite(x * Xfid, inr * int) []rune {
-	int q, cnt, c, nb, nr;
-	Rune *r;
-
-	q = x.f.nrpart;
-	cnt = x.fcall.count;
-	if q > 0 {
-		memmove(x.fcall.data+q, x.fcall.data, cnt);	// there's room; see fsysproc
-		memmove(x.fcall.data, x.f.rpart, q);
-		cnt += q;
-		x.f.nrpart = 0;
-	}
-	r = runemalloc(cnt);
-	cvttorunes(x.fcall.data, cnt-UTFmax, r, &nb, &nr, nil);
-	// approach end of buffer
-	while(fullrune(x.fcall.data+nb, cnt-nb)){
-		c = nb;
-		nb += chartorune(&r[nr], x.fcall.data+c);
-		if r[nr]
-			nr++;
+// This is fiddly code that handles partial runes at the end of a previous write?
+func fullrunewrite(x *Xfid) []rune {
+	var (
+		nb uint32
+		r  []rune
+	)
+	// extend with previous partial rune at the end.
+	x.fcall.Data = append(x.f.rpart[0:x.f.nrpart], x.fcall.Data...)
+	cnt := x.fcall.Count + uint32(x.f.nrpart)
+	r = []rune(string(x.fcall.Data[:cnt-utf8.UTFMax]))
+	// approach end of buffer, decoding the last utf8.UTFMax bytes, which might include an incomplete utf8 sequence
+	for nb = cnt - utf8.UTFMax; utf8.FullRune(x.fcall.Data[nb:]); {
+		ru, l := utf8.DecodeRune(x.fcall.Data[nb:])
+		r = append(r, ru)
+		nb += uint32(l)
 	}
 	if nb < cnt {
-		memmove(x.f.rpart, x.fcall.data+nb, cnt-nb);
-		x.f.nrpart = cnt-nb;
+		copy(x.f.rpart[:], x.fcall.Data[nb:cnt-nb])
+		x.f.nrpart = int(cnt - nb)
 	}
-	*inr = nr;
-	return r;
+	return r
 }
-*/
+
 func xfidwrite(x *Xfid) {
 	Unimpl()
 }
@@ -476,7 +470,8 @@ func xfidwrite(x *Xfid) {
 
 	case Qeditout:
 	case QWeditout:
-		r = fullrunewrite(x, &nr);
+		r = fullrunewrite(x);
+		nr = len(r)
 		if w
 			err = edittext(w, w.wrselrange.q1, r, nr);
 		else
@@ -551,7 +546,8 @@ func xfidwrite(x *Xfid) {
 		goto BodyTag;
 
 	BodyTag:
-		r = fullrunewrite(x, &nr);
+		r = fullrunewrite(x);
+		nr = len(r)
 		if nr > 0 {
 			wincommit(w, t);
 			if qid == QWwrsel {
@@ -875,9 +871,10 @@ func xfideventwrite (x * Xfid, w * Window) () {
 	goto Out;
 }
 */
-func xfidutfread (x * Xfid, t * Text, q1  uint, qid  int) () {
-Unimpl()
+func xfidutfread(x *Xfid, t *Text, q1 uint, qid int) {
+	Unimpl()
 }
+
 /*
 	Fcall fc;
 	Window *w;
@@ -939,10 +936,10 @@ Unimpl()
 	fbuffree(b1);
 }
 */
-func xfidruneread (x * Xfid, t * Text, q0  uint, q1  uint) (int) {
-Unimpl()
+func xfidruneread(x *Xfid, t *Text, q0 uint, q1 uint) int {
+	Unimpl()
 	return 0
-}/*
+} /*
 	Fcall fc;
 	Window *w;
 	Rune *r, junk;
@@ -994,9 +991,10 @@ Unimpl()
 	return q-q0;
 }
 */
-func xfideventread (x * Xfid, w * Window) () {
-Unimpl()
+func xfideventread(x *Xfid, w *Window) {
+	Unimpl()
 }
+
 /*
 	Fcall fc;
 	int i, n;
@@ -1032,9 +1030,10 @@ Unimpl()
 	}
 }
 */
-func xfidindexread (x * Xfid) () {
-Unimpl()
+func xfidindexread(x *Xfid) {
+	Unimpl()
 }
+
 /*
 	Fcall fc;
 	int i, j, m, n, nmax, isbuf, cnt, off;
