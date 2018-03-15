@@ -199,7 +199,7 @@ type Xfid struct {
 	flushed bool
 }
 
-type RangeSet [NRange]Range
+type RangeSet []Range
 
 type Dirlist struct {
 	r   []rune

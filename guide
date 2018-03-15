@@ -1,4 +1,4 @@
-"{ x/->/c/./
+",{ x/->/c/./
 x/TRUE/c/true/
 x/FALSE/c/false/
 x/display.black/c/display.Black/
@@ -15,6 +15,7 @@ x/[^a-zA-Z_0-9]Border([^a-zA-Z_0-9]|\n)/y/[^a-zA-Z_0-9]/g/./{
 	}
 }"
 
+,s/wincommit\(([^)]+)\)/\1.Commit()/g
 ,s/winclose\(([^)]+)\)/\1.Close()/g
 ,s/winlock\(([^)]+)\)/\1.Lock()/g
 ,s/winunlock\(([^)]+)\)/\1.Unlock()/g
@@ -31,7 +32,7 @@ x/struct [a-zA-Z0-9_]+(.*)\n{([^}]*\n)+};/{
 ,x/[^a-zA-Z_0-9]char[^a-zA-Z_0-9]/x/[a-zA-Z0-9_]+/c/byte
 
 // function decls.
-,s/^([a-zA-Z0-9_]+\*?)\n([a-zA-Z0-9_]+)(\(.*)\n{/func \2 \3 (\1) {/g
+,s/^([a-zA-Z0-9_]+)[ ]*(\*?)\n([a-zA-Z0-9_]+)(\(.*)\n{/func \3 \4 (\2 \1) {/g
 ,x/^func.*\([^)]*\)/x/\([^)]*\)/{
 	x/\(void\)/c/()
 	y/,/s/([a-zA-Z0-9_]+)[ 	]+(\*)?([a-zA-Z0-9_]+)/\3 \2 \1/

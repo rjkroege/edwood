@@ -1,23 +1,21 @@
 package main
 
-/*
-
-enum
-{
-	None = 0,
-	Fore = '+',
+const(
+	None = iota
+	Fore = '+'
 	Back = '-'
-};
+)
 
-enum
-{
-	Char,
+const (
+	Char = iota
 	Line
-};
+)
 
-func isaddrc (r  int) (int) {
-	if r && utfrune("0123456789+-/$.#,;?", r)!=nil
+// Return if r is valid character in an address
+func isaddrc (r  int) (bool) {
+	if r != 0 && utfrune([]rune("0123456789+-/$.#,;?"), r)!=-1 {
 		return true;
+	}
 	return false;
 }
 
@@ -25,13 +23,16 @@ func isaddrc (r  int) (int) {
  //* quite hard: could be almost anything but white space, but we are a little conservative,
  //* aiming for regular expressions of alphanumerics and no white space
 
-func isregexc (r  int) (int) {
-	if r == 0
+func isregexc (r  int) (bool) {
+	if r == 0 {
 		return false;
-	if isalnum(r)
+	}
+	if isalnum(rune(r)) {
 		return true;
-	if utfrune("^+-.*?#,;[]()$", r)!=nil
+	}
+	if utfrune([]rune("^+-.*?#,;[]()$"), r)!=-1 {
 		return true;
+	}
 	return false;
 }
 
@@ -40,35 +41,41 @@ func isregexc (r  int) (int) {
 // and then nr chars, being careful not to walk past
 // the end of the current line.
 // It returns the final position.
-func nlcounttopos (t * Text, q0  long, nl  long, nr  long) (long) {
-	while(nl > 0 && q0 < t.file.b.nc) {
-		if textreadc(t, q0++) == '\n'
+func nlcounttopos (t * Text, q0  int, nl  int, nr  int) (int) {
+	for(nl > 0 && q0 < t.file.b.nc()) {
+		if t.ReadC(q0) == '\n' {
 			nl--;
+		}
+		q0++
 	}
-	if nl > 0
+	if nl > 0 {
 		return q0;
-	while(nr > 0 && q0 < t.file.b.nc && textreadc(t, q0) != '\n') {
+	}
+	for(nr > 0 && q0 < t.file.b.nc() && t.ReadC(q0) != '\n') {
 		q0++;
 		nr--;
 	}
 	return q0;
 }
 
-func number (showerr  uint, t * Text, r  Range, line  int, dir  int, size  int, evalp * int) (Range) {
-	uint q0, q1;
+func number (showerr  bool, t * Text, r  Range, line  int, dir  int, size  int) (Range, bool) {
+	var q0, q1 int
 
 	if size == Char {
-		if dir == Fore
+		if dir == Fore {
 			line = r.q1+line;
-		else if dir == Back {
-			if r.q0==0 && line>0
-				r.q0 = t.file.b.nc;
-			line = r.q0 - line;
+		} else {
+			if dir == Back {
+				if r.q0==0 && line>0 {
+					r.q0 = t.file.b.nc()
+				}
+				line = r.q0 - line;
+			}
 		}
-		if line<0 || line>t.file.b.nc
+		if line<0 || line>t.file.b.nc() {
 			goto Rescue;
-		*evalp = true;
-		return range(line, line);
+		}
+		return Range{line, line}, true
 	}
 	q0 = r.q0;
 	q1 = r.q1;
@@ -76,55 +83,89 @@ func number (showerr  uint, t * Text, r  Range, line  int, dir  int, size  int, 
 	case None:
 		q0 = 0;
 		q1 = 0;
-	Forward:
-		while(line>0 && q1<t.file.b.nc)
-			if textreadc(t, q1++) == '\n' || q1==t.file.b.nc
-				if --line > 0
-					q0 = q1;
-		if line==1 && q1==t.file.b.nc  // 6 goes to end of 5-line file
+		for (line>0 && q1<t.file.b.nc()) {
+			if t.ReadC(q1) == '\n' || q1==t.file.b.nc() {
+				line--
+				if line > 0 {
+					q0 = q1+1
+				}
+			}
+			q1++
+		}
+		if line==1 && q1==t.file.b.nc() {  // 6 goes to end of 5-line file
 			break;
-		if line > 0
+		}
+		if line > 0 {
 			goto Rescue;
+		}
 		break;
 	case Fore:
-		if q1 > 0
-			while(q1<t.file.b.nc && textreadc(t, q1-1) != '\n')
+		if q1 > 0 {
+			for (q1<t.file.b.nc() && t.ReadC(q1-1) != '\n') {
 				q1++;
-		q0 = q1;
-		goto Forward;
-	case Back:
-		if q0 < t.file.b.nc
-			while(q0>0 && textreadc(t, q0-1)!='\n')
-				q0--;
-		q1 = q0;
-		while(line>0 && q0>0){
-			if textreadc(t, q0-1) == '\n' {
-				if --line >= 0
-					q1 = q0;
 			}
-			--q0;
+		}
+		q0 = q1;
+		for(line>0 && q1<t.file.b.nc()) {
+			if t.ReadC(q1) == '\n' || q1==t.file.b.nc() {
+				line--
+				if line > 0 {
+					q0 = q1 + 1;
+				}
+			}
+			q1++
+		}
+		if line==1 && q1==t.file.b.nc() {  // 6 goes to end of 5-line file
+			break;
+		}
+		if line > 0 {
+			goto Rescue;
+		}
+		break;
+	case Back:
+		if q0 < t.file.b.nc() {
+			for(q0>0 && t.ReadC(q0-1)!='\n') {
+				q0--;
+			}
+		}
+		q1 = q0;
+		for(line>0 && q0>0){
+			if t.ReadC(q0-1) == '\n' {
+				line--
+				if line >= 0 {
+					q1 = q0;
+				}
+			}
+			q0--
 		}
 		// :1-1 is :0 = #0, but :1-2 is an error
-		if line > 1
+		if line > 1 {
 			goto Rescue;
-		while(q0>0 && textreadc(t, q0-1)!='\n')
-			--q0;
+		}
+		for(q0>0 && t.ReadC(q0-1)!='\n') {
+			q0--
+		}
 	}
-	*evalp = true;
-	return range(q0, q1);
+	return Range{q0, q1}, true
 
     Rescue:
-	if showerr
+	if showerr {
 		warning(nil, "address out of range\n");
-	*evalp = false;
-	return r;
+	}
+	return r, false
 }
 
 
-func regexp (showerr  uint, t * Text, lim  Range, r  Range, pat * Rune, dir  int, foundp * int) (Range) {
-	int found;
-	Rangeset sel;
-	int q;
+func acmeregexp (showerr  bool, t *Text, lim Range, r Range, pat []rune, dir  int) (retr Range, foundp bool) {
+Unimpl()
+return Range{0,0}, false
+}
+
+/*var (
+	found int
+	sel Rangeset
+	q int
+)
 
 	if pat[0] == '\0' && rxnull() {
 		if showerr
