@@ -7,29 +7,29 @@ import (
 
 // TestText implements texter for elog tests.
 type TextMock struct {
-	q0, q1 uint
+	q0, q1 int
 	buf    []rune
 }
 
-func (t TextMock) Constrain(q0, q1 uint) (p0, p1 uint) {
-	p0 = minu(q0, uint(len(t.buf)))
-	p1 = minu(q1, uint(len(t.buf)))
+func (t TextMock) Constrain(q0, q1 int) (p0, p1 int) {
+	p0 = min(q0, (len(t.buf)))
+	p1 = min(q1, (len(t.buf)))
 	return p0, p1
 }
 
-func (t *TextMock) Delete(q0, q1 uint, tofile bool) {
+func (t *TextMock) Delete(q0, q1 int, tofile bool) {
 	_ = tofile
-	if q0 > uint(len(t.buf)) || q1 > uint(len(t.buf)) {
+	if q0 > (len(t.buf)) || q1 > (len(t.buf)) {
 		panic("Out-of-range Delete")
 	}
 	copy(t.buf[q0:], t.buf[q1:])
-	t.buf = t.buf[:uint(len(t.buf))-(q1-q0)] // Reslice to length
+	t.buf = t.buf[:(len(t.buf))-(q1-q0)] // Reslice to length
 }
 
 // Let's make sure our test fixture has the right form.
 func TestDelete(t *testing.T) {
 	tab := []struct {
-		q0, q1   uint
+		q0, q1   int
 		tb       TextMock
 		expected string
 	}{
@@ -48,9 +48,9 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func (t *TextMock) Insert(q0 uint, r []rune, tofile bool) {
+func (t *TextMock) Insert(q0 int, r []rune, tofile bool) {
 	_ = tofile
-	if q0 > uint(len(t.buf)) {
+	if q0 > (len(t.buf)) {
 		panic("Out of range insertion")
 	}
 	t.buf = append(t.buf[:q0], append(r, t.buf[q0:]...)...)
@@ -58,7 +58,7 @@ func (t *TextMock) Insert(q0 uint, r []rune, tofile bool) {
 
 func TestInsert(t *testing.T) {
 	tab := []struct {
-		q0       uint
+		q0       int
 		tb       TextMock
 		insert   string
 		expected string
@@ -77,10 +77,10 @@ func TestInsert(t *testing.T) {
 	}
 }
 
-func (t *TextMock) Q0() uint      { return t.q0 }
-func (t *TextMock) SetQ0(q0 uint) { t.q0 = q0 }
-func (t *TextMock) Q1() uint      { return t.q1 }
-func (t *TextMock) SetQ1(q1 uint) { t.q1 = q1 }
+func (t *TextMock) Q0() int      { return t.q0 }
+func (t *TextMock) SetQ0(q0 int) { t.q0 = q0 }
+func (t *TextMock) Q1() int      { return t.q1 }
+func (t *TextMock) SetQ1(q1 int) { t.q1 = q1 }
 
 func TestElogInsertDelete(t *testing.T) {
 	t0 := []rune("This")

@@ -33,8 +33,8 @@ type Elog struct {
 
 type ElogOperation struct {
 	t  ElogType // Delete, Insert, Filename
-	q0 uint     // location of change (unused in f)
-	nd uint     // number of deleted characters
+	q0 int      // location of change (unused in f)
+	nd int      // number of deleted characters
 	r  []rune
 }
 
@@ -96,7 +96,7 @@ func (eo *ElogOperation) setr(r []rune) {
 	copy(eo.r, r)
 }
 
-func (e *Elog) Replace(q0, q1 uint, r []rune) {
+func (e *Elog) Replace(q0, q1 int, r []rune) {
 	if q0 == q1 && len(r) == 0 {
 		return
 	}
@@ -120,7 +120,7 @@ func (e *Elog) Replace(q0, q1 uint, r []rune) {
 	}
 }
 
-func (e *Elog) Insert(q0 uint, r []rune) {
+func (e *Elog) Insert(q0 int, r []rune) {
 	if len(r) == 0 {
 		return
 	}
@@ -154,7 +154,7 @@ func (e *Elog) Insert(q0 uint, r []rune) {
 	}
 }
 
-func (e *Elog) Delete(q0, q1 uint) {
+func (e *Elog) Delete(q0, q1 int) {
 	if q0 == q1 {
 		return
 	}
@@ -218,22 +218,22 @@ func (e *Elog) Apply(t Texter) {
 			t.Insert(tq0, eo.r, true)
 			// Mark selection
 			if t.Q0() == eo.q0 && t.Q1() == eo.q0 {
-				t.SetQ1(t.Q1() + uint(len(eo.r)))
+				t.SetQ1(t.Q1() + (len(eo.r)))
 			}
 		case Insert:
 			if tracelog {
 				fmt.Printf("elog insert %d %d (%d %d)\n",
-					eo.q0, eo.q0+uint(len(eo.r)), t.Q0(), t.Q1())
+					eo.q0, eo.q0+(len(eo.r)), t.Q0(), t.Q1())
 			}
 			tq0, _ := t.Constrain(eo.q0, eo.q0)
 			t.Insert(tq0, eo.r, true)
 			if t.Q0() == eo.q0 && t.Q1() == eo.q0 {
-				t.SetQ1(t.Q1() + uint(len(eo.r)))
+				t.SetQ1(t.Q1() + (len(eo.r)))
 			}
 		case Delete:
 			if tracelog {
 				fmt.Printf("elog delete %d %d (%d %d)\n",
-					eo.q0, eo.q0+uint(len(eo.r)), t.Q0(), t.Q1())
+					eo.q0, eo.q0+(len(eo.r)), t.Q0(), t.Q1())
 			}
 			tq0, tq1 := t.Constrain(eo.q0, eo.q0+eo.nd)
 			t.Delete(tq0, tq1, true)

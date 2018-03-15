@@ -7,7 +7,7 @@ import (
 // Let's make sure our test fixture has the right form.
 func TestBufferDelete(t *testing.T) {
 	tab := []struct {
-		q0, q1   uint
+		q0, q1   int
 		tb       Buffer
 		expected string
 	}{
@@ -28,7 +28,7 @@ func TestBufferDelete(t *testing.T) {
 
 func TestBufferInsert(t *testing.T) {
 	tab := []struct {
-		q0       uint
+		q0       int
 		tb       Buffer
 		insert   string
 		expected string

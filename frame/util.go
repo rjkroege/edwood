@@ -40,7 +40,7 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	return 0, false
 }
 
-func (f *Frame) cklinewrap(p image.Point, b *frbox)(ret image.Point) {
+func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if b.Nrune < 0 {
 		if int(b.Minwid) > f.Rect.Max.X-p.X {
@@ -56,7 +56,7 @@ func (f *Frame) cklinewrap(p image.Point, b *frbox)(ret image.Point) {
 	return ret
 }
 
-func (f *Frame) cklinewrap0(p image.Point, b *frbox)(ret image.Point) {
+func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if _, ok := f.canfit(p, b); !ok {
 		ret.X = f.Rect.Min.X

@@ -4,7 +4,7 @@ import (
 	"9fans.net/go/draw"
 	"image"
 
-"fmt"
+	"fmt"
 )
 
 func region(a, b int) int {
@@ -63,41 +63,41 @@ func (f *Frame) Select(mc *draw.Mousectl) {
 			}
 		}
 		q = f.Charofpt(mp)
-fmt.Println("q = ", q)
+		fmt.Println("q = ", q)
 		if p1 != q {
 			if reg != region(q, p0) {
 				if reg > 0 {
 					f.DrawSel(pt0, p0, p1, false)
-fmt.Printf("Clearing selection reg > 0 %v %v %v\n", pt0, p0, p1)
+					fmt.Printf("Clearing selection reg > 0 %v %v %v\n", pt0, p0, p1)
 				} else if reg < 0 {
 					f.DrawSel(pt1, p1, p0, false)
-fmt.Printf("Clearing selection reg < 0 %v %v %v\n", pt1, p1, p0)
+					fmt.Printf("Clearing selection reg < 0 %v %v %v\n", pt1, p1, p0)
 				}
 				p1 = p0
 				pt1 = pt0
 				reg = region(q, p0)
 				if reg == 0 {
 					f.DrawSel(pt0, p0, p1, true)
-fmt.Printf("Drawing selection reg = 0 %v %v %v\n", pt0, p0, p1)
+					fmt.Printf("Drawing selection reg = 0 %v %v %v\n", pt0, p0, p1)
 				}
 			}
 			qt := f.Ptofchar(q)
-fmt.Println("qt = ", qt)
+			fmt.Println("qt = ", qt)
 			if reg > 0 {
 				if q > p1 {
 					f.DrawSel(pt1, p1, q, true)
-fmt.Printf("Drawing selection q > p1 %v %v %v\n", pt1, p1, q)
+					fmt.Printf("Drawing selection q > p1 %v %v %v\n", pt1, p1, q)
 				} else if q < p1 {
 					f.DrawSel(qt, q, p1, false)
-fmt.Printf("Clearing selection q < p1 %v %v %v\n", qt, q, p1)
+					fmt.Printf("Clearing selection q < p1 %v %v %v\n", qt, q, p1)
 				}
 			} else if reg < 0 {
 				if q > p1 {
 					f.DrawSel(pt1, p1, q, false)
-fmt.Printf("Clearing selection q > p1 %v %v %v\n", pt1, p1, q)
+					fmt.Printf("Clearing selection q > p1 %v %v %v\n", pt1, p1, q)
 				} else {
 					f.DrawSel(qt, q, p1, true)
-fmt.Printf("Drawing selection q < p1 %v %v %v\n", qt, q, p1)
+					fmt.Printf("Drawing selection q < p1 %v %v %v\n", qt, q, p1)
 				}
 			}
 			p1 = q

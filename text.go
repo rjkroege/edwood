@@ -53,9 +53,9 @@ type Text struct {
 	file    *File
 	fr      *frame.Frame
 	font    *draw.Font
-	org     uint // Origin of the frame withing the buffer
-	q0      uint
-	q1      uint
+	org     int // Origin of the frame withing the buffer
+	q0      int
+	q1      int
 	what    TextKind
 	tabstop int
 	w       *Window
@@ -65,9 +65,9 @@ type Text struct {
 	row     *Row
 	col     *Column
 
-	iq1         uint
+	iq1         int
 	eq0         int
-	cq0         uint
+	cq0         int
 	ncache      int
 	ncachealloc int
 	cache       []rune
@@ -156,7 +156,7 @@ func (t *Text) Close() {
 func (t *Text) Columnate(names []string, widths []int) {
 
 	var colw, mint, maxt, ncol, nrow int
-	q1 := uint(0)
+	q1 := (0)
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
@@ -190,7 +190,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 		for j := i; j < len(names); j += nrow {
 			dl := names[j]
 			t.file.Insert(q1, []rune(dl))
-			q1 += uint(len(dl))
+			q1 += (len(dl))
 			if j+nrow >= len(names) {
 				break
 			}
@@ -214,7 +214,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	}
 }
 
-func (t *Text) Load(q0 uint, filename string, setqid bool) (nread uint, err error) {
+func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
 	if t.ncache != 0 || t.file.b.nc() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
@@ -238,8 +238,8 @@ func (t *Text) Load(q0 uint, filename string, setqid bool) (nread uint, err erro
 		return 0, fmt.Errorf("can't fstat %s: %v\n", filename, err)
 	}
 
-	var count uint
-	q1 := uint(0)
+	var count int
+	q1 := (0)
 	hasNulls := false
 	var sha1 [sha1.Size]byte
 	if d.IsDir() {
@@ -306,7 +306,7 @@ func (t *Text) Load(q0 uint, filename string, setqid bool) (nread uint, err erro
 	if q0 < t.org { // TODO(flux) I don't understand this test, moving origin of frame past the text.
 		t.org += n
 	} else {
-		if q0 <= t.org+uint(t.fr.NChars) { // Text is within the window, put it there.
+		if q0 <= t.org+(t.fr.NChars) { // Text is within the window, put it there.
 			t.fr.Insert(t.file.b[q0:q0+n], int(q0-t.org))
 		}
 	}
@@ -328,7 +328,7 @@ func (t *Text) Load(q0 uint, filename string, setqid bool) (nread uint, err erro
 
 }
 
-func (t *Text) Backnl(p uint, n uint) uint {
+func (t *Text) Backnl(p int, n int) int {
 	/* look for start of this line if n==0 */
 	if n == 0 && p > 0 && t.ReadRune(p-1) != '\n' {
 		n = 1
@@ -351,7 +351,7 @@ func (t *Text) Backnl(p uint, n uint) uint {
 	return p
 }
 
-func (t *Text) BsInsert(q0 uint, r []rune, tofile bool) (q uint, nrp int) {
+func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q int, nrp int) {
 	Unimpl()
 	return 0, 0
 }
@@ -400,7 +400,7 @@ func (t *Text) BsInsert(q0 uint, r []rune, tofile bool) (q uint, nrp int) {
 }
 */
 
-func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
+func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if tofile && t.ncache != 0 {
 		panic("text.insert")
 	}
@@ -424,7 +424,7 @@ func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
 			}
 		}
 	}
-	n := uint(len(r))
+	n := (len(r))
 	if q0 < t.iq1 {
 		t.iq1 += n
 	}
@@ -437,7 +437,7 @@ func (t *Text) Insert(q0 uint, r []rune, tofile bool) {
 	if q0 < t.org {
 		t.org += n
 	} else {
-		if q0 <= t.org+uint(t.fr.NChars) {
+		if q0 <= t.org+(t.fr.NChars) {
 			t.fr.Insert(r[:n], int(q0-t.org))
 		}
 	}
@@ -471,7 +471,7 @@ func (t *Text) Fill() {
 	}
 
 	nl := t.fr.MaxLines - t.fr.NLines
-	lines := runesplitN(t.file.b[t.org+uint(t.fr.NChars):], []rune("\n"), nl)
+	lines := runesplitN(t.file.b[t.org+(t.fr.NChars):], []rune("\n"), nl)
 	for _, s := range lines {
 		t.fr.Insert(s, t.fr.NChars)
 		if t.fr.LastLineFull != 0 {
@@ -480,7 +480,7 @@ func (t *Text) Fill() {
 	}
 }
 
-func (t *Text) Delete(q0, q1 uint, tofile bool) {
+func (t *Text) Delete(q0, q1 int, tofile bool) {
 	if tofile && t.ncache != 0 {
 		panic("text.delete")
 	}
@@ -506,21 +506,21 @@ func (t *Text) Delete(q0, q1 uint, tofile bool) {
 		}
 	}
 	if q0 < t.iq1 {
-		t.iq1 -= minu(n, t.iq1-q0)
+		t.iq1 -= min(n, t.iq1-q0)
 	}
 	if q0 < t.q0 {
-		t.q0 -= minu(n, t.q0-q0)
+		t.q0 -= min(n, t.q0-q0)
 	}
 	if q0 < t.q1 {
-		t.q1 -= minu(n, t.q1-q0)
+		t.q1 -= min(n, t.q1-q0)
 	}
 	if q1 <= t.org {
 		t.org -= n
-	} else if q0 < t.org+uint(t.fr.NChars) {
+	} else if q0 < t.org+(t.fr.NChars) {
 		p1 := q1 - t.org
-		p0 := uint(0)
-		if p1 > uint(t.fr.NChars) {
-			p1 = uint(t.fr.NChars)
+		p0 := (0)
+		if p1 > (t.fr.NChars) {
+			p1 = (t.fr.NChars)
 		}
 		if q0 < t.org {
 			t.org = q0
@@ -528,7 +528,7 @@ func (t *Text) Delete(q0, q1 uint, tofile bool) {
 		} else {
 			p0 = q0 - t.org
 		}
-		t.fr.Delete(int(p0), int(p1))
+		t.fr.Delete((p0), (p1))
 		t.Fill()
 	}
 	if t.w != nil {
@@ -540,18 +540,18 @@ func (t *Text) Delete(q0, q1 uint, tofile bool) {
 	}
 }
 
-func (t *Text) Q0() uint      { return t.q0 }
-func (t *Text) Q1() uint      { return t.q1 }
-func (t *Text) SetQ0(q0 uint) { t.q0 = q0 }
-func (t *Text) SetQ1(q1 uint) { t.q1 = q1 }
-func (t *Text) Constrain(q0, q1 uint) (p0, p1 uint) {
-	p0 = minu(q0, t.file.b.nc())
-	p1 = minu(q1, t.file.b.nc())
+func (t *Text) Q0() int      { return t.q0 }
+func (t *Text) Q1() int      { return t.q1 }
+func (t *Text) SetQ0(q0 int) { t.q0 = q0 }
+func (t *Text) SetQ1(q1 int) { t.q1 = q1 }
+func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
+	p0 = min(q0, t.file.b.nc())
+	p1 = min(q1, t.file.b.nc())
 	return p0, p1
 }
 
-func (t *Text) ReadRune(q uint) rune {
-	if t.cq0 <= q && q < t.cq0+uint(t.ncache) {
+func (t *Text) ReadRune(q int) rune {
+	if t.cq0 <= q && q < t.cq0+(t.ncache) {
 		return t.cache[q-t.cq0]
 	} else {
 		return t.file.b.Read(q, 1)[0]
@@ -593,27 +593,27 @@ func (t *Text) Commit(tofile bool) {
 }
 
 func (t *Text) FrameScroll(dl int) {
-	var q0 uint
+	var q0 int
 	if dl == 0 {
 		ScrSleep(100)
 		return
 	}
 	if dl < 0 {
-		q0 = t.Backnl(t.org, uint(-dl))
-		if selectq > t.org+uint(t.fr.P0) {
-			t.SetSelect(t.org+uint(t.fr.P0), selectq)
+		q0 = t.Backnl(t.org, (-dl))
+		if selectq > t.org+(t.fr.P0) {
+			t.SetSelect(t.org+(t.fr.P0), selectq)
 		} else {
-			t.SetSelect(selectq, t.org+uint(t.fr.P0))
+			t.SetSelect(selectq, t.org+(t.fr.P0))
 		}
 	} else {
-		if t.org+uint(t.fr.NChars) == t.file.b.nc() {
+		if t.org+(t.fr.NChars) == t.file.b.nc() {
 			return
 		}
-		q0 = t.org + uint(t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
-		if selectq > t.org+uint(t.fr.P1) {
-			t.SetSelect(t.org+uint(t.fr.P1), selectq)
+		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
+		if selectq > t.org+(t.fr.P1) {
+			t.SetSelect(t.org+(t.fr.P1), selectq)
 		} else {
-			t.SetSelect(selectq, t.org+uint(t.fr.P1))
+			t.SetSelect(selectq, t.org+(t.fr.P1))
 		}
 	}
 	t.SetOrigin(q0, true)
@@ -623,7 +623,7 @@ var (
 	clicktext  *Text
 	clickmsec  uint32
 	selecttext *Text
-	selectq    uint
+	selectq    int
 )
 
 /*
@@ -651,7 +651,7 @@ func (t *Text) Select() {
 	b := mouse.Buttons
 	q0 := t.q0
 	q1 := t.q1
-	selectq = t.org + uint(t.fr.Charofpt(mouse.Point))
+	selectq = t.org + (t.fr.Charofpt(mouse.Point))
 	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
 	if (clicktext == t && mouse.Msec-uint32(clickmsec) < 500) && (q0 == q1 && selectq == q0) {
@@ -679,18 +679,18 @@ func (t *Text) Select() {
 		t.fr.Select(mousectl)
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.nc() {
-			selectq = t.org + uint(t.fr.P0)
+			selectq = t.org + (t.fr.P0)
 		}
 		t.fr.Scroll = nil
 		if selectq < t.org {
 			q0 = selectq
 		} else {
-			q0 = t.org + uint(t.fr.P0)
+			q0 = t.org + (t.fr.P0)
 		}
-		if selectq > t.org+uint(t.fr.NChars) {
+		if selectq > t.org+(t.fr.NChars) {
 			q1 = selectq
 		} else {
-			q1 = t.org + uint(t.fr.P1)
+			q1 = t.org + (t.fr.P1)
 		}
 	}
 	if q0 == q1 {
@@ -749,13 +749,13 @@ func (t *Text) Select() {
 	}
 }
 
-func (t *Text) Show(q0, q1 uint, doselect bool) {
+func (t *Text) Show(q0, q1 int, doselect bool) {
 	Unimpl()
 
 }
 
-func (t *Text) ReadC(q uint) (r rune) {
-	if t.cq0 <= q && q < t.cq0+uint(t.ncache) {
+func (t *Text) ReadC(q int) (r rune) {
+	if t.cq0 <= q && q < t.cq0+(t.ncache) {
 		r = t.cache[q-t.cq0]
 	} else {
 		r = t.file.b.Read(q, 1)[0]
@@ -764,8 +764,8 @@ func (t *Text) ReadC(q uint) (r rune) {
 
 }
 
-func (t *Text) SetSelect(q0, q1 uint) {
-	/* uint(t.fr.P0) and uint(t.fr.P1) are always right; t.q0 and t.q1 may be off */
+func (t *Text) SetSelect(q0, q1 int) {
+	/* (t.fr.P0) and (t.fr.P1) are always right; t.q0 and t.q1 may be off */
 	t.q0 = q0
 	t.q1 = q1
 	/* compute desired p0,p1 from q0,q1 */
@@ -779,16 +779,16 @@ func (t *Text) SetSelect(q0, q1 uint) {
 	if p1 < 0 {
 		p1 = 0
 	}
-	if p0 > uint(t.fr.NChars) {
-		p0 = uint(t.fr.NChars)
+	if p0 > (t.fr.NChars) {
+		p0 = (t.fr.NChars)
 	}
-	if p1 > uint(t.fr.NChars) {
+	if p1 > (t.fr.NChars) {
 		ticked = false
-		p1 = uint(t.fr.NChars)
+		p1 = (t.fr.NChars)
 	}
-	if p0 == uint(t.fr.P0) && p1 == uint(t.fr.P1) {
+	if p0 == (t.fr.P0) && p1 == (t.fr.P1) {
 		if p0 == p1 && ticked != t.fr.Ticked {
-			t.fr.Tick(t.fr.Ptofchar(int(p0)), ticked)
+			t.fr.Tick(t.fr.Ptofchar((p0)), ticked)
 		}
 		return
 	}
@@ -796,7 +796,7 @@ func (t *Text) SetSelect(q0, q1 uint) {
 		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.NChars))
 	}
 	/* screen disagrees with desired selection */
-	if uint(t.fr.P1) <= p0 || p1 <= uint(t.fr.P0) || p0 == p1 || uint(t.fr.P1) == uint(t.fr.P0) {
+	if (t.fr.P1) <= p0 || p1 <= (t.fr.P0) || p0 == p1 || (t.fr.P1) == (t.fr.P0) {
 		/* no overlap or too easy to bother trying */
 		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P0), t.fr.P0, t.fr.P1, false)
 		if p0 != p1 || ticked {
@@ -805,57 +805,57 @@ func (t *Text) SetSelect(q0, q1 uint) {
 		goto Return
 	}
 	/* overlap; avoid unnecessary painting */
-	if p0 < uint(t.fr.P0) {
+	if p0 < (t.fr.P0) {
 		/* extend selection backwards */
-		t.fr.DrawSel(t.fr.Ptofchar(int(p0)), int(p0), t.fr.P0, true)
+		t.fr.DrawSel(t.fr.Ptofchar((p0)), (p0), t.fr.P0, true)
 	} else {
-		if p0 > uint(t.fr.P0) {
+		if p0 > (t.fr.P0) {
 			/* trim first part of selection */
-			t.fr.DrawSel(t.fr.Ptofchar(t.fr.P0), t.fr.P0, int(p0), false)
+			t.fr.DrawSel(t.fr.Ptofchar(t.fr.P0), t.fr.P0, (p0), false)
 		}
 	}
-	if p1 > uint(t.fr.P1) {
+	if p1 > (t.fr.P1) {
 		/* extend selection forwards */
-		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P1), t.fr.P1, int(p1), true)
-	} else if p1 < uint(t.fr.P1) {
+		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P1), t.fr.P1, (p1), true)
+	} else if p1 < (t.fr.P1) {
 		/* trim last part of selection */
-		t.fr.DrawSel(t.fr.Ptofchar(int(p1)), int(p1), t.fr.P1, false)
+		t.fr.DrawSel(t.fr.Ptofchar(int(p1)), (p1), t.fr.P1, false)
 	}
 
 Return:
-	t.fr.P0 = int(p0)
-	t.fr.P1 = int(p1)
+	t.fr.P0 = (p0)
+	t.fr.P1 = (p1)
 
 }
 
-func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 uint) {
+func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 int) {
 
-	if p1 <= uint(f.P0) || p0 >= uint(f.P1) {
+	if p1 <= (f.P0) || p0 >= (f.P1) {
 		/* no overlap */
-		f.DrawSel0(pt0, int(p0), int(p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
+		f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
 		return
 	}
-	if p0 >= uint(f.P0) && p1 <= uint(f.P1) {
+	if p0 >= (f.P0) && p1 <= (f.P1) {
 		/* entirely inside */
-		f.DrawSel0(pt0, int(p0), int(p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
+		f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
 		return
 	}
 
 	/* they now are known to overlap */
 
 	/* before selection */
-	if p0 < uint(f.P0) {
-		f.DrawSel0(pt0, int(p0), f.P0, f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p0 = uint(f.P0)
-		pt0 = f.Ptofchar(int(p0))
+	if p0 < (f.P0) {
+		f.DrawSel0(pt0, (p0), f.P0, f.Cols[frame.ColBack], f.Cols[frame.ColText])
+		p0 = (f.P0)
+		pt0 = f.Ptofchar((p0))
 	}
 	/* after selection */
-	if p1 > uint(f.P1) {
+	if p1 > (f.P1) {
 		f.DrawSel0(f.Ptofchar(f.P1), f.P1, int(p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p1 = uint(f.P1)
+		p1 = (f.P1)
 	}
 	/* inside selection */
-	f.DrawSel0(pt0, int(p0), int(p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
+	f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
 }
 
 const (
@@ -864,7 +864,7 @@ const (
 )
 
 // When called, button is down.
-func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p uint) {
+func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
 	msec := mc.Mouse.Msec
@@ -873,14 +873,14 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p uint)
 	if f.P0 == f.P1 {
 		f.Tick(f.Ptofchar(f.P0), false)
 	}
-	p0 := uint(f.Charofpt(mp))
-	p1 := uint(p0)
-	pt0 := f.Ptofchar(int(p0))
-	pt1 := f.Ptofchar(int(p1))
+	p0 := (f.Charofpt(mp))
+	p1 := (p0)
+	pt0 := f.Ptofchar((p0))
+	pt1 := f.Ptofchar((p1))
 	reg := 0
 	f.Tick(pt0, true)
 	for {
-		q := uint(f.Charofpt(mc.Mouse.Point))
+		q := (f.Charofpt(mc.Mouse.Point))
 		if p1 != q {
 			if p0 == p1 {
 				f.Tick(pt0, false)
@@ -956,7 +956,7 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p uint)
 	return p0, p1
 }
 
-func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 uint, buts uint) {
+func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
 	p0, p1 := xselect(t.fr, mousectl, high)
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
@@ -970,7 +970,7 @@ func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 uint, buts uint) {
 	return q0, q1, buts
 }
 
-func (t *Text) Select2() (q0, q1 uint, tp *Text, ret bool) {
+func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
 	q0, q1, buts := t.Select23(but2col, 4)
 	if (buts & 4) == 0 {
 		return q0, q1, nil, false
@@ -981,12 +981,12 @@ func (t *Text) Select2() (q0, q1 uint, tp *Text, ret bool) {
 	return q0, q1, nil, true
 }
 
-func (t *Text) Select3() (q0, q1 uint, r bool) {
+func (t *Text) Select3() (q0, q1 int, r bool) {
 	q0, q1, buts := t.Select23(but3col, 1|2)
 	return q0, q1, buts == 0
 }
 
-func (t *Text) DoubleClick(inq0 uint) (q0, q1 uint) {
+func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
 	q0 = inq0
 	if q0, q1, ok := t.ClickHTMLMatch(inq0); ok {
 		return q0, q1
@@ -1045,7 +1045,7 @@ func (t *Text) DoubleClick(inq0 uint) (q0, q1 uint) {
 	return q0, q1
 }
 
-func (t *Text) ClickMatch(cl, cr rune, dir int, inq uint) (q uint, r bool) {
+func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	nest := 1
 	var c rune
 	for {
@@ -1076,27 +1076,27 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq uint) (q uint, r bool) {
 	return inq, cl == '\n' && nest == 1
 }
 
-func (t *Text) ishtmlstart(q uint, q1 *uint) bool {
+func (t *Text) ishtmlstart(q uint, q1 *int) bool {
 	Unimpl()
 	return false
 }
 
-func (t *Text) ishtmlend(q uint, q0 *uint) bool {
+func (t *Text) ishtmlend(q uint, q0 *int) bool {
 	Unimpl()
 	return false
 }
 
-func (t *Text) ClickHTMLMatch(inq0 uint) (q0, q1 uint, r bool) {
+func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	Unimpl()
 	return 0, 0, false
 }
 
-func (t *Text) BackNL(p, n uint) uint {
+func (t *Text) BackNL(p, n int) uint {
 	Unimpl()
 	return 0
 }
 
-func (t *Text) SetOrigin(org uint, exact bool) {
+func (t *Text) SetOrigin(org int, exact bool) {
 	Unimpl()
 
 }

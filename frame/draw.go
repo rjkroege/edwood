@@ -8,11 +8,11 @@ import (
 )
 
 func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
-//	log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
+	//	log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		pt = f.cklinewrap(pt, b)
-//		log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
+		//		log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.NoRedraw && b.Nrune >= 0 {
 			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
@@ -76,7 +76,7 @@ func (f *Frame) DrawSel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		}
 		runes := []rune(string(b.Ptr))
 		if p < p0 {
-			runes = runes[p0 - p:]
+			runes = runes[p0-p:]
 			nr -= p0 - p
 			p = p0
 		}
@@ -96,7 +96,7 @@ func (f *Frame) DrawSel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		if x > f.Rect.Max.X {
 			x = f.Rect.Max.X
 		}
-		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()),  back, nil, pt)
+		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
 		if b.Nrune >= 0 {
 			f.Background.Runes(pt, text, image.ZP, f.Font.Impl(), runes[:nr])
 		}
@@ -158,7 +158,7 @@ func (f *Frame) _tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) Tick(pt image.Point, ticked bool) {
-//	log.Println("Tick")
+	//	log.Println("Tick")
 	if f.TickScale != f.Display.ScaleSize(1) {
 		if f.Ticked {
 			f._tick(pt, false)

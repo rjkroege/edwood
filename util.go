@@ -33,7 +33,7 @@ func abs(x int) int {
 	return x
 }
 
-func region(a, b uint) int {
+func region(a, b int) int {
 	if a < b {
 		return -1
 	}

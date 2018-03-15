@@ -27,7 +27,7 @@ type File struct {
 	sha1 [sha1.Size]byte // Used to check if the file has changed on disk since loaded
 }
 
-func (f *File) Load(q0 uint, fd *os.File) (n uint, h [sha1.Size]byte, hasNulls bool, err error) {
+func (f *File) Load(q0 int, fd *os.File) (n int, h [sha1.Size]byte, hasNulls bool, err error) {
 	n, h, hasNulls, err = f.b.Load(q0, fd)
 	return n, h, hasNulls, err
 }
@@ -42,7 +42,7 @@ func (f *File) DelText(t *Text) {
 	Unimpl()
 }
 
-func (f *File) Insert(p0 uint, s []rune) {
+func (f *File) Insert(p0 int, s []rune) {
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
 	}
@@ -55,15 +55,15 @@ func (f *File) Insert(p0 uint, s []rune) {
 	}
 }
 
-func (f *File) Uninsert(delta *Buffer, q0, ns uint) {
+func (f *File) Uninsert(delta *Buffer, q0, ns int) {
 	Unimpl()
 }
 
-func (f *File) Delete(p0, p1 uint) {
+func (f *File) Delete(p0, p1 int) {
 	Unimpl()
 }
 
-func (f *File) Undelete(delta *Buffer, p0, p1 uint) {
+func (f *File) Undelete(delta *Buffer, p0, p1 int) {
 	Unimpl()
 }
 

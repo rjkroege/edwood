@@ -63,7 +63,7 @@ type Frame struct {
 	MaxLines     int // total number of lines in frame
 	LastLineFull int
 	Modified     bool
-	TickImage         *draw.Image // typing tick
+	TickImage    *draw.Image // typing tick
 	TickBack     *draw.Image // image under tick
 	Ticked       bool
 	NoRedraw     bool

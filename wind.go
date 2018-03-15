@@ -368,15 +368,15 @@ func (w *Window) SetTag() {
 		q0 := w.tag.q0
 		q1 := w.tag.q1
 		if oldbarIndex != -1 {
-			if q0 > uint(oldbarIndex) {
-				bar := uint(newbarIndex - oldbarIndex)
+			if q0 > (oldbarIndex) {
+				bar := (newbarIndex - oldbarIndex)
 				w.tag.q0 = q0 + bar
 				w.tag.q1 = q1 + bar
 			}
 		}
 	}
 	w.tag.file.mod = false
-	n := w.tag.file.b.nc() + uint(w.tag.ncache)
+	n := w.tag.file.b.nc() + (w.tag.ncache)
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}

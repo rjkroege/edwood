@@ -94,8 +94,8 @@ func cmdexec(t *Text, cp *Cmd) int {
 			if dot.r.q1 > int(t.file.b.nc()) {
 				editerror("dot extends past end of buffer during { command")
 			}
-			t.q0 = uint(dot.r.q0)
-			t.q1 = uint(dot.r.q1)
+			t.q0 = dot.r.q0
+			t.q1 = dot.r.q1
 			cmdexec(t, cp)
 		}
 		break
@@ -117,7 +117,7 @@ func edittext(w *Window, q int, r []rune) error {
 	case Inactive:
 		return fmt.Errorf("permission denied")
 	case Inserting:
-		f.elog.Insert(uint(q), r)
+		f.elog.Insert(q, r)
 		return nil
 	case Collecting:
 		collection = append(collection, r...)
@@ -627,8 +627,8 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 	w = nil
 	if state == Inserting {
 		w = t.w
-		t.q0 = uint(addr.r.q0)
-		t.q1 = uint(addr.r.q1)
+		t.q0 = addr.r.q0
+		t.q1 = addr.r.q1
 		if cmd == '<' || cmd == '|' {
 			t.file.elog.Delete(t.q0, t.q1)
 		}

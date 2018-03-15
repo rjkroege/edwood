@@ -83,7 +83,7 @@ func xfidopen(x *Xfid) {
 		w      *Window
 		t      *Text
 		n      int
-		q0, q1 uint
+		q0, q1 int
 		q      uint64
 	)
 
@@ -138,14 +138,14 @@ func xfidopen(x *Xfid) {
 				if n > BUFSIZE/utf8.UTFMax {
 					n = BUFSIZE / utf8.UTFMax
 				}
-				r := t.file.b.Read(q0, uint(n))
+				r := t.file.b.Read(q0, (n))
 				s := string(r)
 				n, err = w.rdselfd.Write([]byte(s))
 				if err != nil || n != len(s) {
 					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
 					break
 				}
-				q0 += uint(n)
+				q0 += (n)
 			}
 		case QWwrsel:
 			w.nopen[q]++
@@ -247,7 +247,7 @@ func xfidclose(x *Xfid) {
 			w.nomark = false
 			t = &w.body
 			// before: only did this if !w.noscroll, but that didn't seem right in practice
-			t.Show(minu(uint(w.wrselrange.q0), t.file.b.nc()), minu(uint(w.wrselrange.q1), t.file.b.nc()), true)
+			t.Show(min((w.wrselrange.q0), t.file.b.nc()), min((w.wrselrange.q1), t.file.b.nc()), true)
 			t.ScrDraw()
 			break
 		case QWeditout:
@@ -342,7 +342,7 @@ func xfidread(x *Xfid) {
 			respond(x, &fc, Eaddr)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), w.body.file.b.nc())
+		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.file.b.nc())
 		w.addr.q1 = w.addr.q0
 
 	case QWxdata:
@@ -351,7 +351,7 @@ func xfidread(x *Xfid) {
 			respond(x, &fc, Eaddr)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, uint(w.addr.q0), uint(w.addr.q1))
+		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
 
 	case QWtag:
 		xfidutfread(x, &w.tag, w.tag.file.b.nc(), int(QWtag))
@@ -378,11 +378,11 @@ func xfidread(x *Xfid) {
 	w.Unlock()
 }
 
-func shouldscroll(t *Text, q0 uint, qid uint64) bool {
+func shouldscroll(t *Text, q0 int, qid uint64) bool {
 	if qid == Qcons {
 		return true
 	}
-	return t.org <= q0 && q0 <= t.org+uint(t.fr.NChars)
+	return t.org <= q0 && q0 <= t.org+(t.fr.NChars)
 }
 
 // This is fiddly code that handles partial runes at the end of a previous write?
@@ -416,7 +416,7 @@ func xfidwrite(x *Xfid) {
 		r                []rune
 		a                Range
 		t                *Text
-		q0, tq0, tq1, nb uint
+		q0, tq0, tq1, nb int
 		err              error
 	)
 
@@ -440,7 +440,7 @@ func xfidwrite(x *Xfid) {
 		if len(r) != 0 {
 			w.Commit(t)
 			if qid == QWwrsel {
-				q0 = uint(w.wrselrange.q1)
+				q0 = (w.wrselrange.q1)
 				if q0 > t.file.b.nc() {
 					q0 = t.file.b.nc()
 				}
@@ -458,7 +458,7 @@ func xfidwrite(x *Xfid) {
 				q0 = q
 				t.SetSelect(t.q0, t.q1) // insert could leave it somewhere else
 				if qid != QWwrsel && shouldscroll(t, q0, qid) {
-					t.Show(q0+uint(nr), q0+uint(nr), true)
+					t.Show(q0+(nr), q0+(nr), true)
 				}
 				t.ScrDraw()
 			}
@@ -488,8 +488,8 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		w.Commit(t)
 		eval = true
-		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, uint(len(r)))
-		if nb < uint(len(r)) {
+		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, (len(r)))
+		if nb < (len(r)) {
 			respond(x, &fc, Ebadaddr)
 			break
 		}
@@ -545,23 +545,23 @@ func xfidwrite(x *Xfid) {
 			seq++
 			t.file.Mark()
 		}
-		q0 = uint(a.q0)
-		if a.q1 > int(q0) {
-			t.Delete(q0, uint(a.q1), true)
-			w.addr.q1 = int(q0)
+		q0 = (a.q0)
+		if a.q1 > (q0) {
+			t.Delete(q0, (a.q1), true)
+			w.addr.q1 = (q0)
 		}
 		tq0 = t.q0
 		tq1 = t.q1
 		t.Insert(q0, r, true)
 		if tq0 >= q0 {
-			tq0 += uint(len(r))
+			tq0 += (len(r))
 		}
 		if tq1 >= q0 {
-			tq1 += uint(len(r))
+			tq1 += (len(r))
 		}
 		t.SetSelect(tq0, tq1)
 		if shouldscroll(t, q0, qid) {
-			t.Show(q0+uint(len(r)), q0+uint(len(r)), false)
+			t.Show(q0+(len(r)), q0+(len(r)), false)
 		}
 		t.ScrDraw()
 		w.SetTag()
@@ -876,7 +876,7 @@ func xfideventwrite(x *Xfid, w *Window) {
 	goto Out;
 }
 */
-func xfidutfread(x *Xfid, t *Text, q1 uint, qid int) {
+func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	Unimpl()
 }
 
@@ -941,7 +941,7 @@ func xfidutfread(x *Xfid, t *Text, q1 uint, qid int) {
 	fbuffree(b1);
 }
 */
-func xfidruneread(x *Xfid, t *Text, q0 uint, q1 uint) int {
+func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	Unimpl()
 	return 0
 } /*

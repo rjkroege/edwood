@@ -151,7 +151,7 @@ func regexp (showerr  uint, t * Text, lim  Range, r  Range, pat * Rune, dir  int
 	return sel.r[0];
 }
 */
-func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 uint, q1 uint) (r Range, evalp bool, qp uint) {
+func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 int, q1 int) (r Range, evalp bool, qp int) {
 	Unimpl()
 	return Range{0, 0}, false, 0
 }

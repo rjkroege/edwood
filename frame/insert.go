@@ -360,8 +360,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	if n0 < f.nbox-1 {
 		n0++
 	}
-	f.clean(ppt0, nn0, n0 + 1)
-//	f.Logboxes("after clean")
+	f.clean(ppt0, nn0, n0+1)
+	//	f.Logboxes("after clean")
 	f.NChars += frame.NChars
 	if f.P0 >= p0 {
 		f.P0 += frame.NChars

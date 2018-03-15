@@ -59,7 +59,7 @@ func startplumbing (void) (void) {
 }
 */
 
-func look3(t *Text, q0 uint, q1 uint, external bool) {
+func look3(t *Text, q0 int, q1 int, external bool) {
 	Unimpl()
 }
 
@@ -438,7 +438,7 @@ func dirname(t *Text, r []rune, n int) []rune {
 	var (
 		b     []rune
 		c     rune
-		nt    uint
+		nt    int
 		slash int
 		tmp   []rune
 	)
@@ -456,7 +456,7 @@ func dirname(t *Text, r []rune, n int) []rune {
 	}
 	b = t.w.tag.file.b.Read(0, nt)
 	slash = -1
-	for m := uint(0); m < nt; m++ {
+	for m := (0); m < nt; m++ {
 		c = b[m]
 		if c == '/' {
 			slash = int(m)
