@@ -59,7 +59,7 @@ func (re *AcmeRegexp)rxexecute(t Texter, r []rune, startp int, eof int, nmatch i
 	if t != nil {
 		source = t
 	} else {
-		source = &TextMock{0,0,r}
+		source = &TextBuffer{0,0,r}
 	}
 
 	rngs := RangeSet([]Range{})

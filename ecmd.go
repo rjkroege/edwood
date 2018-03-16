@@ -475,15 +475,15 @@ func s_cmd(t *Text, cp *Cmd) int {
 	delta = 0;
 	didsub = false;
 	for p1 = addr.r.q0; p1<=addr.r.q1 && rxexecute(t, nil, p1, addr.r.q1, &sel);  {
-		if sel.r[0].q0 == sel.r[0].q1 {	// empty match?
-			if sel.r[0].q0 == op {
+		if sel[0].q0 == sel[0].q1 {	// empty match?
+			if sel[0].q0 == op {
 				p1++;
 				continue;
 			}
-			p1 = sel.r[0].q1+1;
+			p1 = sel[0].q1+1;
 		}else
-			p1 = sel.r[0].q1;
-		op = sel.r[0].q1;
+			p1 = sel[0].q1;
+		op = sel[0].q1;
 		if --n>0  {
 			continue;
 		nrp++;
@@ -501,28 +501,28 @@ func s_cmd(t *Text, cp *Cmd) int {
 				c = cp.u.text.r[++i];
 				if '1'<=c && c<='9'  {
 					j = c-'0';
-					if sel.r[j].q1-sel.r[j].q0>RBUFSIZE {
+					if sel[j].q1-sel[j].q0>RBUFSIZE {
 						err = "replacement string too long";
 						goto Err;
 					}
-					bufread(&t.file.b, sel.r[j].q0, rbuf, sel.r[j].q1-sel.r[j].q0);
-					for k=0; k<sel.r[j].q1-sel.r[j].q0; k++
+					bufread(&t.file.b, sel[j].q0, rbuf, sel[j].q1-sel[j].q0);
+					for k=0; k<sel[j].q1-sel[j].q0; k++
 						Straddc(buf, rbuf[k]);
 				}else
 				 	Straddc(buf, c);
 			}else if c!='&'  {
 				Straddc(buf, c);
 			else{
-				if sel.r[0].q1-sel.r[0].q0>RBUFSIZE {
+				if sel[0].q1-sel[0].q0>RBUFSIZE {
 					err = "right hand side too long in substitution";
 					goto Err;
 				}
-				bufread(&t.file.b, sel.r[0].q0, rbuf, sel.r[0].q1-sel.r[0].q0);
-				for k=0; k<sel.r[0].q1-sel.r[0].q0; k++
+				bufread(&t.file.b, sel[0].q0, rbuf, sel[0].q1-sel[0].q0);
+				for k=0; k<sel[0].q1-sel[0].q0; k++
 					Straddc(buf, rbuf[k]);
 			}
-		elogreplace(t.file, sel.r[0].q0, sel.r[0].q1,  buf.r, buf.n);
-		delta -= sel.r[0].q1-sel.r[0].q0;
+		elogreplace(t.file, sel[0].q0, sel[0].q1,  buf.r, buf.n);
+		delta -= sel[0].q1-sel[0].q0;
 		delta += buf.n;
 		didsub = 1;
 		if !cp.flag  {
@@ -886,20 +886,20 @@ func looper (File *f, Cmd *cp, int xy) () {
 			tr.q0 = op, tr.q1 = r.q1;
 			p = r.q1+1;	// exit next loop
 		}else{
-			if sel.r[0].q0==sel.r[0].q1 {	// empty match?
-				if sel.r[0].q0==op {
+			if sel[0].q0==sel[0].q1 {	// empty match?
+				if sel[0].q0==op {
 					p++;
 					continue;
 				}
-				p = sel.r[0].q1+1;
+				p = sel[0].q1+1;
 			}else
-				p = sel.r[0].q1;
+				p = sel[0].q1;
 			if xy  {
-				tr = sel.r[0];
+				tr = sel[0];
 			else
-				tr.q0 = op, tr.q1 = sel.r[0].q0;
+				tr.q0 = op, tr.q1 = sel[0].q0;
 		}
-		op = sel.r[0].q1;
+		op = sel[0].q1;
 		nrp++;
 		rp = erealloc(rp, nrp*sizeof(Range));
 		rp[nrp-1] = tr;
@@ -1017,31 +1017,45 @@ func filelooper (Cmd *cp, int XY) () {
 	--Glooping;
 	--nest;
 }
-
-func nextmatch (File *f, String *r, long p, int sign) () {
-	if rxcompile(r.r) == false  {
+*/
+func nextmatch (f * File, r []rune, p  int, sign  int) () {
+	are, err := rxcompile(r)
+	if  err != nil  {
 		editerror("bad regexp in command address");
+	}
 	if sign >= 0 {
-		if !rxexecute(f.curtext, nil, p, 0x7FFFFFFFL, &sel)  {
+		sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
+		if len(sel) == 0 {
 			editerror("no match for regexp");
-		if sel.r[0].q0==sel.r[0].q1 && sel.r[0].q0==p {
-			if ++p>f.b.nc  {
+		}
+		if sel[0].q0==sel[0].q1 && sel[0].q0==p {
+			p++
+			if p>f.b.nc()  {
 				p = 0;
-			if !rxexecute(f.curtext, nil, p, 0x7FFFFFFFL, &sel)  {
+			}
+			sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange) 
+			if len(sel) == 0 {
 				editerror("address");
+			}
 		}
 	}else{
-		if !rxbexecute(f.curtext, p, &sel)  {
-			editerror("no match for regexp");
-		if sel.r[0].q0==sel.r[0].q1 && sel.r[0].q1==p {
-			if --p<0  {
-				p = f.b.nc;
-			if !rxbexecute(f.curtext, p, &sel)  {
-				editerror("address");
+		sel = are.rxbexecute(f.curtext, p, NRange)
+		if len(sel) == 0 {
+			editerror("no match for regexp")
+		}
+		if sel[0].q0==sel[0].q1 && sel[0].q1==p {
+			p--
+			if p<0  {
+				p = f.b.nc();
+			}
+			sel = are.rxbexecute(f.curtext, p, NRange)
+			if len(sel) != 0  {
+				editerror("address")
+			}
 		}
 	}
 }
-
+/*
 File	*matchfile(String*);
 Address	charaddr(long, Address, int);
 Address	lineaddr(long, Address, int);
@@ -1081,7 +1095,7 @@ editerror("can't handle '");
 			// fall through
 		case '/':
 			nextmatch(f, ap.u.re, sign>=0? a.r.q1 : a.r.q0, sign);
-			a.r = sel.r[0];
+			a.r = sel[0];
 			break;
 
 		case '"':

@@ -5,39 +5,19 @@ import (
 	"testing"
 )
 
-// TestText implements texter for elog tests.
-type TextMock struct {
-	q0, q1 int
-	buf    []rune
-}
-
-func (t TextMock) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, (len(t.buf)))
-	p1 = min(q1, (len(t.buf)))
-	return p0, p1
-}
-
-func (t *TextMock) Delete(q0, q1 int, tofile bool) {
-	_ = tofile
-	if q0 > (len(t.buf)) || q1 > (len(t.buf)) {
-		panic("Out-of-range Delete")
-	}
-	copy(t.buf[q0:], t.buf[q1:])
-	t.buf = t.buf[:(len(t.buf))-(q1-q0)] // Reslice to length
-}
 
 // Let's make sure our test fixture has the right form.
 func TestDelete(t *testing.T) {
 	tab := []struct {
 		q0, q1   int
-		tb       TextMock
+		tb       TextBuffer
 		expected string
 	}{
-		{0, 5, TextMock{0, 0, []rune("0123456789")}, "56789"},
-		{0, 0, TextMock{0, 0, []rune("0123456789")}, "0123456789"},
-		{0, 10, TextMock{0, 0, []rune("0123456789")}, ""},
-		{1, 5, TextMock{0, 0, []rune("0123456789")}, "056789"},
-		{8, 10, TextMock{0, 0, []rune("0123456789")}, "01234567"},
+		{0, 5, TextBuffer{0, 0, []rune("0123456789")}, "56789"},
+		{0, 0, TextBuffer{0, 0, []rune("0123456789")}, "0123456789"},
+		{0, 10, TextBuffer{0, 0, []rune("0123456789")}, ""},
+		{1, 5, TextBuffer{0, 0, []rune("0123456789")}, "056789"},
+		{8, 10, TextBuffer{0, 0, []rune("0123456789")}, "01234567"},
 	}
 	for _, test := range tab {
 		tb := test.tb
@@ -48,25 +28,17 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func (t *TextMock) Insert(q0 int, r []rune, tofile bool) {
-	_ = tofile
-	if q0 > (len(t.buf)) {
-		panic("Out of range insertion")
-	}
-	t.buf = append(t.buf[:q0], append(r, t.buf[q0:]...)...)
-}
-
 func TestInsert(t *testing.T) {
 	tab := []struct {
 		q0       int
-		tb       TextMock
+		tb       TextBuffer
 		insert   string
 		expected string
 	}{
-		{5, TextMock{0, 0, []rune("01234")}, "56789", "0123456789"},
-		{0, TextMock{0, 0, []rune("56789")}, "01234", "0123456789"},
-		{1, TextMock{0, 0, []rune("06789")}, "12345", "0123456789"},
-		{5, TextMock{0, 0, []rune("01234")}, "56789", "0123456789"},
+		{5, TextBuffer{0, 0, []rune("01234")}, "56789", "0123456789"},
+		{0, TextBuffer{0, 0, []rune("56789")}, "01234", "0123456789"},
+		{1, TextBuffer{0, 0, []rune("06789")}, "12345", "0123456789"},
+		{5, TextBuffer{0, 0, []rune("01234")}, "56789", "0123456789"},
 	}
 	for _, test := range tab {
 		tb := test.tb
@@ -76,13 +48,6 @@ func TestInsert(t *testing.T) {
 		}
 	}
 }
-
-func (t *TextMock) Read(q, n int) []rune { return t.buf[q:q+n] }
-func (t *TextMock) Q0() int      { return t.q0 }
-func (t *TextMock) SetQ0(q0 int) { t.q0 = q0 }
-func (t *TextMock) Q1() int      { return t.q1 }
-func (t *TextMock) SetQ1(q1 int) { t.q1 = q1 }
-func (t *TextMock) nc() int { return len(t.buf) }
 
 func TestElogInsertDelete(t *testing.T) {
 	t0 := []rune("This")
@@ -136,25 +101,25 @@ func TestElogInsertDelete(t *testing.T) {
 
 func TestApply(t *testing.T) {
 	tab := []struct {
-		tb       TextMock
+		tb       TextBuffer
 		elog     Elog
 		expected string
 	}{
-		{TextMock{0, 0, []rune{}},
+		{TextBuffer{0, 0, []rune{}},
 			Elog{[]ElogOperation{
 				{Null, 0, 0, []rune{}},
 				{Insert, 0, 0, []rune("0123456789")},
 			}, false},
 			"0123456789"},
 
-		{TextMock{0, 0, []rune("0123456789")},
+		{TextBuffer{0, 0, []rune("0123456789")},
 			Elog{[]ElogOperation{
 				{Null, 0, 0, []rune{}},
 				{Delete, 0, 5, []rune{}},
 			}, false},
 			"56789"},
 
-		{TextMock{0, 0, []rune("XXX56789")},
+		{TextBuffer{0, 0, []rune("XXX56789")},
 			Elog{[]ElogOperation{
 				{Null, 0, 0, []rune{}},
 				{Insert, 0, 0, []rune("01234")},
@@ -162,7 +127,7 @@ func TestApply(t *testing.T) {
 			}, false},
 			"0123456789"},
 
-		{TextMock{0, 0, []rune("XXX56789")},
+		{TextBuffer{0, 0, []rune("XXX56789")},
 			Elog{[]ElogOperation{
 				{Null, 0, 0, []rune{}},
 				{Replace, 0, 3, []rune("01234")},

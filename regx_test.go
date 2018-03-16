@@ -22,8 +22,8 @@ func testRegexpForward(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to compile tests[%d].re = '%v'", i, test.re)
 		}
-		text := &TextMock{0, 0, []rune(test.text)}
-		rs := are.rxexecute(text, nil, 0, text.nc(), test.nmax)
+		text := &TextBuffer{0, 0, []rune(test.text)}
+		rs := are.rxexecute(text, nil, 0, 0x7FFFFFF/*text.nc()*/, test.nmax)
 		if len(rs) != len(test.expected) {
 			t.Errorf("Mismatch tests[%d] - expected %d elements, got %d", i, len(test.expected), len(rs))
 			t.Errorf("\trs = %#v", rs)
@@ -58,7 +58,7 @@ func TestRegexpBackward(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to compile tests[%d].re = '%v'", i, test.re)
 		}
-		text := &TextMock{0, 0, []rune(test.text)}
+		text := &TextBuffer{0, 0, []rune(test.text)}
 		rs := are.rxbexecute(text, text.nc(), test.nmax)
 		if len(rs) != len(test.expected) {
 			t.Errorf("Mismatch tests[%d] - expected %d elements, got %d", i, len(test.expected), len(rs))
