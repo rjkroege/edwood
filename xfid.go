@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
+	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -586,261 +589,241 @@ func xfidwrite(x *Xfid) {
 }
 
 func xfidctlwrite(x *Xfid, w *Window) {
-	Unimpl()
-}
-
-/*	Fcall fc;
-	int i, m, n, nb, nr, nulls;
-	Rune *r;
-	char *err, *p, *pp, *q, *e;
-	int isfbuf, scrdraw, settag;
-	Text *t;
-
+var (
+	fc plan9.Fcall
+	err error
+	scrdraw, settag bool
+	t *Text
+	n int
+)
 	err = nil;
-	e = x.fcall.data+x.fcall.count;
 	scrdraw = false;
 	settag = false;
-	isfbuf = true;
-	if x.fcall.count < RBUFSIZE
-		r = fbufalloc();
-	else{
-		isfbuf = false;
-		r = emalloc(x.fcall.count*UTFmax+1);
-	}
-	x.fcall.data[x.fcall.count] = 0;
-	textcommit(&w.tag, true);
-	for n=0; n<x.fcall.count; n+=m {
-		p = x.fcall.data+n;
-		if strncmp(p, "lock", 4) == 0 {	// make window exclusive use
-			w.ctllock.Lock();
+	
+	w.tag.Commit(true);
+	lines := strings.Split(string(x.fcall.Data), "\n")
+	var lidx int
+	var line string
+forloop:
+	for lidx, line = range lines {
+		words := strings.Split(line, " ")
+		switch words[0] {
+		case "": // empty line.
+		case "lock" : 	// make window exclusive use
+			w.ctrllock.Lock();
 			w.ctlfid = x.f.fid;
-			m = 4;
-		}else
-		if strncmp(p, "unlock", 6) == 0 {	// release exclusive use
-			w.ctlfid = ~0;
-			w.ctllock.Unlock();
-			m = 6;
-		}else
-		if strncmp(p, "clean", 5) == 0 {	// mark window 'clean', seq=0
+		case  "unlock":// release exclusive use
+			w.ctlfid = math.MaxUint32
+			w.ctrllock.Unlock();
+		case "clean":	// mark window 'clean', seq=0
 			t = &w.body;
-			t.eq0 = ~0;
-			filereset(t.file);
+			t.eq0 = ^0;
+			t.file.Reset();
 			t.file.mod = false;
 			w.dirty = false;
 			settag = true;
-			m = 5;
-		}else
-		if strncmp(p, "dirty", 5) == 0 {	// mark window 'dirty'
+		case "dirty":	// mark window 'dirty'
 			t = &w.body;
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
 			t.file.mod = true;
 			w.dirty = true;
 			settag = true;
-			m = 5;
-		}else
-		if strncmp(p, "show", 4) == 0 {	// show dot
+		case "show":	// show dot
 			t = &w.body;
-			textshow(t, t.q0, t.q1, 1);
-			m = 4;
-		}else
-		if strncmp(p, "name ", 5) == 0 {	// set file name
-			pp = p+5;
-			m = 5;
-			q = memchr(pp, '\n', e-pp);
-			if q==nil || q==pp {
-				err = Ebadctl;
-				break;
-			}
-			*q = 0;
-			nulls = false;
-			cvttorunes(pp, q-pp, r, &nb, &nr, &nulls);
-			if nulls {
-				err = "nulls in file name";
-				break;
-			}
-			for i=0; i<nr; i++
-				if r[i] <= ' ' {
-					err = "bad character in file name";
-					goto out;
+			t.Show(t.q0, t.q1, true);
+		case "name":	// set file name
+			r := []rune(words[1])
+			for _, rr := range r {
+				if rr <= ' ' {
+					err = fmt.Errorf("bad character in file name");
+					break
 				}
-out:
+			}
 			seq++;
-			filemark(w.body.file);
-			winsetname(w, r, nr);
-			m += (q+1) - pp;
-		}else
-		if strncmp(p, "dump ", 5) == 0 {	// set dump string
-			pp = p+5;
-			m = 5;
-			q = memchr(pp, '\n', e-pp);
-			if q==nil || q==pp {
-				err = Ebadctl;
+			w.body.file.Mark();
+			w.SetName(string(r));
+		case "dump":	// set dump string
+			r := []rune(words[1])
+			for _, rr := range r {
+				if rr <= ' ' {
+					err = fmt.Errorf("bad character in file name");
+					break
+				}
+			}
+			w.dumpstr = string(r)
+		case "dumpdir": 	// set dump directory
+			r := []rune(words[1])
+			for _, rr := range r {
+				if rr <= ' ' {
+					err = fmt.Errorf("bad character in file name");
+					break
+				}
+			}
+			w.dumpdir = string(r)
+		case "delete":	// delete for sure
+			w.col.Close(w, true);
+		case "del":	// delete, but check dirty
+			if w.Clean(true) {
+				err = fmt.Errorf("file dirty");
 				break;
 			}
-			*q = 0;
-			nulls = false;
-			cvttorunes(pp, q-pp, r, &nb, &nr, &nulls);
-			if nulls {
-				err = "nulls in dump string";
-				break;
-			}
-			w.dumpstr = runetobyte(r, nr);
-			m += (q+1) - pp;
-		}else
-		if strncmp(p, "dumpdir ", 8) == 0 {	// set dump directory
-			pp = p+8;
-			m = 8;
-			q = memchr(pp, '\n', e-pp);
-			if q==nil || q==pp {
-				err = Ebadctl;
-				break;
-			}
-			*q = 0;
-			nulls = false;
-			cvttorunes(pp, q-pp, r, &nb, &nr, &nulls);
-			if nulls {
-				err = "nulls in dump directory string";
-				break;
-			}
-			w.dumpdir = runetobyte(r, nr);
-			m += (q+1) - pp;
-		}else
-		if strncmp(p, "delete", 6) == 0 {	// delete for sure
-			colclose(w.col, w, true);
-			m = 6;
-		}else
-		if strncmp(p, "del", 3) == 0 {	// delete, but check dirty
-			if !winclean(w, true) {
-				err = "file dirty";
-				break;
-			}
-			colclose(w.col, w, true);
-			m = 3;
-		}else
-		if strncmp(p, "get", 3) == 0 {	// get file
+			w.col.Close(w, true);
+		case "get":	// get file
 			get(&w.body, nil, nil, false, XXX, nil, 0);
-			m = 3;
-		}else
-		if strncmp(p, "put", 3) == 0 {	// put file
+		case "put":	// put file
 			put(&w.body, nil, nil, XXX, XXX, nil, 0);
-			m = 3;
-		}else
-		if strncmp(p, "dot=addr", 8) == 0 {	// set dot
-			textcommit(&w.body, true);
+		case "dot=addr":	// set dot
+			w.body.Commit(true);
 			clampaddr(w);
 			w.body.q0 = w.addr.q0;
 			w.body.q1 = w.addr.q1;
-			textsetselect(&w.body, w.body.q0, w.body.q1);
+			w.body.SetSelect(w.body.q0, w.body.q1);
 			settag = true;
-			m = 8;
-		}else
-		if strncmp(p, "addr=dot", 8) == 0 {	// set addr
+		case "addr=dot":	// set addr
 			w.addr.q0 = w.body.q0;
 			w.addr.q1 = w.body.q1;
-			m = 8;
-		}else
-		if strncmp(p, "limit=addr", 10) == 0 {	// set limit
-			textcommit(&w.body, true);
+		case "limit=addr":	// set limit
+			w.body.Commit(true);
 			clampaddr(w);
 			w.limit.q0 = w.addr.q0;
 			w.limit.q1 = w.addr.q1;
-			m = 10;
-		}else
-		if strncmp(p, "nomark", 6) == 0 {	// turn off automatic marking
+		case "nomark":	// turn off automatic marking
 			w.nomark = true;
-			m = 6;
-		}else
-		if strncmp(p, "mark", 4) == 0 {	// mark file
+		case "mark":	// mark file
 			seq++;
-			filemark(w.body.file);
+			w.body.file.Mark();
 			settag = true;
-			m = 4;
-		}else
-		if strncmp(p, "nomenu", 6) == 0 {	// turn off automatic menu
+		case "nomenu":	// turn off automatic menu
 			w.filemenu = false;
-			m = 6;
-		}else
-		if strncmp(p, "menu", 4) == 0 {	// enable automatic menu
+		case "menu":	// enable automatic menu
 			w.filemenu = true;
-			m = 4;
-		}else
-		if strncmp(p, "cleartag", 8) == 0 {	// wipe tag right of bar
-			wincleartag(w);
+		case "cleartag":	// wipe tag right of bar
+			w.ClearTag();
 			settag = true;
-			m = 8;
-		}else{
+	
+		default:
 			err = Ebadctl;
-			break;
+			break forloop;
 		}
-		while(p[m] == '\n')
-			m++;
 	}
 
-	if isfbuf
-		fbuffree(r);
-	else
-		free(r);
-	if err
+	if err != nil {
 		n = 0;
-	fc.count = n;
-	respond(x, &fc, err);
-	if settag
-		winsettag(w);
-	if scrdraw
-		textscrdraw(&w.body);
-}
-*/
-func xfideventwrite(x *Xfid, w *Window) {
-	Unimpl()
-}
-
-/*
-	Fcall fc;
-	int m, n;
-	Rune *r;
-	char *err, *p, *q;
-	int isfbuf;
-	Text *t;
-	int c;
-	uint q0, q1;
-
-	err = nil;
-	isfbuf = true;
-	if x.fcall.count < RBUFSIZE
-		r = fbufalloc();
-	else{
-		isfbuf = false;
-		r = emalloc(x.fcall.count*UTFmax+1);
+	} else {
+		// how far through the buffer did we get?
+		// count bytes up to line lineidx
+		d := x.fcall.Data
+		curline := 0
+		for n = 0; n < len(d); n++ {
+			if curline == lidx {
+				break
+			}
+			if d[n] == '\n' {
+				curline++
+			}
+		}	
 	}
-	for n=0; n<x.fcall.count; n+=m {
-		p = x.fcall.data+n;
-		w.owner = *p++;	// disgusting
-		c = *p++;
-		while(*p == ' ')
-			p++;
-		q0 = strtoul(p, &q, 10);
-		if q == p
-			goto Rescue;
-		p = q;
-		while(*p == ' ')
-			p++;
-		q1 = strtoul(p, &q, 10);
-		if q == p
-			goto Rescue;
-		p = q;
-		while(*p == ' ')
-			p++;
-		if *p++ != '\n'
-			goto Rescue;
-		m = p-(x.fcall.data+n);
-		if 'a'<=c && c<='z'
+	fc.Count = uint32(n);
+	respond(x, &fc, err);
+	if settag {
+		w.SetTag();
+	}
+	if scrdraw {
+		w.body.ScrDraw();
+	}
+}
+
+func xfideventwrite(x *Xfid, w *Window) {
+var (
+	fc plan9.Fcall
+	m, n int
+	err error
+	t *Text
+	q0, q1 int
+	num int64
+)
+	err = nil;
+/*
+The mes-
+               sages have a fixed format: a character indicating the
+               origin or cause of the action, a character indicating
+               the type of the action, four free-format blank-
+               terminated decimal numbers, optional text, and a new-
+               line.  The first and second numbers are the character
+               addresses of the action, the third is a flag, and the
+               final is a count of the characters in the optional
+               text, which may itself contain newlines.
+		%c%c%d %d %d %d %s\n
+*/
+	events := string(x.fcall.Data)
+	n = 0
+	for events != "" {
+		w.owner = int(events[0]); n++
+		c := events[1]; n++
+		events = events[2:]
+
+		for (events[0] == ' ') { events = events[1:] ; n++}
+		e := strings.SplitN(events, " ", 2)
+		n += len(e[0]) + 1
+		num, err = strconv.ParseInt(e[0], 10, 32)
+		if err != nil {
+			err = Ebadevent
+			break
+		}
+		q0 = int(num)
+		events = e[1]
+
+
+		for (events[0] == ' ') { events = events[1:] ; n++ }
+		e = strings.SplitN(events, " ", 2)
+		n += len(e[0]) + 1
+		num, err = strconv.ParseInt(e[0], 10, 32)
+		if err != nil {
+			err = Ebadevent
+			break
+		}
+		q1 = int(num)
+		events = e[1]
+
+		for (events[0] == ' ') { events = events[1:] ; n++ }
+		n += len(e[0]) + 1
+		e = strings.SplitN(events, " ", 2)
+		num, err = strconv.ParseInt(e[0], 10, 32)
+		if err != nil {
+			err = Ebadevent
+			break
+		}
+		//flag := int(num)
+		events = e[1]
+
+		for (events[0] == ' ') { events = events[1:] ; n++ }
+		n += len(e[0]) + 1
+		e = strings.SplitN(events, " ", 2)
+		num, err = strconv.ParseInt(e[0], 10, 32)
+		if err != nil {
+			err = Ebadevent
+			break
+		}
+		m = int(num)
+		events = e[1]
+
+		for (events[0] == ' ') { events = events[1:] ; n++ }
+
+		if (m != len(x.fcall.Data) - n) { panic("mis-shaped event") }
+		if 'a'<=c && c<='z' {
 			t = &w.tag;
-		else if 'A'<=c && c<='Z'
-			t = &w.body;
-		else
-			goto Rescue;
-		if q0>t.file.b.nc || q1>t.file.b.nc || q0>q1
-			goto Rescue;
+		} else {
+			if 'A'<=c && c<='Z' {
+				t = &w.body;
+			} else {
+				err = Ebadevent
+				break
+			}
+		}
+		if q0>t.file.b.nc() || q1>t.file.b.nc() || q0>q1 {
+			err = Ebadevent
+			break
+		}
 
 		row.lk.Lock();	// just like mousethread
 		switch(c){
@@ -853,29 +836,20 @@ func xfideventwrite(x *Xfid, w *Window) {
 			look3(t, q0, q1, true);
 			break;
 		default:
-			row.lk.Unlock();
-			goto Rescue;
+			err = Ebadevent
+			break
 		}
 		row.lk.Unlock();
-
 	}
 
-    Out:
-	if isfbuf
-		fbuffree(r);
-	else
-		free(r);
-	if err
+	if err != nil {
 		n = 0;
-	fc.count = n;
+	}
+	fc.Count = uint32(n);
 	respond(x, &fc, err);
 	return;
-
-    Rescue:
-	err = Ebadevent;
-	goto Out;
 }
-*/
+
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	Unimpl()
 }

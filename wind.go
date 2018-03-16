@@ -418,9 +418,9 @@ func (w *Window) AddIncl(r string) {
 	Unimpl()
 }
 
-func (w *Window) Clean(conservative bool) int {
+func (w *Window) Clean(conservative bool) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 func (w *Window) CtlPrint(fonts bool) string {

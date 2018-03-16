@@ -11,11 +11,18 @@ func execute(t *Text, q0, q1 int, external bool, argt *Text) {
 	Unimpl()
 }
 
-func cut(et *Text, t *Text, _0 *Text, dosnarf bool, docut bool, _2 *rune, _3 int) {
+func cut(et *Text, t *Text, _0 *Text, dosnarf bool, docut bool, _2 []rune, _3 int) {
 	Unimpl()
 }
 
-func paste(et *Text, t *Text, _0 *Text, selectall bool, tobody bool, _2 *rune, _3 int) {
+func paste(et *Text, t *Text, _0 *Text, selectall bool, tobody bool, _2 []rune, _3 int) {
+	Unimpl()
+}
+
+func get(et * Text, t * Text, argt * Text, flag1  bool, _0  bool, arg []rune, narg  int){
+	Unimpl()
+}
+func put(et * Text, _0 * Text, argt * Text, _1  bool, _2  bool, arg []rune, narg  int){
 	Unimpl()
 }
 
