@@ -11,4 +11,6 @@ type Texter interface {
 	SetQ0(int)
 	Q1() int // End of selelection
 	SetQ1(int)
+	nc() int
+	Read(q, n int) []rune
 }

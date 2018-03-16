@@ -540,6 +540,8 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 }
 
+func (t *Text) Read(q, n int) []rune { return t.file.b.Read(q,n) }
+func (t *Text) nc() int { return t.file.b.nc() }
 func (t *Text) Q0() int      { return t.q0 }
 func (t *Text) Q1() int      { return t.q1 }
 func (t *Text) SetQ0(q0 int) { t.q0 = q0 }

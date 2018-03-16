@@ -77,10 +77,12 @@ func TestInsert(t *testing.T) {
 	}
 }
 
+func (t *TextMock) Read(q, n int) []rune { return t.buf[q:q+n] }
 func (t *TextMock) Q0() int      { return t.q0 }
 func (t *TextMock) SetQ0(q0 int) { t.q0 = q0 }
 func (t *TextMock) Q1() int      { return t.q1 }
 func (t *TextMock) SetQ1(q1 int) { t.q1 = q1 }
+func (t *TextMock) nc() int { return len(t.buf) }
 
 func TestElogInsertDelete(t *testing.T) {
 	t0 := []rune("This")
