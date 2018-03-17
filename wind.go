@@ -53,7 +53,7 @@ type Window struct {
 	dumpdir     string
 	dumpid      int
 	utflastqid  int
-	utflastboff int
+	utflastboff uint64
 	utflastq    int
 	tagsafe     bool
 	tagexpand   bool

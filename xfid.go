@@ -851,24 +851,22 @@ The mes-
 }
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
-	Unimpl()
-}
-
-/*
-	Fcall fc;
-	Window *w;
-	Rune *r;
-	char *b, *b1;
-	uint q, off, boff;
-	int m, n, nr, nb;
-
+var (
+	fc plan9.Fcall;
+	w *Window
+//	r []rune
+	b1 []rune
+	q int
+	off, boff  uint64
+	m, n, nr, nb int
+)
 	w = t.w;
-	w, t.Commit();
-	off = x.fcall.offset;
-	r = fbufalloc();
-	b = fbufalloc();
-	b1 = fbufalloc();
+	w.Commit(t);
+	off = x.fcall.Offset;
 	n = 0;
+	//r = make([]rune, BUFSIZE/utf8.UTFMax)
+	//b = make([]rune, BUFSIZE/utf8.UTFMax)
+	b1 = make([]rune, BUFSIZE/utf8.UTFMax)
 	if qid==w.utflastqid && off>=w.utflastboff && w.utflastq<=q1 {
 		boff = w.utflastboff;
 		q = w.utflastq;
@@ -878,43 +876,46 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		q = 0;
 	}
 	w.utflastqid = qid;
-	while(q<q1 && n<x.fcall.count){
+	for(q<q1 && n<int(x.fcall.Count)){
 		// * Updating here avoids partial rune problem: we're always on a
 		// * char boundary. The cost is we will usually do one more read
 		// * than we really need, but that's better than being n^2.
 		w.utflastboff = boff;
 		w.utflastq = q;
 		nr = q1-q;
-		if nr > BUFSIZE/UTFmax
-			nr = BUFSIZE/UTFmax;
-		bufread(&t.file.b, q, r, nr);
-		nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
-		if boff >= off {
-			m = nb;
-			if boff+m > off+x.fcall.count
-				m = off+x.fcall.count - boff;
-			memmove(b1+n, b, m);
-			n += m;
-		}else if boff+nb > off {
-			if n != 0
-				error("bad count in utfrune");
-			m = nb - (off-boff);
-			if m > x.fcall.count
-				m = x.fcall.count;
-			memmove(b1, b+(off-boff), m);
-			n += m;
+		if nr > BUFSIZE/utf8.UTFMax {
+			nr = BUFSIZE/utf8.UTFMax;
 		}
-		boff += nb;
-		q += nr;
+		r := t.file.b.Read(q, nr);
+		b := r //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
+		if boff >= off {
+			m = len(b);
+			if boff+uint64(m) > off+uint64(x.fcall.Count) {
+				m = int(off+uint64(x.fcall.Count) - boff);
+			}
+			copy(b1[n:], b[:m]);
+			n += m;
+		}else {
+			if boff+uint64(nb) > off {
+				if n != 0 {
+					acmeerror("bad count in utfrune", nil);
+				}
+				m = nb - int(off-boff);
+				if m > int(x.fcall.Count) {
+					m = int(x.fcall.Count)
+				}
+				copy(b1, b[off-boff: int(off-boff)+m]);
+				n += m;
+			}
+		}
+		boff += uint64(nb);
+		q += len(r);
 	}
-	fbuffree(r);
-	fbuffree(b);
-	fc.count = n;
-	fc.data = b1;
+	fc.Count = uint32(n);
+	fc.Data = []byte(string(b1));
 	respond(x, &fc, nil);
-	fbuffree(b1);
 }
-*/
+
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	Unimpl()
 	return 0
