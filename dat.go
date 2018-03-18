@@ -121,7 +121,7 @@ var (
 	wdir              string
 	editing           int = Inactive
 	erroutfd          int
-	messagesize       int 
+	messagesize       int
 	globalautoindent  bool
 	dodollarsigns     bool
 	mtpt              string

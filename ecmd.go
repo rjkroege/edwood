@@ -1018,43 +1018,44 @@ func filelooper (Cmd *cp, int XY) () {
 	--nest;
 }
 */
-func nextmatch (f * File, r []rune, p  int, sign  int) () {
+func nextmatch(f *File, r []rune, p int, sign int) {
 	are, err := rxcompile(r)
-	if  err != nil  {
-		editerror("bad regexp in command address");
+	if err != nil {
+		editerror("bad regexp in command address")
 	}
 	if sign >= 0 {
 		sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
 		if len(sel) == 0 {
-			editerror("no match for regexp");
+			editerror("no match for regexp")
 		}
-		if sel[0].q0==sel[0].q1 && sel[0].q0==p {
+		if sel[0].q0 == sel[0].q1 && sel[0].q0 == p {
 			p++
-			if p>f.b.nc()  {
-				p = 0;
+			if p > f.b.nc() {
+				p = 0
 			}
-			sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange) 
+			sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
 			if len(sel) == 0 {
-				editerror("address");
+				editerror("address")
 			}
 		}
-	}else{
+	} else {
 		sel = are.rxbexecute(f.curtext, p, NRange)
 		if len(sel) == 0 {
 			editerror("no match for regexp")
 		}
-		if sel[0].q0==sel[0].q1 && sel[0].q1==p {
+		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
-			if p<0  {
-				p = f.b.nc();
+			if p < 0 {
+				p = f.b.nc()
 			}
 			sel = are.rxbexecute(f.curtext, p, NRange)
-			if len(sel) != 0  {
+			if len(sel) != 0 {
 				editerror("address")
 			}
 		}
 	}
 }
+
 /*
 File	*matchfile(String*);
 Address	charaddr(long, Address, int);

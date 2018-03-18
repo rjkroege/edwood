@@ -44,10 +44,9 @@ func (t *TextBuffer) Insert(q0 int, r []rune, tofile bool) {
 	t.buf = append(t.buf[:q0], append(r, t.buf[q0:]...)...)
 }
 
-func (t *TextBuffer) Read(q, n int) []rune { return t.buf[q:q+n] }
-func (t *TextBuffer) Q0() int      { return t.q0 }
-func (t *TextBuffer) SetQ0(q0 int) { t.q0 = q0 }
-func (t *TextBuffer) Q1() int      { return t.q1 }
-func (t *TextBuffer) SetQ1(q1 int) { t.q1 = q1 }
-func (t *TextBuffer) nc() int { return len(t.buf) }
-
+func (t *TextBuffer) Read(q, n int) []rune { return t.buf[q : q+n] }
+func (t *TextBuffer) Q0() int              { return t.q0 }
+func (t *TextBuffer) SetQ0(q0 int)         { t.q0 = q0 }
+func (t *TextBuffer) Q1() int              { return t.q1 }
+func (t *TextBuffer) SetQ1(q1 int)         { t.q1 = q1 }
+func (t *TextBuffer) nc() int              { return len(t.buf) }

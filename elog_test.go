@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-
 // Let's make sure our test fixture has the right form.
 func TestDelete(t *testing.T) {
 	tab := []struct {

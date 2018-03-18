@@ -97,10 +97,10 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.tag.what = Tag
 
 	/* tag is a copy of the contents, not a tracked image */
-	if(clone!=nil){
-		w.tag.Delete(0, w.tag.file.b.nc(), true);
-		w.tag.Insert(0, clone.tag.file.b, true);
-		w.tag.file.Reset();
+	if clone != nil {
+		w.tag.Delete(0, w.tag.file.b.nc(), true)
+		w.tag.Insert(0, clone.tag.file.b, true)
+		w.tag.file.Reset()
 		w.tag.SetSelect(len(w.tag.file.b), len(w.tag.file.b))
 	}
 	r1 = r
@@ -111,11 +111,11 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 
 	// Body setup.
 	f = &File{}
-	if clone != nil{
-		f = clone.body.file;
-		w.body.org = clone.body.org;
-		w.isscratch = clone.isscratch;
-		rf = fontget(0, false, false, clone.body.font.Name);
+	if clone != nil {
+		f = clone.body.file
+		w.body.org = clone.body.org
+		w.isscratch = clone.isscratch
+		rf = fontget(0, false, false, clone.body.font.Name)
 	} else {
 		rf = fontget(0, false, false, "")
 	}
@@ -135,7 +135,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.filemenu = true
 	w.maxlines = w.body.fr.MaxLines
 	w.autoindent = globalautoindent
-	if clone != nil{
+	if clone != nil {
 		w.dirty = clone.dirty
 		w.autoindent = clone.autoindent
 		w.body.SetSelect(clone.body.q0, clone.body.q1)
@@ -224,7 +224,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		y = w.body.Resize(r1, keepextra)
 		w.r = r
 		w.r.Max.Y = y
-		w.body.ScrDraw()  
+		w.body.ScrDraw()
 		w.body.all.Min.Y = oy
 	}
 	w.maxlines = min(w.body.fr.NLines, max(w.maxlines, w.body.fr.MaxLines))
@@ -288,22 +288,22 @@ func (w *Window) SetName(name string) {
 }
 
 func (w *Window) Type(t *Text, r rune) {
-	t.Type(r);
+	t.Type(r)
 	if t.what == Body {
-		for _, text := range t.file.text { 
-			text.ScrDraw();
+		for _, text := range t.file.text {
+			text.ScrDraw()
 		}
 	}
-	w.SetTag();
+	w.SetTag()
 }
 
 func (w *Window) ClearTag() {
-Unimpl()
+	Unimpl()
 
 }
 
 func (w *Window) SetTag1() {
-Unimpl()
+	Unimpl()
 
 }
 
@@ -443,23 +443,23 @@ func (w *Window) CtlPrint(fonts bool) string {
 }
 
 func (w *Window) Event(format string, args ...interface{}) {
-var (
-	x *Xfid
-)
+	var (
+		x *Xfid
+	)
 	if w.nopen[QWevent] == 0 {
-		return;
+		return
 	}
 	if w.owner == 0 {
-		acmeerror("no window owner", nil);
+		acmeerror("no window owner", nil)
 	}
 	b := []byte(fmt.Sprintf(format, args...))
 
 	w.events = append(w.events, byte(w.owner))
 	w.events = append(w.events, b...)
 	w.nevents = len(w.events)
-	x = w.eventx;
+	x = w.eventx
 	if x != nil {
-		w.eventx = nil;
+		w.eventx = nil
 		x.c <- nil
 	}
 }

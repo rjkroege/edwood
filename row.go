@@ -152,42 +152,42 @@ func (r *Row) Which(p image.Point) *Text {
 }
 
 func (row *Row) Type(r rune, p image.Point) *Text {
-var (
-	w *Window
-	t *Text
-)
+	var (
+		w *Window
+		t *Text
+	)
 
 	if r == 0 {
-		r = utf8.RuneError;
+		r = utf8.RuneError
 	}
 
-	clearmouse();
-	row.lk.Lock();
+	clearmouse()
+	row.lk.Lock()
 	if bartflag {
-		t = barttext;
+		t = barttext
 	} else {
-		t = row.Which(p);
+		t = row.Which(p)
 	}
-	if t!=nil && !(t.what==Tag && p.In(t.scrollr)) {
-		w = t.w;
+	if t != nil && !(t.what == Tag && p.In(t.scrollr)) {
+		w = t.w
 		if w == nil {
-			t.Type(r);
-		}else{
-			w.Lock('K');
-			w.Type(t, r);
+			t.Type(r)
+		} else {
+			w.Lock('K')
+			w.Type(t, r)
 			/* Expand tag if necessary */
 			if t.what == Tag {
-				t.w.tagsafe = false;
+				t.w.tagsafe = false
 				if r == '\n' {
-					t.w.tagexpand = true;
+					t.w.tagexpand = true
 				}
-				w.Resize(w.r, true, true);
+				w.Resize(w.r, true, true)
 			}
-			w.Unlock();
+			w.Unlock()
 		}
 	}
-	row.lk.Unlock();
-	return t;
+	row.lk.Unlock()
+	return t
 }
 
 func (r *Row) Clean() int {

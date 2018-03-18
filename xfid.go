@@ -187,7 +187,7 @@ func xfidopen(x *Xfid) {
 		}
 	}
 	fc.Qid = x.f.qid
-	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ) 
+	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ)
 	x.f.open = true
 	respond(x, &fc, nil)
 }
@@ -406,9 +406,9 @@ func fullrunewrite(x *Xfid) []rune {
 		ru, si := utf8.DecodeRune(x.fcall.Data[nb:])
 		if ru == utf8.RuneError {
 			// Let's hope we're at the end of the buffer.
-			if (len(x.fcall.Data) - int(nb)) > utf8.UTFMax{
+			if (len(x.fcall.Data) - int(nb)) > utf8.UTFMax {
 				acmeerror("Bad runes in fullrunewrite", nil)
-			} 
+			}
 			break
 		} else {
 			r[i] = ru
@@ -434,7 +434,7 @@ func xfidwrite(x *Xfid) {
 		q0, tq0, tq1, nb int
 		err              error
 	)
-fmt.Println("\n\nxfidwrite\n\n")
+	fmt.Println("\n\nxfidwrite\n\n")
 	qid := FILE(x.f.qid)
 	w := x.f.w
 	if w != nil {
@@ -449,13 +449,13 @@ fmt.Println("\n\nxfidwrite\n\n")
 			return
 		}
 	}
-fmt.Printf("Incoming x.fcall = %#v\n", x.fcall)
+	fmt.Printf("Incoming x.fcall = %#v\n", x.fcall)
 	x.fcall.Count = uint32(len(x.fcall.Data))
 
 	BodyTag := func() { // Trimmed from the switch below.
 		r := fullrunewrite(x)
-fmt.Printf("t (in closure)= %p\n", t)
-fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
+		fmt.Printf("t (in closure)= %p\n", t)
+		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		if len(r) != 0 {
 			w.Commit(t)
 			if qid == QWwrsel {
@@ -487,12 +487,12 @@ fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 			}
 		}
 		fc.Count = x.fcall.Count
-fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
+		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		respond(x, &fc, nil)
 	}
 
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
-fmt.Println("qid =", qid)
+	fmt.Println("qid =", qid)
 	switch qid {
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X')
@@ -523,7 +523,8 @@ fmt.Println("qid =", qid)
 		respond(x, &fc, nil)
 		break
 
-	case Qeditout: fallthrough
+	case Qeditout:
+		fallthrough
 	case QWeditout:
 		r = fullrunewrite(x)
 		if w != nil {
@@ -544,11 +545,12 @@ fmt.Println("qid =", qid)
 		t = &w.body
 		BodyTag()
 
-	case QWbody: fallthrough
+	case QWbody:
+		fallthrough
 	case QWwrsel:
 		t = &w.body
-fmt.Printf("\nt = %p\n", t)
-fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
+		fmt.Printf("\nt = %p\n", t)
+		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		BodyTag()
 
 	case QWctl:
@@ -609,18 +611,18 @@ fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 }
 
 func xfidctlwrite(x *Xfid, w *Window) {
-var (
-	fc plan9.Fcall
-	err error
-	scrdraw, settag bool
-	t *Text
-	n int
-)
-	err = nil;
-	scrdraw = false;
-	settag = false;
-	
-	w.tag.Commit(true);
+	var (
+		fc              plan9.Fcall
+		err             error
+		scrdraw, settag bool
+		t               *Text
+		n               int
+	)
+	err = nil
+	scrdraw = false
+	settag = false
+
+	w.tag.Commit(true)
 	lines := strings.Split(string(x.fcall.Data), "\n")
 	var lidx int
 	var line string
@@ -629,106 +631,106 @@ forloop:
 		words := strings.Split(line, " ")
 		switch words[0] {
 		case "": // empty line.
-		case "lock" : 	// make window exclusive use
-			w.ctrllock.Lock();
-			w.ctlfid = x.f.fid;
-		case  "unlock":// release exclusive use
+		case "lock": // make window exclusive use
+			w.ctrllock.Lock()
+			w.ctlfid = x.f.fid
+		case "unlock": // release exclusive use
 			w.ctlfid = math.MaxUint32
-			w.ctrllock.Unlock();
-		case "clean":	// mark window 'clean', seq=0
-			t = &w.body;
-			t.eq0 = ^0;
-			t.file.Reset();
-			t.file.mod = false;
-			w.dirty = false;
-			settag = true;
-		case "dirty":	// mark window 'dirty'
-			t = &w.body;
+			w.ctrllock.Unlock()
+		case "clean": // mark window 'clean', seq=0
+			t = &w.body
+			t.eq0 = ^0
+			t.file.Reset()
+			t.file.mod = false
+			w.dirty = false
+			settag = true
+		case "dirty": // mark window 'dirty'
+			t = &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
-			t.file.mod = true;
-			w.dirty = true;
-			settag = true;
-		case "show":	// show dot
-			t = &w.body;
-			t.Show(t.q0, t.q1, true);
-		case "name":	// set file name
+			t.file.mod = true
+			w.dirty = true
+			settag = true
+		case "show": // show dot
+			t = &w.body
+			t.Show(t.q0, t.q1, true)
+		case "name": // set file name
 			r := []rune(words[1])
 			for _, rr := range r {
 				if rr <= ' ' {
-					err = fmt.Errorf("bad character in file name");
+					err = fmt.Errorf("bad character in file name")
 					break
 				}
 			}
-			seq++;
-			w.body.file.Mark();
-			w.SetName(string(r));
-		case "dump":	// set dump string
+			seq++
+			w.body.file.Mark()
+			w.SetName(string(r))
+		case "dump": // set dump string
 			r := []rune(words[1])
 			for _, rr := range r {
 				if rr <= ' ' {
-					err = fmt.Errorf("bad character in file name");
+					err = fmt.Errorf("bad character in file name")
 					break
 				}
 			}
 			w.dumpstr = string(r)
-		case "dumpdir": 	// set dump directory
+		case "dumpdir": // set dump directory
 			r := []rune(words[1])
 			for _, rr := range r {
 				if rr <= ' ' {
-					err = fmt.Errorf("bad character in file name");
+					err = fmt.Errorf("bad character in file name")
 					break
 				}
 			}
 			w.dumpdir = string(r)
-		case "delete":	// delete for sure
-			w.col.Close(w, true);
-		case "del":	// delete, but check dirty
+		case "delete": // delete for sure
+			w.col.Close(w, true)
+		case "del": // delete, but check dirty
 			if w.Clean(true) {
-				err = fmt.Errorf("file dirty");
-				break;
+				err = fmt.Errorf("file dirty")
+				break
 			}
-			w.col.Close(w, true);
-		case "get":	// get file
-			get(&w.body, nil, nil, false, XXX, nil, 0);
-		case "put":	// put file
-			put(&w.body, nil, nil, XXX, XXX, nil, 0);
-		case "dot=addr":	// set dot
-			w.body.Commit(true);
-			clampaddr(w);
-			w.body.q0 = w.addr.q0;
-			w.body.q1 = w.addr.q1;
-			w.body.SetSelect(w.body.q0, w.body.q1);
-			settag = true;
-		case "addr=dot":	// set addr
-			w.addr.q0 = w.body.q0;
-			w.addr.q1 = w.body.q1;
-		case "limit=addr":	// set limit
-			w.body.Commit(true);
-			clampaddr(w);
-			w.limit.q0 = w.addr.q0;
-			w.limit.q1 = w.addr.q1;
-		case "nomark":	// turn off automatic marking
-			w.nomark = true;
-		case "mark":	// mark file
-			seq++;
-			w.body.file.Mark();
-			settag = true;
-		case "nomenu":	// turn off automatic menu
-			w.filemenu = false;
-		case "menu":	// enable automatic menu
-			w.filemenu = true;
-		case "cleartag":	// wipe tag right of bar
-			w.ClearTag();
-			settag = true;
-	
+			w.col.Close(w, true)
+		case "get": // get file
+			get(&w.body, nil, nil, false, XXX, nil, 0)
+		case "put": // put file
+			put(&w.body, nil, nil, XXX, XXX, nil, 0)
+		case "dot=addr": // set dot
+			w.body.Commit(true)
+			clampaddr(w)
+			w.body.q0 = w.addr.q0
+			w.body.q1 = w.addr.q1
+			w.body.SetSelect(w.body.q0, w.body.q1)
+			settag = true
+		case "addr=dot": // set addr
+			w.addr.q0 = w.body.q0
+			w.addr.q1 = w.body.q1
+		case "limit=addr": // set limit
+			w.body.Commit(true)
+			clampaddr(w)
+			w.limit.q0 = w.addr.q0
+			w.limit.q1 = w.addr.q1
+		case "nomark": // turn off automatic marking
+			w.nomark = true
+		case "mark": // mark file
+			seq++
+			w.body.file.Mark()
+			settag = true
+		case "nomenu": // turn off automatic menu
+			w.filemenu = false
+		case "menu": // enable automatic menu
+			w.filemenu = true
+		case "cleartag": // wipe tag right of bar
+			w.ClearTag()
+			settag = true
+
 		default:
-			err = Ebadctl;
-			break forloop;
+			err = Ebadctl
+			break forloop
 		}
 	}
 
 	if err != nil {
-		n = 0;
+		n = 0
 	} else {
 		// how far through the buffer did we get?
 		// count bytes up to line lineidx
@@ -741,48 +743,53 @@ forloop:
 			if d[n] == '\n' {
 				curline++
 			}
-		}	
+		}
 	}
-	fc.Count = uint32(n);
-	respond(x, &fc, err);
+	fc.Count = uint32(n)
+	respond(x, &fc, err)
 	if settag {
-		w.SetTag();
+		w.SetTag()
 	}
 	if scrdraw {
-		w.body.ScrDraw();
+		w.body.ScrDraw()
 	}
 }
 
 func xfideventwrite(x *Xfid, w *Window) {
-var (
-	fc plan9.Fcall
-	m, n int
-	err error
-	t *Text
-	q0, q1 int
-	num int64
-)
-	err = nil;
-/*
-The mes-
-               sages have a fixed format: a character indicating the
-               origin or cause of the action, a character indicating
-               the type of the action, four free-format blank-
-               terminated decimal numbers, optional text, and a new-
-               line.  The first and second numbers are the character
-               addresses of the action, the third is a flag, and the
-               final is a count of the characters in the optional
-               text, which may itself contain newlines.
-		%c%c%d %d %d %d %s\n
-*/
+	var (
+		fc     plan9.Fcall
+		m, n   int
+		err    error
+		t      *Text
+		q0, q1 int
+		num    int64
+	)
+	err = nil
+	/*
+	   The mes-
+	                  sages have a fixed format: a character indicating the
+	                  origin or cause of the action, a character indicating
+	                  the type of the action, four free-format blank-
+	                  terminated decimal numbers, optional text, and a new-
+	                  line.  The first and second numbers are the character
+	                  addresses of the action, the third is a flag, and the
+	                  final is a count of the characters in the optional
+	                  text, which may itself contain newlines.
+	   		%c%c%d %d %d %d %s\n
+	*/
 	events := string(x.fcall.Data)
 	n = 0
 	for events != "" {
-		w.owner = int(events[0]); n++
-		c := events[1]; n++
+		w.owner = int(events[0])
+		n++
+		c := events[1]
+		n++
 		events = events[2:]
 
-		for (events[0] == ' ') { events = events[1:] ; n++}
+		for events[0] == ' ' {
+			events = events[1:]
+			n++
+		}
 		e := strings.SplitN(events, " ", 2)
 		n += len(e[0]) + 1
 		num, err = strconv.ParseInt(e[0], 10, 32)
@@ -793,8 +800,10 @@ The mes-
 		q0 = int(num)
 		events = e[1]
 
-
-		for (events[0] == ' ') { events = events[1:] ; n++ }
+		for events[0] == ' ' {
+			events = events[1:]
+			n++
+		}
 		e = strings.SplitN(events, " ", 2)
 		n += len(e[0]) + 1
 		num, err = strconv.ParseInt(e[0], 10, 32)
@@ -805,7 +814,10 @@ The mes-
 		q1 = int(num)
 		events = e[1]
 
-		for (events[0] == ' ') { events = events[1:] ; n++ }
+		for events[0] == ' ' {
+			events = events[1:]
+			n++
+		}
 		n += len(e[0]) + 1
 		e = strings.SplitN(events, " ", 2)
 		num, err = strconv.ParseInt(e[0], 10, 32)
@@ -816,7 +828,10 @@ The mes-
 		//flag := int(num)
 		events = e[1]
 
-		for (events[0] == ' ') { events = events[1:] ; n++ }
+		for events[0] == ' ' {
+			events = events[1:]
+			n++
+		}
 		n += len(e[0]) + 1
 		e = strings.SplitN(events, " ", 2)
 		num, err = strconv.ParseInt(e[0], 10, 32)
@@ -827,138 +842,145 @@ The mes-
 		m = int(num)
 		events = e[1]
 
-		for (events[0] == ' ') { events = events[1:] ; n++ }
+		for events[0] == ' ' {
+			events = events[1:]
+			n++
+		}
 
-		if (m != len(x.fcall.Data) - n) { panic("mis-shaped event") }
-		if 'a'<=c && c<='z' {
-			t = &w.tag;
+		if m != len(x.fcall.Data)-n {
+			panic("mis-shaped event")
+		}
+		if 'a' <= c && c <= 'z' {
+			t = &w.tag
 		} else {
-			if 'A'<=c && c<='Z' {
-				t = &w.body;
+			if 'A' <= c && c <= 'Z' {
+				t = &w.body
 			} else {
 				err = Ebadevent
 				break
 			}
 		}
-		if q0>t.file.b.nc() || q1>t.file.b.nc() || q0>q1 {
+		if q0 > t.file.b.nc() || q1 > t.file.b.nc() || q0 > q1 {
 			err = Ebadevent
 			break
 		}
 
-		row.lk.Lock();	// just like mousethread
-		switch(c){
+		row.lk.Lock() // just like mousethread
+		switch c {
 		case 'x':
 		case 'X':
-			execute(t, q0, q1, true, nil);
-			break;
+			execute(t, q0, q1, true, nil)
+			break
 		case 'l':
 		case 'L':
-			look3(t, q0, q1, true);
-			break;
+			look3(t, q0, q1, true)
+			break
 		default:
 			err = Ebadevent
 			break
 		}
-		row.lk.Unlock();
+		row.lk.Unlock()
 	}
 
 	if err != nil {
-		n = 0;
+		n = 0
 	}
-	fc.Count = uint32(n);
-	respond(x, &fc, err);
-	return;
+	fc.Count = uint32(n)
+	respond(x, &fc, err)
+	return
 }
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
-var (
-	fc plan9.Fcall;
-	w *Window
-//	r []rune
-	b1 []rune
-	q int
-	off, boff  uint64
-	m, n, nr, nb int
-)
-	w = t.w;
-	w.Commit(t);
-	off = x.fcall.Offset;
-	n = 0;
+	var (
+		fc plan9.Fcall
+		w  *Window
+		//	r []rune
+		b1           []rune
+		q            int
+		off, boff    uint64
+		m, n, nr, nb int
+	)
+	w = t.w
+	w.Commit(t)
+	off = x.fcall.Offset
+	n = 0
 	//r = make([]rune, BUFSIZE/utf8.UTFMax)
 	//b = make([]rune, BUFSIZE/utf8.UTFMax)
 	b1 = make([]rune, BUFSIZE/utf8.UTFMax)
-	if qid==w.utflastqid && off>=w.utflastboff && w.utflastq<=q1 {
-		boff = w.utflastboff;
-		q = w.utflastq;
-	}else{
+	if qid == w.utflastqid && off >= w.utflastboff && w.utflastq <= q1 {
+		boff = w.utflastboff
+		q = w.utflastq
+	} else {
 		// BUG: stupid code: scan from beginning
-		boff = 0;
-		q = 0;
+		boff = 0
+		q = 0
 	}
-	w.utflastqid = qid;
-	for(q<q1 && n<int(x.fcall.Count)){
+	w.utflastqid = qid
+	for q < q1 && n < int(x.fcall.Count) {
 		// * Updating here avoids partial rune problem: we're always on a
 		// * char boundary. The cost is we will usually do one more read
 		// * than we really need, but that's better than being n^2.
-		w.utflastboff = boff;
-		w.utflastq = q;
-		nr = q1-q;
+		w.utflastboff = boff
+		w.utflastq = q
+		nr = q1 - q
 		if nr > BUFSIZE/utf8.UTFMax {
-			nr = BUFSIZE/utf8.UTFMax;
+			nr = BUFSIZE / utf8.UTFMax
 		}
-		r := t.file.b.Read(q, nr);
+		r := t.file.b.Read(q, nr)
 		b := r //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
 		if boff >= off {
-			m = len(b);
+			m = len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
-				m = int(off+uint64(x.fcall.Count) - boff);
+				m = int(off + uint64(x.fcall.Count) - boff)
 			}
-			copy(b1[n:], b[:m]);
-			n += m;
-		}else {
+			copy(b1[n:], b[:m])
+			n += m
+		} else {
 			if boff+uint64(nb) > off {
 				if n != 0 {
-					acmeerror("bad count in utfrune", nil);
+					acmeerror("bad count in utfrune", nil)
 				}
-				m = nb - int(off-boff);
+				m = nb - int(off-boff)
 				if m > int(x.fcall.Count) {
 					m = int(x.fcall.Count)
 				}
-				copy(b1, b[off-boff: int(off-boff)+m]);
-				n += m;
+				copy(b1, b[off-boff:int(off-boff)+m])
+				n += m
 			}
 		}
-		boff += uint64(nb);
-		q += len(r);
+		boff += uint64(nb)
+		q += len(r)
 	}
-	fc.Count = uint32(n);
-	fc.Data = []byte(string(b1))[:n];
-	respond(x, &fc, nil);
+	fc.Count = uint32(n)
+	fc.Data = []byte(string(b1))[:n]
+	respond(x, &fc, nil)
 }
 
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
-var (
-	fc plan9.Fcall
-	w *Window
-)
+	var (
+		fc plan9.Fcall
+		w  *Window
+	)
 
-	w = t.w;
-	w.Commit(t);
+	w = t.w
+	w.Commit(t)
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
 	buf := []byte(string(t.file.b.Read(q0, nr)))
 	// Now chop, and back up the end until we have a full rune
 	buf = buf[:nr]
-	i := nr-utf8.UTFMax; 
+	i := nr - utf8.UTFMax
 	// Find a full rune to start in the last 4 bytes
-	for len(buf[i:])>0 {
+	for len(buf[i:]) > 0 {
 		ru, count := utf8.DecodeRune(buf[i:])
 		if ru == utf8.RuneError {
-			i+=count
-		} else { break }
+			i += count
+		} else {
+			break
+		}
 	}
 	// add all further full runes
-	for len(buf[i:])>0 {
+	for len(buf[i:]) > 0 {
 		ru, count := utf8.DecodeRune(buf[i:])
 		if ru == utf8.RuneError {
 			break
@@ -966,13 +988,13 @@ var (
 			i += count
 		}
 	}
-		
+
 	buf = buf[:i]
 
-	fc.Count = uint32(len(buf));
-	fc.Data = buf;
-	respond(x, &fc, nil);
-	return len(string(buf));
+	fc.Count = uint32(len(buf))
+	fc.Data = buf
+	respond(x, &fc, nil)
+	return len(string(buf))
 }
 
 func xfideventread(x *Xfid, w *Window) {
@@ -1005,48 +1027,48 @@ func xfideventread(x *Xfid, w *Window) {
 }
 
 func xfidindexread(x *Xfid) {
-var (
-	fc plan9.Fcall
-)
+	var (
+		fc plan9.Fcall
+	)
 
-	row.lk.Lock();
-	nmax := 0;
+	row.lk.Lock()
+	nmax := 0
 	for _, c := range row.col {
 		for _, w := range c.w {
 			nmax += Ctlsize + w.tag.file.b.nc()*utf8.UTFMax + 1
 		}
 	}
 
-	nmax++;
+	nmax++
 	sb := strings.Builder{}
 	for _, c := range row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
 			if w.body.file.curtext != &w.body {
-				continue;
+				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
-			m := min(BUFSIZE/utf8.UTFMax, w.tag.file.b.nc());
-			tag := w.tag.file.b.Read(0, m);
+			m := min(BUFSIZE/utf8.UTFMax, w.tag.file.b.nc())
+			tag := w.tag.file.b.Read(0, m)
 			sb.WriteString(string(tag))
 			sb.WriteString("\n")
 		}
 	}
-	row.lk.Unlock();
-	off := x.fcall.Offset;
-	cnt := x.fcall.Count;
+	row.lk.Unlock()
+	off := x.fcall.Offset
+	cnt := x.fcall.Count
 
 	// TODO(flux): This code looks buggy here, as it was in the original.
 	// This trims the output list into blocks without respecting utf8 boundaries.
 	// Or maybe it's ok to split a rune in this call.
 	s := []byte(sb.String())
 	if off > uint64(len(s)) {
-		off = uint64(len(s)) ;
+		off = uint64(len(s))
 	}
 	if off+uint64(cnt) > uint64(len(s)) {
-		cnt = uint32(uint64(len(s)) -off);
+		cnt = uint32(uint64(len(s)) - off)
 	}
-	fc.Count = cnt;
-	fc.Data = s[off:off+uint64(cnt)]
-	respond(x, &fc, nil);
+	fc.Count = cnt
+	fc.Data = s[off : off+uint64(cnt)]
+	respond(x, &fc, nil)
 }

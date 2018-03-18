@@ -120,7 +120,7 @@ func fsysproc() {
 	var f *Fid
 	for {
 		fc, err := plan9.ReadFcall(sfd)
-fmt.Printf("fc= %#v\n", fc)
+		fmt.Printf("fc= %#v\n", fc)
 		if err != nil || fc == nil {
 			acmeerror("fsysproc: ", err)
 		}
@@ -339,110 +339,110 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 	var i int
 	var wname string
 	if len(x.fcall.Wname) > 0 {
-Wnames:
-	for i = 0; i < len(x.fcall.Wname); i++ {
-		wname = x.fcall.Wname[i]
-fmt.Println("walk: wname = ", wname)
-		if (q.Type & plan9.QTDIR) == 0 {
-			err = Enotdir
-			break
-		}
+	Wnames:
+		for i = 0; i < len(x.fcall.Wname); i++ {
+			wname = x.fcall.Wname[i]
+			fmt.Println("walk: wname = ", wname)
+			if (q.Type & plan9.QTDIR) == 0 {
+				err = Enotdir
+				break
+			}
 
-		if wname == ".." {
-			typ = plan9.QTDIR
+			if wname == ".." {
+				typ = plan9.QTDIR
+				path = uint64(Qdir)
+				id = 0
+				if w != nil {
+					w.Close()
+					w = nil
+				}
+				q.Type = typ
+				q.Vers = 0
+				q.Path = uint64(QID(id, path))
+				t.Wqid = append(t.Wqid, q)
+				continue
+			}
+			// is it a numeric name?
+			_, err := strconv.ParseInt(wname, 10, 32)
+			if err != nil {
+				goto Regular
+			}
+			// yes: it's a directory
+			if w != nil { // name has form 27/23; get out before losing w
+				break
+			}
+			{
+				id64, _ := strconv.ParseInt(wname, 10, 32)
+				id = int(id64)
+				fmt.Println("id = ", id)
+			}
+			row.lk.Lock()
+			w = row.LookupWin(id, false)
+			if w == nil {
+				row.lk.Unlock()
+				break
+			}
+			w.ref.Inc() // we'll drop reference at end if there's an error
 			path = uint64(Qdir)
-			id = 0
-			if w != nil {
-				w.Close()
-				w = nil
+			typ = plan9.QTDIR
+			row.lk.Unlock()
+			dir = dirtabw[0] // '.'
+			if i == plan9.MAXWELEM {
+				err = fmt.Errorf("name too long")
+				break
 			}
 			q.Type = typ
 			q.Vers = 0
 			q.Path = uint64(QID(id, path))
 			t.Wqid = append(t.Wqid, q)
 			continue
-		}
-		// is it a numeric name?
-		_, err := strconv.ParseInt(wname, 10, 32)
-		if err != nil {
-			goto Regular
-		}
-		// yes: it's a directory
-		if w != nil { // name has form 27/23; get out before losing w
-			break
-		}
-		{
-			id64, _ := strconv.ParseInt(wname, 10, 32)
-			id = int(id64)
-			fmt.Println("id = ", id)
-		}
-		row.lk.Lock()
-		w = row.LookupWin(id, false)
-		if w == nil {
-			row.lk.Unlock()
-			break
-		}
-		w.ref.Inc() // we'll drop reference at end if there's an error
-		path = uint64(Qdir)
-		typ = plan9.QTDIR
-		row.lk.Unlock()
-		dir = dirtabw[0] // '.'
-		if i == plan9.MAXWELEM {
-			err = fmt.Errorf("name too long")
-			break
-		}
-		q.Type = typ
-		q.Vers = 0
-		q.Path = uint64(QID(id, path))
-		t.Wqid = append(t.Wqid, q)
-		continue
 
-	Regular:
-		if wname == "new" {
-			if w != nil {
-				acmeerror("w set in walk to new", nil)
-			}
-			cnewwindow <- nil // signal newwindowthread
-			w = <-cnewwindow  // receive new window
-			w.ref.Inc()
-			typ = plan9.QTDIR
-			path = uint64(QID(w.id, Qdir))
-			id = w.id
-			dir = dirtabw[0]
-			q.Type = typ
-			q.Vers = 0
-			q.Path = QID(id, path)
-			t.Wqid = append(t.Wqid, q)
-			continue Wnames
-		}
-
-		if id == 0 {
-			d = dirtab
-		} else {
-			d = dirtabw
-		}
-		for _, de := range d[1:] {
-			if wname == de.name {
-				path = de.qid
-				typ = de.t
-				dir = de
+		Regular:
+			if wname == "new" {
+				if w != nil {
+					acmeerror("w set in walk to new", nil)
+				}
+				cnewwindow <- nil // signal newwindowthread
+				w = <-cnewwindow  // receive new window
+				w.ref.Inc()
+				typ = plan9.QTDIR
+				path = uint64(QID(w.id, Qdir))
+				id = w.id
+				dir = dirtabw[0]
 				q.Type = typ
 				q.Vers = 0
 				q.Path = QID(id, path)
 				t.Wqid = append(t.Wqid, q)
 				continue Wnames
 			}
-		}
-		break // file not found
-	}
 
-	// If we never incremented
-	if i == 0 && err == nil {
-		err = Eexist
-	}
-	if i == plan9.MAXWELEM {
-		err = fmt.Errorf("name too long")
-	}
+			if id == 0 {
+				d = dirtab
+			} else {
+				d = dirtabw
+			}
+			for _, de := range d[1:] {
+				if wname == de.name {
+					path = de.qid
+					typ = de.t
+					dir = de
+					q.Type = typ
+					q.Vers = 0
+					q.Path = QID(id, path)
+					t.Wqid = append(t.Wqid, q)
+					continue Wnames
+				}
+			}
+			break // file not found
+		}
+
+		// If we never incremented
+		if i == 0 && err == nil {
+			err = Eexist
+		}
+		if i == plan9.MAXWELEM {
+			err = fmt.Errorf("name too long")
+		}
 	}
 
 	if err != nil || len(t.Wqid) < len(x.fcall.Wname) {
@@ -640,7 +640,7 @@ func getclock() int64 {
 }
 
 // buf must have enough length to fit this stat object.
-func dostat(id int, dir *DirTab, buf []byte, clock int64)  int {
+func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	var d plan9.Dir
 
 	d.Qid.Path = QID(id, dir.qid)
@@ -657,6 +657,6 @@ func dostat(id int, dir *DirTab, buf []byte, clock int64)  int {
 
 	b, _ := d.Bytes()
 	copy(buf, b)
-fmt.Println("length(b)=",len(b))
+	fmt.Println("length(b)=", len(b))
 	return len(b)
 }
