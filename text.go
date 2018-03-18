@@ -150,7 +150,24 @@ func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
 }
 
 func (t *Text) Close() {
-	Unimpl()
+	t.fr.Clear(true);
+	t.file.DelText(t);
+	t.file = nil;
+	if argtext == t {
+		argtext = nil;
+	}
+	if typetext == t {
+		typetext = nil;
+	}
+	if seltext == t {
+		seltext = nil;
+	}
+	if mousetext == t {
+		mousetext = nil;
+	}
+	if barttext == t {
+		barttext = nil;
+	}
 }
 
 func (t *Text) Columnate(names []string, widths []int) {
@@ -1536,9 +1553,29 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	return 0, 0, false
 }
 
-func (t *Text) BackNL(p, n int) uint {
-	Unimpl()
-	return 0
+func (t *Text) BackNL(p, n int) int {
+	var i int
+
+	/* look for start of this line if n==0 */
+	if n==0 && p>0 && t.ReadC(p-1)!='\n' {
+		n = 1;
+	}
+	i = n;
+	for(i>0 && p>0){
+		i--
+		p--	/* it's at a newline now; back over it */
+		if p == 0 {
+			break;
+		}
+		/* at 128 chars, call it a line anyway */
+		for j:=128; j>0 && p>0; p--  {
+			if t.ReadC(p-1)=='\n' {
+				break;
+			}
+			j--
+		}
+	}
+	return p;
 }
 
 func (t *Text) SetOrigin(org int, exact bool) {

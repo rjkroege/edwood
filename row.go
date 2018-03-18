@@ -51,7 +51,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 	}
 	/* look for column we'll land on */
 	var colidx int
-	for colidx = range row.col {
+	for colidx = 0; colidx < len(row.col); colidx++ {
 		d = row.col[colidx]
 		if x < d.r.Max.X {
 			break
@@ -122,7 +122,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	}
 }
 
-func (r *Row) DragCol(c *Column, _ uint) {
+func (r *Row) DragCol(c *Column, _ int) {
 	Unimpl()
 }
 

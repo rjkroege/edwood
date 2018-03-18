@@ -338,7 +338,7 @@ func MovedMouse(m draw.Mouse) {
 	if t == nil || m.Buttons == 0 {
 		return
 	}
-	but := uint(0)
+	but := 0
 	switch m.Buttons {
 	case 1:
 		but = 1

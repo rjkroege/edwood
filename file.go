@@ -49,7 +49,18 @@ func (f *File) AddText(t *Text) *File {
 }
 
 func (f *File) DelText(t *Text) {
-	Unimpl()
+
+	for i, text := range f.text {
+		if text == t {
+			f.text[i] = f.text[len(f.text) - 1]
+			f.text = f.text[:len(f.text) - 1]
+			if len(f.text) == 0 { return }
+			if t == f.curtext {
+				f.curtext = f.text[0]
+			}
+		}
+	}
+	acmeerror("can't find text in File.DelText", nil);
 }
 
 func (f *File) Insert(p0 int, s []rune) {

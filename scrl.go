@@ -92,7 +92,7 @@ func (t *Text) ScrDraw() {
 	}
 }
 
-func (t *Text) Scroll(but uint) {
+func (t *Text) Scroll(but int) {
 	var (
 		p0, oldp0   int
 		s           image.Rectangle
@@ -147,7 +147,7 @@ func (t *Text) Scroll(but uint) {
 			first = false
 		}
 		ScrSleep(80)
-		if !(mouse.Buttons&(1<<(but-1)) != 0) {
+		if !(mouse.Buttons&(1<<uint(but-1)) != 0) {
 			break
 		}
 	}

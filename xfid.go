@@ -627,7 +627,8 @@ func xfidctlwrite(x *Xfid, w *Window) {
 	var lidx int
 	var line string
 forloop:
-	for lidx, line = range lines {
+	for lidx = 0; lidx < len(lines); lidx++ {
+		line = lines[lidx]
 		words := strings.Split(line, " ")
 		switch words[0] {
 		case "": // empty line.

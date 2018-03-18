@@ -246,12 +246,11 @@ var warnings = []Warning{}
 
 func flushwarnings() {
 var (
-	warn Warning
 	w *Window
 	t *Text
 	owner, nr, q0, n int
 )
-	for _, warn=range warnings  {
+	for _, warn:=range warnings  {
 		w = errorwin(warn.md, 'E');
 		t = &w.body;
 		owner = w.owner;
