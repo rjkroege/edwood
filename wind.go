@@ -97,14 +97,12 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.tag.what = Tag
 
 	/* tag is a copy of the contents, not a tracked image */
-	/* TODO(flux): Unimplemented Clone
-	if(clone){
-		w.tag.Delete(&, 0, w.tag.file.b.nc, true);
+	if(clone!=nil){
+		w.tag.Delete(0, w.tag.file.b.nc(), true);
 		w.tag.Insert(0, clone.tag.file.b, true);
 		w.tag.file.Reset();
-		w.tag.Setselect(len(w.tag.file.b), len(w.tag.file.b))
+		w.tag.SetSelect(len(w.tag.file.b), len(w.tag.file.b))
 	}
-	*/
 	r1 = r
 	r1.Min.Y += w.taglines*tagfont.Height + 1
 	if r1.Max.Y < r1.Min.Y {
@@ -112,25 +110,22 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	}
 
 	// Body setup.
-	f = nil
-	/* TODO(flux): Unimplemented Clone
-	if clone {
+	f = &File{}
+	if clone != nil{
 		f = clone.body.file;
 		w.body.org = clone.body.org;
 		w.isscratch = clone.isscratch;
-		rf = rfget(false, false, false, clone.body.reffont.f.name);
+		rf = fontget(0, false, false, clone.body.font.Name);
 	} else {
-	*/
-	f = &File{}
-	rf = fontget(0, false, false, "")
-	//	}
+		rf = fontget(0, false, false, "")
+	}
 	f = f.AddText(&w.body)
 	w.body.Init(f, r1, rf, textcolors)
 	w.body.what = Body
 	r1.Min.Y -= 1
 	r1.Max.Y = r1.Min.Y + 1
 	display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
-	// TODO(flux) w.body.Scrdraw()
+	w.body.ScrDraw()
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
@@ -140,14 +135,12 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.filemenu = true
 	w.maxlines = w.body.fr.MaxLines
 	w.autoindent = globalautoindent
-	/* TODO(flux): Unimplemented Clone
 	if clone != nil{
 		w.dirty = clone.dirty
 		w.autoindent = clone.autoindent
-		w.body.Setselect(clone.body.q0, clone.body.q1)
-		w.Settag(w)
+		w.body.SetSelect(clone.body.q0, clone.body.q1)
+		w.SetTag()
 	}
-	*/
 }
 
 func (w *Window) DrawButton() {
@@ -231,7 +224,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		y = w.body.Resize(r1, keepextra)
 		w.r = r
 		w.r.Max.Y = y
-		// w.body.Scrdraw()  // TODO(flux) scrollbars
+		w.body.ScrDraw()  
 		w.body.all.Min.Y = oy
 	}
 	w.maxlines = min(w.body.fr.NLines, max(w.maxlines, w.body.fr.MaxLines))

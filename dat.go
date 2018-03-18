@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -237,6 +238,7 @@ func Unimpl() {
 	for i, l := range stack {
 		if l == "main.Unimpl()" {
 			fmt.Printf("Unimplemented: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
+			runtime.Breakpoint()
 			break
 		}
 	}

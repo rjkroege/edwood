@@ -107,7 +107,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 
 func (f *Frame) chop(pt image.Point, p, bn int) {
 	for b := f.box[bn]; ; bn++ {
-		if bn >= f.nbox {
+		if bn >= len(f.box) {
 			panic("endofframe")
 		}
 		pt = f.cklinewrap(pt, b)

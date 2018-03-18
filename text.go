@@ -469,7 +469,7 @@ func (t *Text) Fill() {
 	if t.ncache > 0 {
 		t.TypeCommit()
 	}
-
+/*
 	nl := t.fr.MaxLines - t.fr.NLines
 	lines := runesplitN(t.file.b[t.org+(t.fr.NChars):], []rune("\n"), nl)
 	for _, s := range lines {
@@ -477,6 +477,35 @@ func (t *Text) Fill() {
 		if t.fr.LastLineFull != 0 {
 			break
 		}
+	}
+*/
+	for {
+		n := t.file.b.nc()-(t.org+t.fr.NChars);
+		if n == 0 {
+			break;
+		}
+		if n > 2000 {	/* educated guess at reasonable amount */
+			n = 2000;
+		}
+		rp := t.file.b.Read(t.org+t.fr.NChars, n);
+		/*
+		 * it's expensive to frinsert more than we need, so
+		 * count newlines.
+		 */
+		nl := t.fr.MaxLines-t.fr.NLines;
+		m := 0;
+		var i int
+		for i=0; i<n;  {
+			i++
+			if rp[i-1] == '\n' {
+				m++;
+				if m >= nl {
+					break;
+				}
+			}
+		}
+		t.fr.Insert(rp[:i], t.fr.NChars);
+		if !(t.fr.LastLineFull == 0) { break };
 	}
 }
 
