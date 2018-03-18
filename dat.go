@@ -120,7 +120,7 @@ var (
 	wdir              string
 	editing           int = Inactive
 	erroutfd          int
-	messagesize       int = MaxBlock + plan9.IOHDRSZ
+	messagesize       int 
 	globalautoindent  bool
 	dodollarsigns     bool
 	mtpt              string

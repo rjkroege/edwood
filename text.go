@@ -362,7 +362,7 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q int, nrp int) {
 
 	if(t->what == Tag){	// can't happen but safety first: mustn't backspace over file name
     Err:
-		textinsert(t, q0, r, n, tofile);
+		t.Insert( q0, r, n, tofile);
 		*nrp = n;
 		return q0;
 	}
@@ -388,10 +388,10 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q int, nrp int) {
 				if(initial > q0)
 					initial = q0;
 				q0 -= initial;
-				textdelete(t, q0, q0+initial, tofile);
+				t.Delete( q0, q0+initial, tofile);
 			}
 			n = up-tp;
-			textinsert(t, q0, tp, n, tofile);
+			t.Insert( q0, tp, n, tofile);
 			free(tp);
 			*nrp = n;
 			return q0;
@@ -576,7 +576,326 @@ func (t *Text) Complete() []rune {
 }
 
 func (t *Text) Type(r rune) {
-	Unimpl()
+var (
+	q0, q1 int
+	nnb, nb, n, i int
+	nr int
+)
+	if t.what!=Body && t.what!=Tag && r=='\n'  {
+		return;
+	}
+	if t.what == Tag {
+		t.w.tagsafe = false;
+	}
+	nr = 1;
+	rp := []rune{r};
+
+	Tagdown := func() {
+		/* expand tag to show all text */
+		if !t.w.tagexpand {
+			t.w.tagexpand = true;
+			t.w.Resize(t.w.r, false, true);
+		}
+		return;
+	}
+
+	Tagup := func() {
+		/* shrink tag to single line */
+		if t.w.tagexpand {
+			t.w.tagexpand = false;
+			t.w.taglines = 1;
+			t.w.Resize(t.w.r, false, true);
+		}
+		return;
+	}
+
+	case_Down := func() {
+		q0 = t.org+t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+n*t.fr.Font.DefaultHeight()));
+		t.SetOrigin(q0, true);
+		return;
+	}
+	case_Up := func() {
+		q0 = t.Backnl(t.org, n);
+		t.SetOrigin(q0, true);
+		return;
+	}
+
+	switch(r){
+	case draw.KeyLeft:
+		t.TypeCommit();
+		if t.q0 > 0 {
+			t.Show(t.q0-1, t.q0-1, true);
+		}
+		return;
+	case draw.KeyRight:
+		t.TypeCommit();
+		if t.q1 < t.file.b.nc() {
+			t.Show( t.q1+1, t.q1+1, true);
+		}
+		return;
+	case draw.KeyDown:
+		if t.what == Tag {
+			Tagdown()
+			return
+		}
+		n = t.fr.MaxLines/3;
+	 	case_Down()
+		return
+	case Kscrollonedown:
+		if t.what == Tag {
+			Tagdown()
+			return
+		}
+		n = mousescrollsize(t.fr.MaxLines);
+		if n <= 0 {
+			n = 1;
+		}
+		case_Down()
+		return
+	case draw.KeyPageDown:
+		n = 2*t.fr.MaxLines/3;
+		case_Down()
+		return 
+	case draw.KeyUp:
+		if t.what == Tag {
+			Tagup();
+			return
+		}
+		n = t.fr.MaxLines/3;
+		case_Up()
+		return
+	case Kscrolloneup:
+		if t.what == Tag {
+			Tagup();
+			return
+		}
+		n = mousescrollsize(t.fr.MaxLines);
+		case_Up()
+		return
+	case draw.KeyPageUp:
+		n = 2*t.fr.MaxLines/3;
+		case_Up()
+		return
+	case draw.KeyHome:
+		t.TypeCommit();
+		if t.org > t.iq1  {
+			q0 = t.Backnl(t.iq1, 1);
+			t.SetOrigin(q0, true);
+		} else {
+			t.Show(0, 0, false);
+		}
+		return;
+	case draw.KeyEnd:
+		t.TypeCommit();
+		if t.iq1 > t.org+t.fr.NChars  {
+			if t.iq1 > t.file.b.nc()  {
+				// should not happen, but does. and it will crash textbacknl.
+				t.iq1 = t.file.b.nc();
+			}
+			q0 = t.Backnl(t.iq1, 1);
+			t.SetOrigin(q0, true);
+		} else {
+			t.Show( t.file.b.nc(), t.file.b.nc(), false);
+		}
+		return;
+	case 0x01:	/* ^A: beginning of line */
+		t.TypeCommit();
+		/* go to where ^U would erase, if not already at BOL */
+		nnb = 0;
+		if t.q0>0 && t.ReadC(t.q0-1)!='\n'  {
+			nnb = t.BsWidth(0x15);
+		}
+		t.Show( t.q0-nnb, t.q0-nnb, true);
+		return;
+	case 0x05:	/* ^E: end of line */
+		t.TypeCommit();
+		q0 = t.q0;
+		for(q0<t.file.b.nc() && t.ReadC(q0)!='\n') {
+			q0++;
+		}
+		t.Show( q0, q0, true);
+		return;
+	case draw.KeyCmd+'c':	/* %C: copy */
+		t.TypeCommit();
+		cut(t, t, nil, true, false, nil, 0);
+		return;
+	case draw.KeyCmd+'z':	/* %Z: undo */
+	 	t.TypeCommit();
+		undo(t, nil, nil, true, false, nil, 0);
+		return;
+	case draw.KeyCmd+'Z':	/* %-shift-Z: redo */
+	 	t.TypeCommit();
+		undo(t, nil, nil, false, false, nil, 0);
+		return;		
+
+	
+	}
+	if t.what == Body {
+		seq++;
+		t.file.Mark();
+	}
+	/* cut/paste must be done after the seq++/filemark */
+	switch(r){
+	case draw.KeyCmd+'x':	/* %X: cut */
+		t.TypeCommit();
+		if t.what == Body {
+			seq++;
+			t.file.Mark();
+		}
+		cut(t, t, nil, true, true, nil, 0);
+		t.Show( t.q0, t.q0, true);
+		t.iq1 = t.q0;
+		return;
+	case draw.KeyCmd+'v':	/* %V: paste */
+		t.TypeCommit();
+		if t.what == Body {
+			seq++;
+			t.file.Mark();
+		}
+		paste(t, t, nil, true, false, nil, 0);
+		t.Show( t.q0, t.q1, true);
+		t.iq1 = t.q1;
+		return;
+	}
+	if t.q1 > t.q0{
+		if t.ncache != 0 {
+			acmeerror("text.type",nil);
+		}
+		cut(t, t, nil, true, true, nil, 0);
+		t.eq0 = ^0;
+	}
+	t.Show( t.q0, t.q0, true);
+	switch(r){
+	case 0x06: fallthrough	/* ^F: complete */
+	case draw.KeyInsert:
+		t.TypeCommit();
+		rp = t.Complete();
+		if rp == nil {
+			return;
+		}
+		nr = len(rp) // runestrlen(rp);
+		break;	/* fall through to normal insertion case */
+	case 0x1B:
+		if t.eq0 != ^0  {
+			if t.eq0 <= t.q0 {
+				t.SetSelect( t.eq0, t.q0);
+			} else {
+				t.SetSelect( t.q0, t.eq0);
+			}
+		}
+		if t.ncache > 0 {
+			t.TypeCommit();
+		}
+		t.iq1 = t.q0;
+		return;
+	case 0x08: fallthrough	/* ^H: erase character */
+	case 0x15: fallthrough	/* ^U: erase line */
+	case 0x17:	/* ^W: erase word */
+		if t.q0 == 0 {	/* nothing to erase */
+			return;
+		}
+		nnb = t.BsWidth( r);
+		q1 = t.q0;
+		q0 = q1-nnb;
+		/* if selection is at beginning of window, avoid deleting invisible text */
+		if q0 < t.org {
+			q0 = t.org;
+			nnb = q1-q0;
+		}
+		if nnb <= 0 {
+			return;
+		}
+		for _, u := range t.file.text { // u is *Text
+			u.nofill = true;
+			nb = nnb;
+			n = u.ncache;
+			if n > 0 {
+				if q1 != u.cq0+n {
+					acmeerror("text.type backspace", nil);
+				}
+				if n > nb {
+					n = nb;
+				}
+				u.ncache -= n;
+				u.Delete( q1-n, q1, false);
+				nb -= n;
+			}
+			if u.eq0==q1 || u.eq0==^0 {
+				u.eq0 = q0;
+			}
+			if nb != 0&& u==t {
+				u.Delete( q0, q0+nb, true);
+			}
+			if u != t {
+				u.SetSelect( u.q0, u.q1);
+			} else {
+				t.SetSelect( q0, q0);
+			}
+			u.nofill = false;
+		}
+		for _, t := range t.file.text {
+			t.Fill()
+		}
+		t.iq1 = t.q0;
+		return;
+	case '\n':
+		if t.w.autoindent {
+			/* find beginning of previous line using backspace code */
+			nnb = t.BsWidth( 0x15); /* ^U case */
+			rp = make([]rune, nnb+1) //runemalloc(nnb + 1);
+			nr = 0;
+			rp[nr] = r;
+			nr++
+			for i=0; i<nnb; i++ {
+				r = t.ReadC(t.q0-nnb+i);
+				if r != ' ' && r != '\t' {
+					break;
+				}
+				rp[nr] = r;
+				nr++
+			}
+		}
+		break; /* fall through to normal code */
+	}
+	/* otherwise ordinary character; just insert, typically in caches of all texts */
+	for _, u := range t.file.text { // u is *Text
+		if(u.eq0 == ^0) {
+			u.eq0 = t.q0;
+		}
+		if u.ncache == 0 {
+			u.cq0 = t.q0;
+		} else {
+			if t.q0 != u.cq0+u.ncache {
+				acmeerror("text.type cq1", nil);
+			}
+		}
+		/*
+		 * Change the tag before we add to ncache,
+		 * so that if the window body is resized the
+		 * commit will not find anything in ncache.
+		 */
+		if u.what==Body && u.ncache == 0 {
+			u.needundo = true;
+			t.w.SetTag();
+			u.needundo = false;
+		}
+		u.Insert( t.q0, rp, false);
+		if u != t {
+			u.SetSelect( u.q0, u.q1);
+		}
+		if u.ncache+nr > u.ncachealloc {
+			u.ncachealloc += 10 + nr;
+			u.cache = make([]rune, u.ncachealloc) //runerealloc(u.cache, u.ncachealloc);
+		}
+		//runemove(u.cache+u.ncache, rp, nr);
+		copy(u.cache[u.ncache:], rp[:nr])
+		u.ncache += nr;
+	}
+	t.SetSelect( t.q0+nr, t.q0+nr);
+	if r=='\n' && t.w!=nil {
+		t.w.Commit(t);
+	}
+	t.iq1 = t.q0;
 
 }
 
@@ -654,8 +973,8 @@ func (t *Text) Select() {
 	q0 := t.q0
 	q1 := t.q1
 	selectq = t.org + (t.fr.Charofpt(mouse.Point))
-	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
-	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
+//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
+//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
 	if (clicktext == t && mouse.Msec-uint32(clickmsec) < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0)
 		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
@@ -752,8 +1071,60 @@ func (t *Text) Select() {
 }
 
 func (t *Text) Show(q0, q1 int, doselect bool) {
-	Unimpl()
-
+var (
+	qe int
+	nl int
+	tsd bool
+	nc int
+	q int
+)
+	if t.what != Body {
+		if doselect {
+			t.SetSelect(0, q1);
+		}
+		return;
+	}
+	if t.w!=nil && t.fr.MaxLines==0 {
+		t.col.Grow(t.w, 1);
+	}
+	if doselect {
+		t.SetSelect(q0, q1);
+	}
+	qe = t.org+t.fr.NChars;
+	tsd = false;	/* do we call textscrdraw? */
+	nc = t.file.b.nc()+t.ncache;
+	if t.org <= q0 {
+		if nc==0 || q0<qe {
+			tsd = true;
+		} else {
+			if q0==qe && qe==nc {
+				if t.ReadC(nc-1) == '\n' {
+					if t.fr.NLines<t.fr.MaxLines {
+						tsd = true;
+					}
+				}else {
+					tsd = true;
+				}
+			}
+		}
+	}
+	if tsd {
+		t.ScrDraw()
+	}else{
+		if t.w.nopen[QWevent] > 0 {
+			nl = 3*t.fr.MaxLines/4;
+		} else {
+			nl = t.fr.MaxLines/4;
+		}
+		q = t.Backnl(q0, nl);
+		/* avoid going backwards if trying to go forwards - long lines! */
+		if !(q0>t.org && q<t.org) {
+			t.SetOrigin(q, true);
+		}
+		for(q0 > t.org+t.fr.NChars) {
+			t.SetOrigin(t.org+1, false);
+		}
+	}
 }
 
 func (t *Text) ReadC(q int) (r rune) {
@@ -1099,8 +1470,44 @@ func (t *Text) BackNL(p, n int) uint {
 }
 
 func (t *Text) SetOrigin(org int, exact bool) {
-	Unimpl()
-
+var (
+	i, a int
+	fixup bool
+	r []rune
+	n int
+)
+	if org>0 && !exact && t.ReadC(org-1) != '\n' {
+		/* org is an estimate of the char posn; find a newline */
+		/* don't try harder than 256 chars */
+		for i=0; i<256 && org<t.file.b.nc(); i++ {
+			if t.ReadC(org) == '\n' {
+				org++;
+				break;
+			}
+			org++;
+		}
+	}
+	a = org-t.org;
+	fixup = false;
+	if a>=0 && a<t.fr.NChars {
+		t.fr.Delete(0, a);
+		fixup = true;	/* frdelete can leave end of last line in wrong selection mode; it doesn't know what follows */
+	} else {
+		if a<0 && -a<t.fr.NChars {
+			n = t.org - org;
+			r = t.file.b.Read(org, n);
+			t.fr.Insert(r, 0);
+		} else {
+			t.fr.Delete(0, t.fr.NChars);
+		}
+	}
+	t.org = org;
+	t.Fill();
+	t.ScrDraw();
+	t.SetSelect(t.q0, t.q1);
+	if fixup && t.fr.P1 > t.fr.P0 {
+		t.fr.DrawSel( t.fr.Ptofchar(t.fr.P1-1), t.fr.P1-1, t.fr.P1, true);
+	}
 }
 
 func (t *Text) Reset() {

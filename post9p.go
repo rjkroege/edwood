@@ -38,8 +38,8 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 			return -1
 		}
 		cmd := exec.Command("9pserve", "-u", addr)
-		cmd.Stdout = fd
 		cmd.Stdin = fd
+		cmd.Stdout = fd
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
 		if err != nil {

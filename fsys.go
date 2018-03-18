@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"9fans.net/go/plan9"
@@ -99,10 +100,12 @@ var (
 
 func fsysinit() {
 	initfcall()
-	reader, writer, err := os.Pipe()
+	pipe, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
-		acmeerror("can't create pipe", err)
+		acmeerror("Failed to open pipe", nil)
 	}
+	reader := os.NewFile(uintptr(pipe[0]), "pipeend0")
+	writer := os.NewFile(uintptr(pipe[1]), "pipeend1")
 	if post9pservice(reader, "acme", mtpt) < 0 { // TODO(flux) I may have messed up whether to give post9pservice the reader or the writer end
 		acmeerror("can't post service", nil)
 	}
@@ -117,8 +120,9 @@ func fsysproc() {
 	var f *Fid
 	for {
 		fc, err := plan9.ReadFcall(sfd)
-		if err != nil {
-			fmt.Sprintf("acme: fsysproc: %v", err)
+fmt.Printf("fc= %#v\n", fc)
+		if err != nil || fc == nil {
+			acmeerror("fsysproc: ", err)
 		}
 		if x == nil {
 			cxfidalloc <- nil
@@ -213,7 +217,7 @@ func fsysclose() {
 }
 
 func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
-	if err == nil {
+	if err != nil {
 		t.Type = plan9.Rerror
 		t.Ename = err.Error()
 	} else {
@@ -222,7 +226,7 @@ func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	t.Fid = x.fcall.Fid
 	t.Tag = x.fcall.Tag
 	if err := plan9.WriteFcall(sfd, t); err != nil {
-		acmeerror("write error in respond", nil)
+		acmeerror("write error in respond", err)
 	}
 	if DEBUG != 0 {
 		fmt.Fprintf(os.Stderr, "r: %v\n", t)
@@ -232,6 +236,7 @@ func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 
 func fsysversion(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
+	messagesize = int(x.fcall.Msize)
 	t.Msize = x.fcall.Msize
 	if x.fcall.Version != "9P2000" {
 		return respond(x, &t, fmt.Errorf("unrecognized 9P version"))
@@ -265,9 +270,13 @@ func fsysattach(x *Xfid, f *Fid) *Xfid {
 	f.w = nil
 	t.Qid = f.qid
 	f.mntdir = nil
-	id, err := strconv.ParseInt(x.fcall.Aname, 10, 32)
-	if err != nil {
-		acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
+	var id int64
+	var err error
+	if x.fcall.Aname != "" {
+		id, err = strconv.ParseInt(x.fcall.Aname, 10, 32)
+		if err != nil {
+			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
+		}
 	}
 	mnt.lk.Lock()
 	var m *MntDir
@@ -329,8 +338,11 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 
 	var i int
 	var wname string
+	if len(x.fcall.Wname) > 0 {
 Wnames:
-	for i, wname = range x.fcall.Wname {
+	for i = 0; i < len(x.fcall.Wname); i++ {
+		wname = x.fcall.Wname[i]
+fmt.Println("walk: wname = ", wname)
 		if (q.Type & plan9.QTDIR) == 0 {
 			err = Enotdir
 			break
@@ -362,6 +374,7 @@ Wnames:
 		{
 			id64, _ := strconv.ParseInt(wname, 10, 32)
 			id = int(id64)
+			fmt.Println("id = ", id)
 		}
 		row.lk.Lock()
 		w = row.LookupWin(id, false)
@@ -423,11 +436,13 @@ Wnames:
 		break // file not found
 	}
 
+	// If we never incremented
 	if i == 0 && err == nil {
 		err = Eexist
 	}
 	if i == plan9.MAXWELEM {
 		err = fmt.Errorf("name too long")
+	}
 	}
 
 	if err != nil || len(t.Wqid) < len(x.fcall.Wname) {
@@ -478,7 +493,6 @@ func fsysopen(x *Xfid, f *Fid) *Xfid {
 	if ((f.dir.perm &^ (plan9.DMDIR | plan9.DMAPPEND)) & m) != m {
 		goto Deny
 	}
-
 	x.c <- xfidopen
 	return nil
 
@@ -549,6 +563,7 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 			row.lk.Unlock()
 			sort.Ints(ids)
 			j = 0
+			length = 0
 			for ; j < len(ids) && i < e; i += uint64(length) {
 				k = ids[j]
 				dt.name = fmt.Sprintf("%d", k)
@@ -565,7 +580,7 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 				j++
 			}
 		}
-		t.Data = b
+		t.Data = b[0:n]
 		t.Count = uint32(n)
 		respond(x, &t, nil)
 		return x
@@ -596,7 +611,8 @@ func fsysstat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
 	t.Stat = make([]byte, messagesize-plan9.IOHDRSZ)
-	_ = dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
+	length := dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
+	t.Stat = t.Stat[:length]
 	x = respond(x, &t, nil)
 	return x
 }
@@ -610,6 +626,10 @@ func fsyswstat(x *Xfid, f *Fid) *Xfid {
 
 func newfid(fid uint32) *Fid {
 	ff := fids[fid]
+	if ff == nil {
+		ff = &Fid{}
+		fids[fid] = ff
+	}
 	ff.fid = fid
 	return ff
 }
@@ -619,7 +639,8 @@ func getclock() int64 {
 	return time.Now().Unix()
 }
 
-func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
+// buf must have enough length to fit this stat object.
+func dostat(id int, dir *DirTab, buf []byte, clock int64)  int {
 	var d plan9.Dir
 
 	d.Qid.Path = QID(id, dir.qid)
@@ -635,6 +656,7 @@ func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	d.Mtime = uint32(clock)
 
 	b, _ := d.Bytes()
-	copy(buf, b[:len(buf)])
+	copy(buf, b)
+fmt.Println("length(b)=",len(b))
 	return len(b)
 }

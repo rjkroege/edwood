@@ -295,14 +295,22 @@ func (w *Window) SetName(name string) {
 }
 
 func (w *Window) Type(t *Text, r rune) {
-
+	t.Type(r);
+	if t.what == Body {
+		for _, text := range t.file.text { 
+			text.ScrDraw();
+		}
+	}
+	w.SetTag();
 }
 
 func (w *Window) ClearTag() {
+Unimpl()
 
 }
 
 func (w *Window) SetTag1() {
+Unimpl()
 
 }
 
@@ -441,6 +449,24 @@ func (w *Window) CtlPrint(fonts bool) string {
 	return buf
 }
 
-func (w *Window) Event(fmt string, args ...interface{}) {
-	Unimpl()
+func (w *Window) Event(format string, args ...interface{}) {
+var (
+	x *Xfid
+)
+	if w.nopen[QWevent] == 0 {
+		return;
+	}
+	if w.owner == 0 {
+		acmeerror("no window owner", nil);
+	}
+	b := []byte(fmt.Sprintf(format, args...))
+
+	w.events = append(w.events, byte(w.owner))
+	w.events = append(w.events, b...)
+	w.nevents = len(w.events)
+	x = w.eventx;
+	if x != nil {
+		w.eventx = nil;
+		x.c <- nil
+	}
 }

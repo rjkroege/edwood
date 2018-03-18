@@ -3,6 +3,7 @@ package main
 import (
 	"image"
 	"sync"
+	"unicode/utf8"
 )
 
 type Row struct {
@@ -150,9 +151,43 @@ func (r *Row) Which(p image.Point) *Text {
 	return nil
 }
 
-func (r *Row) Type(n string, p image.Point) *Text {
-	Unimpl()
-	return nil
+func (row *Row) Type(r rune, p image.Point) *Text {
+var (
+	w *Window
+	t *Text
+)
+
+	if r == 0 {
+		r = utf8.RuneError;
+	}
+
+	clearmouse();
+	row.lk.Lock();
+	if bartflag {
+		t = barttext;
+	} else {
+		t = row.Which(p);
+	}
+	if t!=nil && !(t.what==Tag && p.In(t.scrollr)) {
+		w = t.w;
+		if w == nil {
+			t.Type(r);
+		}else{
+			w.Lock('K');
+			w.Type(t, r);
+			/* Expand tag if necessary */
+			if t.what == Tag {
+				t.w.tagsafe = false;
+				if r == '\n' {
+					t.w.tagexpand = true;
+				}
+				w.Resize(w.r, true, true);
+			}
+			w.Unlock();
+		}
+	}
+	row.lk.Unlock();
+	return t;
 }
 
 func (r *Row) Clean() int {

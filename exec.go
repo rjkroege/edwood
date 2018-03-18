@@ -26,6 +26,10 @@ func put(et * Text, _0 * Text, argt * Text, _1  bool, _2  bool, arg []rune, narg
 	Unimpl()
 }
 
+func undo(et * Text, _0 * Text, _1 * Text, flag1  bool, _2  bool, _3 []rune, _4  int) {
+	Unimpl()
+}
+
 func run(win *Window, s []rune, rdir []rune, newns bool, argaddr []rune, xarg []rune, iseditcmd bool) {
 	var (
 		c    *Command

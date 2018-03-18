@@ -91,9 +91,9 @@ func xfidopen(x *Xfid) {
 	)
 
 	w = x.f.w
-	t = &w.body
 	q = FILE(x.f.qid)
 	if w != nil {
+		t = &w.body
 		w.Lock('E')
 		switch q {
 		case QWaddr:
@@ -187,7 +187,7 @@ func xfidopen(x *Xfid) {
 		}
 	}
 	fc.Qid = x.f.qid
-	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ)
+	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ) 
 	x.f.open = true
 	respond(x, &fc, nil)
 }
@@ -395,15 +395,27 @@ func fullrunewrite(x *Xfid) []rune {
 		r  []rune
 	)
 	// extend with previous partial rune at the end.
-	x.fcall.Data = append(x.f.rpart[0:x.f.nrpart], x.fcall.Data...)
-	cnt := x.fcall.Count + uint32(x.f.nrpart)
-	r = []rune(string(x.fcall.Data[:cnt-utf8.UTFMax]))
-	// approach end of buffer, decoding the last utf8.UTFMax bytes, which might include an incomplete utf8 sequence
-	for nb = cnt - utf8.UTFMax; utf8.FullRune(x.fcall.Data[nb:]); {
-		ru, l := utf8.DecodeRune(x.fcall.Data[nb:])
-		r = append(r, ru)
-		nb += uint32(l)
+	cnt := x.fcall.Count
+	if x.f.nrpart > 0 {
+		x.fcall.Data = append(x.f.rpart[0:x.f.nrpart], x.fcall.Data...)
+		cnt += uint32(x.f.nrpart)
 	}
+	r = make([]rune, cnt)
+	nb = 0
+	for i := uint32(0); i < cnt; i++ {
+		ru, si := utf8.DecodeRune(x.fcall.Data[nb:])
+		if ru == utf8.RuneError {
+			// Let's hope we're at the end of the buffer.
+			if (len(x.fcall.Data) - int(nb)) > utf8.UTFMax{
+				acmeerror("Bad runes in fullrunewrite", nil)
+			} 
+			break
+		} else {
+			r[i] = ru
+			nb += uint32(si)
+		}
+	}
+
 	if nb < cnt {
 		copy(x.f.rpart[:], x.fcall.Data[nb:cnt-nb])
 		x.f.nrpart = int(cnt - nb)
@@ -422,7 +434,7 @@ func xfidwrite(x *Xfid) {
 		q0, tq0, tq1, nb int
 		err              error
 	)
-
+fmt.Println("\n\nxfidwrite\n\n")
 	qid := FILE(x.f.qid)
 	w := x.f.w
 	if w != nil {
@@ -437,9 +449,13 @@ func xfidwrite(x *Xfid) {
 			return
 		}
 	}
+fmt.Printf("Incoming x.fcall = %#v\n", x.fcall)
+	x.fcall.Count = uint32(len(x.fcall.Data))
 
 	BodyTag := func() { // Trimmed from the switch below.
 		r := fullrunewrite(x)
+fmt.Printf("t (in closure)= %p\n", t)
+fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		if len(r) != 0 {
 			w.Commit(t)
 			if qid == QWwrsel {
@@ -471,10 +487,12 @@ func xfidwrite(x *Xfid) {
 			}
 		}
 		fc.Count = x.fcall.Count
+fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		respond(x, &fc, nil)
 	}
 
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
+fmt.Println("qid =", qid)
 	switch qid {
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X')
@@ -505,7 +523,7 @@ func xfidwrite(x *Xfid) {
 		respond(x, &fc, nil)
 		break
 
-	case Qeditout:
+	case Qeditout: fallthrough
 	case QWeditout:
 		r = fullrunewrite(x)
 		if w != nil {
@@ -526,9 +544,11 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		BodyTag()
 
-	case QWbody:
+	case QWbody: fallthrough
 	case QWwrsel:
 		t = &w.body
+fmt.Printf("\nt = %p\n", t)
+fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		BodyTag()
 
 	case QWctl:
@@ -912,65 +932,49 @@ var (
 		q += len(r);
 	}
 	fc.Count = uint32(n);
-	fc.Data = []byte(string(b1));
+	fc.Data = []byte(string(b1))[:n];
 	respond(x, &fc, nil);
 }
 
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
-	Unimpl()
-	return 0
-} /*
-	Fcall fc;
-	Window *w;
-	Rune *r, junk;
-	char *b, *b1;
-	uint q, boff;
-	int i, rw, m, n, nr, nb;
+var (
+	fc plan9.Fcall
+	w *Window
+)
 
 	w = t.w;
-	w, t.Commit();
-	r = fbufalloc();
-	b = fbufalloc();
-	b1 = fbufalloc();
-	n = 0;
-	q = q0;
-	boff = 0;
-	while(q<q1 && n<x.fcall.count){
-		nr = q1-q;
-		if nr > BUFSIZE/UTFmax
-			nr = BUFSIZE/UTFmax;
-		bufread(&t.file.b, q, r, nr);
-		nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
-		m = nb;
-		if boff+m > x.fcall.count {
-			i = x.fcall.count - boff;
-			// copy whole runes only
-			m = 0;
-			nr = 0;
-			while(m < i){
-				rw = chartorune(&junk, b+m);
-				if m+rw > i
-					break;
-				m += rw;
-				nr++;
-			}
-			if m == 0
-				break;
-		}
-		memmove(b1+n, b, m);
-		n += m;
-		boff += nb;
-		q += nr;
+	w.Commit(t);
+	// Get Count runes, but that might be larger than Count bytes
+	nr := min(q1-q0, int(x.fcall.Count))
+	buf := []byte(string(t.file.b.Read(q0, nr)))
+	// Now chop, and back up the end until we have a full rune
+	buf = buf[:nr]
+	i := nr-utf8.UTFMax; 
+	// Find a full rune to start in the last 4 bytes
+	for len(buf[i:])>0 {
+		ru, count := utf8.DecodeRune(buf[i:])
+		if ru == utf8.RuneError {
+			i+=count
+		} else { break }
 	}
-	fbuffree(r);
-	fbuffree(b);
-	fc.count = n;
-	fc.data = b1;
+	// add all further full runes
+	for len(buf[i:])>0 {
+		ru, count := utf8.DecodeRune(buf[i:])
+		if ru == utf8.RuneError {
+			break
+		} else {
+			i += count
+		}
+	}
+		
+	buf = buf[:i]
+
+	fc.Count = uint32(len(buf));
+	fc.Data = buf;
 	respond(x, &fc, nil);
-	fbuffree(b1);
-	return q-q0;
+	return len(string(buf));
 }
-*/
+
 func xfideventread(x *Xfid, w *Window) {
 	var fc plan9.Fcall
 
@@ -1001,64 +1005,48 @@ func xfideventread(x *Xfid, w *Window) {
 }
 
 func xfidindexread(x *Xfid) {
-	Unimpl()
-}
-
-/*
-	Fcall fc;
-	int i, j, m, n, nmax, isbuf, cnt, off;
-	Window *w;
-	char *b;
-	Rune *r;
-	Column *c;
+var (
+	fc plan9.Fcall
+)
 
 	row.lk.Lock();
-	nmax = 0;
-	for j=0; j<row.ncol; j++ {
-		c = row.col[j];
-		for i=0; i<c.nw; i++ {
-			w = c.w[i];
-			nmax += Ctlsize + w.tag.file.b.nc*UTFmax + 1;
+	nmax := 0;
+	for _, c := range row.col {
+		for _, w := range c.w {
+			nmax += Ctlsize + w.tag.file.b.nc()*utf8.UTFMax + 1
 		}
 	}
+
 	nmax++;
-	isbuf = (nmax<=RBUFSIZE);
-	if isbuf
-		b = (char*)x.buf;
-	else
-		b = emalloc(nmax);
-	r = fbufalloc();
-	n = 0;
-	for j=0; j<row.ncol; j++ {
-		c = row.col[j];
-		for i=0; i<c.nw; i++ {
-			w = c.w[i];
+	sb := strings.Builder{}
+	for _, c := range row.col {
+		for _, w := range c.w {
 			// only show the currently active window of a set
-			if w.body.file.curtext != &w.body
+			if w.body.file.curtext != &w.body {
 				continue;
-			winctlprint(w, b+n, 0);
-			n += Ctlsize;
-			m = min(RBUFSIZE, w.tag.file.b.nc);
-			bufread(&w.tag.file.b, 0, r, m);
-			m = n + snprint(b+n, nmax-n-1, "%.*S", m, r);
-			while(n<m && b[n]!='\n')
-				n++;
-			b[n++] = '\n';
+			}
+			sb.WriteString(w.CtlPrint(false))
+			m := min(BUFSIZE/utf8.UTFMax, w.tag.file.b.nc());
+			tag := w.tag.file.b.Read(0, m);
+			sb.WriteString(string(tag))
+			sb.WriteString("\n")
 		}
 	}
 	row.lk.Unlock();
-	off = x.fcall.offset;
-	cnt = x.fcall.count;
-	if off > n
-		off = n;
-	if off+cnt > n
-		cnt = n-off;
-	fc.count = cnt;
-	memmove(r, b+off, cnt);
-	fc.data = (char*)r;
-	if !isbuf
-		free(b);
+	off := x.fcall.Offset;
+	cnt := x.fcall.Count;
+
+	// TODO(flux): This code looks buggy here, as it was in the original.
+	// This trims the output list into blocks without respecting utf8 boundaries.
+	// Or maybe it's ok to split a rune in this call.
+	s := []byte(sb.String())
+	if off > uint64(len(s)) {
+		off = uint64(len(s)) ;
+	}
+	if off+uint64(cnt) > uint64(len(s)) {
+		cnt = uint32(uint64(len(s)) -off);
+	}
+	fc.Count = cnt;
+	fc.Data = s[off:off+uint64(cnt)]
 	respond(x, &fc, nil);
-	fbuffree(r);
 }
-*/

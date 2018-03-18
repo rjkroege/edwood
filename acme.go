@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"fmt"
 
@@ -146,7 +147,7 @@ func main() {
 	mouse = &mousectl.Mouse
 
 	// startplumbing() // TODO(flux): plumbing
-	// fsysinit()  // TODO(flux): I don't even have a clue to the design of Fsys here.
+	fsysinit()  // TODO(flux): I don't even have a clue to the design of Fsys here.
 
 	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
 
@@ -190,6 +191,8 @@ func main() {
 
 	// After row is initialized
 	go mousethread()
+	go keyboardthread()
+	go newwindowthread()
 	go xfidallocthread(display)
 
 	select {
@@ -431,6 +434,54 @@ func MovedMouse(m draw.Mouse) {
 }
 
 func keyboardthread() {
+var (
+	timer *time.Timer
+	t *Text
+)
+	emptyTimer := make(<-chan time.Time)
+	timerchan := emptyTimer
+	typetext := (*Text)(nil)
+	for ;; {
+		select{
+		case <-timerchan:
+			t = typetext;
+			if t!=nil && t.what==Tag {
+				t.w.Lock( 'K');
+				t.w.Commit(t);
+				t.w.Unlock();
+				display.Flush()
+			}
+		case r := <-keyboardctl.C: 
+fmt.Printf("Keypress: %v\n", r)
+			for {
+				typetext = row.Type(r, mouse.Point);
+				t = typetext;
+				if t!=nil && t.col!=nil && !(r==draw.KeyDown || r==draw.KeyLeft || r==draw.KeyRight) {	/* scrolling doesn't change activecol */
+					activecol = t.col;
+				}
+				if t!=nil && t.w!=nil {
+					t.w.body.file.curtext = &t.w.body;
+				}
+				if timer != nil {
+					timer.Stop()
+				}
+				if t!=nil && t.what==Tag  { // Wait 500 msec to commit a tag.
+					timer = time.NewTimer(500 * time.Millisecond);
+					timerchan = timer.C
+				}else{
+					timer = nil;
+					timerchan = emptyTimer
+				}
+				select {
+				case r = <-keyboardctl.C:
+					continue
+				default:
+					display.Flush();
+				}
+				break;
+			}
+		}
+	}
 
 }
 
@@ -467,6 +518,16 @@ func xfidallocthread(d *draw.Display) {
 }
 
 func newwindowthread() {
+	var w *Window 
+
+	for {
+		/* only fsysproc is talking to us, so synchronization is trivial */
+		<-cnewwindow
+		w = makenewwindow(nil);
+		w.SetTag();
+		xfidlog(w, "new");
+		cnewwindow <- w
+	}
 
 }
 

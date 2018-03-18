@@ -177,3 +177,68 @@ func errorwinforwin(w *Window) *Window {
 	}
 	return w
 }
+
+/*
+ * Heuristic city.
+ */
+func makenewwindow (t * Text) (* Window) {
+var (
+	c *Column
+	w, bigw, emptyw *Window
+	emptyb *Text
+	i, y, el int
+)
+	switch {
+	case activecol != nil:
+		c = activecol;
+	case seltext != nil && seltext.col != nil:
+		c = seltext.col;
+	case t != nil && t.col != nil:
+		c = t.col;
+	default:
+		if len(row.col)==0 && row.Add(nil, -1)==nil {
+			acmeerror("can't make column",nil);
+		}
+		c = row.col[len(row.col)-1];
+	}
+	activecol = c;
+	if t==nil || t.w==nil || len(c.w) == 0{
+		return c.Add(nil, nil, -1);
+	}
+
+	/* find biggest window and biggest blank spot */
+	emptyw = c.w[0];
+	bigw = emptyw;
+	for i=1; i<len(c.w); i++ {
+		w = c.w[i];
+		/* use >= to choose one near bottom of screen */
+		if w.body.fr.MaxLines >= bigw.body.fr.MaxLines {
+			bigw = w;
+		}
+		if w.body.fr.MaxLines-w.body.fr.NLines >= emptyw.body.fr.MaxLines-emptyw.body.fr.NLines { 
+			emptyw = w;
+		}
+	}
+	emptyb = &emptyw.body;
+	el = emptyb.fr.MaxLines-emptyb.fr.NLines;
+	/* if empty space is big, use it */
+	if el>15 || (el>3 && el>(bigw.body.fr.MaxLines-1)/2) {
+		y = emptyb.fr.Rect.Min.Y+emptyb.fr.NLines*tagfont.Height;
+	}else{
+		/* if this window is in column and isn't much smaller, split it */
+		if t.col==c && t.w.r.Dy()>2*bigw.r.Dy()/3 {
+			bigw = t.w;
+		}
+		y = (bigw.r.Min.Y + bigw.r.Max.Y)/2;
+	}
+	w = c.Add(nil, nil, y);
+	if w.body.fr.MaxLines < 2 {
+		w.col.Grow(w, 1);
+	}
+	return w;
+}
+
+func mousescrollsize(nl int) int {
+Unimpl()
+	return 1
+}

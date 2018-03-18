@@ -90,7 +90,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 			//			s++
 			p := make([]byte, s)
 
-			log.Println(nb, len(frame.box), frame.box[0])
+		//	log.Println(nb, len(frame.box), frame.box[0])
 
 			b = frame.box[nb]
 			b.Ptr = p
