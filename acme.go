@@ -64,8 +64,7 @@ var varfontflag = flag.String("F", fontnames[1], "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
-var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)") // TODO(flux): Unused?
-
+var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)") 
 var ncol int = 2
 
 var mainpid int
@@ -113,7 +112,7 @@ func main() {
 	wdir, _ = os.Getwd()
 
 	var err error
-	display, err = draw.Init(nil, fontnames[0], "acme", *winsize) // TODO(flux):
+	display, err = draw.Init(nil, fontnames[0], "acme", *winsize)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -125,12 +124,10 @@ func main() {
 	// I suspect it's not useful in the modern world.
 	tagfont = display.DefaultFont
 
-	// TODO(flux)
 	iconinit()
-	//	timerinit()
-	//	rxinit();
+	// rxinit(); // TODO(flux) looks unneeded now
 
-	// cplumb = make(chan *Plumbmsg) TODO(flux): There must be a plumber library in go...
+	//cplumb = make(chan *Plumbmsg) 
 	// cwait = make(chan Waitmsg)
 	ccommand = make(chan *Command)
 	ckill = make(chan []rune)
@@ -147,7 +144,7 @@ func main() {
 	mouse = &mousectl.Mouse
 
 	// startplumbing() // TODO(flux): plumbing
-	fsysinit() // TODO(flux): I don't even have a clue to the design of Fsys here.
+	fsysinit() 
 
 	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
 
@@ -209,15 +206,13 @@ func readfile(c *Column, filename string) {
 	w.dirty = false
 	w.SetTag()
 	w.Resize(w.r, false, true)
-	// textscrdraw(&w->body)  // TODO(flux): Scroll bars
-	// w.tag.SetSelect(w.tag.file.b.nc(), w.tag.file.b.nc()) //  TODO(flux): tag text uninitialized here.
-	// xfidlog(w, "new")  // TODO(flux): Wish I knew what the xfid log did
+	w.body.ScrDraw()  
+	w.tag.SetSelect(w.tag.file.b.nc(), w.tag.file.b.nc()) 
+	xfidlog(w, "new")  
 }
 
 var fontCache map[string]*draw.Font = make(map[string]*draw.Font)
 
-// TODO(flux): I don't refcount the fonts.  They aren't so large that we can't
-// keep them around until the end of time.
 func fontget(fix int, save bool, setfont bool, name string) (font *draw.Font) {
 	font = nil
 	if name == "" {
@@ -296,7 +291,10 @@ func mousethread() {
 
 	for {
 		// TODO(flux) lock row and flush warnings?
-
+		row.lk.Lock()
+		flushwarnings()
+		row.lk.Unlock()
+		display.Flush()
 		select {
 		case <-mousectl.Resize:
 			if err := display.Attach(draw.Refnone); err != nil {
@@ -308,6 +306,9 @@ func mousethread() {
 			row.Resize(display.ScreenImage.R)
 		case mousectl.Mouse = <-mousectl.C:
 			MovedMouse(mousectl.Mouse)
+		case <-cwarn:
+			break
+		//case pm := <-cplumb:
 		}
 	}
 }
@@ -320,7 +321,7 @@ func MovedMouse(m draw.Mouse) {
 
 	if t != mousetext && t != nil && t.w != nil &&
 		(mousetext == nil || mousetext.w == nil || t.w.id != mousetext.w.id) {
-		// xfidlog(t.w, "focus");  TODO(flux)
+		xfidlog(t.w, "focus")
 	}
 
 	if t != mousetext && mousetext != nil && mousetext.w != nil {

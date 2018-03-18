@@ -389,7 +389,10 @@ func (c *Column) Which(p image.Point) *Text {
 	return nil
 }
 
-func (c *Column) Clean() int {
-	Unimpl()
-	return 0
+func (c *Column) Clean() bool {
+	clean := true;
+	for _, w := range c.w {
+		clean= clean && w.Clean(true);
+	}
+	return clean;
 }

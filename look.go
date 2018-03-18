@@ -434,7 +434,7 @@ func includename (Text *t, Rune *r, int n) (Runestr) {
 	return runestr(r, n);
 }
 */
-func dirname(t *Text, r []rune, n int) []rune {
+func dirname(t *Text, r []rune) []rune {
 	var (
 		b     []rune
 		c     rune
@@ -451,7 +451,7 @@ func dirname(t *Text, r []rune, n int) []rune {
 	if nt == 0 {
 		goto Rescue
 	}
-	if n >= 1 && r[0] == '/' {
+	if len(r) >= 1 && r[0] == '/' {
 		goto Rescue
 	}
 	b = t.w.tag.file.b.Read(0, nt)

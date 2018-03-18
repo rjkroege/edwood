@@ -49,6 +49,7 @@ const (
 	//	STACK = 65536
 	EVENTSIZE = 256
 	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
+	RBUFSIZE = BUFSIZE/utf8.UTFMax
 
 	Empty    = 0
 	Null     = '-'
@@ -229,8 +230,9 @@ func (r *Ref) Inc() {
 	*r++
 }
 
-func (r *Ref) Dec() {
+func (r *Ref) Dec() int {
 	*r--
+	return int(*r)
 }
 
 func Unimpl() {

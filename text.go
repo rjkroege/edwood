@@ -351,54 +351,57 @@ func (t *Text) Backnl(p int, n int) int {
 	return p
 }
 
-func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q int, nrp int) {
-	Unimpl()
-	return 0, 0
-}
-
-/*
-	Rune *bp, *tp, *up;
-	int i, initial;
-
-	if(t->what == Tag){	// can't happen but safety first: mustn't backspace over file name
-    Err:
-		t.Insert( q0, r, n, tofile);
-		*nrp = n;
-		return q0;
+func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
+var (
+	tp []rune
+	bp, up, i, initial int
+)
+	n := len(r)
+	if t.what == Tag {	// can't happen but safety first: mustn't backspace over file name
+		t.Insert( q0, r, tofile);
+		nrp = n
+		return q0, nrp;
 	}
-	bp = r;
-	for(i=0; i<n; i++)
-		if(*bp++ == '\b'){
-			--bp;
+	bp = 0 // bp indexes r
+	for i=0; i<n; i++  {
+		if r[bp] == '\b' {
 			initial = 0;
-			tp = runemalloc(n);
-			runemove(tp, r, i);
-			up = tp+i;
-			for(; i<n; i++){
-				*up = *bp++;
-				if(*up == '\b')
-					if(up == tp)
+			tp = make([]rune, n);
+			copy(tp, r[:i]);
+			up = i; // up indexes tp, starting at i
+			for ; i<n; i++ {
+				tp[up] = r[bp];
+				bp++
+				if tp[up] == '\b'  {
+					if up == 0 {
 						initial++;
-					else
-						--up;
-				else
+					} else {
+						up--;
+					}
+				} else {
 					up++;
+				}
 			}
-			if(initial){
-				if(initial > q0)
+			if initial != 0 {
+				if initial > q0 {
 					initial = q0;
+				}
 				q0 -= initial;
 				t.Delete( q0, q0+initial, tofile);
 			}
-			n = up-tp;
-			t.Insert( q0, tp, n, tofile);
-			free(tp);
-			*nrp = n;
-			return q0;
+			n = up;
+			t.Insert( q0, tp[:n], tofile);
+			nrp = n;
+			return q0, nrp;
+		} else {
+			bp++
 		}
-	goto Err;
+	}
+	t.Insert( q0, r, tofile);
+	nrp = n
+	return q0, nrp;
 }
-*/
+
 
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if tofile && t.ncache != 0 {
@@ -505,9 +508,10 @@ func (t *Text) Fill() {
 			}
 		}
 		t.fr.Insert(rp[:i], t.fr.NChars)
-		if !(t.fr.LastLineFull == 0) {
+		if (t.fr.LastLineFull != 0) {
 			break
 		}
+fmt.Printf("Fill: nlines %v, nchars %v, t.org %v\n", t.fr.NLines, t.fr.NChars, t.org)
 	}
 }
 
@@ -592,13 +596,48 @@ func (t *Text) ReadRune(q int) rune {
 }
 
 func (t *Text) BsWidth(c rune) int {
-	Unimpl()
-	return 0
+	/* there is known to be at least one character to erase */
+	if c == 0x08  {	/* ^H: erase character */
+		return 1;
+	}
+	q := t.q0;
+	skipping := true;
+	for(q > 0){
+		r := t.ReadC(q-1);
+		if r == '\n' {		/* eat at most one more character */
+			if q == t.q0 {	/* eat the newline */
+				q--
+			}
+			break; 
+		}
+		if c == 0x17 {
+			eq := isalnum(r);
+			if eq && skipping {	/* found one; stop skipping */
+				skipping = false;
+			} else {
+				if !eq && !skipping {
+					break;
+				}
+			}
+		}
+		q--
+	}
+	return t.q0-q;
 }
 
-func (t *Text) FileWidth(q0 uint, oneelement int) int {
-	Unimpl()
-	return 0
+func (t *Text) FileWidth(q0 int, oneelement bool) int {
+	q := q0;
+	for(q > 0){
+		r := t.ReadC(q-1);
+		if r <= ' ' {
+			break;
+		}
+		if oneelement && r=='/' {
+			break;
+		}
+		q--
+	}
+	return q0-q;
 }
 
 func (t *Text) Complete() []rune {
@@ -1535,6 +1574,7 @@ func (t *Text) SetOrigin(org int, exact bool) {
 		}
 	}
 	t.org = org
+fmt.Printf("Text.SetOrigin: t.org = %v\n", t.org)
 	t.Fill()
 	t.ScrDraw()
 	t.SetSelect(t.q0, t.q1)
@@ -1544,8 +1584,16 @@ func (t *Text) SetOrigin(org int, exact bool) {
 }
 
 func (t *Text) Reset() {
-	Unimpl()
-
+	t.file.seq = 0;
+	t.eq0 = ^0;
+	/* do t.delete(0, t.nc, true) without building backup stuff */
+	t.SetSelect(t.org, t.org);
+	t.fr.Delete(0, t.fr.NChars);
+	t.org = 0;
+	t.q0 = 0;
+	t.q1 = 0;
+	t.file.Reset();
+	t.file.b.Reset();
 }
 
 func (t *Text) DirName() string {

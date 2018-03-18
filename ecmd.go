@@ -637,7 +637,7 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 
 	dir = nil
 	if t != nil {
-		dir = dirname(t, nil, 0)
+		dir = dirname(t, nil)
 	}
 	if len(dir) == 1 && dir[0] == '.' { // sigh
 		dir = dir[0:0]

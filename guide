@@ -1,4 +1,5 @@
-",{ x/->/c/./
+",
+{ x/->/c/./
 x/TRUE/c/true/
 x/FALSE/c/false/
 x/display.black/c/display.Black/
@@ -13,9 +14,14 @@ x/[^a-zA-Z_0-9]Border([^a-zA-Z_0-9]|\n)/y/[^a-zA-Z_0-9]/g/./{
 	i/display.ScaleSize(/
 	a/)/
 	}
-}"
-
-,s/wincommit\(([^)]+)\)/\1.Commit()/g
+}
+"
+textsetselect
+s/textshow\(([^),]+),([^)]+)\)/\1.Show(\2)/g
+,s/textsetselect\(([^),]+),([^)]+)\)/\1.SetSelect(\2)/g
+,s/textinsert\(([^),]+),([^)]+)\)/\1.Insert(\2)/g
+,s/typecommit\(([^)]+)\)/\1.TypeCommit()/g
+s/filemark\(([^)]+)\)/\1.Mark()/g
 ,s/winclose\(([^)]+)\)/\1.Close()/g
 ,s/winlock\(([^)]+)\)/\1.Lock()/g
 ,s/winunlock\(([^)]+)\)/\1.Unlock()/g
@@ -46,6 +52,7 @@ s/^[ 	]*([a-zA-Z0-9_]+)[ 	]+(\*?)(.*);/	\3 \2\1/g
 	x/\*\//d
 }
 
+,s/wincommit\(([^),]+)([^)]*)\)/\1.Commit(\2)/g
 ,s/textcommit\(&([^),]+)([^)]*)\)/\1.Commit(\2)/g
 ,s/qlock\(&([^)]+)\)/\1.Lock()/g
 ,s/qunlock\(&([^)]+)\)/\1.Unlock()/g

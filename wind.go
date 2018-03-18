@@ -44,7 +44,6 @@ type Window struct {
 	dirnames []string
 	widths   []int
 	putseq   int
-	//nincl       int
 	incl        []string
 	reffont     *draw.Font
 	ctrllock    *sync.Mutex
@@ -91,7 +90,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.tagtop.Max.Y = r.Min.Y + tagfont.Height
 	r1.Max.Y = r1.Min.Y + w.taglines*tagfont.Height
 
-	f := &File{}
+	f := NewTagFile()
 	f.AddText(&w.tag)
 	w.tag.Init(f, r1, tagfont, tagcolors)
 	w.tag.what = Tag
@@ -110,7 +109,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	}
 
 	// Body setup.
-	f = &File{}
+	f = NewFile("")
 	if clone != nil {
 		f = clone.body.file
 		w.body.org = clone.body.org
@@ -157,15 +156,31 @@ func (w *Window) DrawButton() {
 
 }
 
-func (w *Window) RunePos() int {
-	return 0
+func (w *Window) delRunePos() int {
+	var n int
+	for n=0; n<w.tag.file.b.nc(); n++  {
+		r := w.tag.file.b.Read(n, 1);
+		if r[0] == ' ' {
+			break;
+		}
+	}
+	n += 2;
+	if n >= w.tag.file.b.nc() {
+		return -1;
+	}
+	return n;
 }
 
-func (w *Window) ToDel() {
-
+func (w *Window) moveToDel() {
+	n := w.delRunePos();
+	if(n < 0) {
+		return;
+	}
+	display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
 }
 
 func (w *Window) TagLines(r image.Rectangle) int {
+	// Unimpl()
 	return 1
 }
 
@@ -232,7 +247,9 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 }
 
 func (w *Window) Lock1(owner int) {
-
+	w.ref.Inc()
+	w.lk.Lock();
+	w.owner = owner;
 }
 
 func (w *Window) Lock(owner int) {
@@ -248,23 +265,49 @@ func (w *Window) Unlock() {
 func (w *Window) MouseBut() {
 	display.MoveTo(w.tag.scrollr.Min.Add(
 		image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
-
 }
 
 func (w *Window) DirFree() {
-
+	w.dirnames = w.dirnames[0:0]
+	w.widths = w.widths[0:0]
 }
 
 func (w *Window) Close() {
-
+	if w.ref.Dec() == 0 {
+		xfidlog(w, "del");
+		w.DirFree();
+		w.tag.Close();
+		w.body.Close();
+		if activewin == w {
+			activewin = nil;
+		}
+	}
 }
 
 func (w *Window) Delete() {
-
+	x := w.eventx;
+	if x != nil {
+		w.events = w.events[0:0];
+		w.eventx = nil;
+		x.c<-nil	/* wake him up */
+	}
 }
 
 func (w *Window) Undo(isundo bool) {
-
+	w.utflastqid = -1;
+	body := &w.body;
+	body.q0, body.q1 = body.file.Undo(isundo);
+	body.Show(body.q0, body.q1, true);
+	f := body.file;
+	for _, text := range f.text {
+		v := text.w;
+		v.dirty = (f.seq != v.putseq);
+		if v != w {
+			v.body.q0 = v.body.fr.P0+v.body.org;
+			v.body.q1 = v.body.fr.P1+v.body.org;
+		}
+	}
+	w.SetTag();
 }
 
 func (w *Window) SetName(name string) {
@@ -298,13 +341,33 @@ func (w *Window) Type(t *Text, r rune) {
 }
 
 func (w *Window) ClearTag() {
-	Unimpl()
-
-}
-
-func (w *Window) SetTag1() {
-	Unimpl()
-
+	/* w must be committed */
+	n := w.tag.file.b.nc();
+	r := w.tag.file.b.Read(0, n);
+	var i int
+	for i=0; i<n; i++ {
+		if r[i]==' ' || r[i]=='\t' {
+			break;
+		}
+	}
+	for ; i<n; i++ {
+		if r[i] == '|' {
+			break;
+		}
+	}
+	if i == n {
+		return;
+	}
+	i++;
+	w.tag.Delete(i, n, true);
+	w.tag.file.mod = false;
+	if w.tag.q0 > i {
+		w.tag.q0 = i;
+	}
+	if w.tag.q1 > i {
+		w.tag.q1 = i;
+	}
+	w.tag.SetSelect(w.tag.q0, w.tag.q1);
 }
 
 func (w *Window) SetTag() {
@@ -331,10 +394,10 @@ func (w *Window) SetTag() {
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
 	if w.filemenu {
-		if w.body.needundo || w.body.file.delta.nc() > 0 || w.body.ncache != 0 {
+		if w.body.needundo || len(w.body.file.delta) > 0 || w.body.ncache != 0 {
 			sb.WriteString(Lundo)
 		}
-		if w.body.file.epsilon.nc() > 0 {
+		if len(w.body.file.epsilon) > 0 {
 			sb.WriteString(Lredo)
 		}
 		dirty := w.body.file.name != "" && (w.body.ncache != 0 || w.body.file.seq != w.putseq)
@@ -415,13 +478,68 @@ func (w *Window) Commit(t *Text) {
 	}
 }
 
+func isDir(r string) (bool, error) {	
+	f, err := os.Open(r)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	if fi.IsDir() {
+		return true, nil
+	}
+
+	return false, nil
+	
+}
+
 func (w *Window) AddIncl(r string) {
-	Unimpl()
+
+	// Tries to open absolute paths, and if fails, tries 
+	// to use dirname instead.
+	d, err := isDir(r)
+	if d == false {
+		if r[0] == '/' {
+			warning(nil, "%s: Not a directory: %v", r, err)
+			return 
+		}
+		r = string(dirname(&w.body, []rune(r)))
+		d, err := isDir(r)
+		if d == false { 
+			warning(nil, "%s: Not a directory: %v", r, err)
+			return
+		}
+	}
+	w.incl = append(w.incl, r)
+	return;
+
 }
 
 func (w *Window) Clean(conservative bool) bool {
-	Unimpl()
-	return false
+	if w.isscratch || w.isdir {	/* don't whine if it's a guide file, error window, etc. */
+		return true;
+	}
+	if !conservative && w.nopen[QWevent]>0 {
+		return true;
+	}
+	if w.dirty {
+		if len(w.body.file.name) != 0 {
+			warning(nil, "%v modified\n", w.body.file.name);
+		} else{
+			if w.body.file.b.nc() < 100 {	/* don't whine if it's too small */
+				return true;
+			}
+			warning(nil, "unnamed file modified\n");
+		}
+		w.dirty = false;
+		return false;
+	}
+	return true;
 }
 
 func (w *Window) CtlPrint(fonts bool) string {

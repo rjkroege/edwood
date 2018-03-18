@@ -43,12 +43,6 @@ func region(a, b int) int {
 	return 1
 }
 
-func warning(md *MntDir, s string, args ...interface{}) {
-	// TODO(flux): Port to actually output to the error window
-	_ = md
-	fmt.Printf(s, args...)
-}
-
 func acmeerror(s string, err error) {
 	fmt.Fprintf(os.Stderr, "acme: %s: %v\n", s, err)
 	// panic(fmt.Sprintf(os.Stderr, "acme: %s: %v\n", s, err))
@@ -239,6 +233,82 @@ func makenewwindow(t *Text) *Window {
 }
 
 func mousescrollsize(nl int) int {
-	Unimpl()
+	// Unimpl()
 	return 1
+}
+
+type Warning struct{
+	md *MntDir
+	buf Buffer
+};
+
+var warnings = []Warning{}
+
+func flushwarnings() {
+var (
+	warn Warning
+	w *Window
+	t *Text
+	owner, nr, q0, n int
+)
+	for _, warn=range warnings  {
+		w = errorwin(warn.md, 'E');
+		t = &w.body;
+		owner = w.owner;
+		if owner == 0 {
+			w.owner = 'E';
+		}
+		w.Commit(t);
+		/*
+		 * Most commands don't generate much output. For instance,
+		 * Edit ,>cat goes through /dev/cons and is already in blocks
+		 * because of the i/o system, but a few can.  Edit ,p will
+		 * put the entire result into a single hunk.  So it's worth doing
+		 * this in blocks (and putting the text in a buffer in the first
+		 * place), to avoid a big memory footprint.
+		 */
+		q0 = t.file.b.nc();
+		for n = 0; n < warn.buf.nc(); n += nr {
+			nr = warn.buf.nc() - n;
+			if nr > RBUFSIZE {
+				nr = RBUFSIZE;
+			}
+			r := warn.buf.Read(n, nr);
+			_, nr = t.BsInsert(t.file.b.nc(), r, true);
+		}
+		t.Show(q0, t.file.b.nc(), true);
+		t.w.SetTag();
+		t.ScrDraw();
+		w.owner = owner;
+		w.dirty = false;
+		w.Unlock();
+		warn.buf.Close();
+		if warn.md != nil {
+			fsysdelid(warn.md);
+		}
+	}
+	warnings = warnings[0:0]
+}
+
+
+func warning(md *MntDir, s string, args... interface{})() {
+	r := []rune(fmt.Sprintf(s, args...))
+	addwarningtext(md, r);
+}
+
+func addwarningtext(md *MntDir, r []rune) {
+	for _, warn := range warnings {
+		if(warn.md == md){
+			warn.buf.Insert(warn.buf.nc(), r);
+			return;
+		}
+	}
+	warn := Warning{}
+	warn.md = md;
+	if(md!=nil) {
+		fsysincid(md);
+	}
+	warnings = append(warnings, warn)
+	warn.buf.Insert(0, r);
+	cwarn <- 0
 }
