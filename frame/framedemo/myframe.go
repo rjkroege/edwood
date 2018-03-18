@@ -17,8 +17,8 @@ type Myframe struct {
 	f frame.Frame
 
 	buffer []rune
-	cursor int // a position at which we can insert text into the backing buffer.
-	cursordown int // down point for a selection drag
+	cursor int // end of selection
+	cursordown int // start of selection, cursordown must be =< cursor
 	offset int // the offset of the frame w.r.t. buffer. 
 }
 
@@ -65,7 +65,8 @@ func (mf *Myframe) Resize(resized bool) {
 
 
 	// Set the tick
-	mf.f.Tick(mf.f.Ptofchar(0), true)
+	// mf.f.Tick(mf.f.Ptofchar(0), true)
+	mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
 
 	mf.f.Display.Flush()
 
@@ -81,14 +82,16 @@ func (mf *Myframe) InsertString(s string, c int) {
 		mf.Insert(r)
 	}
 
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+//	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 	mf.cursor = oc
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	mf.cursordown = mf.cursor
+//	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
 }
 
 // Insert adds a single rune to the frame at the cursor.
 func (mf *Myframe) Insert(r rune) {
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+//	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 
 	mf.f.Insert([]rune{r}, mf.cursor)
 
@@ -96,8 +99,11 @@ func (mf *Myframe) Insert(r rune) {
 	copy(mf.buffer[mf.cursor+1:], mf.buffer[mf.cursor:])
 	mf.buffer[mf.cursor] = r
 	mf.cursor++
+	mf.cursordown = mf.cursor
 
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+//	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
+
 }
 
 // Delete removes a single rune at the cursor.
@@ -105,7 +111,7 @@ func (mf *Myframe) Delete() {
 	if mf.cursor < 1 {
 		return
 	}
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+//	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 	
 	mf.f.Delete(mf.cursor - 1, mf.cursor)
 
@@ -114,8 +120,9 @@ func (mf *Myframe) Delete() {
 	}
 	mf.buffer = mf.buffer[0:len(mf.buffer)-1]
 	mf.cursor--
+	mf.cursordown = mf.cursor
 
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+	mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
 }
 
 // Up moves the cursor up a line if possible and adjusts the frame.
@@ -126,18 +133,22 @@ func (my *Myframe) Up() {
 // Left moves the cursor to the left if possible.
 func (mf *Myframe) Left() {
 	if mf.cursor > 0 {
-		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+//		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 		mf.cursor--
-		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+		mf.cursordown = mf.cursor
+//		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+		mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
 	}
 }
 
 // Right moves the cursor to the right if possible.
 func (mf *Myframe) Right() {
 	if mf.cursor <  len(mf.buffer) {
-		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+//		mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
 		mf.cursor++
-		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+		mf.cursordown = mf.cursor
+//		mf.f.Tick(mf.f.Ptofchar(mf.cursor), true)
+		mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
 	}
 }
 
@@ -151,11 +162,10 @@ func (my *Myframe) Logboxes() {
 }
 
 func (mf *Myframe) MouseDown(pt image.Point) {
-	// This does not do the right thing if there is an existing selection.
-	log.Println("MouseDown hiding cursor")
-	mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+	log.Println("\nMouseDown")
+	// mf.f.Tick(mf.f.Ptofchar(mf.cursor), false)
+	
 	nc := mf.f.Charofpt(pt)
-	mf.f.Tick(mf.f.Ptofchar(nc), false)
 	mf.cursordown = nc
 	mf.cursor = nc
 
@@ -165,9 +175,10 @@ func (mf *Myframe) MouseDown(pt image.Point) {
 }
 
 func (mf Myframe) MouseMove(pt image.Point) {
+	log.Println("\nMouseMove")
 	nc := mf.f.Charofpt(pt)
 
-	// rationalize the cursor position. cursordown will be smaller
+	// Rationalize the cursor position. cursordown <= cursor.
 	if nc < mf.cursordown {
 		mf.cursor = mf.cursordown
 		mf.cursordown = nc
@@ -181,6 +192,8 @@ func (mf Myframe) MouseMove(pt image.Point) {
 }
 
 func (mf *Myframe) MouseUp(pt image.Point) {
+	log.Println("\nMouseUp")
+//	mf.f.DrawSel(mf.f.Ptofchar(mf.cursordown), mf.cursordown, mf.cursor, false)
 	nc := mf.f.Charofpt(pt)
 
 	// rationalize the cursor position. cursordown will be smaller

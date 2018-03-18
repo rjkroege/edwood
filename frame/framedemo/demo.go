@@ -28,7 +28,7 @@ func main() {
 	textcols[frame.ColHText] = d.Black
 
 	// TODO(rjk): Use a font that always is available.
-	fontname := "/mnt/font/SourceSansPro-Regular/13a/font"
+	fontname := "/mnt/font/SourceSansPro-Regular/17a/font"
 	myfont, err := d.OpenFont(fontname)
 	if err != nil {
 		log.Fatalln("Couldn't open font", fontname, "because", err)
@@ -84,6 +84,8 @@ func main() {
 				mousedown = false
 				mf.MouseUp(image.Pt(m.X, m.Y))
 			}
+
+			d.Flush()
 
 //			if m.Buttons&1 == 1 {
 //				// TODO(rjkroege): insert code here to do some drawing and stuff.

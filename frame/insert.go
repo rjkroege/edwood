@@ -134,6 +134,8 @@ var nalloc = 0
 // and newlines are handled by the library, but all other characters,
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
+//
+// Insert manages the tick and selection. 
 func (f *Frame) Insert(r []rune, p0 int) {
 	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
 	//	f.Logboxes("at very start of insert")
@@ -177,6 +179,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 * insertion is complete. pt0 is current location of insertion position
 	 * (p0); pt1 is terminal point (without line wrap) of insertion.
 	 */
+	// TODO(rjk): Insert should remove the selection. Host should use
+	// Drawsel to put it back later?
 	if f.p0 == f.p1 {
 		f.Tick(f.Ptofchar(f.p0), false)
 	}
