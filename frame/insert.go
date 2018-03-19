@@ -135,7 +135,7 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 //
-// Insert manages the tick and selection. 
+// Insert manages the tick and selection.
 func (f *Frame) Insert(r []rune, p0 int) {
 	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
 	//	f.Logboxes("at very start of insert")

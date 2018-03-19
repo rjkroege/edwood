@@ -3,12 +3,9 @@ package frame
 import (
 	"image"
 	"unicode/utf8"
-
-	"log"
 )
 
 func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
-
 	var b *frbox
 	var w int
 	var r rune
@@ -38,11 +35,6 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 }
 
 func (f *Frame) Ptofchar(p int) image.Point {
-	log.Println("Ptofchar start", f.p0, f.p1)
-	defer func(){
-		log.Println("Ptofchar end", f.p0, f.p1)
-	}()
-
 	return f.ptofcharptb(p, f.Rect.Min, 0)
 }
 
@@ -65,11 +57,6 @@ func (f *Frame) grid(p image.Point) image.Point {
 }
 
 func (f *Frame) Charofpt(pt image.Point) int {
-	log.Println("Charofpt start", f.p0, f.p1)
-	defer func(){
-		log.Println("Charofpt end", f.p0, f.p1)
-	}()
-
 	var w, bn int
 	var b *frbox
 	var p int

@@ -52,16 +52,16 @@ func main() {
 		case r := <-keyboardctl.C:
 			log.Println("----- got rune --------", r)
 			switch r {
-			case 6:	// ^f
+			case 6: // ^f
 				mf.Right()
-			case 2:	// ^b
+			case 2: // ^b
 				mf.Left()
-			case 8:	// ^h (delete key)
+			case 8: // ^h (delete key)
 				mf.Delete()
-			case 16:	// ^p
+			case 16: // ^p
 				// TODO(rjk): Should go up.
 				mf.Logboxes()
-			case 7:	// ^g
+			case 7: // ^g
 				// Generate some text.
 				mf.InsertString(generateParagraphs(1, 8, "\n"), mf.cursor)
 			default:
@@ -73,27 +73,26 @@ func main() {
 			d.Flush()
 		case m := <-mousectl.C:
 			// log.Printf("mouse field %v buttons %d\n", m, m.Buttons)
-			
+
 			switch {
 			case m.Buttons&1 == 1 && !mousedown:
 				mousedown = true
 				mf.MouseDown(image.Pt(m.X, m.Y))
+				d.Flush()
 			case m.Buttons&1 == 1 && mousedown:
 				mf.MouseMove(image.Pt(m.X, m.Y))
+				d.Flush()
 			case m.Buttons&1 == 0 && mousedown:
 				mousedown = false
 				mf.MouseUp(image.Pt(m.X, m.Y))
+				d.Flush()
 			}
 
-			d.Flush()
-
-//			if m.Buttons&1 == 1 {
-//				// TODO(rjkroege): insert code here to do some drawing and stuff.
-//				d.ScreenImage.Draw(image.Rect(m.X, m.Y, m.X+10, m.Y+10), d.Black, nil, image.ZP)
-//				d.Flush()
-//			}
-
-			
+			//			if m.Buttons&1 == 1 {
+			//				// TODO(rjkroege): insert code here to do some drawing and stuff.
+			//				d.ScreenImage.Draw(image.Rect(m.X, m.Y, m.X+10, m.Y+10), d.Black, nil, image.ZP)
+			//				d.Flush()
+			//			}
 
 		}
 	}
