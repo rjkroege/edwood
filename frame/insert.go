@@ -136,8 +136,8 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 func (f *Frame) Insert(r []rune, p0 int) {
-	//log.Printf("\n\n-----\nframe.Insert: %s", string(r))
-	//	f.Logboxes("at very start of insert")
+	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
+		f.Logboxes("at very start of insert")
 
 	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
 		return
@@ -163,10 +163,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	ppt1 := pt1
 
 	// I expect n0 to be 0. But... the array is empty.
-	//	log.Println("len of box", len(f.box), "n0", n0)
-	//	f.Logboxes("f after bxscan")
-	//	log.Println("----")
-	//	frame.Logboxes("frame after bxscan")
+		log.Println("len of box", len(f.box), "n0", n0)
+		f.Logboxes("f after bxscan")
+		log.Println("----")
+		frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
 		pt0 = f.cklinewrap(pt0, f.box[n0])

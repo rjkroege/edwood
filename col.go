@@ -2,6 +2,7 @@ package main
 
 import (
 	"image"
+	"sort"
 
 	"github.com/paul-lalonde/acme/frame"
 )
@@ -207,13 +208,18 @@ var (
 }
 
 func (c *Column) CloseAll() {
-	Unimpl()
-
+	if(c == activecol) {
+		activecol = nil;
+	}
+	c.tag.Close();
+	for _, w := range c.w {
+		w.Close();
+	}
+	clearmouse();
 }
 
 func (c *Column) MouseBut() {
-	Unimpl()
-
+	display.MoveTo(c.tag.scrollr.Min.Add(c.tag.scrollr.Max).Div(2));
 }
 
 func (c *Column) Resize(r image.Rectangle) {
@@ -244,14 +250,28 @@ func (c *Column) Resize(r image.Rectangle) {
 	c.r = r
 }
 
-func cmp(a, b interface{}) int {
-	Unimpl()
-	return 0
-}
 
 func (c *Column) Sort() {
-	Unimpl()
+	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.name < c.w[j].body.file.name})
 
+	r := c.r;
+	r.Min.Y = c.tag.fr.Rect.Max.Y;
+	display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP);
+	y := r.Min.Y;
+	for i:=0; i<len(c.w); i++ {
+		w := c.w[i];
+		r.Min.Y = y;
+		if(i == len(c.w)-1) {
+			r.Max.Y = c.r.Max.Y;
+		} else {
+			r.Max.Y = r.Min.Y+w.r.Dy()+display.ScaleSize(Border);
+		}
+		r1 := r;
+		r1.Max.Y = r1.Min.Y+display.ScaleSize(Border);
+		display.ScreenImage.Draw(r1, display.Black, nil, image.ZP);
+		r.Min.Y = r1.Max.Y;
+		y = w.Resize(r, false, i==len(c.w)-1);
+	}
 }
 
 func (c *Column) Grow(w *Window, but int) {

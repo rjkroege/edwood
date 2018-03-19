@@ -524,6 +524,7 @@ func (t *Text) Fill() {
 				}
 			}
 		}
+fmt.Printf("Fill: nlines %v, nchars %v, t.org %v, i %v\n", t.fr.NLines, t.fr.NChars, t.org, i)
 		t.fr.Insert(rp[:i], t.fr.NChars)
 		if (t.fr.LastLineFull != 0) {
 			break

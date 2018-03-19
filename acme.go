@@ -170,13 +170,13 @@ func main() {
 		for i := 0; i < ncol; i++ {
 			row.Add(nil, -1)
 		}
-		rightmostcol := row.col[row.ncol()-1]
+		rightmostcol := row.col[len(row.col)-1]
 		if len(files) == 0 {
-			readfile(row.col[row.ncol()-1], wdir)
+			readfile(row.col[len(row.col)-1], wdir)
 		} else {
 			for i, filename := range files {
 				// guide  always goes in the rightmost column
-				if filepath.Base(filename) == "guide" || uint(i)/WindowsPerCol >= row.ncol() {
+				if filepath.Base(filename) == "guide" || i/WindowsPerCol >= len(row.col) {
 					readfile(rightmostcol, filename)
 				} else {
 					readfile(row.col[i/WindowsPerCol], filename)
