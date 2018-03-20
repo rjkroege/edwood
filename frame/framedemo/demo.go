@@ -68,8 +68,8 @@ func main() {
 				mf.Insert(r)
 			}
 			d.Flush()
-		case <-mousectl.Resize:
-			mf.Resize(true)
+		case msg := <-mousectl.Resize:
+			mf.Resize(msg)
 			d.Flush()
 		case m := <-mousectl.C:
 			// log.Printf("mouse field %v buttons %d\n", m, m.Buttons)

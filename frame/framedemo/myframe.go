@@ -5,6 +5,7 @@ import (
 	"image"
 	"log"
 
+	"9fans.net/go/draw"
 	"github.com/ProjectSerenity/acme/frame"
 )
 
@@ -23,8 +24,15 @@ type Myframe struct {
 func (mf *Myframe) Resize(resized bool) {
 	log.Println("Myframe.Resize")
 	if resized {
-		log.Println("i no know how to dealz")
-		// TODO(rjk): stuff.
+		// Stupid implementation.
+
+		mf.f.Clear(false)
+
+		if err := mf.f.Display.Attach(draw.Refmesg); err != nil {
+			log.Fatalf("can't reattach to window: %v", err)
+		}
+		
+		mf.f.SetRects( mf.f.Display.Image.R.Inset(20),  mf.f.Display.ScreenImage)
 	}
 
 	mf.f.Background.Draw(
@@ -33,8 +41,15 @@ func (mf *Myframe) Resize(resized bool) {
 		nil,
 		image.ZP)
 
+
+	if resized {
+		// insert text such that we fit a window around the cursor.
+		// TODO(rjk): Adjust for scrollable buffers.
+		mf.f.Insert(mf.buffer,  0)
+	}
+
 	// Set the tick
-	mf.f.DrawSel(mf.f.Ptofchar(mf.cursor), mf.cursordown, mf.cursor, true)
+	mf.f.DrawSel(mf.f.Ptofchar(mf.cursordown), mf.cursordown, mf.cursor, true)
 	mf.f.Display.Flush()
 }
 
