@@ -215,6 +215,8 @@ func (f *Frame) Clear(freeall bool) {
 	}
 	if f.box != nil {
 		f.box = nil
+		f.nbox = 0
+		f.nalloc = 0
 	}
 	if freeall {
 		f.tickimage.Free()
@@ -222,6 +224,6 @@ func (f *Frame) Clear(freeall bool) {
 		f.tickimage = nil
 		f.tickback = nil
 	}
-	f.box = nil
 	f.ticked = false
 }
+
