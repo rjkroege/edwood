@@ -12,7 +12,7 @@ import (
 
 	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
-	"github.com/paul-lalonde/acme/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 const (
