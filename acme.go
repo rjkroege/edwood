@@ -14,7 +14,7 @@ import (
 	"fmt"
 
 	"9fans.net/go/draw"
-	"github.com/paul-lalonde/acme/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 const (
@@ -25,7 +25,7 @@ var (
 	snarfrune [NSnarf + 1]rune
 
 	fontnames = [2]string{
-		"/lib/font/bit/lucsans/euro.8.font",
+		"/mnt/font/GoRegular/13a/font",
 		"/lib/font/bit/lucm/unicode.9.font",
 	}
 

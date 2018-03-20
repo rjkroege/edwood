@@ -206,18 +206,18 @@ func makenewwindow(t *Text) *Window {
 	for i = 1; i < len(c.w); i++ {
 		w = c.w[i]
 		/* use >= to choose one near bottom of screen */
-		if w.body.fr.MaxLines >= bigw.body.fr.MaxLines {
+		if w.body.fr.GetFrameFillStatus().Maxlines >= bigw.body.fr.GetFrameFillStatus().Maxlines {
 			bigw = w
 		}
-		if w.body.fr.MaxLines-w.body.fr.NLines >= emptyw.body.fr.MaxLines-emptyw.body.fr.NLines {
+		if w.body.fr.GetFrameFillStatus().Maxlines-w.body.fr.GetFrameFillStatus().Nlines >= emptyw.body.fr.GetFrameFillStatus().Maxlines-emptyw.body.fr.GetFrameFillStatus().Nlines {
 			emptyw = w
 		}
 	}
 	emptyb = &emptyw.body
-	el = emptyb.fr.MaxLines - emptyb.fr.NLines
+	el = emptyb.fr.GetFrameFillStatus().Maxlines - emptyb.fr.GetFrameFillStatus().Nlines
 	/* if empty space is big, use it */
-	if el > 15 || (el > 3 && el > (bigw.body.fr.MaxLines-1)/2) {
-		y = emptyb.fr.Rect.Min.Y + emptyb.fr.NLines*tagfont.Height
+	if el > 15 || (el > 3 && el > (bigw.body.fr.GetFrameFillStatus().Maxlines-1)/2) {
+		y = emptyb.fr.Rect.Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*tagfont.Height
 	} else {
 		/* if this window is in column and isn't much smaller, split it */
 		if t.col == c && t.w.r.Dy() > 2*bigw.r.Dy()/3 {
@@ -226,7 +226,7 @@ func makenewwindow(t *Text) *Window {
 		y = (bigw.r.Min.Y + bigw.r.Max.Y) / 2
 	}
 	w = c.Add(nil, nil, y)
-	if w.body.fr.MaxLines < 2 {
+	if w.body.fr.GetFrameFillStatus().Maxlines < 2 {
 		w.col.Grow(w, 1)
 	}
 	return w

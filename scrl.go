@@ -6,7 +6,7 @@ import (
 	"image"
 	"time"
 
-	"github.com/paul-lalonde/acme/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 var scrtmp *draw.Image
@@ -80,7 +80,7 @@ func (t *Text) ScrDraw() {
 	r1 = r
 	r1.Min.X = 0
 	r1.Max.X = r.Dx()
-	r2 = scrpos(r1, t.org, t.org+t.fr.NChars, t.file.b.nc())
+	r2 = scrpos(r1, t.org, t.org+t.fr.GetFrameFillStatus().Nchars, t.file.b.nc())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		b.Draw(r1, t.fr.Cols[frame.ColBord], nil, image.ZP)

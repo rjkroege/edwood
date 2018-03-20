@@ -385,7 +385,7 @@ func shouldscroll(t *Text, q0 int, qid uint64) bool {
 	if qid == Qcons {
 		return true
 	}
-	return t.org <= q0 && q0 <= t.org+(t.fr.NChars)
+	return t.org <= q0 && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars)
 }
 
 // This is fiddly code that handles partial runes at the end of a previous write?

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"9fans.net/go/draw"
-	"github.com/paul-lalonde/acme/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 const (
@@ -110,9 +110,9 @@ func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
 			maxt = t.tabstop
 		}
 	}
-	t.fr.MaxTab = maxt * f.StringWidth("0")
+	t.fr.Maxtab(maxt * f.StringWidth("0"))
 	if t.what == Body && t.w.isdir && odx != t.all.Dx() {
-		if t.fr.MaxLines > 0 {
+		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
 			t.Show(0, 0, false)
@@ -182,8 +182,8 @@ func (t *Text) Columnate(names []string, widths []int) {
 	}
 	mint = t.fr.Font.StringWidth("0")
 	/* go for narrower tabs if set more than 3 wide */
-	t.fr.MaxTab = min(int(maxtab), TABDIR) * mint
-	maxt = t.fr.MaxTab
+	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
+	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
 		if maxt-w%maxt < mint || w%maxt == 0 {
 			w += mint
@@ -323,7 +323,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	if q0 < t.org { // TODO(flux) I don't understand this test, moving origin of frame past the text.
 		t.org += n
 	} else {
-		if q0 <= t.org+(t.fr.NChars) { // Text is within the window, put it there.
+		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.
 			t.fr.Insert(t.file.b[q0:q0+n], int(q0-t.org))
 		}
 	}
@@ -457,7 +457,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if q0 < t.org {
 		t.org += n
 	} else {
-		if q0 <= t.org+(t.fr.NChars) {
+		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
 			t.fr.Insert(r[:n], int(q0-t.org))
 		}
 	}
@@ -490,29 +490,29 @@ func (t *Text) Fill() {
 		t.TypeCommit()
 	}
 	/*
-		nl := t.fr.MaxLines - t.fr.NLines
-		lines := runesplitN(t.file.b[t.org+(t.fr.NChars):], []rune("\n"), nl)
+		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines
+		lines := runesplitN(t.file.b[t.org+(t.fr.GetFrameFillStatus().Nchars):], []rune("\n"), nl)
 		for _, s := range lines {
-			t.fr.Insert(s, t.fr.NChars)
+			t.fr.Insert(s, t.fr.GetFrameFillStatus().Nchars)
 			if t.fr.LastLineFull != 0 {
 				break
 			}
 		}
 	*/
 	for {
-		n := t.file.b.nc() - (t.org + t.fr.NChars)
+		n := t.file.b.nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
 			break
 		}
 		if n > 2000 { /* educated guess at reasonable amount */
 			n = 2000
 		}
-		rp := t.file.b.Read(t.org+t.fr.NChars, n)
+		rp := t.file.b.Read(t.org+t.fr.GetFrameFillStatus().Nchars, n)
 		/*
 		 * it's expensive to frinsert more than we need, so
 		 * count newlines.
 		 */
-		nl := t.fr.MaxLines - t.fr.NLines
+		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines
 		m := 0
 		var i int
 		for i = 0; i < n; {
@@ -524,12 +524,12 @@ func (t *Text) Fill() {
 				}
 			}
 		}
-fmt.Printf("Fill: nlines %v, nchars %v, t.org %v, i %v\n", t.fr.NLines, t.fr.NChars, t.org, i)
-		t.fr.Insert(rp[:i], t.fr.NChars)
+fmt.Printf("Fill: nlines %v, nchars %v, t.org %v, i %v\n", t.fr.GetFrameFillStatus().Nlines, t.fr.GetFrameFillStatus().Nchars, t.org, i)
+		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
 		if (t.fr.LastLineFull != 0) {
 			break
 		}
-fmt.Printf("Fill: nlines %v, nchars %v, t.org %v\n", t.fr.NLines, t.fr.NChars, t.org)
+fmt.Printf("Fill: nlines %v, nchars %v, t.org %v\n", t.fr.GetFrameFillStatus().Nlines, t.fr.GetFrameFillStatus().Nchars, t.org)
 	}
 }
 
@@ -569,11 +569,11 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 	if q1 <= t.org {
 		t.org -= n
-	} else if q0 < t.org+(t.fr.NChars) {
+	} else if q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
 		p1 := q1 - t.org
 		p0 := (0)
-		if p1 > (t.fr.NChars) {
-			p1 = (t.fr.NChars)
+		if p1 > (t.fr.GetFrameFillStatus().Nchars) {
+			p1 = (t.fr.GetFrameFillStatus().Nchars)
 		}
 		if q0 < t.org {
 			t.org = q0
@@ -726,7 +726,7 @@ func (t *Text) Type(r rune) {
 			Tagdown()
 			return
 		}
-		n = t.fr.MaxLines / 3
+		n = t.fr.GetFrameFillStatus().Maxlines / 3
 		case_Down()
 		return
 	case Kscrollonedown:
@@ -734,14 +734,14 @@ func (t *Text) Type(r rune) {
 			Tagdown()
 			return
 		}
-		n = mousescrollsize(t.fr.MaxLines)
+		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
 		if n <= 0 {
 			n = 1
 		}
 		case_Down()
 		return
 	case draw.KeyPageDown:
-		n = 2 * t.fr.MaxLines / 3
+		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
 		case_Down()
 		return
 	case draw.KeyUp:
@@ -749,7 +749,7 @@ func (t *Text) Type(r rune) {
 			Tagup()
 			return
 		}
-		n = t.fr.MaxLines / 3
+		n = t.fr.GetFrameFillStatus().Maxlines / 3
 		case_Up()
 		return
 	case Kscrolloneup:
@@ -757,11 +757,11 @@ func (t *Text) Type(r rune) {
 			Tagup()
 			return
 		}
-		n = mousescrollsize(t.fr.MaxLines)
+		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
 		case_Up()
 		return
 	case draw.KeyPageUp:
-		n = 2 * t.fr.MaxLines / 3
+		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
 		case_Up()
 		return
 	case draw.KeyHome:
@@ -775,7 +775,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyEnd:
 		t.TypeCommit()
-		if t.iq1 > t.org+t.fr.NChars {
+		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
 			if t.iq1 > t.file.b.nc() {
 				// should not happen, but does. and it will crash textbacknl.
 				t.iq1 = t.file.b.nc()
@@ -1003,6 +1003,15 @@ func (t *Text) Commit(tofile bool) {
 	t.ncache = 0
 }
 
+func getP0(fr *frame.Frame) int {
+	p0, _ := fr.GetSelectionExtent()
+	return p0
+}
+func getP1(fr *frame.Frame) int {
+	_, p1 := fr.GetSelectionExtent()
+	return p1
+}
+
 func (t *Text) FrameScroll(dl int) {
 	var q0 int
 	if dl == 0 {
@@ -1011,20 +1020,20 @@ func (t *Text) FrameScroll(dl int) {
 	}
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
-		if selectq > t.org+(t.fr.P0) {
-			t.SetSelect(t.org+(t.fr.P0), selectq)
+		if selectq > t.org+(getP0((t.fr))) {
+			t.SetSelect(t.org+(getP0((t.fr))), selectq)
 		} else {
-			t.SetSelect(selectq, t.org+(t.fr.P0))
+			t.SetSelect(selectq, t.org+(getP0((t.fr))))
 		}
 	} else {
-		if t.org+(t.fr.NChars) == t.file.b.nc() {
+		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.nc() {
 			return
 		}
 		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
-		if selectq > t.org+(t.fr.P1) {
-			t.SetSelect(t.org+(t.fr.P1), selectq)
+		if selectq > t.org+(getP1((t.fr))) {
+			t.SetSelect(t.org+(getP1((t.fr))), selectq)
 		} else {
-			t.SetSelect(selectq, t.org+(t.fr.P1))
+			t.SetSelect(selectq, t.org+(getP1((t.fr))))
 		}
 	}
 	t.SetOrigin(q0, true)
@@ -1087,21 +1096,21 @@ func (t *Text) Select() {
 	}
 	if mouse.Buttons == b {
 		t.fr.Scroll = framescroll
-		t.fr.Select(mousectl)
+		t.fr.Select(*mousectl)
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.nc() {
-			selectq = t.org + (t.fr.P0)
+			selectq = t.org + (getP0((t.fr)))
 		}
 		t.fr.Scroll = nil
 		if selectq < t.org {
 			q0 = selectq
 		} else {
-			q0 = t.org + (t.fr.P0)
+			q0 = t.org + (getP0((t.fr)))
 		}
-		if selectq > t.org+(t.fr.NChars) {
+		if selectq > t.org+(t.fr.GetFrameFillStatus().Nchars) {
 			q1 = selectq
 		} else {
-			q1 = t.org + (t.fr.P1)
+			q1 = t.org + (getP1((t.fr)))
 		}
 	}
 	if q0 == q1 {
@@ -1174,13 +1183,13 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		}
 		return
 	}
-	if t.w != nil && t.fr.MaxLines == 0 {
+	if t.w != nil && t.fr.GetFrameFillStatus().Maxlines == 0 {
 		t.col.Grow(t.w, 1)
 	}
 	if doselect {
 		t.SetSelect(q0, q1)
 	}
-	qe = t.org + t.fr.NChars
+	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false /* do we call textscrdraw? */
 	nc = t.file.b.nc() + t.ncache
 	if t.org <= q0 {
@@ -1189,7 +1198,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		} else {
 			if q0 == qe && qe == nc {
 				if t.ReadC(nc-1) == '\n' {
-					if t.fr.NLines < t.fr.MaxLines {
+					if t.fr.GetFrameFillStatus().Nlines < t.fr.GetFrameFillStatus().Maxlines {
 						tsd = true
 					}
 				} else {
@@ -1202,16 +1211,16 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		t.ScrDraw()
 	} else {
 		if t.w.nopen[QWevent] > 0 {
-			nl = 3 * t.fr.MaxLines / 4
+			nl = 3 * t.fr.GetFrameFillStatus().Maxlines / 4
 		} else {
-			nl = t.fr.MaxLines / 4
+			nl = t.fr.GetFrameFillStatus().Maxlines / 4
 		}
 		q = t.Backnl(q0, nl)
 		/* avoid going backwards if trying to go forwards - long lines! */
 		if !(q0 > t.org && q < t.org) {
 			t.SetOrigin(q, true)
 		}
-		for q0 > t.org+t.fr.NChars {
+		for q0 > t.org+t.fr.GetFrameFillStatus().Nchars {
 			t.SetOrigin(t.org+1, false)
 		}
 	}
@@ -1228,7 +1237,7 @@ func (t *Text) ReadC(q int) (r rune) {
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
-	/* (t.fr.P0) and (t.fr.P1) are always right; t.q0 and t.q1 may be off */
+	/* (getP0((t.fr))) and (getP1((t.fr))) are always right; t.q0 and t.q1 may be off */
 	t.q0 = q0
 	t.q1 = q1
 	/* compute desired p0,p1 from q0,q1 */
@@ -1242,83 +1251,81 @@ func (t *Text) SetSelect(q0, q1 int) {
 	if p1 < 0 {
 		p1 = 0
 	}
-	if p0 > (t.fr.NChars) {
-		p0 = (t.fr.NChars)
+	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
+		p0 = (t.fr.GetFrameFillStatus().Nchars)
 	}
-	if p1 > (t.fr.NChars) {
+	if p1 > (t.fr.GetFrameFillStatus().Nchars) {
 		ticked = false
-		p1 = (t.fr.NChars)
+		p1 = (t.fr.GetFrameFillStatus().Nchars)
 	}
-	if p0 == (t.fr.P0) && p1 == (t.fr.P1) {
+	if p0 == (getP0((t.fr))) && p1 == (getP1((t.fr))) {
 		if p0 == p1 && ticked != t.fr.Ticked {
 			t.fr.Tick(t.fr.Ptofchar((p0)), ticked)
 		}
 		return
 	}
 	if p0 > p1 {
-		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.NChars))
+		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.GetFrameFillStatus().Nchars))
 	}
 	/* screen disagrees with desired selection */
-	if (t.fr.P1) <= p0 || p1 <= (t.fr.P0) || p0 == p1 || (t.fr.P1) == (t.fr.P0) {
+	if (getP1((t.fr))) <= p0 || p1 <= (getP0((t.fr))) || p0 == p1 || (getP1((t.fr))) == (getP0((t.fr))) {
 		/* no overlap or too easy to bother trying */
-		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P0), t.fr.P0, t.fr.P1, false)
+		t.fr.DrawSel(t.fr.Ptofchar(getP0((t.fr))),(getP0( t.fr)),(getP1( t.fr)), false)
 		if p0 != p1 || ticked {
 			t.fr.DrawSel(t.fr.Ptofchar(int(p0)), int(p0), int(p1), true)
 		}
 		goto Return
 	}
 	/* overlap; avoid unnecessary painting */
-	if p0 < (t.fr.P0) {
+	if p0 < (getP0((t.fr))) {
 		/* extend selection backwards */
-		t.fr.DrawSel(t.fr.Ptofchar((p0)), (p0), t.fr.P0, true)
+		t.fr.DrawSel(t.fr.Ptofchar((p0)), (p0),(getP0( t.fr)), true)
 	} else {
-		if p0 > (t.fr.P0) {
+		if p0 > (getP0((t.fr))) {
 			/* trim first part of selection */
-			t.fr.DrawSel(t.fr.Ptofchar(t.fr.P0), t.fr.P0, (p0), false)
+			t.fr.DrawSel(t.fr.Ptofchar(getP0((t.fr))),(getP0( t.fr)), (p0), false)
 		}
 	}
-	if p1 > (t.fr.P1) {
+	if p1 > (getP1((t.fr))) {
 		/* extend selection forwards */
-		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P1), t.fr.P1, (p1), true)
-	} else if p1 < (t.fr.P1) {
+		t.fr.DrawSel(t.fr.Ptofchar(getP1((t.fr))),(getP1( t.fr)), (p1), true)
+	} else if p1 < (getP1((t.fr))) {
 		/* trim last part of selection */
-		t.fr.DrawSel(t.fr.Ptofchar(int(p1)), (p1), t.fr.P1, false)
+		t.fr.DrawSel(t.fr.Ptofchar(int(p1)), (p1),(getP1( t.fr)), false)
 	}
 
 Return:
-	t.fr.P0 = (p0)
-	t.fr.P1 = (p1)
-
+	t.fr.SetSelectionExtent(p0, p1)
 }
 
 func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 int) {
 
-	if p1 <= (f.P0) || p0 >= (f.P1) {
+	if p1 <= (getP0((f))) || p0 >= (getP1((f))) {
 		/* no overlap */
-		f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
+		f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
 		return
 	}
-	if p0 >= (f.P0) && p1 <= (f.P1) {
+	if p0 >= (getP0((f))) && p1 <= (getP1((f))) {
 		/* entirely inside */
-		f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
+		f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
 		return
 	}
 
 	/* they now are known to overlap */
 
 	/* before selection */
-	if p0 < (f.P0) {
-		f.DrawSel0(pt0, (p0), f.P0, f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p0 = (f.P0)
+	if p0 < (getP0((f))) {
+		f.Drawsel0(pt0, (p0),(getP0( f)), f.Cols[frame.ColBack], f.Cols[frame.ColText])
+		p0 = (getP0((f)))
 		pt0 = f.Ptofchar((p0))
 	}
 	/* after selection */
-	if p1 > (f.P1) {
-		f.DrawSel0(f.Ptofchar(f.P1), f.P1, int(p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p1 = (f.P1)
+	if p1 > (getP1((f))) {
+		f.Drawsel0(f.Ptofchar(getP1((f))),(getP1( f)), int(p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
+		p1 = (getP1((f)))
 	}
 	/* inside selection */
-	f.DrawSel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
+	f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
 }
 
 const (
@@ -1333,8 +1340,8 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 	msec := mc.Mouse.Msec
 
 	/* remove tick */
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), false)
+	if(getP0( f)) ==(getP1( f)) {
+		f.Tick(f.Ptofchar(getP0((f))), false)
 	}
 	p0 := (f.Charofpt(mp))
 	p1 := (p0)
@@ -1360,13 +1367,13 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 				pt1 = pt0
 				reg = region(q, p0)
 				if reg == 0 {
-					f.DrawSel0(pt0, int(p0), int(p1), col, display.White)
+					f.Drawsel0(pt0, int(p0), int(p1), col, display.White)
 				}
 			}
 			qt := f.Ptofchar(int(q))
 			if reg > 0 {
 				if q > p1 {
-					f.DrawSel0(pt1, int(p1), int(q), col, display.White)
+					f.Drawsel0(pt1, int(p1), int(q), col, display.White)
 				} else {
 					if q < p1 {
 						selrestore(f, qt, q, p1)
@@ -1377,7 +1384,7 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 					if q > p1 {
 						selrestore(f, pt1, p1, q)
 					} else {
-						f.DrawSel0(qt, int(q), int(p1), col, display.White)
+						f.Drawsel0(qt, int(q), int(p1), col, display.White)
 					}
 				}
 			}
@@ -1412,8 +1419,8 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 	}
 	selrestore(f, pt0, p0, p1)
 	/* restore tick */
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), true)
+	if(getP0( f)) ==(getP1( f)) {
+		f.Tick(f.Ptofchar(getP0((f))), true)
 	}
 	display.Flush()
 	return p0, p1
@@ -1599,16 +1606,16 @@ func (t *Text) SetOrigin(org int, exact bool) {
 	}
 	a = org - t.org
 	fixup = false
-	if a >= 0 && a < t.fr.NChars {
+	if a >= 0 && a < t.fr.GetFrameFillStatus().Nchars {
 		t.fr.Delete(0, a)
 		fixup = true /* frdelete can leave end of last line in wrong selection mode; it doesn't know what follows */
 	} else {
-		if a < 0 && -a < t.fr.NChars {
+		if a < 0 && -a < t.fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = t.file.b.Read(org, n)
 			t.fr.Insert(r, 0)
 		} else {
-			t.fr.Delete(0, t.fr.NChars)
+			t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 		}
 	}
 	t.org = org
@@ -1616,8 +1623,8 @@ fmt.Printf("Text.SetOrigin: t.org = %v\n", t.org)
 	t.Fill()
 	t.ScrDraw()
 	t.SetSelect(t.q0, t.q1)
-	if fixup && t.fr.P1 > t.fr.P0 {
-		t.fr.DrawSel(t.fr.Ptofchar(t.fr.P1-1), t.fr.P1-1, t.fr.P1, true)
+	if fixup &&(getP1( t.fr)) >(getP0( t.fr)) {
+		t.fr.DrawSel(t.fr.Ptofchar(getP1((t.fr))-1),(getP1( t.fr))-1,(getP1( t.fr)), true)
 	}
 }
 
@@ -1626,7 +1633,7 @@ func (t *Text) Reset() {
 	t.eq0 = ^0;
 	/* do t.delete(0, t.nc, true) without building backup stuff */
 	t.SetSelect(t.org, t.org);
-	t.fr.Delete(0, t.fr.NChars);
+	t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars);
 	t.org = 0;
 	t.q0 = 0;
 	t.q1 = 0;

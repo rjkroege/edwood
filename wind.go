@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"9fans.net/go/draw"
-	"github.com/paul-lalonde/acme/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 type Window struct {
@@ -132,7 +132,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	br.Max.Y = br.Min.Y + button.R.Dy()
 	display.ScreenImage.Draw(br, button, nil, button.R.Min)
 	w.filemenu = true
-	w.maxlines = w.body.fr.MaxLines
+	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	w.autoindent = globalautoindent
 	if clone != nil {
 		w.dirty = clone.dirty
@@ -242,7 +242,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.body.ScrDraw()
 		w.body.all.Min.Y = oy
 	}
-	w.maxlines = min(w.body.fr.NLines, max(w.maxlines, w.body.fr.MaxLines))
+	w.maxlines = min(w.body.fr.GetFrameFillStatus().Nlines, max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
 	return w.r.Max.Y
 }
 
@@ -303,8 +303,8 @@ func (w *Window) Undo(isundo bool) {
 		v := text.w;
 		v.dirty = (f.seq != v.putseq);
 		if v != w {
-			v.body.q0 = v.body.fr.P0+v.body.org;
-			v.body.q1 = v.body.fr.P1+v.body.org;
+			v.body.q0 =(getP0( v.body.fr))+v.body.org;
+			v.body.q1 =(getP1( v.body.fr))+v.body.org;
 		}
 	}
 	w.SetTag();
@@ -555,7 +555,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 		w.body.file.b.nc(), isdir, dirty)
 	if fonts {
 		return fmt.Sprintf("%s%11d %q %11d ", buf, w.body.fr.Rect.Dx(),
-			w.body.font.Name, w.body.fr.MaxTab)
+			w.body.font.Name, w.body.fr.GetMaxtab())
 	}
 	return buf
 }
