@@ -379,6 +379,4 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.Tick(f.Ptofchar(f.P0), true)
 	}
 
-	//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
-
 }

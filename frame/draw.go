@@ -3,7 +3,7 @@ package frame
 import (
 	"image"
 	//	"log"
-
+//	"fmt"
 	"9fans.net/go/draw"
 )
 
@@ -20,6 +20,13 @@ func (f *Frame) DrawText(pt image.Point, text *draw.Image, back *draw.Image) {
 		pt.X += b.Wid
 	}
 }
+
+func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point) {
+	f.Background.Draw(r, col, nil, qt)
+	r = r.Inset(1)
+	f.Background.Draw(r, back, nil, qt)
+}
+
 
 func (f *Frame) DrawSel(pt image.Point, p0, p1 int, issel bool) {
 	//	log.Println("DrawSel")
@@ -67,12 +74,14 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			continue
 		}
 		if p >= p0 {
-			qt := pt
+//			qt := pt
 			pt = f.cklinewrap(pt, b)
-			// fill in the end of a wrapped line
-			if pt.Y > qt.Y {
-				f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
-			}
+			// fill in the end of a wrapped line // Doesn't look necessary
+//			if pt.Y > qt.Y {
+//f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), text, back,qt)
+//fmt.Printf("end of wrapped line box: %v, qt %v pt %v\n",image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), qt, pt)
+			//	f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
+//			}
 		}
 		runes := []rune(string(b.Ptr))
 		if p < p0 {
@@ -96,7 +105,8 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		if x > f.Rect.Max.X {
 			x = f.Rect.Max.X
 		}
-		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
+f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
+	//	f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
 		if b.Nrune >= 0 {
 			f.Background.Runes(pt, text, image.ZP, f.Font.Impl(), runes[:nr])
 		}
@@ -107,6 +117,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		qt := pt
 		pt = f.cklinewrap(pt, b)
 		if pt.Y > qt.Y {
+f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.Cols[ColHigh], back, qt)
 			f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
 	}
