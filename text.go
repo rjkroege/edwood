@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"9fans.net/go/draw"
-	"github.com/rjkroege/acme/frame"
+	"github.com/paul-lalonde/acme/frame"
 )
 
 const (
@@ -134,7 +134,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
 	odx := t.all.Dx()
 	t.all = r
 	t.scrollr = r
-	t.scrollr.Max.X = r.Min.X + Scrollwid
+	t.scrollr.Max.X = r.Min.X + display.ScaleSize(Scrollwid)
 	t.lastsr = image.ZR
 	r.Min.X += display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
@@ -504,15 +504,15 @@ func (t *Text) Fill() {
 		if n == 0 {
 			break
 		}
-		if n > 2000 { /* educated guess at reasonable amount */
+		if n > 2000 { // educated guess at reasonable amount 
 			n = 2000
 		}
 		rp := t.file.b.Read(t.org+t.fr.GetFrameFillStatus().Nchars, n)
-		/*
-		 * it's expensive to frinsert more than we need, so
-		 * count newlines.
-		 */
-		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines
+		//
+		// it's expensive to frinsert more than we need, so
+		// count newlines.
+		//
+		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines //+1
 		m := 0
 		var i int
 		for i = 0; i < n; {
@@ -524,12 +524,11 @@ func (t *Text) Fill() {
 				}
 			}
 		}
-fmt.Printf("Fill: nlines %v, nchars %v, t.org %v, i %v\n", t.fr.GetFrameFillStatus().Nlines, t.fr.GetFrameFillStatus().Nchars, t.org, i)
+fmt.Printf("Inserting:\n%v========\n", string(rp[:i]))
 		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
 		if (t.fr.LastLineFull != 0) {
 			break
 		}
-fmt.Printf("Fill: nlines %v, nchars %v, t.org %v\n", t.fr.GetFrameFillStatus().Nlines, t.fr.GetFrameFillStatus().Nchars, t.org)
 	}
 }
 
@@ -1096,7 +1095,7 @@ func (t *Text) Select() {
 	}
 	if mouse.Buttons == b {
 		t.fr.Scroll = framescroll
-		t.fr.Select(*mousectl)
+		t.fr.Select(mousectl)
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.nc() {
 			selectq = t.org + (getP0((t.fr)))
@@ -1587,15 +1586,28 @@ func (t *Text) BackNL(p, n int) int {
 }
 
 func (t *Text) SetOrigin(org int, exact bool) {
+
+	t.org = org
+	r := t.all
+	r.Min.X += display.ScaleSize(Scrollwid) + display.ScaleSize(Scrollgap)
+	r.Min.Y += 1 //display.ScaleSize(Border)
+//	r.Max.Y -= r.Dy() % t.fr.Font.DefaultHeight()
+	t.Redraw(r, t.font, display.ScreenImage, -1)
+	t.ScrDraw()
+}
+/*
+fmt.Printf("Text.SetOrigin: t.org = %v, org = %v\n", t.org, org)
+fmt.Printf("\t: t = %#v\n", t)
+fmt.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 	var (
 		i, a  int
 		fixup bool
 		r     []rune
-		n     int
+		n     int 
 	)
 	if org > 0 && !exact && t.ReadC(org-1) != '\n' {
-		/* org is an estimate of the char posn; find a newline */
-		/* don't try harder than 256 chars */
+		// org is an estimate of the char posn; find a newline 
+		// don't try harder than 256 chars 
 		for i = 0; i < 256 && org < t.file.b.nc(); i++ {
 			if t.ReadC(org) == '\n' {
 				org++
@@ -1608,18 +1620,19 @@ func (t *Text) SetOrigin(org int, exact bool) {
 	fixup = false
 	if a >= 0 && a < t.fr.GetFrameFillStatus().Nchars {
 		t.fr.Delete(0, a)
-		fixup = true /* frdelete can leave end of last line in wrong selection mode; it doesn't know what follows */
+		fixup = true // frdelete can leave end of last line in wrong selection mode; it doesn't know what follows 
 	} else {
 		if a < 0 && -a < t.fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = t.file.b.Read(org, n)
 			t.fr.Insert(r, 0)
+fmt.Printf("\t\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 		} else {
 			t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 		}
 	}
 	t.org = org
-fmt.Printf("Text.SetOrigin: t.org = %v\n", t.org)
+fmt.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 	t.Fill()
 	t.ScrDraw()
 	t.SetSelect(t.q0, t.q1)
@@ -1627,7 +1640,7 @@ fmt.Printf("Text.SetOrigin: t.org = %v\n", t.org)
 		t.fr.DrawSel(t.fr.Ptofchar(getP1((t.fr))-1),(getP1( t.fr))-1,(getP1( t.fr)), true)
 	}
 }
-
+*/
 func (t *Text) Reset() {
 	t.file.seq = 0;
 	t.eq0 = ^0;

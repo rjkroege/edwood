@@ -5,16 +5,18 @@ import (
 	"image"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"fmt"
 
 	"9fans.net/go/draw"
-	"github.com/rjkroege/acme/frame"
+	"github.com/paul-lalonde/acme/frame"
 )
 
 const (
@@ -25,8 +27,8 @@ var (
 	snarfrune [NSnarf + 1]rune
 
 	fontnames = [2]string{
-		"/mnt/font/GoRegular/13a/font",
-		"/lib/font/bit/lucm/unicode.9.font",
+		"/mnt/font/GoRegular/17a/font",
+		"/mnt/font/GoRegular/17a/font",
 	}
 
 	command           *Command
@@ -37,23 +39,6 @@ func timefmt( /*Fmt* */ ) int {
 	return 0
 }
 
-func main2() {
-	var cols [5]*draw.Image
-	errch := make(chan<- error)
-	display, err := draw.Init(errch, "", "acme", "1024x720")
-	if err != nil {
-		panic(err)
-	}
-	img, err := display.AllocImage(image.Rect(0, 0, 1024, 720), draw.RGB16, true, draw.Cyan)
-	if err != nil {
-		panic(err)
-	}
-	f := frame.NewFrame(image.Rect(0, 0, 500, 600), display.DefaultFont, img, cols)
-
-	for {
-		f.Tick(image.ZP, true)
-	}
-}
 
 // var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
@@ -112,7 +97,7 @@ func main() {
 	wdir, _ = os.Getwd()
 
 	var err error
-	display, err = draw.Init(nil, fontnames[0], "acme", *winsize)
+	display, cexit, err = draw.Init(nil, fontnames[0], "acme", *winsize)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -135,7 +120,7 @@ func main() {
 	cxfidfree = make(chan *Xfid)
 	cnewwindow = make(chan *Window)
 	mouseexit0 = make(chan int)
-	cexit = make(chan int)
+	csignal = make(chan os.Signal, 1)
 	cerr = make(chan error)
 	cedit = make(chan int)
 	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
@@ -192,9 +177,17 @@ func main() {
 	go newwindowthread()
 	go xfidallocthread(display)
 
-	select {
-	case <-cexit:
+	signal.Notify(csignal/*, hangupsignals...*/)
+	for {
+		select {
+		case <-cexit:
+			shutdown(os.Interrupt)
+
+		case s := <-csignal:
+			shutdown(s)
+		}
 	}
+
 }
 
 func readfile(c *Column, filename string) {
@@ -233,7 +226,7 @@ func fontget(fix int, save bool, setfont bool, name string) (font *draw.Font) {
 		fontnames[fix] = name
 	}
 	if setfont {
-		tagfont = font
+		tagfont = font // TODO(flux): Global font stuff is just nasty.
 		iconinit()
 	}
 	return font
@@ -534,4 +527,36 @@ func newwindowthread() {
 
 func plumbproc() {
 
+}
+
+func killprocs() {
+	fsysclose()
+/*
+	for _, c := range command {
+		c.Signal(os.Interrupt)
+	}
+*/
+}
+
+var dumping bool
+
+var hangupsignals = []os.Signal{
+	os.Signal(syscall.SIGINT),
+	os.Signal(syscall.SIGHUP),
+	os.Signal(syscall.SIGQUIT),
+	os.Signal(syscall.SIGSTOP),
+}
+func shutdown(s os.Signal) {
+fmt.Println("Exiting!", s)
+	killprocs();
+	if(!dumping && os.Getpid()==mainpid){
+		dumping = true;
+		row.Dump("");
+	}
+	for _, sig := range hangupsignals {
+		if sig == s {
+			os.Exit(0)
+		}
+	}
+	return
 }

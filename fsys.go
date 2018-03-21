@@ -106,7 +106,7 @@ func fsysinit() {
 	}
 	reader := os.NewFile(uintptr(pipe[0]), "pipeend0")
 	writer := os.NewFile(uintptr(pipe[1]), "pipeend1")
-	if post9pservice(reader, "acme", mtpt) < 0 { // TODO(flux) I may have messed up whether to give post9pservice the reader or the writer end
+	if post9pservice(reader, "acme", mtpt) < 0 { 
 		acmeerror("can't post service", nil)
 	}
 	sfd = writer

@@ -16,7 +16,7 @@ import (
 func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 	left := f.Rect.Max.X - pt.X
 	if b.Nrune < 0 {
-		if b.Minwid <= byte(left) {
+		if int(b.Minwid) <= left {
 			return 1, true
 		} else {
 			return 0, false

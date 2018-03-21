@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"runtime"
+	"os"
+//	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -12,7 +13,7 @@ import (
 
 	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
-	"github.com/rjkroege/acme/frame"
+	"github.com/paul-lalonde/acme/frame"
 )
 
 const (
@@ -135,7 +136,8 @@ var (
 	cnewwindow chan *Window
 	mouseexit0 chan int
 	mouseexit1 chan int
-	cexit      chan int
+	cexit      chan struct{}
+	csignal     chan os.Signal
 	cerr       chan error
 	cedit      chan int
 	cwarn      chan uint
@@ -239,7 +241,7 @@ func Unimpl() {
 	for i, l := range stack {
 		if l == "main.Unimpl()" {
 			fmt.Printf("Unimplemented: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
-			runtime.Breakpoint()
+		//	runtime.Breakpoint()
 			break
 		}
 	}

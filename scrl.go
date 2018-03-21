@@ -6,7 +6,7 @@ import (
 	"image"
 	"time"
 
-	"github.com/rjkroege/acme/frame"
+	"github.com/paul-lalonde/acme/frame"
 )
 
 var scrtmp *draw.Image

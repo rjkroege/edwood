@@ -46,6 +46,31 @@ func (ff *frfont) Impl() *draw.Font {
 	return ff.Font
 }
 
+// Maxtab sets the maximum size of a tab in pixels.
+func (f *Frame) Maxtab(m int) {
+	f.MaxTab = m
+}
+
+// GetMaxtab returns the current maximum size of a tab in pixels.
+func (f *Frame) GetMaxtab() int { return f.MaxTab }
+
+// FrameFillStatus is a snapshot of the capacity of the Frame.
+type FrameFillStatus struct {
+	Nchars   int
+	Nlines   int
+	Maxlines int
+}
+
+// GetFrameFillStatus returns a snapshot of the capacity of the frame.
+func (f *Frame) GetFrameFillStatus() FrameFillStatus {
+	return FrameFillStatus{
+		Nchars:   f.NChars,
+		Nlines:   f.NLines,
+		Maxlines: f.MaxLines,
+	}
+}
+
+
 type Frame struct {
 	Font         Fontmetrics
 	Display      *draw.Display           // on which the frame is displayed
