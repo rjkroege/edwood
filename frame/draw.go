@@ -4,8 +4,6 @@ import (
 	"image"
 
 	"9fans.net/go/draw"
-
-	"log"
 )
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
@@ -48,7 +46,6 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	}
 
 	var back, text *draw.Image
-	log.Println("before the f.Tick", f.p0, f.p1)
 	if f.ticked {
 		f.Tick(f.Ptofchar(f.p0), false)
 	}
@@ -133,7 +130,6 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			nr -= int(p0) - p
 			p = int(p0)
 		}
-		log.Println("after advance", nr, p)
 		trim = false
 		if p+nr > p1 {
 			// end of region: trim box
