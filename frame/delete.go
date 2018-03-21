@@ -2,13 +2,13 @@ package frame
 
 import (
 	"image"
-	"log"
+	//"log"
 )
 
 // Delete deletes from the Frame the text between p0 and p1; p1 points at
 // the first rune beyond the deletion.
 func (f *Frame) Delete(p0, p1 int) int {
-	log.Println("Delete")
+	//log.Println("Delete")
 	var r image.Rectangle
 
 	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
@@ -18,7 +18,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 		p1 = f.NChars
 	}
 
-	log.Println("Delete is doing something")
+	//log.Println("Delete is doing something")
 
 	n0 := f.findbox(0, 0, p0)
 	if n0 == f.nbox {

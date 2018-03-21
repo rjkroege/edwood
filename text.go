@@ -524,7 +524,6 @@ func (t *Text) Fill() {
 				}
 			}
 		}
-fmt.Printf("Inserting:\n%v========\n", string(rp[:i]))
 		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
 		if (t.fr.LastLineFull != 0) {
 			break
@@ -1586,13 +1585,12 @@ func (t *Text) BackNL(p, n int) int {
 }
 
 func (t *Text) SetOrigin(org int, exact bool) {
-
 	t.org = org
 	r := t.all
 	r.Min.X += display.ScaleSize(Scrollwid) + display.ScaleSize(Scrollgap)
-	r.Min.Y += 1 //display.ScaleSize(Border)
-//	r.Max.Y -= r.Dy() % t.fr.Font.DefaultHeight()
+	r.Min.Y += 1 //same + 1 as col.go:402?  Makes up the 1 px line at top of window.
 	t.Redraw(r, t.font, display.ScreenImage, -1)
+	t.lastsr = image.ZR
 	t.ScrDraw()
 }
 /*

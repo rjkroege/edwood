@@ -100,7 +100,7 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 // TODO(rjk): broken. does not fix up the world correctly?
 // clean merges boxes where possible over boxes [n0, n1)
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
-	log.Println("clean", pt, n0, n1, f.Rect.Max.X)
+	//log.Println("clean", pt, n0, n1, f.Rect.Max.X)
 	//	f.Logboxes("--- clean: starting ---")
 	c := f.Rect.Max.X
 	nb := 0
