@@ -161,11 +161,15 @@ func (mf *Myframe) MouseMove(pt image.Point) {
 	nc := mf.f.Charofpt(pt)
 	mf.cursor = nc
 
+	log.Println("MouseMove basic", pt, "->", nc)
+
 	if mf.cursordown <= mf.cursor {
 		selpt := mf.f.Ptofchar(mf.cursordown)
+		log.Println("MouseMove str", selpt,string(mf.buffer[mf.cursordown:mf.cursor]))
 		mf.f.DrawSel(selpt, mf.cursordown, mf.cursor, true)
 	} else {
 		selpt := mf.f.Ptofchar(mf.cursor)
+		log.Println("MouseMove str", selpt,string(mf.buffer[mf.cursor:mf.cursordown]))
 		mf.f.DrawSel(selpt, mf.cursor, mf.cursordown, true)
 	}
 }
