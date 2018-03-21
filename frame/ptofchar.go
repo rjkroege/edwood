@@ -21,7 +21,7 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 					p--
 					r, w = utf8.DecodeRune(b.Ptr[s:])
 					pt.X += f.Font.StringWidth(string(b.Ptr[s : s+1]))
-					if r == 0 || pt.X > f.Rect.Max.X {
+					if r == utf8.RuneErrror || pt.X > f.Rect.Max.X {
 						panic("frptofchar")
 					}
 				}
@@ -91,7 +91,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 				s := 0
 				for ; s < len(b.Ptr); s += w {
 					r, w = utf8.DecodeRune(b.Ptr[s:])
-					if r == 0 {
+					if r == utf8.RuneError {
 						panic("end of string in frcharofpt")
 					}
 					// TODO(flux): This StringWidth handling seems wrong
