@@ -13,11 +13,11 @@ import (
 
 type Window struct {
 	display *draw.Display
-	lk   sync.Mutex
-	ref  Ref
-	tag  Text
-	body Text
-	r    image.Rectangle
+	lk      sync.Mutex
+	ref     Ref
+	tag     Text
+	body    Text
+	r       image.Rectangle
 
 	isdir      bool
 	isscratch  bool
@@ -39,12 +39,12 @@ type Window struct {
 	eventx *Xfid
 	events []byte
 
-	nevents  int
-	owner    int
-	maxlines int
-	dirnames []string
-	widths   []int
-	putseq   int
+	nevents     int
+	owner       int
+	maxlines    int
+	dirnames    []string
+	widths      []int
+	putseq      int
 	incl        []string
 	reffont     *draw.Font
 	ctrllock    *sync.Mutex
@@ -125,14 +125,18 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	w.body.what = Body
 	r1.Min.Y -= 1
 	r1.Max.Y = r1.Min.Y + 1
-	w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+	if w.display != nil {
+		w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+	}
 	w.body.ScrDraw()
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
 	br.Max.X = br.Min.X + button.R.Dx()
 	br.Max.Y = br.Min.Y + button.R.Dy()
-	w.display.ScreenImage.Draw(br, button, nil, button.R.Min)
+	if w.display != nil {
+		w.display.ScreenImage.Draw(br, button, nil, button.R.Min)
+	}
 	w.filemenu = true
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	w.autoindent = globalautoindent
@@ -154,31 +158,34 @@ func (w *Window) DrawButton() {
 	br.Min = w.tag.scrollr.Min
 	br.Max.X = br.Min.X + b.R.Dx()
 	br.Max.Y = br.Min.Y + b.R.Dy()
-	w.display.ScreenImage.Draw(br, b, nil, b.R.Min)
-
+	if w.display != nil {
+		w.display.ScreenImage.Draw(br, b, nil, b.R.Min)
+	}
 }
 
 func (w *Window) delRunePos() int {
 	var n int
-	for n=0; n<w.tag.file.b.nc(); n++  {
-		r := w.tag.file.b.Read(n, 1);
+	for n = 0; n < w.tag.file.b.nc(); n++ {
+		r := w.tag.file.b.Read(n, 1)
 		if r[0] == ' ' {
-			break;
+			break
 		}
 	}
-	n += 2;
+	n += 2
 	if n >= w.tag.file.b.nc() {
-		return -1;
+		return -1
 	}
-	return n;
+	return n
 }
 
 func (w *Window) moveToDel() {
-	n := w.delRunePos();
-	if(n < 0) {
-		return;
+	n := w.delRunePos()
+	if n < 0 {
+		return
 	}
-	w.display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
+	if w.display != nil {
+		w.display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
+	}
 }
 
 func (w *Window) TagLines(r image.Rectangle) int {
@@ -213,13 +220,17 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		if mouseintag && !mouse.Point.In(w.tag.all) {
 			p := mouse.Point
 			p.Y = w.tag.all.Max.Y - 3
-			w.display.MoveTo(p)
+			if w.display != nil {
+				w.display.MoveTo(p)
+			}
 		}
 		// If mouse is in body, push down as tag expands.
 		if mouseinbody && mouse.Point.In(w.tag.all) {
 			p := mouse.Point
 			p.Y = w.tag.all.Max.Y + 3
-			w.display.MoveTo(p)
+			if w.display != nil {
+				w.display.MoveTo(p)
+			}
 		}
 	}
 	// Redraw body
@@ -230,7 +241,9 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		if y+1+w.body.fr.Font.DefaultHeight() <= r.Max.Y { /* room for one line */
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
-			w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+			if w.display != nil {
+				w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+			}
 			y++
 			r1.Min.Y = min(y, r.Max.Y)
 			r1.Max.Y = r.Max.Y
@@ -250,8 +263,8 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 
 func (w *Window) Lock1(owner int) {
 	w.ref.Inc()
-	w.lk.Lock();
-	w.owner = owner;
+	w.lk.Lock()
+	w.owner = owner
 }
 
 func (w *Window) Lock(owner int) {
@@ -265,8 +278,10 @@ func (w *Window) Unlock() {
 }
 
 func (w *Window) MouseBut() {
-	w.display.MoveTo(w.tag.scrollr.Min.Add(
-		image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
+	if w.display != nil {
+		w.display.MoveTo(w.tag.scrollr.Min.Add(
+			image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
+	}
 }
 
 func (w *Window) DirFree() {
@@ -276,40 +291,40 @@ func (w *Window) DirFree() {
 
 func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
-		xfidlog(w, "del");
-		w.DirFree();
-		w.tag.Close();
-		w.body.Close();
+		xfidlog(w, "del")
+		w.DirFree()
+		w.tag.Close()
+		w.body.Close()
 		if activewin == w {
-			activewin = nil;
+			activewin = nil
 		}
 	}
 }
 
 func (w *Window) Delete() {
-	x := w.eventx;
+	x := w.eventx
 	if x != nil {
-		w.events = w.events[0:0];
-		w.eventx = nil;
-		x.c<-nil	/* wake him up */
+		w.events = w.events[0:0]
+		w.eventx = nil
+		x.c <- nil /* wake him up */
 	}
 }
 
 func (w *Window) Undo(isundo bool) {
-	w.utflastqid = -1;
-	body := &w.body;
-	body.q0, body.q1 = body.file.Undo(isundo);
-	body.Show(body.q0, body.q1, true);
-	f := body.file;
+	w.utflastqid = -1
+	body := &w.body
+	body.q0, body.q1 = body.file.Undo(isundo)
+	body.Show(body.q0, body.q1, true)
+	f := body.file
 	for _, text := range f.text {
-		v := text.w;
-		v.dirty = (f.seq != v.putseq);
+		v := text.w
+		v.dirty = (f.seq != v.putseq)
 		if v != w {
-			v.body.q0 =(getP0( v.body.fr))+v.body.org;
-			v.body.q1 =(getP1( v.body.fr))+v.body.org;
+			v.body.q0 = (getP0(v.body.fr)) + v.body.org
+			v.body.q1 = (getP1(v.body.fr)) + v.body.org
 		}
 	}
-	w.SetTag();
+	w.SetTag()
 }
 
 func (w *Window) SetName(name string) {
@@ -344,32 +359,32 @@ func (w *Window) Type(t *Text, r rune) {
 
 func (w *Window) ClearTag() {
 	/* w must be committed */
-	n := w.tag.file.b.nc();
-	r := w.tag.file.b.Read(0, n);
+	n := w.tag.file.b.nc()
+	r := w.tag.file.b.Read(0, n)
 	var i int
-	for i=0; i<n; i++ {
-		if r[i]==' ' || r[i]=='\t' {
-			break;
+	for i = 0; i < n; i++ {
+		if r[i] == ' ' || r[i] == '\t' {
+			break
 		}
 	}
-	for ; i<n; i++ {
+	for ; i < n; i++ {
 		if r[i] == '|' {
-			break;
+			break
 		}
 	}
 	if i == n {
-		return;
+		return
 	}
-	i++;
-	w.tag.Delete(i, n, true);
-	w.tag.file.mod = false;
+	i++
+	w.tag.Delete(i, n, true)
+	w.tag.file.mod = false
 	if w.tag.q0 > i {
-		w.tag.q0 = i;
+		w.tag.q0 = i
 	}
 	if w.tag.q1 > i {
-		w.tag.q1 = i;
+		w.tag.q1 = i
 	}
-	w.tag.SetSelect(w.tag.q0, w.tag.q1);
+	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 }
 
 func (w *Window) SetTag() {
@@ -480,7 +495,7 @@ func (w *Window) Commit(t *Text) {
 	}
 }
 
-func isDir(r string) (bool, error) {	
+func isDir(r string) (bool, error) {
 	f, err := os.Open(r)
 	if err != nil {
 		return false, err
@@ -497,51 +512,51 @@ func isDir(r string) (bool, error) {
 	}
 
 	return false, nil
-	
+
 }
 
 func (w *Window) AddIncl(r string) {
 
-	// Tries to open absolute paths, and if fails, tries 
+	// Tries to open absolute paths, and if fails, tries
 	// to use dirname instead.
 	d, err := isDir(r)
 	if d == false {
 		if r[0] == '/' {
 			warning(nil, "%s: Not a directory: %v", r, err)
-			return 
+			return
 		}
 		r = string(dirname(&w.body, []rune(r)))
 		d, err := isDir(r)
-		if d == false { 
+		if d == false {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}
 	}
 	w.incl = append(w.incl, r)
-	return;
+	return
 
 }
 
 func (w *Window) Clean(conservative bool) bool {
-	if w.isscratch || w.isdir {	/* don't whine if it's a guide file, error window, etc. */
-		return true;
+	if w.isscratch || w.isdir { /* don't whine if it's a guide file, error window, etc. */
+		return true
 	}
-	if !conservative && w.nopen[QWevent]>0 {
-		return true;
+	if !conservative && w.nopen[QWevent] > 0 {
+		return true
 	}
 	if w.dirty {
 		if len(w.body.file.name) != 0 {
-			warning(nil, "%v modified\n", w.body.file.name);
-		} else{
-			if w.body.file.b.nc() < 100 {	/* don't whine if it's too small */
-				return true;
+			warning(nil, "%v modified\n", w.body.file.name)
+		} else {
+			if w.body.file.b.nc() < 100 { /* don't whine if it's too small */
+				return true
 			}
-			warning(nil, "unnamed file modified\n");
+			warning(nil, "unnamed file modified\n")
 		}
-		w.dirty = false;
-		return false;
+		w.dirty = false
+		return false
 	}
-	return true;
+	return true
 }
 
 func (w *Window) CtlPrint(fonts bool) string {

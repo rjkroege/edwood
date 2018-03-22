@@ -11,6 +11,6 @@ import (
 func test_fsys(t *testing.T) {
 	fsysinit()
 
-	// Now we need to 9p our way to it, and understand how much 
+	// Now we need to 9p our way to it, and understand how much
 	// acme needs to exist to run.
 }

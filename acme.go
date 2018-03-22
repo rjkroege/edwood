@@ -39,7 +39,6 @@ func timefmt( /*Fmt* */ ) int {
 	return 0
 }
 
-
 // var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
 var bartflagflag = flag.Bool("b", false, "Bart's Flag")
@@ -49,7 +48,7 @@ var varfontflag = flag.String("F", fontnames[1], "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
-var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)") 
+var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)")
 var ncol int = 2
 
 var mainpid int
@@ -113,7 +112,7 @@ func main() {
 	iconinit(display)
 	// rxinit(); // TODO(flux) looks unneeded now
 
-	//cplumb = make(chan *Plumbmsg) 
+	//cplumb = make(chan *Plumbmsg)
 	// cwait = make(chan Waitmsg)
 	ccommand = make(chan *Command)
 	ckill = make(chan []rune)
@@ -130,7 +129,7 @@ func main() {
 	mouse = &mousectl.Mouse
 
 	// startplumbing() // TODO(flux): plumbing
-	fsysinit() 
+	fsysinit()
 
 	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
 
@@ -178,7 +177,7 @@ func main() {
 	go newwindowthread()
 	go xfidallocthread(display)
 
-	signal.Notify(csignal/*, hangupsignals...*/)
+	signal.Notify(csignal /*, hangupsignals...*/)
 	for {
 		select {
 		case <-cexit:
@@ -200,9 +199,9 @@ func readfile(c *Column, filename string) {
 	w.dirty = false
 	w.SetTag()
 	w.Resize(w.r, false, true)
-	w.body.ScrDraw()  
-	w.tag.SetSelect(w.tag.file.b.nc(), w.tag.file.b.nc()) 
-	xfidlog(w, "new")  
+	w.body.ScrDraw()
+	w.tag.SetSelect(w.tag.file.b.nc(), w.tag.file.b.nc())
+	xfidlog(w, "new")
 }
 
 var fontCache map[string]*draw.Font = make(map[string]*draw.Font)
@@ -302,7 +301,7 @@ func mousethread(display *draw.Display) {
 			MovedMouse(mousectl.Mouse)
 		case <-cwarn:
 			break
-		//case pm := <-cplumb:
+			//case pm := <-cplumb:
 		}
 	}
 }
@@ -532,11 +531,11 @@ func plumbproc() {
 
 func killprocs() {
 	fsysclose()
-/*
-	for _, c := range command {
-		c.Signal(os.Interrupt)
-	}
-*/
+	/*
+		for _, c := range command {
+			c.Signal(os.Interrupt)
+		}
+	*/
 }
 
 var dumping bool
@@ -547,12 +546,13 @@ var hangupsignals = []os.Signal{
 	os.Signal(syscall.SIGQUIT),
 	os.Signal(syscall.SIGSTOP),
 }
+
 func shutdown(s os.Signal) {
-fmt.Println("Exiting!", s)
-	killprocs();
-	if(!dumping && os.Getpid()==mainpid){
-		dumping = true;
-		row.Dump("");
+	fmt.Println("Exiting!", s)
+	killprocs()
+	if !dumping && os.Getpid() == mainpid {
+		dumping = true
+		row.Dump("")
 	}
 	for _, sig := range hangupsignals {
 		if sig == s {

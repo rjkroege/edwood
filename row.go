@@ -1,18 +1,18 @@
 package main
 
 import (
+	"9fans.net/go/draw"
 	"image"
 	"sync"
 	"unicode/utf8"
-	"9fans.net/go/draw"
 )
 
 type Row struct {
 	display *draw.Display
-	lk  sync.Mutex
-	r   image.Rectangle
-	tag Text
-	col []*Column
+	lk      sync.Mutex
+	r       image.Rectangle
+	tag     Text
+	col     []*Column
 }
 
 func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
@@ -124,110 +124,110 @@ func (r *Row) Resize(rect image.Rectangle) {
 }
 
 func (row *Row) DragCol(c *Column, _ int) {
-var (
-	r image.Rectangle
-	i, b, x int
-	p, op image.Point
-	d *Column
-)
-	clearmouse();
+	var (
+		r       image.Rectangle
+		i, b, x int
+		p, op   image.Point
+		d       *Column
+	)
+	clearmouse()
 	// setcursor(mousectl, &boxcursor); TODO(flux)
-	b = mouse.Buttons;
-	op = mouse.Point;
-	for(mouse.Buttons == b) {
+	b = mouse.Buttons
+	op = mouse.Point
+	for mouse.Buttons == b {
 		mousectl.Read()
 	}
 	// setcursor(mousectl, nil);
-	if(mouse.Buttons!=0){
-		for(mouse.Buttons!=0) {
+	if mouse.Buttons != 0 {
+		for mouse.Buttons != 0 {
 			mousectl.Read()
 		}
-		return;
+		return
 	}
 
-	for i=0; i<len(row.col); i++ {
-		if(row.col[i] == c) {
-			goto Found;
+	for i = 0; i < len(row.col); i++ {
+		if row.col[i] == c {
+			goto Found
 		}
 	}
-	acmeerror("can't find column", nil);
+	acmeerror("can't find column", nil)
 
-  Found:
-	p = mouse.Point;
-	if((abs(p.X-op.X)<5 && abs(p.Y-op.Y)<5)) {
-		return;
+Found:
+	p = mouse.Point
+	if abs(p.X-op.X) < 5 && abs(p.Y-op.Y) < 5 {
+		return
 	}
-	if((i>0 && p.X<row.col[i-1].r.Min.X) || (i<len(row.col)-1 && p.X>c.r.Max.X)){
+	if (i > 0 && p.X < row.col[i-1].r.Min.X) || (i < len(row.col)-1 && p.X > c.r.Max.X) {
 		/* shuffle */
-		x = c.r.Min.X;
-		row.Close(c, false);
-		if(row.Add(c, p.X) == nil) &&	/* whoops! */
-		 (row.Add(c, x) == nil) &&		/* WHOOPS! */
-		 (row.Add(c, -1)==nil){		/* shit! */
-			row.Close(c, true);
-			return;
+		x = c.r.Min.X
+		row.Close(c, false)
+		if (row.Add(c, p.X) == nil) && /* whoops! */
+			(row.Add(c, x) == nil) && /* WHOOPS! */
+			(row.Add(c, -1) == nil) { /* shit! */
+			row.Close(c, true)
+			return
 		}
-		c.MouseBut();
-		return;
+		c.MouseBut()
+		return
 	}
-	if(i == 0) {
-		return;
+	if i == 0 {
+		return
 	}
-	d = row.col[i-1];
-	if(p.X < d.r.Min.X+80+row.display.ScaleSize(Scrollwid)) {
-		p.X = d.r.Min.X+80+row.display.ScaleSize(Scrollwid);
+	d = row.col[i-1]
+	if p.X < d.r.Min.X+80+row.display.ScaleSize(Scrollwid) {
+		p.X = d.r.Min.X + 80 + row.display.ScaleSize(Scrollwid)
 	}
-	if(p.X > c.r.Max.X-80-row.display.ScaleSize(Scrollwid)) {
-		p.X = c.r.Max.X-80-row.display.ScaleSize(Scrollwid);
+	if p.X > c.r.Max.X-80-row.display.ScaleSize(Scrollwid) {
+		p.X = c.r.Max.X - 80 - row.display.ScaleSize(Scrollwid)
 	}
-	r = d.r;
-	r.Max.X = c.r.Max.X;
-	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
-	r.Max.X = p.X;
-	d.Resize(r);
-	r = c.r;
-	r.Min.X = p.X;
-	r.Min.X = r.Min.X;
-	r.Max.X += row.display.ScaleSize(Border);
-	row.display.ScreenImage.Draw(r, row.display.Black, nil, image.ZP);
-	r.Min.X = r.Max.X;
-	r.Max.X = c.r.Max.X;
-	c.Resize(r);
-	c.MouseBut();
+	r = d.r
+	r.Max.X = c.r.Max.X
+	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+	r.Max.X = p.X
+	d.Resize(r)
+	r = c.r
+	r.Min.X = p.X
+	r.Min.X = r.Min.X
+	r.Max.X += row.display.ScaleSize(Border)
+	row.display.ScreenImage.Draw(r, row.display.Black, nil, image.ZP)
+	r.Min.X = r.Max.X
+	r.Max.X = c.r.Max.X
+	c.Resize(r)
+	c.MouseBut()
 }
 
 func (row *Row) Close(c *Column, dofree bool) {
-var (
-	r image.Rectangle
-	i int
-)
+	var (
+		r image.Rectangle
+		i int
+	)
 
-	for i=0; i<len(row.col); i++  {
-		if(row.col[i] == c) {
-			goto Found;
+	for i = 0; i < len(row.col); i++ {
+		if row.col[i] == c {
+			goto Found
 		}
 	}
-	acmeerror("can't find column", nil);
-  Found:
-	r = c.r;
-	if(dofree) {
+	acmeerror("can't find column", nil)
+Found:
+	r = c.r
+	if dofree {
 		c.CloseAll()
 	}
 	row.col = append(row.col[:i], row.col[i+1:]...)
-	if(len(row.col) == 0){
-		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
-		return;
+	if len(row.col) == 0 {
+		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+		return
 	}
-	if(i == len(row.col)){		/* extend last column right */
-		c = row.col[i-1];
-		r.Min.X = c.r.Min.X;
-		r.Max.X = row.r.Max.X;
-	}else{			/* extend next window left */
-		c = row.col[i];
-		r.Max.X = c.r.Max.X;
+	if i == len(row.col) { /* extend last column right */
+		c = row.col[i-1]
+		r.Min.X = c.r.Min.X
+		r.Max.X = row.r.Max.X
+	} else { /* extend next window left */
+		c = row.col[i]
+		r.Max.X = c.r.Max.X
 	}
-	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
-	c.Resize(r);
+	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+	c.Resize(r)
 }
 
 func (r *Row) WhichCol(p image.Point) *Column {
@@ -292,11 +292,11 @@ func (row *Row) Type(r rune, p image.Point) *Text {
 
 func (row *Row) Clean() bool {
 
-	clean := true;
+	clean := true
 	for _, col := range row.col {
-		clean = clean && col.Clean();
+		clean = clean && col.Clean()
 	}
-	return clean;
+	return clean
 }
 
 func (r *Row) Dump(file string) {

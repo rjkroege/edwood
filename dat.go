@@ -5,7 +5,7 @@ import (
 	"image"
 	"math"
 	"os"
-//	"runtime"
+	//	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -50,7 +50,7 @@ const (
 	//	STACK = 65536
 	EVENTSIZE = 256
 	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
-	RBUFSIZE = BUFSIZE/utf8.UTFMax
+	RBUFSIZE  = BUFSIZE / utf8.UTFMax
 
 	Empty    = 0
 	Null     = '-'
@@ -136,7 +136,7 @@ var (
 	mouseexit0 chan int
 	mouseexit1 chan int
 	cexit      chan struct{}
-	csignal     chan os.Signal
+	csignal    chan os.Signal
 	cerr       chan error
 	cedit      chan int
 	cwarn      chan uint
@@ -240,7 +240,7 @@ func Unimpl() {
 	for i, l := range stack {
 		if l == "main.Unimpl()" {
 			fmt.Printf("Unimplemented: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
-		//	runtime.Breakpoint()
+			//	runtime.Breakpoint()
 			break
 		}
 	}

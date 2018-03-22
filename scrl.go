@@ -52,7 +52,7 @@ func scrpos(r image.Rectangle, p0, p1 int, tot int) image.Rectangle {
 			q.Min.Y = q.Max.Y - 2
 		}
 	}
-fmt.Printf("q = %v\n",q)
+	fmt.Printf("q = %v\n", q)
 	return q
 }
 
