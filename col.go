@@ -4,6 +4,7 @@ import (
 	"image"
 	"sort"
 
+	"9fans.net/go/draw"
 	"github.com/rjkroege/acme/frame"
 )
 
@@ -12,6 +13,7 @@ var (
 )
 
 type Column struct {
+	display *draw.Display
 	r    image.Rectangle
 	tag  Text
 	row  *Row
@@ -23,26 +25,27 @@ func (c *Column) nw() int {
 	return len(c.w)
 }
 
-func (c *Column) Init(r image.Rectangle) *Column {
+func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	if c == nil {
 		c = &Column{}
 	}
+	c.display = dis
 	c.w = []*Window{}
-	display.ScreenImage.Draw(r, display.White, nil, image.ZP)
+	c.display.ScreenImage.Draw(r, c.display.White, nil, image.ZP)
 	c.r = r
 	c.tag.col = c
 	tagfile := NewFile("")
 	r1 := r
 	r1.Max.Y = r1.Min.Y + tagfont.Height
-	c.tag.Init(tagfile.AddText(&c.tag), r1, tagfont, tagcolors)
+	c.tag.Init(tagfile.AddText(&c.tag), r1, tagfont, tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
-	r1.Max.Y += display.ScaleSize(Border)
-	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+	r1.Max.Y += c.display.ScaleSize(Border)
+	c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
 	c.tag.Insert(0, Lheader, true)
 	c.tag.SetSelect(c.tag.file.b.nc(), c.tag.file.b.nc())
-	display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
-	display.Flush()
+	c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+	c.display.Flush()
 	c.safe = true
 	return c
 }
@@ -60,7 +63,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	var ymax int
 
 	r := c.r
-	r.Min.Y = c.tag.fr.Rect.Max.Y + display.ScaleSize(Border)
+	r.Min.Y = c.tag.fr.Rect.Max.Y + c.display.ScaleSize(Border)
 	if y < r.Min.Y && c.nw() > 0 { // Steal half the last window
 		v = c.w[c.nw()-1]
 		y = v.body.fr.Rect.Min.Y + v.body.fr.Rect.Dx()/2
@@ -81,7 +84,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		/*
 		 * if landing window (v) is too small, grow it first.
 		 */
-		minht := v.tag.fr.Font.DefaultHeight() + display.ScaleSize(Border) + 1
+		minht := v.tag.fr.Font.DefaultHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
 		ffs := v.body.fr.GetFrameFillStatus()
 		for !c.safe || ffs.Maxlines < 3 || v.body.all.Dy() <= minht {
@@ -99,33 +102,33 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 
 		// new window stops where next window begins 
 		if windex < c.nw() {
-			ymax = c.w[windex].r.Min.Y - display.ScaleSize(Border)
+			ymax = c.w[windex].r.Min.Y - c.display.ScaleSize(Border)
 		} else {
 			ymax = c.r.Max.Y
 		}
 
 		// new window must start after v's tag ends 
-		y = max(y, v.tagtop.Max.Y+display.ScaleSize(Border))
+		y = max(y, v.tagtop.Max.Y+c.display.ScaleSize(Border))
 
 		// new window must start early enough to end before ymax 
 		y = min(y, ymax-minht)
 
 		// if y is too small, too many windows in column 
-		if y < v.tagtop.Max.Y+display.ScaleSize(Border) {
+		if y < v.tagtop.Max.Y+c.display.ScaleSize(Border) {
 			buggered = true
 		}
 
 		// Resize & redraw v
 		r = v.r
 		r.Max.Y = ymax
-		display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+		c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 		r1 := r
-		y = min(y, ymax-(v.tag.fr.Font.DefaultHeight()*v.taglines+v.body.fr.Font.DefaultHeight()+display.ScaleSize(Border)+1))
+		y = min(y, ymax-(v.tag.fr.Font.DefaultHeight()*v.taglines+v.body.fr.Font.DefaultHeight()+c.display.ScaleSize(Border)+1))
 		ffs = v.body.fr.GetFrameFillStatus()
 		r1.Max.Y = min(y, v.body.fr.Rect.Min.Y+ffs.Nlines*v.body.fr.Font.DefaultHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
-		r1.Max.Y = r1.Min.Y + display.ScaleSize(Border)
-		display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
+		c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
 
 		/*
 		 * leave r with w's coordinates
@@ -135,8 +138,8 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	if w == nil {
 		w = NewWindow()
 		w.col = c
-		display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
-		w.Init(clone, r)
+		c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+		w.Init(clone, r, c.display)
 	} else {
 		w.col = c
 		w.Resize(r, false, true)
@@ -151,7 +154,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		c.Resize(c.r)
 	}
 	savemouse(w)
-	display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3, 3)))
+	c.display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3, 3)))
 	barttext = &w.body
 	return w
 }
@@ -184,7 +187,7 @@ var (
 	}
 	c.w = append(c.w[:i], c.w[i+1:]...)
 	if len(c.w) == 0 {
-		display.ScreenImage.Draw( r, display.White, nil, image.ZP);
+		c.display.ScreenImage.Draw( r, c.display.White, nil, image.ZP);
 		return;
 	}
 	up = false;
@@ -197,7 +200,7 @@ var (
 		w = c.w[i];
 		r.Max.Y = w.r.Max.Y;
 	}
-	display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP);
+	c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP);
 	if(c.safe) {
 		if(!didmouse && up) {
 			w.showdel = true;
@@ -221,7 +224,7 @@ func (c *Column) CloseAll() {
 }
 
 func (c *Column) MouseBut() {
-	display.MoveTo(c.tag.scrollr.Min.Add(c.tag.scrollr.Max).Div(2));
+	c.display.MoveTo(c.tag.scrollr.Min.Add(c.tag.scrollr.Max).Div(2));
 }
 
 func (c *Column) Resize(r image.Rectangle) {
@@ -229,10 +232,10 @@ func (c *Column) Resize(r image.Rectangle) {
 	r1 := r
 	r1.Max.Y = r1.Min.Y + c.tag.fr.Font.Impl().Height
 	c.tag.Resize(r1, true)
-	display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+	c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
 	r1.Min.Y = r1.Max.Y
-	r1.Max.Y += display.ScaleSize(Border)
-	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+	r1.Max.Y += c.display.ScaleSize(Border)
+	c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
 	r1.Max.Y = r.Max.Y
 	for i := 0; i < c.nw(); i++ {
 		w := c.w[i]
@@ -240,12 +243,12 @@ func (c *Column) Resize(r image.Rectangle) {
 		if i == c.nw()-1 {
 			r1.Max.Y = r.Max.Y
 		} else {
-			r1.Max.Y = r1.Min.Y + (w.r.Dy()+display.ScaleSize(Border))*r.Dy()/c.r.Dy()
+			r1.Max.Y = r1.Min.Y + (w.r.Dy()+c.display.ScaleSize(Border))*r.Dy()/c.r.Dy()
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+display.ScaleSize(Border)+tagfont.Height)
+		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+tagfont.Height)
 		r2 := r1
-		r2.Max.Y = r2.Min.Y + display.ScaleSize(Border)
-		display.ScreenImage.Draw(r2, display.Black, nil, image.ZP)
+		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
+		c.display.ScreenImage.Draw(r2, c.display.Black, nil, image.ZP)
 		r1.Min.Y = r2.Max.Y
 		r1.Min.Y = w.Resize(r1, false, i == c.nw()-1)
 	}
@@ -258,7 +261,7 @@ func (c *Column) Sort() {
 
 	r := c.r;
 	r.Min.Y = c.tag.fr.Rect.Max.Y;
-	display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP);
+	c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP);
 	y := r.Min.Y;
 	for i:=0; i<len(c.w); i++ {
 		w := c.w[i];
@@ -266,11 +269,11 @@ func (c *Column) Sort() {
 		if(i == len(c.w)-1) {
 			r.Max.Y = c.r.Max.Y;
 		} else {
-			r.Max.Y = r.Min.Y+w.r.Dy()+display.ScaleSize(Border);
+			r.Max.Y = r.Min.Y+w.r.Dy()+c.display.ScaleSize(Border);
 		}
 		r1 := r;
-		r1.Max.Y = r1.Min.Y+display.ScaleSize(Border);
-		display.ScreenImage.Draw(r1, display.Black, nil, image.ZP);
+		r1.Max.Y = r1.Min.Y+c.display.ScaleSize(Border);
+		c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP);
 		r.Min.Y = r1.Max.Y;
 		y = w.Resize(r, false, i==len(c.w)-1);
 	}
@@ -297,7 +300,7 @@ func (c *Column) Grow(w *Window, but int) {
 		if windex == int(c.nw()-1) || !c.safe {
 			r.Max.Y = cr.Max.Y
 		} else {
-			r.Max.Y = c.w[windex+1].r.Min.Y - display.ScaleSize(Border)
+			r.Max.Y = c.w[windex+1].r.Min.Y - c.display.ScaleSize(Border)
 		}
 		w.Resize(r, false, true)
 		return
@@ -309,7 +312,7 @@ func (c *Column) Grow(w *Window, but int) {
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		display.ScreenImage.Draw(cr, textcolors[frame.ColBack], nil, image.ZP)
+		c.display.ScreenImage.Draw(cr, textcolors[frame.ColBack], nil, image.ZP)
 		w.Resize(cr, false, true)
 		for i := 1; i < c.nw(); i++ {
 			ffs :=c.w[i].body.fr.GetFrameFillStatus()
@@ -376,8 +379,8 @@ Pack:
 			r.Max.Y += 1 + nl[j]*v.body.fr.Font.DefaultHeight()
 		}
 		r.Min.Y = v.Resize(r, c.safe, false)
-		r.Max.Y += display.ScaleSize(Border)
-		display.ScreenImage.Draw(r, display.Black, nil, image.ZP)
+		r.Max.Y += c.display.ScaleSize(Border)
+		c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
 		y1 = r.Max.Y
 	}
 	// scan to see new size of everyone below 
@@ -389,7 +392,7 @@ Pack:
 		if nl[j] != 0 {
 			r.Min.Y -= 1 + nl[j]*v.body.fr.Font.DefaultHeight()
 		}
-		r.Min.Y -= display.ScaleSize(Border)
+		r.Min.Y -= c.display.ScaleSize(Border)
 		ny[j] = r.Min.Y
 		y2 = r.Min.Y
 	}
@@ -398,15 +401,15 @@ Pack:
 	r.Min.Y = y1
 	r.Max.Y = y2
 	h := w.body.fr.Font.DefaultHeight() // TODO(flux) Is this the right frame font height to use?
-	if r.Dy() < w.tagtop.Dy()+1+h+display.ScaleSize(Border) {
-		r.Max.Y = r.Min.Y + w.tagtop.Dy() + 1 + h + display.ScaleSize(Border)
+	if r.Dy() < w.tagtop.Dy()+1+h+c.display.ScaleSize(Border) {
+		r.Max.Y = r.Min.Y + w.tagtop.Dy() + 1 + h + c.display.ScaleSize(Border)
 	}
 	// draw window 
 	r.Max.Y = w.Resize(r, c.safe, true)
 	if windex < c.nw()-1 {
 		r.Min.Y = r.Max.Y
-		r.Max.Y += display.ScaleSize(Border)
-		display.ScreenImage.Draw(r, display.Black, nil, image.ZP)
+		r.Max.Y += c.display.ScaleSize(Border)
+		c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
 		for j := windex + 1; j < c.nw(); j++ {
 			ny[j] -= (y2 - r.Max.Y)
 		}
@@ -424,8 +427,8 @@ Pack:
 		y1 = v.Resize(r, c.safe, j == c.nw()-1)
 		if j < c.nw()-1 { // no border on last window 
 			r.Min.Y = y1
-			r.Max.Y += display.ScaleSize(Border)
-			display.ScreenImage.Draw(r, display.Black, nil, image.ZP)
+			r.Max.Y += c.display.ScaleSize(Border)
+			c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
 			y1 = r.Max.Y
 		}
 	}
@@ -502,8 +505,8 @@ var (
 	if p.Y < v.tagtop.Max.Y {
 		p.Y = v.tagtop.Max.Y;
 	}
-	if(p.Y > w.r.Max.Y-w.tagtop.Dy()-display.ScaleSize(Border)) {
-		p.Y = w.r.Max.Y-w.tagtop.Dy()-display.ScaleSize(Border);
+	if(p.Y > w.r.Max.Y-w.tagtop.Dy()-c.display.ScaleSize(Border)) {
+		p.Y = w.r.Max.Y-w.tagtop.Dy()-c.display.ScaleSize(Border);
 	}
 	if r.Max.Y > v.body.fr.Rect.Min.Y {
 		r.Max.Y -= (r.Max.Y-v.body.fr.Rect.Min.Y)%v.body.fr.Font.DefaultHeight();
@@ -512,13 +515,13 @@ var (
 		}
 	}
 	r.Min.Y = v.Resize(r, c.safe, false);
-	r.Max.Y= r.Min.Y+display.ScaleSize(Border);
-	display.ScreenImage.Draw(r, display.Black, nil, image.ZP);
+	r.Max.Y= r.Min.Y+c.display.ScaleSize(Border);
+	c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP);
 	r.Min.Y = r.Max.Y;
 	if(i == len(c.w)-1) {
 		r.Max.Y = c.r.Max.Y;
 	} else {
-		r.Max.Y = c.w[i+1].r.Min.Y-display.ScaleSize(Border);
+		r.Max.Y = c.w[i+1].r.Min.Y-c.display.ScaleSize(Border);
 	}
 	w.Resize(r, c.safe, true);
 	c.safe = true;

@@ -12,6 +12,7 @@ import (
 )
 
 type Window struct {
+	display *draw.Display
 	lk   sync.Mutex
 	ref  Ref
 	tag  Text
@@ -65,7 +66,7 @@ func NewWindow() *Window {
 	return &Window{}
 }
 
-func (w *Window) Init(clone *Window, r image.Rectangle) {
+func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 	//	var r1, br image.Rectangle
 	//	var f *File
@@ -81,6 +82,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 	w.incl = []string{}
 	WinId++
 	w.id = WinId
+	w.display = dis
 
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
@@ -92,7 +94,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 
 	f := NewTagFile()
 	f.AddText(&w.tag)
-	w.tag.Init(f, r1, tagfont, tagcolors)
+	w.tag.Init(f, r1, tagfont, tagcolors, w.display)
 	w.tag.what = Tag
 
 	/* tag is a copy of the contents, not a tracked image */
@@ -114,23 +116,23 @@ func (w *Window) Init(clone *Window, r image.Rectangle) {
 		f = clone.body.file
 		w.body.org = clone.body.org
 		w.isscratch = clone.isscratch
-		rf = fontget(0, false, false, clone.body.font.Name)
+		rf = fontget(0, false, false, clone.body.font.Name, dis)
 	} else {
-		rf = fontget(0, false, false, "")
+		rf = fontget(0, false, false, "", dis)
 	}
 	f = f.AddText(&w.body)
-	w.body.Init(f, r1, rf, textcolors)
+	w.body.Init(f, r1, rf, textcolors, w.display)
 	w.body.what = Body
 	r1.Min.Y -= 1
 	r1.Max.Y = r1.Min.Y + 1
-	display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+	w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
 	w.body.ScrDraw()
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
 	br.Max.X = br.Min.X + button.R.Dx()
 	br.Max.Y = br.Min.Y + button.R.Dy()
-	display.ScreenImage.Draw(br, button, nil, button.R.Min)
+	w.display.ScreenImage.Draw(br, button, nil, button.R.Min)
 	w.filemenu = true
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	w.autoindent = globalautoindent
@@ -152,7 +154,7 @@ func (w *Window) DrawButton() {
 	br.Min = w.tag.scrollr.Min
 	br.Max.X = br.Min.X + b.R.Dx()
 	br.Max.Y = br.Min.Y + b.R.Dy()
-	display.ScreenImage.Draw(br, b, nil, b.R.Min)
+	w.display.ScreenImage.Draw(br, b, nil, b.R.Min)
 
 }
 
@@ -176,7 +178,7 @@ func (w *Window) moveToDel() {
 	if(n < 0) {
 		return;
 	}
-	display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
+	w.display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
 }
 
 func (w *Window) TagLines(r image.Rectangle) int {
@@ -211,13 +213,13 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		if mouseintag && !mouse.Point.In(w.tag.all) {
 			p := mouse.Point
 			p.Y = w.tag.all.Max.Y - 3
-			display.MoveTo(p)
+			w.display.MoveTo(p)
 		}
 		// If mouse is in body, push down as tag expands.
 		if mouseinbody && mouse.Point.In(w.tag.all) {
 			p := mouse.Point
 			p.Y = w.tag.all.Max.Y + 3
-			display.MoveTo(p)
+			w.display.MoveTo(p)
 		}
 	}
 	// Redraw body
@@ -228,7 +230,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		if y+1+w.body.fr.Font.DefaultHeight() <= r.Max.Y { /* room for one line */
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
-			display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+			w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
 			y++
 			r1.Min.Y = min(y, r.Max.Y)
 			r1.Max.Y = r.Max.Y
@@ -263,7 +265,7 @@ func (w *Window) Unlock() {
 }
 
 func (w *Window) MouseBut() {
-	display.MoveTo(w.tag.scrollr.Min.Add(
+	w.display.MoveTo(w.tag.scrollr.Min.Add(
 		image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
 }
 

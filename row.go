@@ -4,34 +4,37 @@ import (
 	"image"
 	"sync"
 	"unicode/utf8"
+	"9fans.net/go/draw"
 )
 
 type Row struct {
+	display *draw.Display
 	lk  sync.Mutex
 	r   image.Rectangle
 	tag Text
 	col []*Column
 }
 
-func (row *Row) Init(r image.Rectangle) *Row {
+func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	if row == nil {
 		row = &Row{}
 	}
-	display.ScreenImage.Draw(r, display.White, nil, image.ZP)
+	row.display = dis
+	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
 	row.col = []*Column{}
 	row.r = r
 	tagfile := NewTagFile()
 	r1 := r
 	r1.Max.Y = r1.Min.Y + tagfont.Height
 	t := &row.tag
-	t.Init(tagfile, r1, fontget(0, false, false, ""), tagcolors)
+	t.Init(tagfile, r1, fontget(0, false, false, "", row.display), tagcolors, row.display)
 	t.what = Rowtag
 	t.row = row
 	t.w = nil
 	t.col = nil
 	r1.Min.Y = r1.Max.Y
-	r1.Max.Y += display.ScaleSize(Border)
-	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+	r1.Max.Y += row.display.ScaleSize(Border)
+	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
 	t.Insert(0, []rune("Newcol Kill Putall Dump Exit"), true)
 	t.SetSelect(t.file.b.nc(), t.file.b.nc())
 	return row
@@ -42,7 +45,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 	var d *Column
 
 	// Work out the geometry of the column.
-	r.Min.Y = row.tag.fr.Rect.Max.Y + display.ScaleSize(Border)
+	r.Min.Y = row.tag.fr.Rect.Max.Y + row.display.ScaleSize(Border)
 	if x < r.Min.X && len(row.col) > 0 { // Take 40% of last column unless specified
 		d = row.col[len(row.col)-1]
 		x = d.r.Min.X + 3*d.r.Dx()/5
@@ -63,21 +66,21 @@ func (row *Row) Add(c *Column, x int) *Column {
 		if r.Dx() < 100 {
 			return nil // Refuse columns too narrow
 		}
-		display.ScreenImage.Draw(r, display.White, nil, image.ZP)
+		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
 		r1 := r
-		r1.Max.X = min(x-display.ScaleSize(Border), r.Max.X-50)
+		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-50)
 		if r1.Dx() < 50 {
 			r1.Max.X = r1.Min.X + 50
 		}
 		d.Resize(r1)
 		r1.Min.X = r1.Max.X
-		r1.Max.X = r1.Min.X + display.ScaleSize(Border)
-		display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+		r1.Max.X = r1.Min.X + row.display.ScaleSize(Border)
+		row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
 		r.Min.X = r1.Max.X
 	}
 	if c == nil {
 		c = &Column{}
-		c.Init(r)
+		c.Init(r, row.display)
 	} else {
 		c.Resize(r)
 	}
@@ -96,8 +99,8 @@ func (r *Row) Resize(rect image.Rectangle) {
 	r1.Max.Y = r1.Min.Y + tagfont.Height
 	row.tag.Resize(r1, true)
 	r1.Min.Y = r1.Max.Y
-	r1.Max.Y += display.ScaleSize(Border)
-	display.ScreenImage.Draw(r1, display.Black, nil, image.ZP)
+	r1.Max.Y += row.display.ScaleSize(Border)
+	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
 	rect.Min.Y = r1.Max.Y
 	r1 = rect
 	r1.Max.X = r1.Min.X
@@ -112,8 +115,8 @@ func (r *Row) Resize(rect image.Rectangle) {
 		}
 		if i > 0 {
 			r2 := r1
-			r2.Max.X = r2.Min.X + display.ScaleSize(Border)
-			display.ScreenImage.Draw(r2, display.Black, nil, image.ZP)
+			r2.Max.X = r2.Min.X + row.display.ScaleSize(Border)
+			row.display.ScreenImage.Draw(r2, row.display.Black, nil, image.ZP)
 			r1.Min.X = r2.Max.X
 		}
 		c.Resize(r1)
@@ -171,22 +174,22 @@ var (
 		return;
 	}
 	d = row.col[i-1];
-	if(p.X < d.r.Min.X+80+display.ScaleSize(Scrollwid)) {
-		p.X = d.r.Min.X+80+display.ScaleSize(Scrollwid);
+	if(p.X < d.r.Min.X+80+row.display.ScaleSize(Scrollwid)) {
+		p.X = d.r.Min.X+80+row.display.ScaleSize(Scrollwid);
 	}
-	if(p.X > c.r.Max.X-80-display.ScaleSize(Scrollwid)) {
-		p.X = c.r.Max.X-80-display.ScaleSize(Scrollwid);
+	if(p.X > c.r.Max.X-80-row.display.ScaleSize(Scrollwid)) {
+		p.X = c.r.Max.X-80-row.display.ScaleSize(Scrollwid);
 	}
 	r = d.r;
 	r.Max.X = c.r.Max.X;
-	display.ScreenImage.Draw(r, display.White, nil, image.ZP);
+	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
 	r.Max.X = p.X;
 	d.Resize(r);
 	r = c.r;
 	r.Min.X = p.X;
 	r.Min.X = r.Min.X;
-	r.Max.X += display.ScaleSize(Border);
-	display.ScreenImage.Draw(r, display.Black, nil, image.ZP);
+	r.Max.X += row.display.ScaleSize(Border);
+	row.display.ScreenImage.Draw(r, row.display.Black, nil, image.ZP);
 	r.Min.X = r.Max.X;
 	r.Max.X = c.r.Max.X;
 	c.Resize(r);
@@ -212,7 +215,7 @@ var (
 	}
 	row.col = append(row.col[:i], row.col[i+1:]...)
 	if(len(row.col) == 0){
-		display.ScreenImage.Draw(r, display.White, nil, image.ZP);
+		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
 		return;
 	}
 	if(i == len(row.col)){		/* extend last column right */
@@ -223,7 +226,7 @@ var (
 		c = row.col[i];
 		r.Max.X = c.r.Max.X;
 	}
-	display.ScreenImage.Draw(r, display.White, nil, image.ZP);
+	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP);
 	c.Resize(r);
 }
 

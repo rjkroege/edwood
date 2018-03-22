@@ -434,7 +434,6 @@ func xfidwrite(x *Xfid) {
 		q0, tq0, tq1, nb int
 		err              error
 	)
-	fmt.Println("\n\nxfidwrite\n\n")
 	qid := FILE(x.f.qid)
 	w := x.f.w
 	if w != nil {

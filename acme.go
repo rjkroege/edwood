@@ -97,6 +97,7 @@ func main() {
 	wdir, _ = os.Getwd()
 
 	var err error
+	var display *draw.Display
 	display, cexit, err = draw.Init(nil, fontnames[0], "acme", *winsize)
 	if err != nil {
 		log.Fatal(err)
@@ -109,7 +110,7 @@ func main() {
 	// I suspect it's not useful in the modern world.
 	tagfont = display.DefaultFont
 
-	iconinit()
+	iconinit(display)
 	// rxinit(); // TODO(flux) looks unneeded now
 
 	//cplumb = make(chan *Plumbmsg) 
@@ -135,7 +136,7 @@ func main() {
 
 	const WindowsPerCol = 6
 
-	row.Init(display.ScreenImage.R)
+	row.Init(display.ScreenImage.R, display)
 	if loadfile == "" || row.Load(loadfile, true) != nil {
 		// Open the files from the command line, up to WindowsPerCol each
 		files := flag.Args()
@@ -172,8 +173,8 @@ func main() {
 	display.Flush()
 
 	// After row is initialized
-	go mousethread()
-	go keyboardthread()
+	go mousethread(display)
+	go keyboardthread(display)
 	go newwindowthread()
 	go xfidallocthread(display)
 
@@ -206,7 +207,7 @@ func readfile(c *Column, filename string) {
 
 var fontCache map[string]*draw.Font = make(map[string]*draw.Font)
 
-func fontget(fix int, save bool, setfont bool, name string) (font *draw.Font) {
+func fontget(fix int, save bool, setfont bool, name string, display *draw.Display) (font *draw.Font) {
 	font = nil
 	if name == "" {
 		name = fontnames[fix]
@@ -227,12 +228,12 @@ func fontget(fix int, save bool, setfont bool, name string) (font *draw.Font) {
 	}
 	if setfont {
 		tagfont = font // TODO(flux): Global font stuff is just nasty.
-		iconinit()
+		iconinit(display)
 	}
 	return font
 }
 
-func iconinit() {
+func iconinit(display *draw.Display) {
 	//TODO(flux): Probably should de-globalize colors.
 	if tagcolors[frame.ColBack] == nil {
 		tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
@@ -279,7 +280,7 @@ func ismtpt(filename string) bool {
 	return strings.HasPrefix(filename, mtpt) && (mtpt[len(mtpt)-1] == '/' || filename[len(mtpt)] == '/' || len(filename) == len(mtpt))
 }
 
-func mousethread() {
+func mousethread(display *draw.Display) {
 	runtime.LockOSThread()
 
 	for {
@@ -295,7 +296,7 @@ func mousethread() {
 			}
 			fmt.Println("RESIZE!")
 			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
-			iconinit()
+			iconinit(display)
 			row.Resize(display.ScreenImage.R)
 		case mousectl.Mouse = <-mousectl.C:
 			MovedMouse(mousectl.Mouse)
@@ -427,7 +428,7 @@ func MovedMouse(m draw.Mouse) {
 	return
 }
 
-func keyboardthread() {
+func keyboardthread(display *draw.Display) {
 	var (
 		timer *time.Timer
 		t     *Text

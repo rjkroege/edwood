@@ -10,7 +10,7 @@ import (
 
 func test_fsys(t *testing.T) {
 	fsysinit()
-}
 
-func test_post9pservice(t *testing.T) {
+	// Now we need to 9p our way to it, and understand how much 
+	// acme needs to exist to run.
 }

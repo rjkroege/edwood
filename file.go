@@ -221,7 +221,7 @@ var (
 		}
 		switch(u.t){
 		default:
-			panic(fmt.Sprintf("undo: 0x%ux\n", u.t))
+			panic(fmt.Sprintf("undo: 0x%x\n", u.t))
 		case Delete:
 			f.seq = u.seq;
 			f.Undelete(epsilon, u.p0, u.p0+u.n);

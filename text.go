@@ -50,6 +50,7 @@ const (
 // Text is a view onto a buffer, managing a frame.
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
+	display *draw.Display
 	file    *File
 	fr      *frame.Frame
 	font    *draw.Font
@@ -75,29 +76,30 @@ type Text struct {
 	needundo    bool
 }
 
-func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumColours]*draw.Image) *Text {
+func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
 	if t == nil {
 		t = new(Text)
 	}
+	t.display = dis
 	t.file = f
 	t.all = r
 	t.scrollr = r
-	t.scrollr.Max.X = r.Min.X + display.ScaleSize(Scrollwid)
+	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
 	t.lastsr = nullrect
-	r.Min.X += display.ScaleSize(Scrollwid) + display.ScaleSize(Scrollgap)
+	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = math.MaxInt64
 	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
-	t.fr = frame.NewFrame(r, rf, display.ScreenImage, cols)
-	t.Redraw(r, rf, display.ScreenImage, -1)
+	t.fr = frame.NewFrame(r, rf, t.display.ScreenImage, cols)
+	t.Redraw(r, rf, t.display.ScreenImage, -1)
 	return t
 }
 
 func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
 	t.fr.Init(r, f, b, t.fr.Cols)
 	rr := t.fr.Rect
-	rr.Min.X -= display.ScaleSize(Scrollwid + Scrollgap) /* back fill to scroll bar */
+	rr.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap) /* back fill to scroll bar */
 	if !t.fr.NoRedraw {
 		t.fr.Background.Draw(rr, t.fr.Cols[frame.ColBack], nil, image.ZP)
 	}
@@ -134,17 +136,17 @@ func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
 	odx := t.all.Dx()
 	t.all = r
 	t.scrollr = r
-	t.scrollr.Max.X = r.Min.X + display.ScaleSize(Scrollwid)
+	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
 	t.lastsr = image.ZR
-	r.Min.X += display.ScaleSize(Scrollwid + Scrollgap)
+	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
 	t.Redraw(r, t.fr.Font.Impl(), t.fr.Background, odx)
 	if keepextra && t.fr.Rect.Max.Y < t.all.Max.Y /* && !t.fr.NoRedraw */ {
 		/* draw background in bottom fringe of window */
-		r.Min.X -= display.ScaleSize(Scrollgap)
+		r.Min.X -= t.display.ScaleSize(Scrollgap)
 		r.Min.Y = t.fr.Rect.Max.Y
 		r.Max.Y = t.all.Max.Y
-		display.ScreenImage.Draw(r, t.fr.Cols[frame.ColBack], nil, image.ZP)
+		t.display.ScreenImage.Draw(r, t.fr.Cols[frame.ColBack], nil, image.ZP)
 	}
 	return t.all.Max.Y
 }
@@ -1076,7 +1078,7 @@ func (t *Text) Select() {
 		q0, q1 = t.DoubleClick(q0)
 		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
 		t.SetSelect(q0, q1)
-		display.Flush()
+		t.display.Flush()
 		x := mouse.Point.X
 		y := mouse.Point.Y
 		/* stay here until something interesting happens */
@@ -1123,7 +1125,7 @@ func (t *Text) Select() {
 		clicktext = nil
 	}
 	t.SetSelect(q0, q1)
-	display.Flush()
+	t.display.Flush()
 	state := None /* what we've done; undo when possible */
 	for mouse.Buttons != 0 {
 		mouse.Msec = 0
@@ -1159,7 +1161,7 @@ func (t *Text) Select() {
 			t.ScrDraw()
 			clearmouse()
 		}
-		display.Flush()
+		t.display.Flush()
 		for mouse.Buttons == b {
 			mousectl.Read()
 		}
@@ -1332,7 +1334,7 @@ const (
 )
 
 // When called, button is down.
-func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) {
+func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image, dis *draw.Display) (p0p, p1p int) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
 	msec := mc.Mouse.Msec
@@ -1365,13 +1367,13 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 				pt1 = pt0
 				reg = region(q, p0)
 				if reg == 0 {
-					f.Drawsel0(pt0, int(p0), int(p1), col, display.White)
+					f.Drawsel0(pt0, int(p0), int(p1), col, dis.White)
 				}
 			}
 			qt := f.Ptofchar(int(q))
 			if reg > 0 {
 				if q > p1 {
-					f.Drawsel0(pt1, int(p1), int(q), col, display.White)
+					f.Drawsel0(pt1, int(p1), int(q), col, dis.White)
 				} else {
 					if q < p1 {
 						selrestore(f, qt, q, p1)
@@ -1382,7 +1384,7 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 					if q > p1 {
 						selrestore(f, pt1, p1, q)
 					} else {
-						f.Drawsel0(qt, int(q), int(p1), col, display.White)
+						f.Drawsel0(qt, int(q), int(p1), col, dis.White)
 					}
 				}
 			}
@@ -1392,7 +1394,7 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 		if p0 == p1 {
 			f.Tick(pt0, true)
 		}
-		display.Flush()
+		dis.Flush()
 		mc.Read()
 		if mc.Mouse.Buttons != b {
 			break
@@ -1420,12 +1422,12 @@ func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image) (p0p, p1p int) 
 	if(getP0( f)) ==(getP1( f)) {
 		f.Tick(f.Ptofchar(getP0((f))), true)
 	}
-	display.Flush()
+	dis.Flush()
 	return p0, p1
 }
 
 func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := xselect(t.fr, mousectl, high)
+	p0, p1 := xselect(t.fr, mousectl, high, t.display)
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
 		q0 = p0 + t.org
@@ -1587,9 +1589,9 @@ func (t *Text) BackNL(p, n int) int {
 func (t *Text) SetOrigin(org int, exact bool) {
 	t.org = org
 	r := t.all
-	r.Min.X += display.ScaleSize(Scrollwid) + display.ScaleSize(Scrollgap)
+	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	r.Min.Y += 1 //same + 1 as col.go:402?  Makes up the 1 px line at top of window.
-	t.Redraw(r, t.font, display.ScreenImage, -1)
+	t.Redraw(r, t.font, t.display.ScreenImage, -1)
 	t.lastsr = image.ZR
 	t.ScrDraw()
 }

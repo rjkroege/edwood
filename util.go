@@ -65,7 +65,7 @@ func savemouse(w *Window) {
 func restoremouse(w *Window) bool {
 	defer func() { mousew = nil }()
 	if mousew != nil && mousew == w {
-		display.MoveTo(prevmouse)
+		w.display.MoveTo(prevmouse)
 		return true
 	}
 	return false

@@ -81,7 +81,6 @@ var (
 	seq          int
 	maxtab       uint /*size of a tab, in units of the '0' character */
 
-	display     *draw.Display
 	tagfont     *draw.Font
 	mouse       *draw.Mouse
 	mousectl    *draw.Mousectl
