@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"9fans.net/go/draw"
-	"github.com/ProjectSerenity/acme/frame"
+	"github.com/rjkroege/edwood/frame"
 )
 
 // A naïve buffer implementation for testing.
