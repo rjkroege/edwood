@@ -1,24 +1,41 @@
-# acme
-Go port of Rob Pike's Acme editor, based on the implementation in plan9port.
+# edwood
+Go port of Rob Pike's Acme editor. Derived from
+[ProjectSerenity](https://github.com/ProjectSerenity/acme) but now
+increasingly divergent. ProjectSerenity was itself a transliteration
+of the original Acme and libframe C code from
+[plan9port](https://9fans.github.io/plan9port/)
 
-## Plan of Attack
+Named *edwood* in celebration of the  formative influence of Ed Wood on
+Plan9 and the truth of
+[ed](http://www.dcs.ed.ac.uk/home/jec/texts/ed.html)-iting.
 
-- [ ] Port libframe
-    - [x] Transliterate libframe from plan9port
-    - [ ] Refactor into more idiomatic Go
-    - [ ] Verify and Test
-- [ ] Port Acme
-    - [ ] Transliterate acme from plan9port
-    - [ ] Refactor into more idiomatic Go
-    - [ ] Verfiy and Test
+Note that Edwood (as with Acme) requires some infrastructure from
+[plan9port](https://9fans.github.io/plan9port/): in particular
+`devdraw` and the p9p font server. So to actually use this, you'll want
+to install [plan9port](https://9fans.github.io/plan9port/) first.
 
-## Contributions
+# Contributions
+Contributions are welcome. Just submit a pull request and we'll review
+the code before merging it in.
 
-Contributions are very welcome. Just submit a pull request and we'll review the code before merging it in. I intend to handle the bulk of the transliteration myself, but contributions for the refactor into idiomatic Go are more than welcome.
+# Status
+Edwood is not yet ready for use but is getting close to being actually useful.
+The *useful* milestone will offer the following:
+
+* editing experience effectively identical to Acme
+* support for `win` and other filesystem clients
+* but... buggy
+
+# Roadmap
+
+* Get to useful.
+* More idiomatic Go.
+* Fix bugs.
+* API modernization
 
 # Build And Test
-[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/acme)](https://goreportcard.com/report/github.com/rjkroege/acme)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)
 
-Project needs work. But I knew that.
+
 
 
