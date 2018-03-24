@@ -4,7 +4,6 @@ import (
 	"image"
 
 	"9fans.net/go/draw"
-	//	"log"
 )
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
@@ -106,22 +105,22 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 	nb := 0
 	for ; nb < f.nbox && p < p1; nb++ {
 		b := f.box[nb]
-		nr := b.Nrune
-
-		// TODO(rjk): There is a method for this I think. Use it.
-		if nr < 0 {
-			nr = 1
-		}
+		nr := nrune(b)
 		if p+nr <= p0 {
 			// This box doesn't need to be modified.
 			p += nr
 			continue
 		}
 		if p >= p0 {
+			// Fills in the end of the previous line with selection highlight when the line has
+			// has been wrapped.
 			qt := pt
 			pt = f.cklinewrap(pt, b)
 			if pt.Y > qt.Y {
-				f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), text, back,qt)
+				if qt.X > f.Rect.Max.X {
+					qt.X = f.Rect.Max.X
+				}
+				//f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), text, back,qt)
 				f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 			}
 		}
@@ -161,8 +160,8 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		qt := pt
 		pt = f.cklinewrap(pt, f.box[nb])
 		if pt.Y > qt.Y {
-			// f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.Cols[ColHigh], back, qt)
-			f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
+			f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.Cols[ColHigh], back, qt)
+			// f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
 	}
 	return pt
