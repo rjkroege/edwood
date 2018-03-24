@@ -38,7 +38,7 @@ type Fontmetrics interface {
 }
 
 type frfont struct {
-	draw.Font
+	*draw.Font
 }
 
 func (ff *frfont) DefaultHeight() int {
@@ -46,13 +46,16 @@ func (ff *frfont) DefaultHeight() int {
 }
 
 func (ff *frfont) Impl() *draw.Font {
-	return &ff.Font
+	return ff.Font
 }
 
 // Maxtab sets the maximum size of a tab in pixels.
 func (f *Frame) Maxtab(m int) {
-	f.maxtab = m
+	f.MaxTab = m
 }
+
+// GetMaxtab returns the current maximum size of a tab in pixels.
+func (f *Frame) GetMaxtab() int { return f.MaxTab }
 
 // FrameFillStatus is a snapshot of the capacity of the Frame.
 type FrameFillStatus struct {
@@ -64,9 +67,9 @@ type FrameFillStatus struct {
 // GetFrameFillStatus returns a snapshot of the capacity of the frame.
 func (f *Frame) GetFrameFillStatus() FrameFillStatus {
 	return FrameFillStatus{
-		Nchars:   f.nchars,
-		Nlines:   f.nlines,
-		Maxlines: f.maxlines,
+		Nchars:   f.NChars,
+		Nlines:   f.NLines,
+		Maxlines: f.MaxLines,
 	}
 }
 
@@ -87,27 +90,27 @@ type Frame struct {
 	// private
 	nbox, nalloc int
 
-	p0, p1 int // bounds of the selection
-	maxtab int // max size of a tab (in pixels)
-	nchars int // number of runes in frame
-	nlines int // number of lines with text
+	P0, P1       int // bounds of a selection
+	MaxTab int // max size of a tab (in pixels)
+	NChars int // number of runes in frame
+	NLines int // number of lines with text
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
-	maxlines int // total number of lines in frame
+	MaxLines int // total number of lines in frame
 
 	// TODO(rjk): make a bool
 	// ro. Doesn't need a getter. Used only with frinsert and frdelete. Return from there.
-	lastlinefull int
+	LastLineFull int
 
-	modified  bool
-	tickimage *draw.Image // typing tick
-	tickback  *draw.Image // image under tick
+	Modified  bool
+	TickImage *draw.Image // typing tick
+	TickBack  *draw.Image // image under tick
 
 	// TODO(rjk): Expose. public ro
-	ticked bool
+	Ticked bool
 
 	// TODO(rjk): Expose public rw.
-	noredraw  bool
-	tickscale int // tick scaling factor
+	NoRedraw  bool
+	TickScale int // tick scaling factor
 }
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
@@ -126,26 +129,26 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 // routines to be called to maintain the associated data structure in,
 // for example, an obscured window.
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
-	f.Font = &frfont{*ft}
+	f.Font = &frfont{ft}
 	f.Display = b.Display
-	f.maxtab = 8 * ft.StringWidth("0")
+	f.MaxTab = 8 * ft.StringWidth("0")
 	f.nbox = 0
 	f.nalloc = 0
-	f.nchars = 0
-	f.nlines = 0
-	f.p0 = 0
-	f.p1 = 0
+	f.NChars = 0
+	f.NLines = 0
+	f.P0 = 0
+	f.P1 = 0
 	f.box = nil
-	f.lastlinefull = 0
+	f.LastLineFull = 0
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.tickimage == nil && f.Cols[ColBack] != nil {
+	if f.TickImage == nil && f.Cols[ColBack] != nil {
 		f.InitTick()
 	}
 }
 
-// InitTick sets up the tick (e.g. cursor)
+// InitTick sets up the TickImage (e.g. cursor)
 func (f *Frame) InitTick() {
 	log.Println("InitTick called")
 
@@ -154,35 +157,35 @@ func (f *Frame) InitTick() {
 		return
 	}
 
-	f.tickscale = f.Display.ScaleSize(1)
+	f.TickScale = f.Display.ScaleSize(1)
 	b := f.Display.ScreenImage
 	ft := f.Font
 
-	if f.tickimage != nil {
-		f.tickimage.Free()
+	if f.TickImage != nil {
+		f.TickImage.Free()
 	}
 
 	height := ft.DefaultHeight()
 
-	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.TickImage, err = f.Display.AllocImage(image.Rect(0, 0, f.TickScale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
 
-	f.tickback, err = f.Display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
+	f.TickBack, err = f.Display.AllocImage(f.TickImage.R, b.Pix, false, draw.White)
 	if err != nil {
-		f.tickimage.Free()
-		f.tickimage = nil
+		f.TickImage.Free()
+		f.TickImage = nil
 		return
 	}
-	f.tickback.Draw(f.tickback.R, f.Cols[ColBack], nil, image.ZP)
+	f.TickBack.Draw(f.TickBack.R, f.Cols[ColBack], nil, image.ZP)
 
-	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
+	f.TickImage.Draw(f.TickImage.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(f.TickScale*(frtickw/2), 0, f.TickScale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
-	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(0, 0, f.TickScale*frtickw, f.TickScale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.TickImage.Draw(image.Rect(0, height-f.TickScale*frtickw, f.TickScale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
@@ -192,7 +195,7 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	f.Entire = r
 	f.Rect = r
 	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
-	f.maxlines = (r.Max.Y - r.Min.Y) / height
+	f.MaxLines = (r.Max.Y - r.Min.Y) / height
 }
 
 // Clear frees the internal structures associated with f, permitting
@@ -219,11 +222,11 @@ func (f *Frame) Clear(freeall bool) {
 		f.nalloc = 0
 	}
 	if freeall {
-		f.tickimage.Free()
-		f.tickback.Free()
-		f.tickimage = nil
-		f.tickback = nil
+		f.TickImage.Free()
+		f.TickBack.Free()
+		f.TickImage = nil
+		f.TickBack = nil
 	}
-	f.ticked = false
+	f.Ticked = false
 }
 

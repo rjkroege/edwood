@@ -2,7 +2,7 @@ package frame
 
 import (
 	"image"
-	"log"
+	//"log"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -20,12 +20,13 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	var c rune
 
 	frame.Rect = f.Rect
+	frame.Display = f.Display
 	frame.Background = f.Background
 	frame.Font = f.Font
-	frame.maxtab = f.maxtab
+	frame.MaxTab = f.MaxTab
 	frame.nbox = 0
 	frame.nalloc = 0
-	frame.nchars = 0
+	frame.NChars = 0
 	frame.box = []*frbox{}
 
 	copy(frame.Cols[:], f.Cols[:])
@@ -36,7 +37,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 	// log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
 
 	offs := 0
-	for nb := 0; offs < len(r) && nl <= f.maxlines; nb++ {
+	for nb := 0; offs < len(r) && nl <= f.MaxLines; nb++ {
 		if nb >= len(frame.box) {
 			// We have no boxes on start. So add on demand.
 			// TODO(rjk): consider removing delta, DELTA, nalloc if possible
@@ -54,7 +55,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		c = r[offs]
 		if c == '\t' || c == '\n' {
 			b.Bc = c
-			b.Wid = 5000
+			b.Wid = 5000 // TODO(flux): This won't be wide enough for 8k screens
 			if c == '\n' {
 				b.Minwid = 0
 				nl++
@@ -62,7 +63,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 				b.Minwid = byte(frame.Font.StringWidth(" "))
 			}
 			b.Nrune = -1
-			frame.nchars++
+			frame.NChars++
 			offs++
 		} else {
 			s := 0
@@ -89,35 +90,36 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 			//			s++
 			p := make([]byte, s)
 
-			log.Println(nb, len(frame.box), frame.box[0])
+			//	log.Println(nb, len(frame.box), frame.box[0])
 
 			b = frame.box[nb]
 			b.Ptr = p
 			copy(b.Ptr, tmp[:s])
 			b.Wid = w
 			b.Nrune = nr
-			frame.nchars += nr
+			frame.NChars += nr
 		}
 		frame.nbox++
 	}
-	f.cklinewrap0(ppt, frame.box[0])
+	*ppt = f.cklinewrap0(*ppt, frame.box[0])
 	return frame._draw(*ppt)
 }
 
 func (f *Frame) chop(pt image.Point, p, bn int) {
 	for b := f.box[bn]; ; bn++ {
-		if bn >= f.nbox {
+		// Safe but not necessarily a good idea.
+		if bn >= len(f.box) {
 			panic("endofframe")
 		}
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		if pt.Y >= f.Rect.Max.Y {
 			break
 		}
 		p += nrune(b)
 		f.advance(&pt, b)
 	}
-	f.nchars = int(p)
-	f.nlines = f.maxlines
+	f.NChars = int(p)
+	f.NLines = f.MaxLines
 	if bn < f.nbox { // BUG
 		f.delbox(bn, f.nbox-1)
 	}
@@ -137,10 +139,10 @@ var nalloc = 0
 //
 // Insert manages the tick and selection.
 func (f *Frame) Insert(r []rune, p0 int) {
-	log.Printf("\n\n-----\nframe.Insert: %s", string(r))
+	//log.Printf("\n\n-----\nframe.Insert: %s", string(r))
 	//	f.Logboxes("at very start of insert")
 
-	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
+	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
 		return
 	}
 
@@ -170,10 +172,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	//	frame.Logboxes("frame after bxscan")
 
 	if n0 < f.nbox {
-		f.cklinewrap(&pt0, f.box[n0])
-		f.cklinewrap0(&ppt1, f.box[n0])
+		pt0 = f.cklinewrap(pt0, f.box[n0])
+		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
 	}
-	f.modified = true
+	f.Modified = true
 	/*
 	 * ppt0 and ppt1 are start and end of insertion as they will appear when
 	 * insertion is complete. pt0 is current location of insertion position
@@ -181,8 +183,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 */
 	// TODO(rjk): Insert should remove the selection. Host should use
 	// Drawsel to put it back later?
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), false)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
 	/*
@@ -195,8 +197,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	npts := 0
 	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < f.nbox; npts++ {
 		b := f.box[n0]
-		f.cklinewrap(&pt0, b)
-		f.cklinewrap0(&pt1, b)
+		pt0 = f.cklinewrap(pt0, b)
+		pt1 = f.cklinewrap0(pt1, b)
 
 		if b.Nrune > 0 {
 			n, fits := f.canfit(pt1, b)
@@ -228,7 +230,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		panic("frame.Insert pt1 too far")
 	}
 	if pt1.Y == f.Rect.Max.Y && n0 < f.nbox {
-		f.nchars -= f.strlen(n0)
+		f.NChars -= f.strlen(n0)
 		f.delbox(n0, f.nbox-1)
 	}
 	if n0 == f.nbox {
@@ -236,13 +238,13 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		if pt1.X > f.Rect.Min.X {
 			div++
 		}
-		f.nlines = (pt1.Y - f.Rect.Min.Y) / div
+		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
 	} else if pt1.Y != pt0.Y {
 		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
-		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
-		if f.nlines > f.maxlines {
+		f.NLines += (q1 - q0) / f.Font.DefaultHeight()
+		if f.NLines > f.MaxLines {
 			f.chop(ppt1, p0, nn0)
 		}
 		if pt1.Y < y {
@@ -269,7 +271,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		y = pt1.Y
 	}
 	npts--
-	log.Println("npts", npts, "y", y)
+	//log.Println("npts", npts, "y", y)
 	for n0 = n0 - 1; npts >= 0; n0-- {
 		b := f.box[n0]
 		pt := pts[npts].pt1
@@ -288,7 +290,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.p0 <= cn0 && cn0 < f.p1 { /* b+1 is inside selection */
+				if f.P0 <= cn0 && cn0 < f.P1 { /* b+1 is inside selection */
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -301,7 +303,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.p0 <= cn0 && cn0 < f.p1 {
+				if f.P0 <= cn0 && cn0 < f.P1 {
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -319,7 +321,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				rect.Max.X = f.Rect.Max.X
 			}
 			cn0--
-			if f.p0 <= cn0 && cn0 < f.p1 {
+			if f.P0 <= cn0 && cn0 < f.P1 {
 				col = f.Cols[ColHigh]
 				tcol = f.Cols[ColHText]
 			} else {
@@ -335,7 +337,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		npts--
 	}
 
-	if f.p0 < p0 && p0 <= f.p1 {
+	if f.P0 < p0 && p0 <= f.P1 {
 		col = f.Cols[ColHigh]
 		tcol = f.Cols[ColHText]
 	} else {
@@ -365,23 +367,21 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	}
 	f.clean(ppt0, nn0, n0+1)
 	//	f.Logboxes("after clean")
-	f.nchars += frame.nchars
-	if f.p0 >= p0 {
-		f.p0 += frame.nchars
+	f.NChars += frame.NChars
+	if f.P0 >= p0 {
+		f.P0 += frame.NChars
 	}
-	if f.p0 >= f.nchars {
-		f.p0 = f.nchars
+	if f.P0 >= f.NChars {
+		f.P0 = f.NChars
 	}
-	if f.p1 >= p0 {
-		f.p1 += frame.nchars
+	if f.P1 >= p0 {
+		f.P1 += frame.NChars
 	}
-	if f.p1 >= f.nchars {
-		f.p1 += f.nchars
+	if f.P1 >= f.NChars {
+		f.P1 += f.NChars
 	}
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), true)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), true)
 	}
-
-	//	log.Printf("first box %#v, %s\n",  *f.box[0], string(f.box[0].Ptr))
 
 }

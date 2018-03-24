@@ -41,7 +41,6 @@ func (mf *Myframe) Resize(resized bool) {
 		nil,
 		image.ZP)
 
-
 	if resized {
 		// insert text such that we fit a window around the cursor.
 		// TODO(rjk): Adjust for scrollable buffers.

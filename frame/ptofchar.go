@@ -12,7 +12,7 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 
 	for ; bn < f.nbox; bn++ {
 		b = f.box[bn]
-		f.cklinewrap(&pt, b)
+		pt = f.cklinewrap(pt, b)
 		l := nrune(b)
 		if p < l {
 			if b.Nrune > 0 {
@@ -20,7 +20,7 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 					p--
 					r, w = utf8.DecodeRune(b.Ptr[s:])
 					pt.X += f.Font.StringWidth(string(b.Ptr[s : s+1]))
-					if r == 0 || pt.X > f.Rect.Max.X {
+					if r == utf8.RuneError || pt.X > f.Rect.Max.X {
 						panic("frptofchar")
 					}
 				}
@@ -67,7 +67,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 
 	for bn = 0; bn < f.nbox && qt.Y < pt.Y; bn++ {
 		b = f.box[bn]
-		f.cklinewrap(&qt, b)
+		qt = f.cklinewrap(qt, b)
 		if qt.Y >= pt.Y {
 			break
 		}
@@ -77,7 +77,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 
 	for ; bn < f.nbox && qt.X <= pt.X; bn++ {
 		b = f.box[bn]
-		f.cklinewrap(&qt, b)
+		qt = f.cklinewrap(qt, b)
 		if qt.Y > pt.Y {
 			break
 		}
@@ -88,7 +88,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 				s := 0
 				for ; s < len(b.Ptr); s += w {
 					r, w = utf8.DecodeRune(b.Ptr[s:])
-					if r == 0 {
+					if r == utf8.RuneError {
 						panic("end of string in frcharofpt")
 					}
 					qt.X += f.Font.StringWidth(string(b.Ptr[s : s+1]))

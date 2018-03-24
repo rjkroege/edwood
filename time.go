@@ -1,7 +1,5 @@
 package main
 
-import ()
-
 type Timer struct {
 	dt     int
 	cancel int

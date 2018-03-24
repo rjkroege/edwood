@@ -27,14 +27,24 @@ func main() {
 	textcols[frame.ColText] = d.Black
 	textcols[frame.ColHText] = d.Black
 
-	// TODO(rjk): Use a font that always is available.
-	fontname := "/mnt/font/SourceSansPro-Regular/17a/font"
-	myfont, err := d.OpenFont(fontname)
-	if err != nil {
-		log.Fatalln("Couldn't open font", fontname, "because", err)
+	// Try two but one will do. Just cause.
+	var myfont *draw.Font
+	fontnames  := []string{
+		"/mnt/font/Go-Regular/13a/font",
+		"/mnt/font/SourceSansPro-Regular/17a/font",
 	}
 
-	// I need colours to init. I
+	for _, fn := range fontnames {
+		myfont, err = d.OpenFont(fn)
+		if err != nil {
+			log.Println("Couldn't open font", fn, "because", err)
+		}
+	}
+	if myfont == nil {
+		log.Fatalln("None of the font choices were available. Giving up")
+	}
+
+	// I need colours to init.
 	// TODO(rjk): Test that the window isn't too small.
 	mf := new(Myframe)
 

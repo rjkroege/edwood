@@ -4,11 +4,49 @@ package main
 // TODO(flux): This is probably lame and will get re-done when I understand
 // how Text stores its text.
 type Texter interface {
-	Constrain(q0, q1 uint) (p0, p1 uint)
-	Delete(q0, q1 uint, tofile bool)
-	Insert(q0 uint, r []rune, tofile bool)
-	Q0() uint // Selection start
-	SetQ0(uint)
-	Q1() uint // End of selelection
-	SetQ1(uint)
+	Constrain(q0, q1 int) (p0, p1 int)
+	Delete(q0, q1 int, tofile bool)
+	Insert(q0 int, r []rune, tofile bool)
+	Q0() int // Selection start
+	SetQ0(int)
+	Q1() int // End of selelection
+	SetQ1(int)
+	nc() int
+	Read(q, n int) []rune
 }
+
+// TestText implements Texter around a buffer
+type TextBuffer struct {
+	q0, q1 int
+	buf    []rune
+}
+
+func (t TextBuffer) Constrain(q0, q1 int) (p0, p1 int) {
+	p0 = min(q0, (len(t.buf)))
+	p1 = min(q1, (len(t.buf)))
+	return p0, p1
+}
+
+func (t *TextBuffer) Delete(q0, q1 int, tofile bool) {
+	_ = tofile
+	if q0 > (len(t.buf)) || q1 > (len(t.buf)) {
+		panic("Out-of-range Delete")
+	}
+	copy(t.buf[q0:], t.buf[q1:])
+	t.buf = t.buf[:(len(t.buf))-(q1-q0)] // Reslice to length
+}
+
+func (t *TextBuffer) Insert(q0 int, r []rune, tofile bool) {
+	_ = tofile
+	if q0 > (len(t.buf)) {
+		panic("Out of range insertion")
+	}
+	t.buf = append(t.buf[:q0], append(r, t.buf[q0:]...)...)
+}
+
+func (t *TextBuffer) Read(q, n int) []rune { return t.buf[q : q+n] }
+func (t *TextBuffer) Q0() int              { return t.q0 }
+func (t *TextBuffer) SetQ0(q0 int)         { t.q0 = q0 }
+func (t *TextBuffer) Q1() int              { return t.q1 }
+func (t *TextBuffer) SetQ1(q1 int)         { t.q1 = q1 }
+func (t *TextBuffer) nc() int              { return len(t.buf) }

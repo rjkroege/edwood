@@ -2,23 +2,23 @@ package frame
 
 import (
 	"image"
-	"log"
+	//"log"
 )
 
 // Delete deletes from the Frame the text between p0 and p1; p1 points at
 // the first rune beyond the deletion.
 func (f *Frame) Delete(p0, p1 int) int {
-	log.Println("Delete")
+	//log.Println("Delete")
 	var r image.Rectangle
 
-	if p0 >= f.nchars || p0 == p1 || f.Background == nil {
+	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
 		return 0
 	}
-	if p1 > f.nchars {
-		p1 = f.nchars
+	if p1 > f.NChars {
+		p1 = f.NChars
 	}
 
-	log.Println("Delete is doing something")
+	//log.Println("Delete is doing something")
 
 	n0 := f.findbox(0, 0, p0)
 	if n0 == f.nbox {
@@ -29,14 +29,14 @@ func (f *Frame) Delete(p0, p1 int) int {
 	pt0 := f.ptofcharnb(p0, n0)
 	pt1 := f.Ptofchar(p1)
 
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), false)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
 	nn0 := n0
 	ppt0 := pt0
 	f.freebox(n0, n1-1)
-	f.modified = true
+	f.Modified = true
 
 	/*
 	 * Invariants:
@@ -51,8 +51,8 @@ func (f *Frame) Delete(p0, p1 int) int {
 	cn1 := p1
 
 	for pt1.X != pt0.X && n1 < f.nbox {
-		f.cklinewrap0(&pt0, b)
-		f.cklinewrap(&pt1, b)
+		pt0 = f.cklinewrap0(pt0, b)
+		pt1 = f.cklinewrap(pt1, b)
 		n, fits := f.canfit(pt0, b)
 
 		if !fits {
@@ -85,7 +85,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 				r.Max.X = f.Rect.Max.X
 			}
 			col := f.Cols[ColBack]
-			if f.p0 <= cn1 && cn1 < f.p1 {
+			if f.P0 <= cn1 && cn1 < f.P1 {
 				col = f.Cols[ColHigh]
 			}
 			f.Background.Draw(r, col, nil, pt0)
@@ -138,27 +138,27 @@ func (f *Frame) Delete(p0, p1 int) int {
 		f.clean(ppt0, nn0, n0)
 	}
 
-	if f.p1 > p1 {
-		f.p1 -= p1 - p0
-	} else if f.p1 > p0 {
-		f.p1 = p0
+	if f.P1 > p1 {
+		f.P1 -= p1 - p0
+	} else if f.P1 > p0 {
+		f.P1 = p0
 	}
 
-	if f.p0 > p1 {
-		f.p0 -= p1 - p0
-	} else if f.p0 > p0 {
-		f.p0 = p0
+	if f.P0 > p1 {
+		f.P0 -= p1 - p0
+	} else if f.P0 > p0 {
+		f.P0 = p0
 	}
 
-	f.nchars -= int(p1 - p0)
-	if f.p0 == f.p1 {
-		f.Tick(f.Ptofchar(f.p0), true)
+	f.NChars -= int(p1 - p0)
+	if f.P0 == f.P1 {
+		f.Tick(f.Ptofchar(f.P0), true)
 	}
-	pt0 = f.Ptofchar(f.nchars)
-	n := f.nlines
-	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
+	pt0 = f.Ptofchar(f.NChars)
+	n := f.NLines
+	f.NLines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
 	if pt0.X > f.Rect.Min.X {
-		f.nlines++
+		f.NLines++
 	}
-	return n - f.nlines
+	return n - f.NLines
 }
