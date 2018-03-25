@@ -234,7 +234,16 @@ func (r *Ref) Dec() int {
 	*r--
 	return int(*r)
 }
-
+func Untested() {
+	stack := strings.Split(string(debug.Stack()), "\n")
+	for i, l := range stack {
+		if l == "main.Untested()" {
+			fmt.Printf("Untested: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
+			//	runtime.Breakpoint()
+			break
+		}
+	}
+}
 func Unimpl() {
 	stack := strings.Split(string(debug.Stack()), "\n")
 	for i, l := range stack {

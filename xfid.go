@@ -40,7 +40,6 @@ func xfidctl(x *Xfid, d *draw.Display) {
 	for {
 		select {
 		case f := <-x.c:
-			fmt.Printf("xfidclt: %#v\n\tx.f:%#v\n", x, x.f)
 			f(x)
 			if d != nil {
 				d.Flush()
@@ -285,7 +284,7 @@ func xfidread(x *Xfid) {
 	if w == nil {
 		fc.Count = 0
 		switch q {
-		case Qcons:
+		case Qcons: fallthrough
 		case Qlabel:
 			break
 		case Qindex:
@@ -451,13 +450,10 @@ func xfidwrite(x *Xfid) {
 			return
 		}
 	}
-	fmt.Printf("Incoming x.fcall = %#v\n", x.fcall)
 	x.fcall.Count = uint32(len(x.fcall.Data))
 
 	BodyTag := func() { // Trimmed from the switch below.
 		r := fullrunewrite(x)
-		fmt.Printf("t (in closure)= %p\n", t)
-		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		if len(r) != 0 {
 			w.Commit(t)
 			if qid == QWwrsel {
@@ -489,12 +485,10 @@ func xfidwrite(x *Xfid) {
 			}
 		}
 		fc.Count = x.fcall.Count
-		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		respond(x, &fc, nil)
 	}
 
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
-	fmt.Println("qid =", qid)
 	switch qid {
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X')
@@ -510,7 +504,6 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		w.Commit(t)
 		eval = true
-		fmt.Println("read addr:", string(r))
 		a, eval, nb = address(false, t, w.limit, w.addr, 0, (len(r)),
 			func(q int) rune { return r[q] }, eval)
 		if nb < (len(r)) {
@@ -552,8 +545,6 @@ func xfidwrite(x *Xfid) {
 		fallthrough
 	case QWwrsel:
 		t = &w.body
-		fmt.Printf("\nt = %p\n", t)
-		fmt.Printf("x.fcall.Count = %d\n", x.fcall.Count)
 		BodyTag()
 
 	case QWctl:

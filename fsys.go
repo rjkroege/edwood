@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	//	"os/user"
 	"sort"
 	"strconv"
 	"sync"
@@ -120,7 +119,6 @@ func fsysproc() {
 	var f *Fid
 	for {
 		fc, err := plan9.ReadFcall(sfd)
-		fmt.Printf("fc= %#v\n", fc)
 		if err != nil || fc == nil {
 			acmeerror("fsysproc: ", err)
 		}
@@ -342,7 +340,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 	Wnames:
 		for i = 0; i < len(x.fcall.Wname); i++ {
 			wname = x.fcall.Wname[i]
-			fmt.Println("walk: wname = ", wname)
 			if (q.Type & plan9.QTDIR) == 0 {
 				err = Enotdir
 				break
@@ -374,7 +371,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 			{
 				id64, _ := strconv.ParseInt(wname, 10, 32)
 				id = int(id64)
-				fmt.Println("id = ", id)
 			}
 			row.lk.Lock()
 			w = row.LookupWin(id, false)
@@ -382,7 +378,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				row.lk.Unlock()
 				break
 			}
-			fmt.Printf("Window %d found in row w= %#v\n", id, w)
 			w.ref.Inc() // we'll drop reference at end if there's an error
 			path = uint64(Qdir)
 			typ = plan9.QTDIR
@@ -455,7 +450,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 		if len(t.Wqid) == len(x.fcall.Wname) {
 			if w != nil {
 				f.w = w
-				w = nil // don't drop the reference
+				w = nil // don't drop the reference when closing below.
 			}
 			if dir != nil {
 				f.dir = dir
@@ -474,7 +469,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 func fsysopen(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 	var m uint
-
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^(uint8(plan9.OTRUNC | plan9.OCEXEC))
 	// can't execute or remove anything
@@ -522,7 +516,6 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 		clock       int64
 		length      int
 	)
-
 	if f.qid.Type&plan9.QTDIR != 0 {
 		if FILE(f.qid) == Qacme { // empty dir
 			t.Data = nil
@@ -591,7 +584,6 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsyswrite(x *Xfid, f *Fid) *Xfid {
-
 	x.c <- xfidwrite
 	return nil
 }
@@ -658,6 +650,5 @@ func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 
 	b, _ := d.Bytes()
 	copy(buf, b)
-	fmt.Println("length(b)=", len(b))
 	return len(b)
 }

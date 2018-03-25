@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -19,6 +20,7 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 	os.Remove(os.TempDir() + "/ns.fsystest/acme")
 
 	acmd := exec.Command("./edwood")
+	acmd.Stdout = os.Stdout
 	acmd.Start()
 
 	var fsys *client.Fsys
@@ -182,9 +184,26 @@ Occasion
 	//	t.Errorf("New window is %v", id)
 
 	winname := "/" + id
-	tfs.Write(winname+"/addr", "1,2")
-	addr := tfs.Read(winname + "/addr")
-	t.Errorf("Addr = %v", addr)
+
+	// Addr is not persistent once you close it, so you need
+	// to read any desired changes with the same opening.
+	fid, err := fsys.Open(winname+"/addr", plan9.OREAD | plan9.OWRITE)
+	if err != nil {
+		t.Fatalf("Failed to open %s/addr", winname)
+	}
+	// TODO(flux): Should table drive this and add a pile more cases.
+	fid.Write([]byte("1,2"))
+	var buf [8192]byte
+	n, err := fid.Read(buf[:])
+	if err != nil {
+		t.Fatalf("Failed to read %s/addr", winname)
+	}
+	var q0, q1 int
+	fmt.Sscanf(string(buf[:n]), "%d %d", &q0, &q1)
+	if q0 != 0 || q1 != 23 {
+		t.Errorf("Expected range of 0..23 retured.  Got %d-%d.", q0, q1)
+	}
+	fid.Close()
 }
 
 type tFsys struct {
