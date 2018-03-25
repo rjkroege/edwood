@@ -96,6 +96,10 @@ func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumCo
 	return t
 }
 
+func (t *Text) Nc() int {
+	return t.file.b.nc()
+}
+
 func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
 	t.fr.Init(r, f, b, t.fr.Cols)
 	rr := t.fr.Rect

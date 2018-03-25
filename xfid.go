@@ -28,11 +28,11 @@ func clampaddr(w *Window) {
 	if w.addr.q1 < 0 {
 		w.addr.q1 = 0
 	}
-	if w.addr.q0 > int(w.body.file.b.nc()) {
-		w.addr.q0 = int(w.body.file.b.nc())
+	if w.addr.q0 > int(w.body.Nc()) {
+		w.addr.q0 = int(w.body.Nc())
 	}
-	if w.addr.q1 > int(w.body.file.b.nc()) {
-		w.addr.q1 = int(w.body.file.b.nc())
+	if w.addr.q1 > int(w.body.Nc()) {
+		w.addr.q1 = int(w.body.Nc())
 	}
 }
 
@@ -40,6 +40,7 @@ func xfidctl(x *Xfid, d *draw.Display) {
 	for {
 		select {
 		case f := <-x.c:
+			fmt.Printf("xfidclt: %#v\n\tx.f:%#v\n", x, x.f)
 			f(x)
 			if d != nil {
 				d.Flush()
@@ -222,10 +223,12 @@ func xfidclose(x *Xfid) {
 			}
 			break
 		case QWdata:
+			fallthrough
 		case QWxdata:
 			w.nomark = false
-			// fall through
+			fallthrough
 		case QWaddr:
+			fallthrough
 		case QWevent: // BUG: do we need to shut down Xfid?
 			w.nopen[q]--
 			if w.nopen[q] == 0 {
@@ -250,7 +253,7 @@ func xfidclose(x *Xfid) {
 			w.nomark = false
 			t = &w.body
 			// before: only did this if !w.noscroll, but that didn't seem right in practice
-			t.Show(min((w.wrselrange.q0), t.file.b.nc()), min((w.wrselrange.q1), t.file.b.nc()), true)
+			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
 			t.ScrDraw()
 			break
 		case QWeditout:
@@ -321,7 +324,7 @@ func xfidread(x *Xfid) {
 		fc.Data = []byte(buf[off:])
 		respond(x, &fc, nil)
 	case QWbody:
-		xfidutfread(x, &w.body, w.body.file.b.nc(), int(QWbody))
+		xfidutfread(x, &w.body, w.body.Nc(), int(QWbody))
 
 	case QWctl:
 		b = w.CtlPrint(true)
@@ -341,23 +344,23 @@ func xfidread(x *Xfid) {
 
 	case QWdata:
 		// BUG: what should happen if q1 > q0?
-		if w.addr.q0 > int(w.body.file.b.nc()) {
+		if w.addr.q0 > int(w.body.Nc()) {
 			respond(x, &fc, Eaddr)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.file.b.nc())
+		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.Nc())
 		w.addr.q1 = w.addr.q0
 
 	case QWxdata:
 		// BUG: what should happen if q1 > q0?
-		if w.addr.q0 > int(w.body.file.b.nc()) {
+		if w.addr.q0 > int(w.body.Nc()) {
 			respond(x, &fc, Eaddr)
 			break
 		}
 		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
 
 	case QWtag:
-		xfidutfread(x, &w.tag, w.tag.file.b.nc(), int(QWtag))
+		xfidutfread(x, &w.tag, w.tag.Nc(), int(QWtag))
 
 	case QWrdsel:
 		w.rdselfd.Seek(int64(off), 0)
@@ -459,11 +462,11 @@ func xfidwrite(x *Xfid) {
 			w.Commit(t)
 			if qid == QWwrsel {
 				q0 = (w.wrselrange.q1)
-				if q0 > t.file.b.nc() {
-					q0 = t.file.b.nc()
+				if q0 > t.Nc() {
+					q0 = t.Nc()
 				}
 			} else {
-				q0 = t.file.b.nc()
+				q0 = t.Nc()
 			}
 			if qid == QWtag {
 				t.Insert(q0, r, true)
@@ -503,12 +506,13 @@ func xfidwrite(x *Xfid) {
 		respond(x, &fc, nil)
 
 	case QWaddr:
-		//x.fcall.Data[x.fcall.Count] = 0;// null-terminate. unneeded
 		r = []rune(string(x.fcall.Data))
 		t = &w.body
 		w.Commit(t)
 		eval = true
-		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, (len(r)))
+		fmt.Println("read addr:", string(r))
+		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, (len(r)),
+			func(q int) rune { return r[q] }, eval)
 		if nb < (len(r)) {
 			respond(x, &fc, Ebadaddr)
 			break
@@ -560,7 +564,7 @@ func xfidwrite(x *Xfid) {
 		a = w.addr
 		t = &w.body
 		w.Commit(t)
-		if a.q0 > int(t.file.b.nc()) || a.q1 > int(t.file.b.nc()) {
+		if a.q0 > int(t.Nc()) || a.q1 > int(t.Nc()) {
 			respond(x, &fc, Eaddr)
 			break
 		}
@@ -860,7 +864,7 @@ func xfideventwrite(x *Xfid, w *Window) {
 				break
 			}
 		}
-		if q0 > t.file.b.nc() || q1 > t.file.b.nc() || q0 > q1 {
+		if q0 > t.Nc() || q1 > t.Nc() || q0 > q1 {
 			err = Ebadevent
 			break
 		}
@@ -1035,7 +1039,7 @@ func xfidindexread(x *Xfid) {
 	nmax := 0
 	for _, c := range row.col {
 		for _, w := range c.w {
-			nmax += Ctlsize + w.tag.file.b.nc()*utf8.UTFMax + 1
+			nmax += Ctlsize + w.tag.Nc()*utf8.UTFMax + 1
 		}
 	}
 
@@ -1048,7 +1052,7 @@ func xfidindexread(x *Xfid) {
 				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
-			m := min(BUFSIZE/utf8.UTFMax, w.tag.file.b.nc())
+			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := w.tag.file.b.Read(0, m)
 			sb.WriteString(string(tag))
 			sb.WriteString("\n")

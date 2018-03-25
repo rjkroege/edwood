@@ -382,6 +382,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				row.lk.Unlock()
 				break
 			}
+			fmt.Printf("Window %d found in row w= %#v\n", id, w)
 			w.ref.Inc() // we'll drop reference at end if there's an error
 			path = uint64(Qdir)
 			typ = plan9.QTDIR

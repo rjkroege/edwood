@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"9fans.net/go/draw"
-	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/acme/frame"
 )
 
 type Window struct {
@@ -83,6 +83,10 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	WinId++
 	w.id = WinId
 	w.display = dis
+	w.ref.Inc()
+	if globalincref {
+		w.ref.Inc()
+	}
 
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
@@ -99,7 +103,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 	/* tag is a copy of the contents, not a tracked image */
 	if clone != nil {
-		w.tag.Delete(0, w.tag.file.b.nc(), true)
+		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, clone.tag.file.b, true)
 		w.tag.file.Reset()
 		w.tag.SetSelect(len(w.tag.file.b), len(w.tag.file.b))
@@ -165,14 +169,14 @@ func (w *Window) DrawButton() {
 
 func (w *Window) delRunePos() int {
 	var n int
-	for n = 0; n < w.tag.file.b.nc(); n++ {
+	for n = 0; n < w.tag.Nc(); n++ {
 		r := w.tag.file.b.Read(n, 1)
 		if r[0] == ' ' {
 			break
 		}
 	}
 	n += 2
-	if n >= w.tag.file.b.nc() {
+	if n >= w.tag.Nc() {
 		return -1
 	}
 	return n
@@ -359,7 +363,7 @@ func (w *Window) Type(t *Text, r rune) {
 
 func (w *Window) ClearTag() {
 	/* w must be committed */
-	n := w.tag.file.b.nc()
+	n := w.tag.Nc()
 	r := w.tag.file.b.Read(0, n)
 	var i int
 	for i = 0; i < n; i++ {
@@ -442,7 +446,7 @@ func (w *Window) SetTag() {
 	resize := false
 	if !new.Eq(w.tag.file.b) {
 		resize = true // Might need to resize the tag
-		w.tag.Delete(0, w.tag.file.b.nc(), true)
+		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, new, true)
 		/* try to preserve user selection */
 		newbarIndex := new.Index([]rune("|")) // New always has "|"
@@ -457,7 +461,7 @@ func (w *Window) SetTag() {
 		}
 	}
 	w.tag.file.mod = false
-	n := w.tag.file.b.nc() + (w.tag.ncache)
+	n := w.tag.Nc() + (w.tag.ncache)
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}
@@ -483,7 +487,7 @@ func (w *Window) Commit(t *Text) {
 	if t.what == Body {
 		return
 	}
-	r := w.tag.file.b.Read(0, w.tag.file.b.nc())
+	r := w.tag.file.b.Read(0, w.tag.Nc())
 	filename := string(runesplitN(r, []rune(" \t"), 1)[0])
 	if filename != w.body.file.name {
 		seq++
@@ -548,7 +552,7 @@ func (w *Window) Clean(conservative bool) bool {
 		if len(w.body.file.name) != 0 {
 			warning(nil, "%v modified\n", w.body.file.name)
 		} else {
-			if w.body.file.b.nc() < 100 { /* don't whine if it's too small */
+			if w.body.Nc() < 100 { /* don't whine if it's too small */
 				return true
 			}
 			warning(nil, "unnamed file modified\n")
@@ -568,8 +572,8 @@ func (w *Window) CtlPrint(fonts bool) string {
 	if w.dirty {
 		dirty = 1
 	}
-	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.file.b.nc(),
-		w.body.file.b.nc(), isdir, dirty)
+	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.Nc(),
+		w.body.Nc(), isdir, dirty)
 	if fonts {
 		return fmt.Sprintf("%s%11d %q %11d ", buf, w.body.fr.Rect.Dx(),
 			w.body.font.Name, w.body.fr.GetMaxtab())
