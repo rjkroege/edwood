@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"9fans.net/go/plan9/client"
 )
@@ -348,16 +350,19 @@ func search (Text *ct, Rune *r, uint n) (int) {
 	fbuffree(s);
 	return false;
 }
+*/
 
-func isfilec (Rune r) (int) {
-	static Rune Lx[] = { '.', '-', '+', '/', ':', 0 };
-	if isalnum(r)
+func isfilec (r rune) (bool) {
+	Lx := ".-+/:"
+	if isalnum(r) {
 		return true;
-	if runestrchr(Lx, r)
+	}
+	if runestrchr([]rune(Lx), r) != -1 {
 		return true;
+	}
 	return false;
 }
-*/
+
 // Runestr wrapper for cleanname
 func cleanrname(rs []rune) []rune {
 	return []rune(filepath.Clean(string(rs)))
@@ -479,8 +484,11 @@ Rescue:
 	return r
 }
 
-/*
-func expandfile (Text *t, uint q0, uint q1, Expand *e) (int) {
+
+func expandfile (t * Text, q0  int, q1  int) (Expand, bool) {
+Unimpl()
+return Expand{}, false
+}/*
 	int i, n, nname, colon, eval;
 	uint amin, amax;
 	Rune *r, c;
@@ -587,67 +595,60 @@ func expandfile (Text *t, uint q0, uint q1, Expand *e) (int) {
 	free(r);
 	return false;
 }
-
-func expand (Text *t, uint q0, uint q1, Expand *e) (int) {
-	memset(e, 0, sizeof *e);
-	e.agetc = tgetc;
+*/
+func expand (t * Text, q0  int, q1  int)(Expand, bool) {
+Untested()
+	e := Expand{}
+	e.agetc = func(q int)rune{if q < t.Nc() { return t.ReadC(q)} else { return 0 }}
+	
 	// if in selection, choose selection
 	e.jump = true;
-	if q1==q0 && t.q1>t.q0 && t.q0<=q0 && q0<=t.q1){
+	if q1==q0 && t.inSelection(q0) {
 		q0 = t.q0;
 		q1 = t.q1;
-		if(t.what == Tag
+		if t.what == Tag {
 			e.jump = false;
+		}
 	}
 
-	if expandfile(t, q0, q1, e)
-		return true;
+	if e, ok := expandfile(t, q0, q1); ok {
+		return e, true;
+	}
 
 	if q0 == q1 {
-		while(q1<t.file.b.nc && isalnum(textreadc(t, q1)))
+		for(q1<t.file.b.nc() && isalnum(t.ReadC(q1))) {
 			q1++;
-		while(q0>0 && isalnum(textreadc(t, q0-1)))
+		}
+		for(q0>0 && isalnum(t.ReadC(q0-1))) {
 			q0--;
+		}
 	}
 	e.q0 = q0;
 	e.q1 = q1;
-	return q1 > q0;
+	return e, q1 > q0;
 }
-*/
+
 
 func lookfile(s string) *Window {
-	Unimpl()
-	return nil
-}
-
-/*
-{
-	int i, j, k;
-	Window *w;
-	Column *c;
-	Text *t;
+Untested()
 
 	// avoid terminal slash on directories
-	if n>1 && s[n-1] == '/'
-		--n;
-	for j=0; j<row.ncol; j++ {
-		c = row.col[j];
-		for i=0; i<c.nw; i++ {
-			w = c.w[i];
-			t = &w.body;
-			k = t.file.nname;
-			if k>1 && t.file.name[k-1] == '/'
-				k--;
-			if runeeq(t.file.name, k, s, n) {
+	s = strings.TrimRight(s, "/")
+	for _, c := range row.col {
+		for _, w := range c.w {
+		fmt.Printf("Checking: %v\n", w.body.file.name)
+			k := strings.TrimRight(w.body.file.name, "/")
+			if k == s {
 				w = w.body.file.curtext.w;
-				if(w.col != nil 	// protect against race deleting w
+				if w.col != nil {	// protect against race deleting w
 					return w;
+				}
 			}
 		}
 	}
 	return nil;
 }
-
+/*
 func lookid (int id, int dump) (Window*) {
 	int i, j;
 	Window *w;

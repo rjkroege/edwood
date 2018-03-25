@@ -487,6 +487,10 @@ func (t *Text) TypeCommit() {
 	}
 }
 
+func (t *Text)inSelection(q0 int)bool {
+	return t.q1>t.q0 && t.q0<=q0 && q0<=t.q1
+}
+
 func (t *Text) Fill() {
 	if t.fr.LastLineFull != 0 || t.nofill {
 		return
@@ -808,15 +812,15 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyCmd + 'c': /* %C: copy */
 		t.TypeCommit()
-		cut(t, t, nil, true, false, nil, 0)
+		cut(t, t, nil, true, false, nil)
 		return
 	case draw.KeyCmd + 'z': /* %Z: undo */
 		t.TypeCommit()
-		undo(t, nil, nil, true, false, nil, 0)
+		undo(t, nil, nil, true, false, nil)
 		return
 	case draw.KeyCmd + 'Z': /* %-shift-Z: redo */
 		t.TypeCommit()
-		undo(t, nil, nil, false, false, nil, 0)
+		undo(t, nil, nil, false, false, nil)
 		return
 
 	}
@@ -832,7 +836,7 @@ func (t *Text) Type(r rune) {
 			seq++
 			t.file.Mark()
 		}
-		cut(t, t, nil, true, true, nil, 0)
+		cut(t, t, nil, true, true, nil)
 		t.Show(t.q0, t.q0, true)
 		t.iq1 = t.q0
 		return
@@ -842,7 +846,7 @@ func (t *Text) Type(r rune) {
 			seq++
 			t.file.Mark()
 		}
-		paste(t, t, nil, true, false, nil, 0)
+		paste(t, t, nil, true, false, nil)
 		t.Show(t.q0, t.q1, true)
 		t.iq1 = t.q1
 		return
@@ -851,7 +855,7 @@ func (t *Text) Type(r rune) {
 		if t.ncache != 0 {
 			acmeerror("text.type", nil)
 		}
-		cut(t, t, nil, true, true, nil, 0)
+		cut(t, t, nil, true, true, nil)
 		t.eq0 = ^0
 	}
 	t.Show(t.q0, t.q0, true)
@@ -1145,7 +1149,7 @@ func (t *Text) Select() {
 					state = None
 				} else {
 					if state != Cut {
-						cut(t, t, nil, true, true, nil, 0)
+						cut(t, t, nil, true, true, nil)
 						state = Cut
 					}
 				}
@@ -1156,7 +1160,7 @@ func (t *Text) Select() {
 					state = None
 				} else {
 					if state != Paste {
-						paste(t, t, nil, true, false, nil, 0)
+						paste(t, t, nil, true, false, nil)
 						state = Paste
 					}
 				}
@@ -1445,7 +1449,8 @@ func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
 
 func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
 	q0, q1, buts := t.Select23(but2col, 4)
-	if (buts & 4) == 0 {
+	fmt.Println("buts =", buts, q0, q1)
+	if (buts & 4) != 0 {
 		return q0, q1, nil, false
 	}
 	if (buts & 1) != 0 { /* pick up argument */

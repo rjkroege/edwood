@@ -126,6 +126,7 @@ func main() {
 	csignal = make(chan os.Signal, 1)
 	cerr = make(chan error)
 	cedit = make(chan int)
+	cexit = make(chan struct {})
 	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
 
 	mousectl = display.InitMouse()

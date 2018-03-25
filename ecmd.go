@@ -615,7 +615,7 @@ func X_cmd(t *Text, cp *Cmd) int {
 func runpipe(t *Text, cmd int, cr []rune, state int) {
 	var (
 		r, s []rune
-		dir  []rune
+		dir  string
 		w    *Window
 		q    *sync.Mutex
 	)
@@ -635,9 +635,9 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 	}
 	s = append([]rune{rune(cmd)}, r...)
 
-	dir = nil
+	dir = ""
 	if t != nil {
-		dir = dirname(t, nil)
+		dir = t.DirName()
 	}
 	if len(dir) == 1 && dir[0] == '.' { // sigh
 		dir = dir[0:0]
@@ -646,7 +646,7 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 	if t != nil && t.w != nil {
 		t.w.ref.Inc()
 	}
-	run(w, s, dir, true, nil, nil, true)
+	run(w, s, dir, true, "", "", true)
 	if t != nil && t.w != nil {
 		t.w.Unlock()
 	}

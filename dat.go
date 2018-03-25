@@ -212,14 +212,14 @@ type Dirlist struct {
 }
 
 type Expand struct {
-	q0    uint
-	q1    uint
+	q0    int
+	q1    int
 	name  string
 	bname string
-	jump  int
+	jump  bool
 	at    *Text
 	ar    []rune
-	agetc func(interface{}, uint) int
+	agetc func(int) rune
 	a0    int
 	a1    int
 }

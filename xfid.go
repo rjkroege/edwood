@@ -154,7 +154,7 @@ func xfidopen(x *Xfid) {
 			w.nopen[q]++
 			seq++
 			t.file.Mark()
-			cut(t, t, nil, false, true, nil, 0)
+			cut(t, t, nil, false, true, nil)
 			w.wrselrange = Range{int(t.q1), int(t.q1)}
 			w.nomark = true
 		case QWeditout:
@@ -686,9 +686,9 @@ forloop:
 			}
 			w.col.Close(w, true)
 		case "get": // get file
-			get(&w.body, nil, nil, false, XXX, nil, 0)
+			get(&w.body, nil, nil, false, XXX, nil)
 		case "put": // put file
-			put(&w.body, nil, nil, XXX, XXX, nil, 0)
+			put(&w.body, nil, nil, XXX, XXX, nil)
 		case "dot=addr": // set dot
 			w.body.Commit(true)
 			clampaddr(w)
