@@ -28,11 +28,11 @@ type FRuneReader struct {
 type BRuneReader FRuneReader
 
 func NewFRuneReader(b Texter, offset int, eof int) *FRuneReader {
-	if eof > b.nc() {
-		eof = b.nc()
+	if eof > b.Nc() {
+		eof = b.Nc()
 	}
 	if eof < 0 {
-		eof = b.nc()
+		eof = b.Nc()
 	}
 	return &FRuneReader{b, offset, eof}
 }

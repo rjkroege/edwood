@@ -59,7 +59,7 @@ func TestRegexpBackward(t *testing.T) {
 			t.Errorf("Failed to compile tests[%d].re = '%v'", i, test.re)
 		}
 		text := &TextBuffer{0, 0, []rune(test.text)}
-		rs := are.rxbexecute(text, text.nc(), test.nmax)
+		rs := are.rxbexecute(text, text.Nc(), test.nmax)
 		if len(rs) != len(test.expected) {
 			t.Errorf("Mismatch tests[%d] - expected %d elements, got %d", i, len(test.expected), len(rs))
 			t.Errorf("\trs = %#v", rs)

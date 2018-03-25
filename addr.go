@@ -40,7 +40,7 @@ func isregexc(r int) bool {
 // and then nr chars, being careful not to walk past
 // the end of the current line.
 // It returns the final position.
-func nlcounttopos(t *Text, q0 int, nl int, nr int) int {
+func nlcounttopos(t Texter, q0 int, nl int, nr int) int {
 	for nl > 0 && q0 < t.Nc() {
 		if t.ReadC(q0) == '\n' {
 			nl--
@@ -57,7 +57,7 @@ func nlcounttopos(t *Text, q0 int, nl int, nr int) int {
 	return q0
 }
 
-func number(showerr bool, t *Text, r Range, line int, dir int, size int) (Range, bool) {
+func number(showerr bool, t Texter, r Range, line int, dir int, size int) (Range, bool) {
 	var q0, q1 int
 
 	if size == Char {
@@ -156,7 +156,7 @@ Rescue:
 
 var pattern *AcmeRegexp
 
-func acmeregexp(showerr bool, t *Text, lim Range, r Range, pat string, dir int) (retr Range, foundp bool) {
+func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int) (retr Range, foundp bool) {
 	var (
 		sel RangeSet
 		q   int
@@ -191,7 +191,8 @@ func acmeregexp(showerr bool, t *Text, lim Range, r Range, pat string, dir int) 
 	return sel[0], true
 }
 
-func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 int, q1 int, getc func(q int) rune, eval bool) (r Range, evalp bool, qp int) {
+// getc takes a closure over the address expression and returns the qth rune.
+func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc func(q int) rune, eval bool) (r Range, evalp bool, qp int) {
 	var (
 		dir, size    int
 		n            int
@@ -220,17 +221,18 @@ func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 int, q1 in
 			if prevc == 0 { // lhs defaults to 0
 				r.q0 = 0
 			}
-			if q >= q1 && t != nil && t.file != nil { // rhs defaults to $
+			text, ok := t.(*Text)
+			if q >= q1 && t != nil && ok && text.file != nil { // rhs defaults to $
 				r.q1 = t.Nc()
 			} else {
-				nr, evalp, q = address(showerr, t, lim, ar, a, q, q1, getc, evalp)
+				nr, evalp, q = address(showerr, t, lim, ar, q, q1, getc, evalp)
 				r.q1 = nr.q1
 			}
 			return r, evalp, q
 		case c == '+':
 			fallthrough
 		case c == '-':
-			nc = getc(q)
+			if q < q1 { nc = getc(q) } else { nc = 0 }
 			if evalp && (prevc == '+' || prevc == '-') &&
 				(nc != '#' && nc != '/' && nc != '?') {
 				r, evalp = number(showerr, t, r, 1, int(prevc), Line) // do previous one
@@ -260,7 +262,7 @@ func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 int, q1 in
 			if q == q1 {
 				return r, evalp, q - 1
 			}
-			c = getc(q)
+			if q < q1 { c = getc(q) } else { c = 0 }
 			q++
 			if c < '0' || '9' < c {
 				return r, evalp, q - 1
@@ -270,7 +272,8 @@ func address(showerr bool, t *Text, lim Range, ar Range, a []rune, q0 int, q1 in
 		case c >= '0' && c <= '9':
 			n = int(c - '0')
 			for q < q1 {
-				c = getc(q)
+				if q < q1 { c = getc(q) } else { c = 0 }
+
 				q++
 				if c < '0' || '9' < c {
 					q--

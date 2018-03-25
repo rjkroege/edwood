@@ -511,7 +511,7 @@ func xfidwrite(x *Xfid) {
 		w.Commit(t)
 		eval = true
 		fmt.Println("read addr:", string(r))
-		a, eval, nb = address(false, t, w.limit, w.addr, r, 0, (len(r)),
+		a, eval, nb = address(false, t, w.limit, w.addr, 0, (len(r)),
 			func(q int) rune { return r[q] }, eval)
 		if nb < (len(r)) {
 			respond(x, &fc, Ebadaddr)
