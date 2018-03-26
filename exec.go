@@ -238,6 +238,7 @@ fmt.Println("Not Exiting?")
 }
 
 func del(et * Text, _0 * Text, _1 * Text, flag1  bool, _2  bool, _3 string) {
+fmt.Println("Calling del")
 	if(et.col==nil || et.w == nil) {
 		return;
 	}

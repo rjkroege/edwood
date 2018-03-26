@@ -1001,7 +1001,7 @@ func (t *Text) Commit(tofile bool) {
 		return
 	}
 	if tofile {
-		t.file.Insert(t.cq0, t.cache)
+		t.file.Insert(t.cq0, t.cache[:t.ncache])
 	}
 	if t.what == Body {
 		t.w.dirty = true
