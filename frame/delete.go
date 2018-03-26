@@ -7,6 +7,9 @@ import (
 
 // Delete deletes from the Frame the text between p0 and p1; p1 points at
 // the first rune beyond the deletion.
+//
+// Delete will clear a selection or tick if present but not put it back.
+// TODO(rjk): This code will redraw too much.
 func (f *Frame) Delete(p0, p1 int) int {
 	//log.Println("Delete")
 	var r image.Rectangle
@@ -29,9 +32,8 @@ func (f *Frame) Delete(p0, p1 int) int {
 	pt0 := f.ptofcharnb(p0, n0)
 	pt1 := f.Ptofchar(p1)
 
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), false)
-	}
+	// Remove the selection or tick. 
+	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
 
 	nn0 := n0
 	ppt0 := pt0

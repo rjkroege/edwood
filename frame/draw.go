@@ -7,11 +7,11 @@ import (
 )
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
-	//	log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
+	// log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
 		pt = f.cklinewrap(pt, b)
-		//		log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
+		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.NoRedraw && b.Nrune >= 0 {
 			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
@@ -43,12 +43,14 @@ func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point
 // Note that the original code does not remove the pre-existing selection.
 // I (rjk) claim that this is clearly the wrong semantics. This function should
 // arrange for the drawn selection on return to be p0, p1
+//
+// DrawSel does the minimum work needed to clear a highlight and (in particular)
+// multiple calls to DrawSel with highlighted false will be cheap.
 func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if p0 > p1 {
 		panic("Drawsel0: p0 and p1 must be ordered")
 	}
 
-	var back, text *draw.Image
 	if f.Ticked {
 		f.Tick(f.Ptofchar(f.P0), false)
 	}
@@ -56,11 +58,20 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if f.P0 != f.P1 {
 		// Clear the selection so that subsequent code can
 		// update correctly.
-		back = f.Cols[ColBack]
-		text = f.Cols[ColText]
+		back := f.Cols[ColBack]
+		text := f.Cols[ColText]
 		f.Drawsel0(f.Ptofchar(f.P0), f.P0, f.P1, back, text)
 	}
 
+	// We've already done everything necessary above if not
+	// highlighting so simply return.
+	if !highlighted {
+		f.P0 = p0
+		f.P1 = p1
+		return		
+	}
+
+	// If we should just show the tick, do that and return.
 	if p0 == p1 {
 		f.Tick(pt, highlighted)
 		f.P0 = p0
@@ -68,13 +79,9 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 		return
 	}
 
-	if highlighted {
-		back = f.Cols[ColHigh]
-		text = f.Cols[ColHText]
-	} else {
-		back = f.Cols[ColBack]
-		text = f.Cols[ColText]
-	}
+	// Need to use the highlight colour.
+	back := f.Cols[ColHigh]
+	text := f.Cols[ColHText]
 
 	f.Drawsel0(pt, p0, p1, back, text)
 	f.P0 = p0

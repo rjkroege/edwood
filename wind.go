@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"9fans.net/go/draw"
-	"github.com/rjkroege/acme/frame"
+	"github.com/rjkroege/edwood/frame"
 )
 
 type Window struct {

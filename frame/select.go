@@ -3,8 +3,6 @@ package frame
 import (
 	"9fans.net/go/draw"
 	"image"
-
-	"fmt"
 )
 
 // SetSelectionExtent sets the rune offsets of the selection maintained
@@ -31,100 +29,78 @@ func region(a, b int) int {
 	return 1
 }
 
-// called when mouse 1 is down
-func (f *Frame) Select(mc *draw.Mousectl) {
-	mp := mc.Mouse.Point
-	b := mc.Mouse.Buttons
+// Select takes ownership of the mouse channel to update the selection
+// so long as a button is down in downevent. Selection stops when the
+// staring point buttondown is altered. 
+func (f *Frame) Select(mc *draw.Mousectl,  downevent *draw.Mouse) (int, int) {
+	omp := downevent.Point
+	omb := downevent.Buttons
 
+	// TODO(rjk): Figure out what Modified is really for.
 	f.Modified = false
-	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
-	p0 := f.Charofpt(mp)
+
+	p0 := f.Charofpt(omp)
 	p1 := p0
+	f.DrawSel(f.Ptofchar(p0), p0, p1, true)
 
-	f.P0 = p0
-	f.P1 = p1
-
-	pt0 := f.Ptofchar(p0)
-	pt1 := f.Ptofchar(p1)
-
-	f.DrawSel(pt0, p0, p1, true)
 	reg := 0
+	pin := 0
 
-	var q int
 	for {
+		me := <-mc.C
+		mp := me.Point
+		mb := me.Buttons
+
 		scrled := false
-		if f.Scroll != nil {
-			if mp.Y < f.Rect.Min.Y {
-				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
-				p0 = f.P1
-				p1 = f.P0
-				scrled = true
-			} else if mp.Y > f.Rect.Max.Y {
+ 		if f.Scroll != nil {
+ 			if mp.Y < f.Rect.Min.Y {
+ 				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
+				// As a result of scrolling, we will have called Insert. Insert will
+				// remove the selection. But not put it back. But it will correct
+				// P1 and P0 to reflect the insertion.
+				// TODO(rjk): Add a unittest to prove this statement.
+ 				p0 = f.P1
+ 				p1 = f.P0
+ 				scrled = true
+ 			} else if mp.Y > f.Rect.Max.Y {
 				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
-				p0 = f.P1
-				p1 = f.P0
-				scrled = true
-			}
-			if scrled {
-				if reg != region(p1, p0) {
-					q = p0
+ 				p0 = f.P1
+ 				p1 = f.P0
+ 				scrled = true
+ 			}
+ 			if scrled {
+ 				if reg != region(p1, p0) {
+ 					tmp := p0
 					p0 = p1
-					p1 = q
-				}
-				pt0 = f.Ptofchar(p0)
-				pt1 = f.Ptofchar(p1)
-				reg = region(p1, p0)
-			}
-		}
-		q = f.Charofpt(mp)
-		fmt.Println("q = ", q)
-		if p1 != q {
-			if reg != region(q, p0) {
-				if reg > 0 {
-					f.DrawSel(pt0, p0, p1, false)
-					fmt.Printf("Clearing selection reg > 0 %v %v %v\n", pt0, p0, p1)
-				} else if reg < 0 {
-					f.DrawSel(pt1, p1, p0, false)
-					fmt.Printf("Clearing selection reg < 0 %v %v %v\n", pt1, p1, p0)
-				}
-				p1 = p0
-				pt1 = pt0
-				reg = region(q, p0)
-				if reg == 0 {
-					f.DrawSel(pt0, p0, p1, true)
-					fmt.Printf("Drawing selection reg = 0 %v %v %v\n", pt0, p0, p1)
-				}
-			}
-			qt := f.Ptofchar(q)
-			fmt.Println("qt = ", qt)
-			if reg > 0 {
-				if q > p1 {
-					f.DrawSel(pt1, p1, q, true)
-					fmt.Printf("Drawing selection q > p1 %v %v %v\n", pt1, p1, q)
-				} else if q < p1 {
-					f.DrawSel(qt, q, p1, false)
-					fmt.Printf("Clearing selection q < p1 %v %v %v\n", qt, q, p1)
-				}
-			} else if reg < 0 {
-				if q > p1 {
-					f.DrawSel(pt1, p1, q, false)
-					fmt.Printf("Clearing selection q > p1 %v %v %v\n", pt1, p1, q)
-				} else {
-					f.DrawSel(qt, q, p1, true)
-					fmt.Printf("Drawing selection q < p1 %v %v %v\n", qt, q, p1)
-				}
-			}
+ 					p1 = tmp
+ 				}
+ 				reg = region(p1, p0)
+ 			}
+ 		}
+
+		q := f.Charofpt(mp)
+		switch {
+		case p0 == p1 && q == p0:
+			pin = 0
+		case pin == 0 && q > p0:
+			pin = 1
 			p1 = q
-			pt1 = qt
+		case pin == 0 && q < p0:
+			pin = -1
+			p0 = q
+		case pin == -1 && q < p1:
+			p0 = q
+		case pin == -1 && q > p1:
+			p1 = q
+			pin = 1
+		case pin == 1 && q > p0:
+			p1 = q
+		case pin == 1 && q < p0:
+			pin = -1
+			p0 = q
 		}
-		f.Modified = false
-		if p0 < p1 {
-			f.P0 = p0
-			f.P1 = p1
-		} else {
-			f.P0 = p1
-			f.P1 = p0
-		}
+
+		f.DrawSel(f.Ptofchar(p0), p0, p1, true)
 
 		if scrled {
 			f.Scroll(f, 0)
@@ -132,15 +108,11 @@ func (f *Frame) Select(mc *draw.Mousectl) {
 		if err := f.Display.Flush(); err != nil {
 			panic(err)
 		}
-		if !scrled {
-			mc.Read()
-		}
-		mp = mc.Mouse.Point
-		if mc.Mouse.Buttons != b {
+		if omb != mb {
 			break
 		}
 	}
-
+	return f.P0, f.P1
 }
 
 func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {

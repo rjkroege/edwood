@@ -12,6 +12,8 @@ import (
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
+
+	"log"
 )
 
 const (
@@ -54,7 +56,7 @@ type Text struct {
 	file    *File
 	fr      *frame.Frame
 	font    *draw.Font
-	org     int // Origin of the frame withing the buffer
+	org     int // Origin of the frame within the buffer
 	q0      int
 	q1      int
 	what    TextKind
@@ -491,24 +493,20 @@ func (t *Text)inSelection(q0 int)bool {
 	return t.q1>t.q0 && t.q0<=q0 && q0<=t.q1
 }
 
+// Fill inserts additional text from t into the Frame object until the Frame object is full.
 func (t *Text) Fill() {
+	// log.Println("Test.Fill Start")
+	// defer log.Println("Test.Fill End")
+
+	// Conceivably, LastLineFull should be true or would it only be true if there are no more
+	// characters possible?
 	if t.fr.LastLineFull != 0 || t.nofill {
 		return
 	}
 	if t.ncache > 0 {
 		t.TypeCommit()
 	}
-	/*
-		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines
-		lines := runesplitN(t.file.b[t.org+(t.fr.GetFrameFillStatus().Nchars):], []rune("\n"), nl)
-		for _, s := range lines {
-			t.fr.Insert(s, t.fr.GetFrameFillStatus().Nchars)
-			if t.fr.LastLineFull != 0 {
-				break
-			}
-		}
-	*/
-	for {
+ 	for {
 		n := t.file.b.nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
 			break
@@ -522,6 +520,7 @@ func (t *Text) Fill() {
 		// count newlines.
 		//
 		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines //+1
+
 		m := 0
 		var i int
 		for i = 0; i < n; {
@@ -533,6 +532,7 @@ func (t *Text) Fill() {
 				}
 			}
 		}
+
 		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
 		if t.fr.LastLineFull != 0 {
 			break
@@ -1022,33 +1022,26 @@ func getP1(fr *frame.Frame) int {
 func (t *Text) FrameScroll(dl int) {
 	var q0 int
 	if dl == 0 {
+		// TODO(rjk): Make this mechanism better? It seems unfortunate.
 		ScrSleep(100)
 		return
 	}
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
-		if selectq > t.org+(getP0((t.fr))) {
-			t.SetSelect(t.org+(getP0((t.fr))), selectq)
-		} else {
-			t.SetSelect(selectq, t.org+(getP0((t.fr))))
-		}
 	} else {
 		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.nc() {
 			return
 		}
 		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
-		if selectq > t.org+(getP1((t.fr))) {
-			t.SetSelect(t.org+(getP1((t.fr))), selectq)
-		} else {
-			t.SetSelect(selectq, t.org+(getP1((t.fr))))
-		}
 	}
-	t.SetOrigin(q0, true)
+	// Insert text into the frame. 
+	t.setorigin(q0, true, true)
 }
 
 var (
 	clicktext  *Text
 	clickmsec  uint32
+	// TODO(rjk): Replace with closure.
 	selecttext *Text
 	selectq    int
 )
@@ -1064,6 +1057,9 @@ func framescroll(f *frame.Frame, dl int) {
 }
 
 func (t *Text) Select() {
+	log.Println("Text.Select Begin")
+	defer log.Println("Text.Select End")
+
 	const (
 		None = iota
 		Cut
@@ -1089,6 +1085,7 @@ func (t *Text) Select() {
 		x := mouse.Point.X
 		y := mouse.Point.Y
 		/* stay here until something interesting happens */
+		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
 			mousectl.Read()
 			if !(mouse.Buttons == b && abs(mouse.Point.X-x) < 3 && abs(mouse.Point.Y-y) < 3) {
@@ -1103,21 +1100,24 @@ func (t *Text) Select() {
 	}
 	if mouse.Buttons == b {
 		t.fr.Scroll = framescroll
-		t.fr.Select(mousectl)
+		sP0, sP1 := t.fr.Select(mousectl, mouse)
+
+		// Printouts the world...
+
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.nc() {
-			selectq = t.org + (getP0((t.fr)))
+			selectq = t.org + sP0
 		}
 		t.fr.Scroll = nil
 		if selectq < t.org {
 			q0 = selectq
 		} else {
-			q0 = t.org + (getP0((t.fr)))
+			q0 = t.org + sP0
 		}
 		if selectq > t.org+(t.fr.GetFrameFillStatus().Nchars) {
 			q1 = selectq
 		} else {
-			q1 = t.org + (getP1((t.fr)))
+			q1 = t.org + sP1
 		}
 	}
 	if q0 == q1 {
@@ -1244,6 +1244,9 @@ func (t *Text) ReadC(q int) (r rune) {
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
+	// log.Println("Text SetSelect Start", q0, q1)
+	// defer log.Println("Text SetSelect End", q0, q1)
+
 	/* (getP0((t.fr))) and (getP1((t.fr))) are always right; t.q0 and t.q1 may be off */
 	t.q0 = q0
 	t.q1 = q1
@@ -1252,61 +1255,27 @@ func (t *Text) SetSelect(q0, q1 int) {
 	p1 := q1 - t.org
 	ticked := true
 	if p0 < 0 {
-		ticked = false
 		p0 = 0
 	}
 	if p1 < 0 {
+		ticked = false
 		p1 = 0
 	}
 	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
+		ticked = false
 		p0 = (t.fr.GetFrameFillStatus().Nchars)
 	}
 	if p1 > (t.fr.GetFrameFillStatus().Nchars) {
-		ticked = false
 		p1 = (t.fr.GetFrameFillStatus().Nchars)
-	}
-	if p0 == (getP0((t.fr))) && p1 == (getP1((t.fr))) {
-		if p0 == p1 && ticked != t.fr.Ticked {
-			t.fr.Tick(t.fr.Ptofchar((p0)), ticked)
-		}
-		return
 	}
 	if p0 > p1 {
 		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.GetFrameFillStatus().Nchars))
 	}
-	/* screen disagrees with desired selection */
-	if (getP1((t.fr))) <= p0 || p1 <= (getP0((t.fr))) || p0 == p1 || (getP1((t.fr))) == (getP0((t.fr))) {
-		/* no overlap or too easy to bother trying */
-		t.fr.DrawSel(t.fr.Ptofchar(getP0((t.fr))), (getP0(t.fr)), (getP1(t.fr)), false)
-		if p0 != p1 || ticked {
-			t.fr.DrawSel(t.fr.Ptofchar(int(p0)), int(p0), int(p1), true)
-		}
-		goto Return
-	}
-	/* overlap; avoid unnecessary painting */
-	if p0 < (getP0((t.fr))) {
-		/* extend selection backwards */
-		t.fr.DrawSel(t.fr.Ptofchar((p0)), (p0), (getP0(t.fr)), true)
-	} else {
-		if p0 > (getP0((t.fr))) {
-			/* trim first part of selection */
-			t.fr.DrawSel(t.fr.Ptofchar(getP0((t.fr))), (getP0(t.fr)), (p0), false)
-		}
-	}
-	if p1 > (getP1((t.fr))) {
-		/* extend selection forwards */
-		t.fr.DrawSel(t.fr.Ptofchar(getP1((t.fr))), (getP1(t.fr)), (p1), true)
-	} else if p1 < (getP1((t.fr))) {
-		/* trim last part of selection */
-		t.fr.DrawSel(t.fr.Ptofchar(int(p1)), (p1), (getP1(t.fr)), false)
-	}
 
-Return:
-	t.fr.SetSelectionExtent(p0, p1)
+	t.fr.DrawSel(t.fr.Ptofchar(p0), p0, p1, ticked)
 }
 
 func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 int) {
-
 	if p1 <= (getP0((f))) || p0 >= (getP1((f))) {
 		/* no overlap */
 		f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
@@ -1341,6 +1310,8 @@ const (
 )
 
 // When called, button is down.
+// TODO(rjk): There is considerable overlap between this function and Drawsel
+// Conceivably, this could be eliminated.
 func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image, dis *draw.Display) (p0p, p1p int) {
 	mp := mc.Mouse.Point
 	b := mc.Mouse.Buttons
@@ -1594,26 +1565,23 @@ func (t *Text) BackNL(p, n int) int {
 	return p
 }
 
+
 func (t *Text) SetOrigin(org int, exact bool) {
-	t.org = org
-	r := t.all
-	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
-	r.Min.Y += 1 //same + 1 as col.go:402?  Makes up the 1 px line at top of window.
-	t.Redraw(r, t.font, t.display.ScreenImage, -1)
-	t.lastsr = image.ZR
-	t.ScrDraw()
+	t.setorigin(org, exact, false)
 }
 
-/*
-fmt.Printf("Text.SetOrigin: t.org = %v, org = %v\n", t.org, org)
-fmt.Printf("\t: t = %#v\n", t)
-fmt.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
+func (t *Text) setorigin(org int, exact bool, calledfromscroll bool) {
+	// log.Printf("Text.SetOrigin start: t.org = %v, org = %v, exact = %v\n", t.org, org, exact)
+	// defer log.Println("Text.SetOrigin end")
+	// log.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
+
 	var (
 		i, a  int
-		fixup bool
 		r     []rune
 		n     int
 	)
+
+	// rjk: I'm not sure what this is for exactly.
 	if org > 0 && !exact && t.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
@@ -1626,30 +1594,26 @@ fmt.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus
 		}
 	}
 	a = org - t.org
-	fixup = false
 	if a >= 0 && a < t.fr.GetFrameFillStatus().Nchars {
 		t.fr.Delete(0, a)
-		fixup = true // frdelete can leave end of last line in wrong selection mode; it doesn't know what follows
 	} else {
 		if a < 0 && -a < t.fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = t.file.b.Read(org, n)
 			t.fr.Insert(r, 0)
-fmt.Printf("\t\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 		} else {
 			t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 		}
 	}
 	t.org = org
-fmt.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 	t.Fill()
 	t.ScrDraw()
-	t.SetSelect(t.q0, t.q1)
-	if fixup &&(getP1( t.fr)) >(getP0( t.fr)) {
-		t.fr.DrawSel(t.fr.Ptofchar(getP1((t.fr))-1),(getP1( t.fr))-1,(getP1( t.fr)), true)
+
+	if !calledfromscroll {
+		t.SetSelect(t.q0, t.q1)
 	}
 }
-*/
+
 func (t *Text) Reset() {
 	t.file.seq = 0
 	t.eq0 = ^0

@@ -2,10 +2,11 @@ package frame
 
 import (
 	"image"
-	//"log"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
+
+	"log"
 )
 
 var (
@@ -15,8 +16,6 @@ var (
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
-	//	log.Println("bxscan starting")
-
 	var c rune
 
 	frame.Rect = f.Rect
@@ -106,9 +105,10 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 }
 
 func (f *Frame) chop(pt image.Point, p, bn int) {
-	for b := f.box[bn]; ; bn++ {
+	for {
+		b := f.box[bn]
 		// Safe but not necessarily a good idea.
-		if bn >= len(f.box) {
+		if bn >= f.nbox {
 			panic("endofframe")
 		}
 		pt = f.cklinewrap(pt, b)
@@ -117,8 +117,9 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		}
 		p += nrune(b)
 		f.advance(&pt, b)
+		bn++
 	}
-	f.NChars = int(p)
+	f.NChars = p
 	f.NLines = f.MaxLines
 	if bn < f.nbox { // BUG
 		f.delbox(bn, f.nbox-1)
@@ -137,16 +138,15 @@ var nalloc = 0
 // including control characters, are just displayed. For example,
 // backspaces are printed; to erase a character, use Delete.
 //
-// Insert manages the tick and selection.
+// Insert will remove the selection or tick  if present but update selection offsets.
 func (f *Frame) Insert(r []rune, p0 int) {
-	//log.Printf("\n\n-----\nframe.Insert: %s", string(r))
+	// log.Printf("frame.Insert. Start: %s", string(r))
+	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")
 
 	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
 		return
 	}
-
-	//	log.Println("frame.Insert, doing some work")
 
 	var rect image.Rectangle
 	var col, tcol *draw.Image
@@ -165,12 +165,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	pt1 := f.bxscan(r, &ppt0)
 	ppt1 := pt1
 
-	// I expect n0 to be 0. But... the array is empty.
-	//	log.Println("len of box", len(f.box), "n0", n0)
-	//	f.Logboxes("f after bxscan")
-	//	log.Println("----")
-	//	frame.Logboxes("frame after bxscan")
-
 	if n0 < f.nbox {
 		pt0 = f.cklinewrap(pt0, f.box[n0])
 		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
@@ -181,11 +175,9 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 * insertion is complete. pt0 is current location of insertion position
 	 * (p0); pt1 is terminal point (without line wrap) of insertion.
 	 */
-	// TODO(rjk): Insert should remove the selection. Host should use
-	// Drawsel to put it back later?
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), false)
-	}
+
+	// Remove the selection or tick. 
+	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
 
 	/*
 	 * Find point where old and new x's line up
@@ -210,11 +202,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 				b = f.box[n0]
 			}
 		}
-		//		if npts == nalloc {
-		//			pts = append(pts, make([]points, npts+DELTA)...)
-		//			nalloc += DELTA
-		//			b = f.box[n0]
-		//		}
 
 		pts = append(pts, points{pt0, pt1})
 		if pt1.Y == f.Rect.Max.Y {
@@ -240,23 +227,29 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		}
 		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
 	} else if pt1.Y != pt0.Y {
+		log.Println("suspect branch in Insert")
 		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
 		f.NLines += (q1 - q0) / f.Font.DefaultHeight()
 		if f.NLines > f.MaxLines {
+			// log.Println("f.chop", ppt1, p0, nn0, len(f.box), f.nbox)
 			f.chop(ppt1, p0, nn0)
 		}
 		if pt1.Y < y {
 			rect = f.Rect
 			rect.Min.Y = q1
 			rect.Max.Y = y
-			if q1 < y {
-				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
-			}
+			// TODO(rjk): This bitblit considered harmful. It damages the
+			// the output. Investigate further.
+//			if q1 < y {
+//				log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
+//				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
+//			}
 			rect.Min = pt1
 			rect.Max.X = pt1.X + (f.Rect.Max.X - pt0.X)
 			rect.Max.Y += q1
+			log.Println("second blit op on ", rect, "from", pt0)
 			f.Background.Draw(rect, f.Background, nil, pt0)
 		}
 	}
@@ -271,8 +264,9 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		y = pt1.Y
 	}
 	npts--
-	//log.Println("npts", npts, "y", y)
+	// log.Println("npts", npts, "y", y)
 	for n0 = n0 - 1; npts >= 0; n0-- {
+		log.Println("looping over  boxes..", n0)
 		b := f.box[n0]
 		pt := pts[npts].pt1
 
@@ -354,7 +348,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		f.box[nn0+n] = frame.box[n]
 	}
 
-	//	f.Logboxes("after adding")
+	// f.Logboxes("after adding")
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
 		nn0--
@@ -380,8 +374,4 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	if f.P1 >= f.NChars {
 		f.P1 += f.NChars
 	}
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), true)
-	}
-
 }
