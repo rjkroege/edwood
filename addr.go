@@ -232,7 +232,11 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 		case c == '+':
 			fallthrough
 		case c == '-':
-			if q < q1 { nc = getc(q) } else { nc = 0 }
+			if q < q1 {
+				nc = getc(q)
+			} else {
+				nc = 0
+			}
 			if evalp && (prevc == '+' || prevc == '-') &&
 				(nc != '#' && nc != '/' && nc != '?') {
 				r, evalp = number(showerr, t, r, 1, int(prevc), Line) // do previous one
@@ -262,7 +266,11 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			if q == q1 {
 				return r, evalp, q - 1
 			}
-			if q < q1 { c = getc(q) } else { c = 0 }
+			if q < q1 {
+				c = getc(q)
+			} else {
+				c = 0
+			}
 			q++
 			if c < '0' || '9' < c {
 				return r, evalp, q - 1
@@ -272,7 +280,11 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 		case c >= '0' && c <= '9':
 			n = int(c - '0')
 			for q < q1 {
-				if q < q1 { c = getc(q) } else { c = 0 }
+				if q < q1 {
+					c = getc(q)
+				} else {
+					c = 0
+				}
 
 				q++
 				if c < '0' || '9' < c {

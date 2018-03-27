@@ -99,7 +99,7 @@ func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumCo
 }
 
 func (t *Text) Nc() int {
-	return t.file.b.nc()
+	return t.file.b.Nc()
 }
 
 func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
@@ -240,7 +240,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 }
 
 func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
-	if t.ncache != 0 || t.file.b.nc() > 0 || t.w == nil || t != &t.w.body {
+	if t.ncache != 0 || t.file.b.Nc() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 	if t.w.isdir && t.file.name == "" {
@@ -307,7 +307,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 = t.file.b.nc()
+		q1 = t.file.b.Nc()
 	} else {
 		t.w.isdir = false
 		t.w.filemenu = true
@@ -338,7 +338,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	// For each clone, redraw
 	for _, u := range t.file.text {
 		if u != t { // Skip the one we just redrew
-			if u.org > u.file.b.nc() { /* will be 0 because of reset(), but safety first */
+			if u.org > u.file.b.Nc() { /* will be 0 because of reset(), but safety first */
 				u.org = 0
 			}
 			u.Resize(u.all, true)
@@ -489,8 +489,8 @@ func (t *Text) TypeCommit() {
 	}
 }
 
-func (t *Text)inSelection(q0 int)bool {
-	return t.q1>t.q0 && t.q0<=q0 && q0<=t.q1
+func (t *Text) inSelection(q0 int) bool {
+	return t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1
 }
 
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
@@ -506,15 +506,16 @@ func (t *Text) Fill() {
 	if t.ncache > 0 {
 		t.TypeCommit()
 	}
- 	for {
-		n := t.file.b.nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
+	for {
+		n := t.file.b.Nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
 			break
 		}
 		if n > 2000 { // educated guess at reasonable amount
 			n = 2000
 		}
-		rp := t.file.b.Read(t.org+t.fr.GetFrameFillStatus().Nchars, n)
+		rp := make([]rune, n)
+		t.file.b.Read(t.org+t.fr.GetFrameFillStatus().Nchars, rp)
 		//
 		// it's expensive to frinsert more than we need, so
 		// count newlines.
@@ -600,15 +601,15 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 }
 
-func (t *Text) Read(q, n int) []rune { return t.file.b.Read(q, n) }
-func (t *Text) nc() int              { return t.file.b.nc() }
-func (t *Text) Q0() int              { return t.q0 }
-func (t *Text) Q1() int              { return t.q1 }
-func (t *Text) SetQ0(q0 int)         { t.q0 = q0 }
-func (t *Text) SetQ1(q1 int)         { t.q1 = q1 }
+func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
+func (t *Text) nc() int                                  { return t.file.b.Nc() }
+func (t *Text) Q0() int                                  { return t.q0 }
+func (t *Text) Q1() int                                  { return t.q1 }
+func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
+func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, t.file.b.nc())
-	p1 = min(q1, t.file.b.nc())
+	p0 = min(q0, t.file.b.Nc())
+	p1 = min(q1, t.file.b.Nc())
 	return p0, p1
 }
 
@@ -616,7 +617,7 @@ func (t *Text) ReadRune(q int) rune {
 	if t.cq0 <= q && q < t.cq0+(t.ncache) {
 		return t.cache[q-t.cq0]
 	} else {
-		return t.file.b.Read(q, 1)[0]
+		return t.file.b.ReadC(q)
 	}
 }
 
@@ -724,7 +725,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyRight:
 		t.TypeCommit()
-		if t.q1 < t.file.b.nc() {
+		if t.q1 < t.file.b.Nc() {
 			t.Show(t.q1+1, t.q1+1, true)
 		}
 		return
@@ -783,14 +784,14 @@ func (t *Text) Type(r rune) {
 	case draw.KeyEnd:
 		t.TypeCommit()
 		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.b.nc() {
+			if t.iq1 > t.file.b.Nc() {
 				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.b.nc()
+				t.iq1 = t.file.b.Nc()
 			}
 			q0 = t.Backnl(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
-			t.Show(t.file.b.nc(), t.file.b.nc(), false)
+			t.Show(t.file.b.Nc(), t.file.b.Nc(), false)
 		}
 		return
 	case 0x01: /* ^A: beginning of line */
@@ -805,14 +806,14 @@ func (t *Text) Type(r rune) {
 	case 0x05: /* ^E: end of line */
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.b.nc() && t.ReadC(q0) != '\n' {
+		for q0 < t.file.b.Nc() && t.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
 		return
 	case draw.KeyCmd + 'c': /* %C: copy */
 		t.TypeCommit()
-		cut(t, t, nil, true, false, nil)
+		cut(t, t, nil, true, false, "")
 		return
 	case draw.KeyCmd + 'z': /* %Z: undo */
 		t.TypeCommit()
@@ -836,7 +837,7 @@ func (t *Text) Type(r rune) {
 			seq++
 			t.file.Mark()
 		}
-		cut(t, t, nil, true, true, nil)
+		cut(t, t, nil, true, true, "")
 		t.Show(t.q0, t.q0, true)
 		t.iq1 = t.q0
 		return
@@ -855,7 +856,7 @@ func (t *Text) Type(r rune) {
 		if t.ncache != 0 {
 			acmeerror("text.type", nil)
 		}
-		cut(t, t, nil, true, true, nil)
+		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
 	}
 	t.Show(t.q0, t.q0, true)
@@ -1029,18 +1030,18 @@ func (t *Text) FrameScroll(dl int) {
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
 	} else {
-		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.nc() {
+		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
 			return
 		}
 		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
 	}
-	// Insert text into the frame. 
+	// Insert text into the frame.
 	t.setorigin(q0, true, true)
 }
 
 var (
-	clicktext  *Text
-	clickmsec  uint32
+	clicktext *Text
+	clickmsec uint32
 	// TODO(rjk): Replace with closure.
 	selecttext *Text
 	selectq    int
@@ -1105,7 +1106,7 @@ func (t *Text) Select() {
 		// Printouts the world...
 
 		/* horrible botch: while asleep, may have lost selection altogether */
-		if selectq > t.file.b.nc() {
+		if selectq > t.file.b.Nc() {
 			selectq = t.org + sP0
 		}
 		t.fr.Scroll = nil
@@ -1149,7 +1150,7 @@ func (t *Text) Select() {
 					state = None
 				} else {
 					if state != Cut {
-						cut(t, t, nil, true, true, nil)
+						cut(t, t, nil, true, true, "")
 						state = Cut
 					}
 				}
@@ -1198,7 +1199,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false /* do we call textscrdraw? */
-	nc = t.file.b.nc() + t.ncache
+	nc = t.file.b.Nc() + t.ncache
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
@@ -1237,7 +1238,7 @@ func (t *Text) ReadC(q int) (r rune) {
 	if t.cq0 <= q && q < t.cq0+(t.ncache) {
 		r = t.cache[q-t.cq0]
 	} else {
-		r = t.file.b.Read(q, 1)[0]
+		r = t.file.b.ReadC(q)
 	}
 	return r
 
@@ -1461,7 +1462,7 @@ func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
 			return
 		}
 		/* try matching character to right, looking left */
-		if q == t.file.b.nc() {
+		if q == t.file.b.Nc() {
 			c = '\n'
 		} else {
 			c = t.ReadC(q)
@@ -1470,7 +1471,7 @@ func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0
-				if q0 < t.file.b.nc() && c == '\n' {
+				if q0 < t.file.b.Nc() && c == '\n' {
 					q1++
 				}
 				q0 = q
@@ -1483,7 +1484,7 @@ func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
 	}
 
 	/* try filling out word to right */
-	for q1 < t.file.b.nc() && isalnum(t.ReadC(q1)) {
+	for q1 < t.file.b.Nc() && isalnum(t.ReadC(q1)) {
 		q1++
 	}
 	/* try filling out word to left */
@@ -1499,7 +1500,7 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	var c rune
 	for {
 		if dir > 0 {
-			if inq == t.file.b.nc() {
+			if inq == t.file.b.Nc() {
 				break
 			}
 			c = t.ReadC(inq)
@@ -1565,7 +1566,6 @@ func (t *Text) BackNL(p, n int) int {
 	return p
 }
 
-
 func (t *Text) SetOrigin(org int, exact bool) {
 	t.setorigin(org, exact, false)
 }
@@ -1576,16 +1576,16 @@ func (t *Text) setorigin(org int, exact bool, calledfromscroll bool) {
 	// log.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
 
 	var (
-		i, a  int
-		r     []rune
-		n     int
+		i, a int
+		r    []rune
+		n    int
 	)
 
 	// rjk: I'm not sure what this is for exactly.
 	if org > 0 && !exact && t.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
-		for i = 0; i < 256 && org < t.file.b.nc(); i++ {
+		for i = 0; i < 256 && org < t.file.b.Nc(); i++ {
 			if t.ReadC(org) == '\n' {
 				org++
 				break
@@ -1599,7 +1599,8 @@ func (t *Text) setorigin(org int, exact bool, calledfromscroll bool) {
 	} else {
 		if a < 0 && -a < t.fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
-			r = t.file.b.Read(org, n)
+			r = make([]rune, n)
+			t.file.b.Read(org, r)
 			t.fr.Insert(r, 0)
 		} else {
 			t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
@@ -1631,7 +1632,8 @@ func (t *Text) DirName() string {
 	if t == nil || t.w == nil {
 		return "."
 	}
-	b := t.w.tag.file.b.Read(0, t.w.tag.file.b.nc())
+	b := make([]rune, t.w.tag.file.b.Nc())
+	t.w.tag.file.b.Read(0, b)
 	spl := strings.SplitN(string(b), " ", 1)[0]
 	return filepath.Dir(spl)
 }

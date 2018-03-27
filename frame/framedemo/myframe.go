@@ -31,8 +31,8 @@ func (mf *Myframe) Resize(resized bool) {
 		if err := mf.f.Display.Attach(draw.Refmesg); err != nil {
 			log.Fatalf("can't reattach to window: %v", err)
 		}
-		
-		mf.f.SetRects( mf.f.Display.Image.R.Inset(20),  mf.f.Display.ScreenImage)
+
+		mf.f.SetRects(mf.f.Display.Image.R.Inset(20), mf.f.Display.ScreenImage)
 	}
 
 	mf.f.Background.Draw(
@@ -44,7 +44,7 @@ func (mf *Myframe) Resize(resized bool) {
 	if resized {
 		// insert text such that we fit a window around the cursor.
 		// TODO(rjk): Adjust for scrollable buffers.
-		mf.f.Insert(mf.buffer,  0)
+		mf.f.Insert(mf.buffer, 0)
 	}
 
 	// Set the tick
@@ -164,11 +164,11 @@ func (mf *Myframe) MouseMove(pt image.Point) {
 
 	if mf.cursordown <= mf.cursor {
 		selpt := mf.f.Ptofchar(mf.cursordown)
-		log.Println("MouseMove str", selpt,string(mf.buffer[mf.cursordown:mf.cursor]))
+		log.Println("MouseMove str", selpt, string(mf.buffer[mf.cursordown:mf.cursor]))
 		mf.f.DrawSel(selpt, mf.cursordown, mf.cursor, true)
 	} else {
 		selpt := mf.f.Ptofchar(mf.cursor)
-		log.Println("MouseMove str", selpt,string(mf.buffer[mf.cursor:mf.cursordown]))
+		log.Println("MouseMove str", selpt, string(mf.buffer[mf.cursor:mf.cursordown]))
 		mf.f.DrawSel(selpt, mf.cursor, mf.cursordown, true)
 	}
 }

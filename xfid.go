@@ -141,7 +141,8 @@ func xfidopen(x *Xfid) {
 				if n > BUFSIZE/utf8.UTFMax {
 					n = BUFSIZE / utf8.UTFMax
 				}
-				r := t.file.b.Read(q0, (n))
+				r := make([]rune, (n))
+				t.file.b.Read(q0, r)
 				s := string(r)
 				n, err = w.rdselfd.Write([]byte(s))
 				if err != nil || n != len(s) {
@@ -154,7 +155,7 @@ func xfidopen(x *Xfid) {
 			w.nopen[q]++
 			seq++
 			t.file.Mark()
-			cut(t, t, nil, false, true, nil)
+			cut(t, t, nil, false, true, "")
 			w.wrselrange = Range{int(t.q1), int(t.q1)}
 			w.nomark = true
 		case QWeditout:
@@ -284,7 +285,8 @@ func xfidread(x *Xfid) {
 	if w == nil {
 		fc.Count = 0
 		switch q {
-		case Qcons: fallthrough
+		case Qcons:
+			fallthrough
 		case Qlabel:
 			break
 		case Qindex:
@@ -921,7 +923,8 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
-		r := t.file.b.Read(q, nr)
+		r := make([]rune, nr)
+		t.file.b.Read(q, r)
 		b := r //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
 		if boff >= off {
 			m = len(b)
@@ -961,7 +964,9 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	w.Commit(t)
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
-	buf := []byte(string(t.file.b.Read(q0, nr)))
+	tmp := make([]rune, nr)
+	t.file.b.Read(q0, tmp)
+	buf := []byte(string(tmp))
 	// Now chop, and back up the end until we have a full rune
 	buf = buf[:nr]
 	i := nr - utf8.UTFMax
@@ -1044,7 +1049,8 @@ func xfidindexread(x *Xfid) {
 			}
 			sb.WriteString(w.CtlPrint(false))
 			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
-			tag := w.tag.file.b.Read(0, m)
+			tag := make([]rune, m)
+			w.tag.file.b.Read(0, tag)
 			sb.WriteString(string(tag))
 			sb.WriteString("\n")
 		}

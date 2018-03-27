@@ -44,15 +44,16 @@ func (b *Buffer) Load(q0 int, fd *os.File) (n int, h [sha1.Size]byte, hasNulls b
 	return (len(runes)), sha1.Sum(d), hasNulls, err
 }
 
-func (b *Buffer) Read(q0, n int) (r []rune) {
-	// TODO(flux): Can I just reslice here, or do I need to copy?
+func (b *Buffer) Read(q0 int, r []rune) (n int, err error) {
+	n = len(r)
 	if !(q0 <= (len(*b)) && q0+n <= (len(*b))) {
 		panic("internal error: Buffer.Read")
 	}
-	r = make([]rune, n)
 	copy(r, (*b)[q0:q0+n])
-	return r
+	return n, nil
 }
+
+func (b *Buffer) ReadC(q int) rune { return (*b)[q] }
 
 func (b *Buffer) Close() {
 	(*b).Reset()
@@ -63,7 +64,7 @@ func (b *Buffer) Reset() {
 	(*b) = (*b)[0:0]
 }
 
-func (b *Buffer) nc() int {
+func (b *Buffer) Nc() int {
 	return len(*b)
 }
 

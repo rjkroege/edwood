@@ -47,18 +47,18 @@ func (frr *FRuneReader) ReadRune() (r rune, size int, err error) {
 	if frr.q >= frr.eof {
 		return 0, 0, fmt.Errorf("end of buffer")
 	}
-	rr := frr.buf.Read(frr.q, 1)
+	rr := frr.buf.ReadC(frr.q)
 	frr.q++
-	return rr[0], 1, nil
+	return rr, 1, nil
 }
 
 func (brr *BRuneReader) ReadRune() (r rune, size int, err error) {
 	if brr.q < 0 {
 		return 0, 0, fmt.Errorf("end of buffer")
 	}
-	rr := brr.buf.Read(brr.q, 1)
+	rr := brr.buf.ReadC(brr.q)
 	brr.q--
-	return rr[0], 1, nil
+	return rr, 1, nil
 }
 
 // works on Text if present, rune otherwise

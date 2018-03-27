@@ -66,7 +66,7 @@ func (f *File) DelText(t *Text) {
 }
 
 func (f *File) Insert(p0 int, s []rune) {
-	if p0 > f.b.nc() {
+	if p0 > f.b.Nc() {
 		panic("internal error: fileinsert")
 	}
 	if f.seq > 0 {
@@ -90,7 +90,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 }
 
 func (f *File) Delete(p0, p1 int) {
-	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
+	if !(p0 <= p1 && p0 <= f.b.Nc() && p1 <= f.b.Nc()) {
 		acmeerror("internal error: filedelete", nil)
 	}
 	if f.seq > 0 {
@@ -110,7 +110,8 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	u.seq = f.seq
 	u.p0 = p0
 	u.n = p1 - p0
-	u.buf = f.b.Read(p0, u.n)
+	u.buf = make([]rune, u.n)
+	f.b.Read(p0, u.buf)
 	(*delta) = append(*delta, &u)
 }
 

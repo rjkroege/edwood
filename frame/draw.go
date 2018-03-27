@@ -68,7 +68,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if !highlighted {
 		f.P0 = p0
 		f.P1 = p1
-		return		
+		return
 	}
 
 	// If we should just show the tick, do that and return.

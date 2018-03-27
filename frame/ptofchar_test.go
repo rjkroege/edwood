@@ -5,17 +5,15 @@ import (
 	"testing"
 )
 
-
 type CharofptTestCase struct {
-	name       string
-	frame      *Frame
-	stim	 image.Point
+	name     string
+	frame    *Frame
+	stim     image.Point
 	expected int
 }
 
-
 func TestCharofpt(t *testing.T) {
-	
+
 	for _, tv := range []CharofptTestCase{
 		{
 			"empty",
@@ -37,7 +35,7 @@ func TestCharofpt(t *testing.T) {
 				box: []*frbox{
 					makeBox("本"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(10+56, 15+56),
 			1,
@@ -52,7 +50,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("12345"),
 					makeBox("本b"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(10, 15),
 			0,
@@ -67,7 +65,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("12345"),
 					makeBox("本b"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(19, 27),
 			0,
@@ -82,7 +80,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("12345"),
 					makeBox("本b"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(20, 27),
 			1,
@@ -97,7 +95,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("12345"),
 					makeBox("本bcd"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(19, 28),
 			5,
@@ -112,7 +110,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("12345"),
 					makeBox("本bcd"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(20, 28),
 			6,
@@ -128,7 +126,7 @@ func TestCharofpt(t *testing.T) {
 					makeBox("本bcd"),
 					makeBox("Göph"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(20, 28),
 			6,
@@ -144,9 +142,9 @@ func TestCharofpt(t *testing.T) {
 					makeBox("本bcd"),
 					makeBox("Göph"),
 				},
-				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
-			image.Pt(30, 1 + 15 + 2 * 13),
+			image.Pt(30, 1+15+2*13),
 			11,
 		},
 	} {

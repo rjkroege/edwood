@@ -31,8 +31,8 @@ func region(a, b int) int {
 
 // Select takes ownership of the mouse channel to update the selection
 // so long as a button is down in downevent. Selection stops when the
-// staring point buttondown is altered. 
-func (f *Frame) Select(mc *draw.Mousectl,  downevent *draw.Mouse) (int, int) {
+// staring point buttondown is altered.
+func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 	omp := downevent.Point
 	omb := downevent.Buttons
 
@@ -52,31 +52,31 @@ func (f *Frame) Select(mc *draw.Mousectl,  downevent *draw.Mouse) (int, int) {
 		mb := me.Buttons
 
 		scrled := false
- 		if f.Scroll != nil {
- 			if mp.Y < f.Rect.Min.Y {
- 				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
+		if f.Scroll != nil {
+			if mp.Y < f.Rect.Min.Y {
+				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
 				// As a result of scrolling, we will have called Insert. Insert will
 				// remove the selection. But not put it back. But it will correct
 				// P1 and P0 to reflect the insertion.
 				// TODO(rjk): Add a unittest to prove this statement.
- 				p0 = f.P1
- 				p1 = f.P0
- 				scrled = true
- 			} else if mp.Y > f.Rect.Max.Y {
+				p0 = f.P1
+				p1 = f.P0
+				scrled = true
+			} else if mp.Y > f.Rect.Max.Y {
 				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
- 				p0 = f.P1
- 				p1 = f.P0
- 				scrled = true
- 			}
- 			if scrled {
- 				if reg != region(p1, p0) {
- 					tmp := p0
+				p0 = f.P1
+				p1 = f.P0
+				scrled = true
+			}
+			if scrled {
+				if reg != region(p1, p0) {
+					tmp := p0
 					p0 = p1
- 					p1 = tmp
- 				}
- 				reg = region(p1, p0)
- 			}
- 		}
+					p1 = tmp
+				}
+				reg = region(p1, p0)
+			}
+		}
 
 		q := f.Charofpt(mp)
 		switch {

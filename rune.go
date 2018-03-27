@@ -37,7 +37,7 @@ func runesplitN(buf []rune, sep []rune, nl int) [][]rune {
 	for i, r := range buf {
 		for _, se := range sep {
 			if r == se {
-				line := append(buf[linestart:i], rune('\n'))
+				line := buf[linestart:i]
 				lines = append(lines, line)
 				linestart = i + 1
 			}

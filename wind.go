@@ -170,8 +170,8 @@ func (w *Window) DrawButton() {
 func (w *Window) delRunePos() int {
 	var n int
 	for n = 0; n < w.tag.Nc(); n++ {
-		r := w.tag.file.b.Read(n, 1)
-		if r[0] == ' ' {
+		r := w.tag.file.b.ReadC(n)
+		if r == ' ' {
 			break
 		}
 	}
@@ -364,7 +364,8 @@ func (w *Window) Type(t *Text, r rune) {
 func (w *Window) ClearTag() {
 	/* w must be committed */
 	n := w.tag.Nc()
-	r := w.tag.file.b.Read(0, n)
+	r := make([]rune, n)
+	w.tag.file.b.Read(0, r)
 	var i int
 	for i = 0; i < n; i++ {
 		if r[i] == ' ' || r[i] == '\t' {
@@ -487,7 +488,8 @@ func (w *Window) Commit(t *Text) {
 	if t.what == Body {
 		return
 	}
-	r := w.tag.file.b.Read(0, w.tag.Nc())
+	r := make([]rune, w.tag.Nc())
+	w.tag.file.b.Read(0, r)
 	filename := string(runesplitN(r, []rune(" \t"), 1)[0])
 	if filename != w.body.file.name {
 		seq++

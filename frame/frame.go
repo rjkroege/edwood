@@ -90,7 +90,7 @@ type Frame struct {
 	// private
 	nbox, nalloc int
 
-	P0, P1       int // bounds of a selection
+	P0, P1 int // bounds of a selection
 	MaxTab int // max size of a tab (in pixels)
 	NChars int // number of runes in frame
 	NLines int // number of lines with text
@@ -229,4 +229,3 @@ func (f *Frame) Clear(freeall bool) {
 	}
 	f.Ticked = false
 }
-

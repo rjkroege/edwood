@@ -50,7 +50,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 		c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
 	}
 	c.tag.Insert(0, Lheader, true)
-	c.tag.SetSelect(c.tag.file.b.nc(), c.tag.file.b.nc())
+	c.tag.SetSelect(c.tag.file.b.Nc(), c.tag.file.b.Nc())
 	if c.display != nil {
 		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
 		c.display.Flush()
@@ -576,7 +576,7 @@ func (c *Column) Which(p image.Point) *Text {
 func (c *Column) Clean() bool {
 	clean := true
 	for _, w := range c.w {
-		clean = clean && w.Clean(true)
+		clean = w.Clean(true) && clean
 	}
 	return clean
 }

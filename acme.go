@@ -118,7 +118,7 @@ func main() {
 	//cplumb = make(chan *Plumbmsg)
 	// cwait = make(chan Waitmsg)
 	ccommand = make(chan *Command)
-	ckill = make(chan []rune)
+	ckill = make(chan string)
 	cxfidalloc = make(chan *Xfid)
 	cxfidfree = make(chan *Xfid)
 	cnewwindow = make(chan *Window)
@@ -126,7 +126,7 @@ func main() {
 	csignal = make(chan os.Signal, 1)
 	cerr = make(chan error)
 	cedit = make(chan int)
-	cexit = make(chan struct {})
+	cexit = make(chan struct{})
 	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
 
 	mousectl = display.InitMouse()
@@ -176,6 +176,7 @@ func main() {
 	display.Flush()
 
 	// After row is initialized
+	acmeerrorinit()
 	go mousethread(display)
 	go keyboardthread(display)
 	go newwindowthread()
@@ -204,7 +205,7 @@ func readfile(c *Column, filename string) {
 	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw()
-	w.tag.SetSelect(w.tag.file.b.nc(), w.tag.file.b.nc())
+	w.tag.SetSelect(w.tag.file.b.Nc(), w.tag.file.b.Nc())
 	xfidlog(w, "new")
 }
 
@@ -483,8 +484,121 @@ func keyboardthread(display *draw.Display) {
 
 }
 
-func waitthread() {
+/*
+ * There is a race between process exiting and our finding out it was ever created.
+ * This structure keeps a list of processes that have exited we haven't heard of.
+ */
+type Pid struct {
+	pid  int
+	msg  string
+	next *Pid // TODO(flux) turn this into a slice of Pid
+}
 
+func waitthread() {
+	var lc, c *Command
+	var pids *Pid
+	Freecmd := func() {
+		if c != nil {
+			if c.iseditcommand {
+				cedit <- 0
+			}
+			fsysdelid(c.md)
+		}
+	}
+	for {
+	Switch:
+		select {
+		case err := <-cerr:
+			row.lk.Lock()
+			warning(nil, "%s", err)
+			row.display.Flush()
+			row.lk.Unlock()
+			break
+		case cmd := <-ckill:
+			found := false
+			for c = command; c != nil; c = c.next {
+				/* -1 for blank */
+				if c.name == cmd {
+					if err := c.proc.Kill(); err != nil {
+						warning(nil, "kill %v: %v\n", cmd, err)
+					}
+					found = true
+				}
+			}
+			if !found {
+				warning(nil, "Kill: no process %S\n", cmd)
+			}
+			break
+		case w := <-cwait:
+			pid := w.Pid()
+			for c = command; c != nil; c = c.next {
+				if c.pid == pid {
+					if lc != nil {
+						lc.next = c.next
+					} else {
+						command = c.next
+					}
+					break
+				}
+				lc = c
+			}
+			row.lk.Lock()
+			t := &row.tag
+			t.Commit(true)
+			if c == nil {
+				/* helper processes use this exit status */
+				// TODO(flux): I don't understand what this libthread code is doing
+				Untested()
+				if strings.HasPrefix(w.String(), "libthread") {
+					p := &Pid{}
+					p.pid = pid
+					p.msg = w.String()
+					p.next = pids
+					pids = p
+				}
+			} else {
+				if search(t, []rune(c.name)) {
+					t.Delete(t.q0, t.q1, true)
+					t.SetSelect(0, 0)
+				}
+				if w.String() != "" {
+					warning(c.md, "%s: exit %s\n", c.name, w.String())
+				}
+				row.display.Flush()
+			}
+			row.lk.Unlock()
+			Freecmd()
+
+		case c = <-ccommand:
+			/* has this command already exited? */
+			lastp := (*Pid)(nil)
+			for p := pids; p != nil; p = p.next {
+				if p.pid == c.pid {
+					if p.msg != "" {
+						warning(c.md, "%s\n", p.msg)
+					}
+					if lastp == nil {
+						pids = p.next
+					} else {
+						lastp.next = p.next
+					}
+					Freecmd()
+					break Switch
+				}
+				lastp = p
+			}
+			c.next = command
+			command = c
+			row.lk.Lock()
+			t := &row.tag
+			t.Commit(true)
+			t.Insert(0, []rune(c.name), true)
+			t.SetSelect(0, 0)
+			row.display.Flush()
+			row.lk.Unlock()
+		}
+
+	}
 }
 
 // maintain a linked list of Xfid
@@ -552,16 +666,76 @@ var hangupsignals = []os.Signal{
 }
 
 func shutdown(s os.Signal) {
-	fmt.Println("Exiting!", s)
-	killprocs()
-	if !dumping && os.Getpid() == mainpid {
-		dumping = true
-		row.Dump("")
-	}
 	for _, sig := range hangupsignals {
 		if sig == s {
-			os.Exit(0)
+			if !dumping && os.Getpid() == mainpid {
+				killprocs()
+				dumping = true
+				row.Dump("")
+			} else {
+				os.Exit(0)
+			}
 		}
 	}
 	return
 }
+
+func acmeerrorinit() {
+	var pfd [2]int
+	err := syscall.Pipe(pfd[:])
+
+	if err != nil {
+		acmeerror("can't create pipe", nil)
+	}
+
+	syscall.CloseOnExec(pfd[0])
+	syscall.CloseOnExec(pfd[1])
+	erroutfd = pfd[0]
+	errorfd := pfd[1]
+	if errorfd < 0 {
+		acmeerror("can't re-open acmeerror file", nil)
+	}
+	go func() {
+		var buf [BUFSIZE]byte
+		errorf := os.NewFile(uintptr(errorfd), "Global Error File/Pipe")
+		for {
+			n, _ := errorf.Read(buf[:])
+			if n < 0 {
+				return
+			}
+			cerr <- fmt.Errorf(string(buf[:n]))
+		}
+	}()
+}
+
+const MAXSNARF = 100*1024
+
+func acmeputsnarf() {
+Unimpl()
+}
+/*
+{
+	int i, n;
+	Fmt f;
+	char *s;
+
+	if(snarfbuf.nc==0)
+		return;
+	if(snarfbuf.nc > MAXSNARF)
+		return;
+
+	fmtstrinit(&f);
+	for(i=0; i<snarfbuf.nc; i+=n){
+		n = snarfbuf.nc-i;
+		if(n >= NSnarf)
+			n = NSnarf;
+		bufread(&snarfbuf, i, snarfrune, n);
+		if(fmtprint(&f, "%.*S", n, snarfrune) < 0)
+			break;
+	}
+	s = fmtstrflush(&f);
+	if(s && s[0])
+		putsnarf(s);
+	free(s);
+}
+*/

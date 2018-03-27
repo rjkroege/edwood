@@ -32,7 +32,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	pt0 := f.ptofcharnb(p0, n0)
 	pt1 := f.Ptofchar(p1)
 
-	// Remove the selection or tick. 
+	// Remove the selection or tick.
 	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
 
 	nn0 := n0

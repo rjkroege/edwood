@@ -187,7 +187,7 @@ Occasion
 
 	// Addr is not persistent once you close it, so you need
 	// to read any desired changes with the same opening.
-	fid, err := fsys.Open(winname+"/addr", plan9.OREAD | plan9.OWRITE)
+	fid, err := fsys.Open(winname+"/addr", plan9.OREAD|plan9.OWRITE)
 	if err != nil {
 		t.Fatalf("Failed to open %s/addr", winname)
 	}

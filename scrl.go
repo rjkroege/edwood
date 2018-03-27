@@ -80,7 +80,7 @@ func (t *Text) ScrDraw() {
 	r1 = r
 	r1.Min.X = 0
 	r1.Max.X = r.Dx()
-	r2 = scrpos(r1, t.org, t.org+t.fr.GetFrameFillStatus().Nchars, t.file.b.nc())
+	r2 = scrpos(r1, t.org, t.org+t.fr.GetFrameFillStatus().Nchars, t.file.b.Nc())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		b.Draw(r1, t.fr.Cols[frame.ColBord], nil, image.ZP)
@@ -119,7 +119,7 @@ func (t *Text) Scroll(but int) {
 		}
 		if but == 2 {
 			y = my
-			p0 = t.file.b.nc() * (y - s.Min.Y) / h
+			p0 = t.file.b.Nc() * (y - s.Min.Y) / h
 			if p0 >= t.q1 {
 				p0 = t.Backnl(p0, 2)
 			}

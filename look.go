@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"image"
 	"path/filepath"
 	"strings"
 
@@ -62,147 +62,156 @@ func startplumbing (void) (void) {
 */
 
 func look3(t *Text, q0 int, q1 int, external bool) {
-	Unimpl()
+	Untested()
+	var (
+		n, c, f int
+		ct      *Text
+		e       Expand
+		r       []rune
+		//m *Plumbmsg
+		//dir string
+		expanded bool
+	)
+
+	ct = seltext
+	if ct == nil {
+		seltext = t
+	}
+	e, expanded = expand(t, q0, q1)
+	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
+		// send alphanumeric expansion to external client
+		if expanded == false {
+			return
+		}
+		f = 0
+		if (e.at != nil && t.w != nil) || (len(e.name) > 0 && lookfile(e.name) != nil) {
+			f = 1 // acme can do it without loading a file
+		}
+		if q0 != e.q0 || q1 != e.q1 {
+			f |= 2 // second (post-expand) message follows
+		}
+		if len(e.name) > 0 {
+			f |= 4 // it's a file name
+		}
+		c = 'l'
+		if t.what == Body {
+			c = 'L'
+		}
+		n = q1 - q0
+		if n <= EVENTSIZE {
+			r = make([]rune, n)
+			t.file.b.Read(q0, r)
+			t.w.Event("%c%d %d %d %d %.*S\n", c, q0, q1, f, n, n, r)
+		} else {
+			t.w.Event("%c%d %d %d 0 \n", c, q0, q1, f, n)
+		}
+		if q0 == e.q0 && q1 == e.q1 {
+			return
+		}
+		if len(e.name) > 0 {
+			n = len(e.name)
+			if e.a1 > e.a0 {
+				n += 1 + (e.a1 - e.a0)
+			}
+			r = make([]rune, n)
+			copy(r, []rune(e.name))
+			if e.a1 > e.a0 {
+				nlen := len([]rune(e.name))
+				r[nlen] = ':'
+				e.at.file.b.Read(e.a0, r[nlen+1:nlen+1+e.a1-e.a0])
+			}
+		} else {
+			n = e.q1 - e.q0
+			r = make([]rune, n)
+			t.file.b.Read(e.q0, r)
+		}
+		f &= ^2
+		if n <= EVENTSIZE {
+			t.w.Event("%c%d %d %d %d %.*S\n", c, e.q0, e.q1, f, n, n, r)
+		} else {
+			t.w.Event("%c%d %d %d 0 \n", c, e.q0, e.q1, f, n)
+		}
+		return
+	}
+	if plumbsendfid != nil {
+		Unimpl() /*
+		   // send whitespace-delimited word to plumber
+		   m = emalloc(sizeof(Plumbmsg));
+		   m.src = estrdup("acme");
+		   m.dst = nil;
+		   dir = dirname(t, nil, 0);
+		   if dir.nr==1 && dir.r[0]=='.' { // sigh
+		           free(dir.r);
+		           dir.r = nil;
+		           dir.nr = 0;
+		   }
+		   if dir.nr == 0
+		           m.wdir = estrdup(wdir);
+		   else
+		           m.wdir = runetobyte(dir.r, dir.nr);
+		   free(dir.r);
+		   m.type = estrdup("text");
+		   m.attr = nil;
+		   buf[0] = '\0';
+		   if q1 == q0 {
+		           if t.q1>t.q0 && t.q0<=q0 && q0<=t.q1){
+		                   q0 = t.q0;
+		                   q1 = t.q1;
+		           }else{
+		                   p = q0;
+		                   while(q0>0 && (c=tgetc(t, q0-1))!=' ' && c!='\t' && c!='\n')
+		                           q0--;
+		                   while(q1<t.file.b.nc && (c=tgetc(t, q1))!=' ' && c!='\t' && c!='\n')
+		                           q1++;
+		                   if q1 == q0 {
+		                           plumbfree(m);
+		                           goto Return;
+		                   }
+		                   sprint(buf, "click=%d", p-q0);
+		                   m.attr = plumbunpackattr(buf);
+		           }
+		   }
+		   r = runemalloc(q1-q0);
+		   bufread(&t.file.b, q0, r, q1-q0);
+		   m.data = runetobyte(r, q1-q0);
+		   m.ndata = strlen(m.data);
+		   free(r);
+		   if m.ndata<messagesize-1024 && plumbsendtofid(plumbsendfid, m) >= 0 {
+		           plumbfree(m);
+		           goto Return;
+		   }
+		   plumbfree(m);
+		   // plumber failed to match; fall through
+		*/
+	}
+	// interpret alphanumeric string ourselves
+	if expanded == false {
+		return
+	}
+	if e.name != "" || e.at != nil {
+		openfile(t, &e)
+	} else {
+		if t.w == nil {
+			return
+		}
+		ct = &t.w.body
+		if t.w != ct.w {
+			ct.w.Lock('M')
+			defer ct.w.Unlock()
+		}
+		if t == ct {
+			ct.SetSelect(e.q1, e.q1)
+		}
+		n = e.q1 - e.q0
+		r = make([]rune, n)
+		t.file.b.Read(e.q0, r)
+		if search(ct, r[:n]) && e.jump {
+			row.display.MoveTo(ct.fr.Ptofchar(ct.fr.P0).Add(image.Pt(4, ct.fr.Font.DefaultHeight()-4)))
+		}
+	}
 }
 
 /*
-	int n, c, f, expanded;
-	Text *ct;
-	Expand e;
-	Rune *r;
-	uint p;
-	Plumbmsg *m;
-	Runestr dir;
-	char buf[32];
-
-	ct = seltext;
-	if ct == nil
-		seltext = t;
-	expanded = expand(t, q0, q1, &e);
-	if !external && t.w!=nil && t.w.nopen[QWevent]>0 {
-		// send alphanumeric expansion to external client
-		if expanded == false
-			return;
-		f = 0;
-		if (e.u.at!=nil && t.w!=nil) || (e.nname>0 && lookfile(e.name, e.nname)!=nil)
-			f = 1;		// acme can do it without loading a file
-		if q0!=e.q0 || q1!=e.q1
-			f |= 2;	// second (post-expand) message follows
-		if e.nname
-			f |= 4;	// it's a file name
-		c = 'l';
-		if t.what == Body
-			c = 'L';
-		n = q1-q0;
-		if n <= EVENTSIZE {
-			r = runemalloc(n);
-			bufread(&t.file.b, q0, r, n);
-			winevent(t.w, "%c%d %d %d %d %.*S\n", c, q0, q1, f, n, n, r);
-			free(r);
-		}else
-			winevent(t.w, "%c%d %d %d 0 \n", c, q0, q1, f, n);
-		if q0==e.q0 && q1==e.q1
-			return;
-		if e.nname {
-			n = e.nname;
-			if e.a1 > e.a0
-				n += 1+(e.a1-e.a0);
-			r = runemalloc(n);
-			runemove(r, e.name, e.nname);
-			if e.a1 > e.a0 {
-				r[e.nname] = ':';
-				bufread(&e.u.at.file.b, e.a0, r+e.nname+1, e.a1-e.a0);
-			}
-		}else{
-			n = e.q1 - e.q0;
-			r = runemalloc(n);
-			bufread(&t.file.b, e.q0, r, n);
-		}
-		f &= ~2;
-		if n <= EVENTSIZE
-			winevent(t.w, "%c%d %d %d %d %.*S\n", c, e.q0, e.q1, f, n, n, r);
-		else
-			winevent(t.w, "%c%d %d %d 0 \n", c, e.q0, e.q1, f, n);
-		free(r);
-		goto Return;
-	}
-	if plumbsendfid != nil {
-		// send whitespace-delimited word to plumber
-		m = emalloc(sizeof(Plumbmsg));
-		m.src = estrdup("acme");
-		m.dst = nil;
-		dir = dirname(t, nil, 0);
-		if dir.nr==1 && dir.r[0]=='.' {	// sigh
-			free(dir.r);
-			dir.r = nil;
-			dir.nr = 0;
-		}
-		if dir.nr == 0
-			m.wdir = estrdup(wdir);
-		else
-			m.wdir = runetobyte(dir.r, dir.nr);
-		free(dir.r);
-		m.type = estrdup("text");
-		m.attr = nil;
-		buf[0] = '\0';
-		if q1 == q0 {
-			if t.q1>t.q0 && t.q0<=q0 && q0<=t.q1){
-				q0 = t.q0;
-				q1 = t.q1;
-			}else{
-				p = q0;
-				while(q0>0 && (c=tgetc(t, q0-1))!=' ' && c!='\t' && c!='\n')
-					q0--;
-				while(q1<t.file.b.nc && (c=tgetc(t, q1))!=' ' && c!='\t' && c!='\n')
-					q1++;
-				if q1 == q0 {
-					plumbfree(m);
-					goto Return;
-				}
-				sprint(buf, "click=%d", p-q0);
-				m.attr = plumbunpackattr(buf);
-			}
-		}
-		r = runemalloc(q1-q0);
-		bufread(&t.file.b, q0, r, q1-q0);
-		m.data = runetobyte(r, q1-q0);
-		m.ndata = strlen(m.data);
-		free(r);
-		if m.ndata<messagesize-1024 && plumbsendtofid(plumbsendfid, m) >= 0 {
-			plumbfree(m);
-			goto Return;
-		}
-		plumbfree(m);
-		// plumber failed to match; fall through
-	}
-
-	// interpret alphanumeric string ourselves
-	if expanded == false
-		return;
-	if e.name || e.u.at
-		openfile(t, &e);
-	else{
-		if t.w == nil
-			return;
-		ct = &t.w.body;
-		if(t.w != ct.w
-			winlock(ct.w, 'M');
-		if t == ct
-			textsetselect(ct, e.q1, e.q1);
-		n = e.q1 - e.q0;
-		r = runemalloc(n);
-		bufread(&t.file.b, e.q0, r, n);
-		if search(ct, r, n) && e.jump
-			moveto(mousectl, addpt(frptofchar(&ct.fr, ct.fr.p0), Pt(4, ct.fr.font.height-4)));
-		if t.w != ct.w
-			winunlock(ct.w);
-		free(r);
-	}
-
-   Return:
-	free(e.name);
-	free(e.bname);
-}
 
 func plumbgetc (void *a, uint n) (int) {
 	Rune *r;
@@ -279,88 +288,95 @@ func plumbshow (Plumbmsg *m) (void) {
 	textsetselect(&w.tag, w.tag.file.b.nc, w.tag.file.b.nc);
 	xfidlog(w, "new");
 }
-
-func search (Text *ct, Rune *r, uint n) (int) {
-	uint q, nb, maxn;
-	int around;
-	Rune *s, *b, *c;
-
-	if n==0 || n>ct.file.b.nc
-		return false;
-	if 2*n > RBUFSIZE {
-		warning(nil, "string too long\n");
-		return false;
-	}
-	maxn = max(2*n, RBUFSIZE);
-	s = fbufalloc();
-	b = s;
-	nb = 0;
-	b[nb] = 0;
-	around = 0;
-	q = ct.q1;
-	for ;; {
-		if q >= ct.file.b.nc {
-			q = 0;
-			around = 1;
-			nb = 0;
-			b[nb] = 0;
-		}
-		if nb > 0 {
-			c = runestrchr(b, r[0]);
-			if c == nil {
-				q += nb;
-				nb = 0;
-				b[nb] = 0;
-				if around && q>=ct.q1
-					break;
-				continue;
-			}
-			q += (c-b);
-			nb -= (c-b);
-			b = c;
-		}
-		// reload if buffer covers neither string nor rest of file
-		if nb<n && nb!=ct.file.b.nc-q {
-			nb = ct.file.b.nc-q;
-			if nb >= maxn
-				nb = maxn-1;
-			bufread(&ct.file.b, q, s, nb);
-			b = s;
-			b[nb] = '\0';
-		}
-		// this runeeq is fishy but the null at b[nb] makes it safe
-		if runeeq(b, n, r, n)==true {
-			if ct.w {
-				textshow(ct, q, q+n, 1);
-				winsettag(ct.w);
-			}else{
-				ct.q0 = q;
-				ct.q1 = q+n;
-			}
-			seltext = ct;
-			fbuffree(s);
-			return true;
-		}
-		--nb;
-		b++;
-		q++;
-		if around && q>=ct.q1
-			break;
-	}
-	fbuffree(s);
-	return false;
-}
 */
 
-func isfilec (r rune) (bool) {
+// TODO(flux): This just looks for r in ct; a regexp could do it too,
+// using our buffer streaming thing.  Frankly, even scanning the buffer
+// using the streamer would probably be easier to read/more idiomatic.
+func search(ct *Text, r []rune) bool {
+	Untested()
+	var (
+		n, maxn int
+	)
+	n = len(r)
+	if n == 0 || n > ct.Nc() {
+		return false
+	}
+	if 2*n > RBUFSIZE {
+		warning(nil, "string too long\n")
+		return false
+	}
+	maxn = max(2*n, RBUFSIZE)
+	s := make([]rune, RBUFSIZE)
+	bi := 0 // b indexes s
+	nb := 0
+	//s[bi+nb] = 0; // null terminate, useless in go.
+	around := false
+	q := ct.q1
+	for {
+		if q >= ct.Nc() {
+			q = 0
+			around = true
+			nb = 0
+			//s[bi+nb] = 0; // null terminate
+		}
+		if nb > 0 {
+			ci := runestrchr(s[bi:bi+nb], r[0])
+			if ci == -1 {
+				q += nb
+				nb = 0
+				s[bi+nb] = 0
+				if around && q >= ct.q1 {
+					break
+				}
+				continue
+			}
+			q += (ci - bi)
+			nb -= (ci - bi)
+			bi = ci
+		}
+		// reload if buffer covers neither string nor rest of file
+		if nb < n && nb != ct.Nc()-q {
+			nb = ct.Nc() - q
+			if nb >= maxn {
+				nb = maxn - 1
+			}
+			s = make([]rune, nb)
+			ct.file.b.Read(q, s)
+			bi = 0
+			//s[bi+nb] = '\000'
+		}
+		// this runeeq is fishy but the null at b[nb] makes it safe
+		if runeeq(s[bi:bi+n], r) {
+			if ct.w != nil {
+				ct.Show(q, q+n, true)
+				ct.w.SetTag()
+			} else {
+				ct.q0 = q
+				ct.q1 = q + n
+			}
+			seltext = ct
+			return true
+		}
+		nb--
+		bi++
+		q++
+		if around && q >= ct.q1 {
+			break
+		}
+	}
+	return false
+}
+
+func isfilec(r rune) bool {
 	Lx := ".-+/:"
 	if isalnum(r) {
-		return true;
+		return true
 	}
 	if runestrchr([]rune(Lx), r) != -1 {
-		return true;
+		return true
 	}
-	return false;
+	return false
 }
 
 // Runestr wrapper for cleanname
@@ -452,14 +468,15 @@ func dirname(t *Text, r []rune) []rune {
 	if t == nil || t.w == nil {
 		goto Rescue
 	}
-	nt = t.w.tag.file.b.nc()
+	nt = t.w.tag.file.b.Nc()
 	if nt == 0 {
 		goto Rescue
 	}
 	if len(r) >= 1 && r[0] == '/' {
 		goto Rescue
 	}
-	b = t.w.tag.file.b.Read(0, nt)
+	b = make([]rune, nt)
+	t.w.tag.file.b.Read(0, b)
 	slash = -1
 	for m := (0); m < nt; m++ {
 		c = b[m]
@@ -484,11 +501,10 @@ Rescue:
 	return r
 }
 
-
-func expandfile (t * Text, q0  int, q1  int) (Expand, bool) {
-Unimpl()
-return Expand{}, false
-}/*
+func expandfile(t *Text, q0 int, q1 int) (Expand, bool) {
+	Unimpl()
+	return Expand{}, false
+} /*
 	int i, n, nname, colon, eval;
 	uint amin, amax;
 	Rune *r, c;
@@ -596,58 +612,63 @@ return Expand{}, false
 	return false;
 }
 */
-func expand (t * Text, q0  int, q1  int)(Expand, bool) {
-Untested()
+func expand(t *Text, q0 int, q1 int) (Expand, bool) {
+	Untested()
 	e := Expand{}
-	e.agetc = func(q int)rune{if q < t.Nc() { return t.ReadC(q)} else { return 0 }}
-	
+	e.agetc = func(q int) rune {
+		if q < t.Nc() {
+			return t.ReadC(q)
+		} else {
+			return 0
+		}
+	}
+
 	// if in selection, choose selection
-	e.jump = true;
-	if q1==q0 && t.inSelection(q0) {
-		q0 = t.q0;
-		q1 = t.q1;
+	e.jump = true
+	if q1 == q0 && t.inSelection(q0) {
+		q0 = t.q0
+		q1 = t.q1
 		if t.what == Tag {
-			e.jump = false;
+			e.jump = false
 		}
 	}
 
 	if e, ok := expandfile(t, q0, q1); ok {
-		return e, true;
+		return e, true
 	}
 
 	if q0 == q1 {
-		for(q1<t.file.b.nc() && isalnum(t.ReadC(q1))) {
-			q1++;
+		for q1 < t.file.b.Nc() && isalnum(t.ReadC(q1)) {
+			q1++
 		}
-		for(q0>0 && isalnum(t.ReadC(q0-1))) {
-			q0--;
+		for q0 > 0 && isalnum(t.ReadC(q0-1)) {
+			q0--
 		}
 	}
-	e.q0 = q0;
-	e.q1 = q1;
-	return e, q1 > q0;
+	e.q0 = q0
+	e.q1 = q1
+	return e, q1 > q0
 }
 
-
 func lookfile(s string) *Window {
-Untested()
+	Untested()
 
 	// avoid terminal slash on directories
 	s = strings.TrimRight(s, "/")
 	for _, c := range row.col {
 		for _, w := range c.w {
-		fmt.Printf("Checking: %v\n", w.body.file.name)
 			k := strings.TrimRight(w.body.file.name, "/")
 			if k == s {
-				w = w.body.file.curtext.w;
-				if w.col != nil {	// protect against race deleting w
-					return w;
+				w = w.body.file.curtext.w
+				if w.col != nil { // protect against race deleting w
+					return w
 				}
 			}
 		}
 	}
-	return nil;
+	return nil
 }
+
 /*
 func lookid (int id, int dump) (Window*) {
 	int i, j;
@@ -666,9 +687,13 @@ func lookid (int id, int dump) (Window*) {
 	}
 	return nil;
 }
+*/
 
-
-func openfile (Text *t, Expand *e) (Window*) {
+func openfile (t * Text, e * Expand) (*Window) {
+Unimpl()
+return nil
+}
+/*
 	Range r;
 	Window *w, *ow;
 	int eval, i, n;

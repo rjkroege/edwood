@@ -176,7 +176,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 * (p0); pt1 is terminal point (without line wrap) of insertion.
 	 */
 
-	// Remove the selection or tick. 
+	// Remove the selection or tick.
 	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
 
 	/*
@@ -242,10 +242,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 			rect.Max.Y = y
 			// TODO(rjk): This bitblit considered harmful. It damages the
 			// the output. Investigate further.
-//			if q1 < y {
-//				log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
-//				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
-//			}
+			//			if q1 < y {
+			//				log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
+			//				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
+			//			}
 			rect.Min = pt1
 			rect.Max.X = pt1.X + (f.Rect.Max.X - pt0.X)
 			rect.Max.Y += q1

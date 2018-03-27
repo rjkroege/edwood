@@ -127,9 +127,9 @@ var (
 	mtpt              string
 
 	//	cplumb chan *Plumbmsg
-	//	cwait chan Waitmsg
+	cwait      chan *os.ProcessState
 	ccommand   chan *Command
-	ckill      chan []rune
+	ckill      chan string
 	cxfidalloc chan *Xfid
 	cxfidfree  chan *Xfid
 	cnewwindow chan *Window
@@ -152,12 +152,13 @@ type Range struct {
 
 type Command struct {
 	pid           int
-	name          []rune
+	proc          *os.Process
+	name          string
 	text          string
 	av            []string
 	iseditcommand bool
 	md            *MntDir
-	next          *Command
+	next          *Command // TODO(flux).  This really wants to be a cannonical slice instead of a linked list
 }
 
 type DirTab struct {

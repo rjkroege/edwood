@@ -29,7 +29,7 @@ func main() {
 
 	// Try two but one will do. Just cause.
 	var myfont *draw.Font
-	fontnames  := []string{
+	fontnames := []string{
 		"/mnt/font/Go-Regular/13a/font",
 		"/mnt/font/SourceSansPro-Regular/17a/font",
 	}

@@ -91,7 +91,7 @@ func cmdexec(t *Text, cp *Cmd) int {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > int(t.file.b.nc()) {
+			if dot.r.q1 > int(t.file.b.Nc()) {
 				editerror("dot extends past end of buffer during { command")
 			}
 			t.q0 = dot.r.q0
@@ -646,7 +646,7 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 	if t != nil && t.w != nil {
 		t.w.ref.Inc()
 	}
-	run(w, s, dir, true, "", "", true)
+	run(w, string(s), dir, true, "", "", true)
 	if t != nil && t.w != nil {
 		t.w.Unlock()
 	}
@@ -1030,7 +1030,7 @@ func nextmatch(f *File, r []rune, p int, sign int) {
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q0 == p {
 			p++
-			if p > f.b.nc() {
+			if p > f.b.Nc() {
 				p = 0
 			}
 			sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
@@ -1046,7 +1046,7 @@ func nextmatch(f *File, r []rune, p int, sign int) {
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
 			if p < 0 {
-				p = f.b.nc()
+				p = f.b.Nc()
 			}
 			sel = are.rxbexecute(f.curtext, p, NRange)
 			if len(sel) != 0 {
