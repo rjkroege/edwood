@@ -39,6 +39,7 @@ var exectab =  []Exectab{
 //	{ "New",		new,		false,	true /*unused*/,		true /*unused*/		},
 //	{ "Newcol",	newcol,	false,	true /*unused*/,		true /*unused*/		},
 //	{ "Paste",		paste,	true,	true,	true /*unused*/		},
+// TODO(rjk): Implement this one.
 //	{ "Put",		put,		false,	true /*unused*/,		true /*unused*/		},
 //	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
 //	{ "Redo",		undo,	false,	false,	true /*unused*/		},
