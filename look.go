@@ -297,6 +297,7 @@ func plumbshow (Plumbmsg *m) (void) {
 func search(ct *Text, r []rune) bool {
 	Untested()
 	defer Untested()
+
 	var (
 		n, maxn int
 	)
@@ -312,13 +313,12 @@ func search(ct *Text, r []rune) bool {
 	s := make([]rune, RBUFSIZE)
 	bi := 0 // b indexes s
 	nb := 0
-	//s[bi+nb] = 0; // null terminate, useless in go.
-	around := false
+	wraparound := false
 	q := ct.q1
 	for {
 		if q >= ct.Nc() {
 			q = 0
-			around = true
+			wraparound = true
 			nb = 0
 			//s[bi+nb] = 0; // null terminate
 		}
@@ -327,15 +327,15 @@ func search(ct *Text, r []rune) bool {
 			if ci == -1 {
 				q += nb
 				nb = 0
-				s[bi+nb] = 0
-				if around && q >= ct.q1 {
+				//s[bi+nb] = 0
+				if wraparound && q >= ct.q1 {
 					break
 				}
 				continue
 			}
-			q += (ci - bi)
-			nb -= (ci - bi)
-			bi = ci
+			q += (bi + ci - bi)
+			nb -= (bi + ci - bi)
+			bi = bi + ci
 		}
 		// reload if buffer covers neither string nor rest of file
 		if nb < n && nb != ct.Nc()-q {
@@ -343,13 +343,11 @@ func search(ct *Text, r []rune) bool {
 			if nb >= maxn {
 				nb = maxn - 1
 			}
-			s = make([]rune, nb)
-			ct.file.b.Read(q, s)
+			ct.file.b.Read(q, s[:nb])
 			bi = 0
-			//s[bi+nb] = '\000'
 		}
-		// this runeeq is fishy but the null at b[nb] makes it safe
-		if runeeq(s[bi:bi+n], r) {
+		limit := min(len(s), bi+n)
+		if runeeq(s[bi:limit], r) {
 			if ct.w != nil {
 				ct.Show(q, q+n, true)
 				ct.w.SetTag()
@@ -363,7 +361,7 @@ func search(ct *Text, r []rune) bool {
 		nb--
 		bi++
 		q++
-		if around && q >= ct.q1 {
+		if wraparound && q >= ct.q1 {
 			break
 		}
 	}
