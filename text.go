@@ -1490,8 +1490,8 @@ func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
 			return
 		}
 	}
-
 	/* try filling out word to right */
+	q1 = inq0
 	for q1 < t.file.b.Nc() && isalnum(t.ReadC(q1)) {
 		q1++
 	}
