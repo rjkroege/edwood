@@ -128,6 +128,9 @@ func (t *Text) Scroll(but int) {
 			}
 			oldp0 = p0
 			mousectl.Read()
+			if mouse.Buttons&(1<<uint(but-1)) == 0 {
+				break
+			}
 			continue
 		}
 		if but == 1 {
@@ -147,7 +150,7 @@ func (t *Text) Scroll(but int) {
 			first = false
 		}
 		ScrSleep(80)
-		if !(mouse.Buttons&(1<<uint(but-1)) != 0) {
+		if mouse.Buttons&(1<<uint(but-1)) == 0 {
 			break
 		}
 	}
