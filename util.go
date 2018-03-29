@@ -162,7 +162,7 @@ func errorwinforwin(w *Window) *Window {
 	)
 
 	t = &w.body
-	dir = t.DirName()
+	dir = t.DirName("")
 	if dir == "." { /* sigh */
 		dir = ""
 	}

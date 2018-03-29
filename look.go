@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"path/filepath"
 	"strings"
@@ -691,136 +692,121 @@ func lookid (int id, int dump) (Window*) {
 */
 
 func openfile(t *Text, e *Expand) *Window {
-	Unimpl()
-	return nil
-}
+	var (
+		r     Range
+		w, ow *Window
+		eval  bool
+		rs    string
+	)
 
-/*
-	Range r;
-	Window *w, *ow;
-	int eval, i, n;
-	Rune *rp;
-	Runestr rs;
-	uint dummy;
-
-	r.q0 = 0;
-	r.q1 = 0;
-	if e.nname == 0 {
-		w = t.w;
-		if w == nil
-			return nil;
-	}else{
-		w = lookfile(e.name, e.nname);
+	r.q0 = 0
+	r.q1 = 0
+	if e.name == "" {
+		w = t.w
+		if w == nil {
+			return nil
+		}
+	} else {
+		w = lookfile(e.name)
 		if w == nil && e.name[0] != '/' {
-			 //* Unrooted path in new window.
+			//* Unrooted path in new window.
 			// * This can happen if we type a pwd-relative path
-			 //* in the topmost tag or the column tags.
-			 //* Most of the time plumber takes care of these,
+			//* in the topmost tag or the column tags.
+			//* Most of the time plumber takes care of these,
 			// * but plumber might not be running or might not
 			// * be configured to accept plumbed directories.
 			// * Make the name a full path, just like we would if
 			// * opening via the plumber.
-			n = utflen(wdir)+1+e.nname+1;
-			rp = runemalloc(n);
-			runesnprint(rp, n, "%s/%.*S", wdir, e.nname, e.name);
-			rs = cleanrname(runestr(rp, n-1));
-			free(e.name);
-			e.name = rs.r;
-			e.nname = rs.nr;
-			w = lookfile(e.name, e.nname);
+			rp := fmt.Sprintf("%s/%s", wdir, e.name)
+			rs = string(cleanrname([]rune(rp)))
+			e.name = rs
+			w = lookfile(e.name)
 		}
 	}
-	if w {
-		t = &w.body;
-		if(!t.col.safe && t.fr.maxlines==0  // window is obscured by full-column window
-			colgrow(t.col, t.col.w[0], 1);
-	}else{
-		ow = nil;
-		if t
-			ow = t.w;
-		w = makenewwindow(t);
-		t = &w.body;
-		winsetname(w, e.name, e.nname);
-		if textload(t, 0, e.bname, 1) >= 0
-			t.file.unread = false;
-		t.file.mod = false;
-		t.w.dirty = false;
-		winsettag(t.w);
-		textsetselect(&t.w.tag, t.w.tag.file.b.nc, t.w.tag.file.b.nc);
+	if w != nil {
+		t = &w.body
+		if !t.col.safe && t.fr.GetFrameFillStatus().Maxlines == 0 { // window is obscured by full-column window
+			t.col.Grow(t.col.w[0], 1)
+		}
+	} else {
+		ow = nil
+		if t != nil {
+			ow = t.w
+		}
+		w = makenewwindow(t)
+		t = &w.body
+		w.SetName(e.name)
+		_, err := t.Load(0, e.bname, true)
+		if err != nil {
+			t.file.unread = false
+		}
+		t.file.mod = false
+		t.w.dirty = false
+		t.w.SetTag()
+		t.w.tag.SetSelect(t.w.tag.file.b.Nc(), t.w.tag.file.b.Nc())
 		if ow != nil {
-			for i=ow.nincl; --i>=0;  {
-				n = runestrlen(ow.incl[i]);
-				rp = runemalloc(n);
-				runemove(rp, ow.incl[i], n);
-				winaddincl(w, rp, n);
+			for _, inc := range ow.incl {
+				w.AddIncl(inc)
 			}
-			w.autoindent = ow.autoindent;
-		}else
-			w.autoindent = globalautoindent;
-		xfidlog(w, "new");
-	}
-	if e.a1 == e.a0
-		eval = false;
-	else{
-		eval = true;
-		r = address(true, t, range(-1,-1), range(t.q0, t.q1), e.u.at, e.a0, e.a1, e.agetc, &eval, &dummy);
-		if r.q0 > r.q1  {
-			eval = false;
-			warning(nil, "addresses out of order\n");
+			w.autoindent = ow.autoindent
+		} else {
+			w.autoindent = globalautoindent
 		}
-		if eval == false)
-			e.jump = false;	// don't jump if invalid address
+		xfidlog(w, "new")
+	}
+	if e.a1 == e.a0 {
+		eval = false
+	} else {
+		eval = true
+		r, eval, _ = address(true, t, Range{-1, -1}, Range{t.q0, t.q1}, e.a0, e.a1, e.agetc, eval)
+		if r.q0 > r.q1 {
+			eval = false
+			warning(nil, "addresses out of order\n")
+		}
+		if eval == false {
+			e.jump = false // don't jump if invalid address
+		}
 	}
 	if eval == false {
-		r.q0 = t.q0;
-		r.q1 = t.q1;
+		r.q0 = t.q0
+		r.q1 = t.q1
 	}
-	textshow(t, r.q0, r.q1, 1);
-	winsettag(t.w);
-	seltext = t;
-	if e.jump
-		moveto(mousectl, addpt(frptofchar(&t.fr, t.fr.p0), Pt(4, font.height-4)));
-	return w;
+	t.Show(r.q0, r.q1, true)
+	t.w.SetTag()
+	seltext = t
+	if e.jump {
+		row.display.MoveTo(t.fr.Ptofchar(t.fr.P0).Add(image.Pt(4, tagfont.Height-4)))
+	}
+	return w
 }
 
-func new (Text *et, Text *t, Text *argt, int flag1, int flag2, Rune *arg, int narg) (void) {
-	int ndone;
-	Rune *a, *f;
-	int na, nf;
-	Expand e;
-	Runestr rs;
-	Window *w;
+func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 
-	getarg(argt, false, true, &a, &na);
-	if a {
-		new(et, t, nil, flag1, flag2, a, na);
-		if narg == 0
-			return;
-	}
-	// loop condition: *arg is not a blank
-	for ndone=0; ; ndone++ {
-		a = findbl(arg, narg, &na);
-		if a == arg {
-			if ndone==0 && et.col!=nil  {
-				w = coladd(et.col, nil, nil, -1);
-				winsettag(w);
-				xfidlog(w, "new");
-			}
-			break;
+	a, _ := getarg(argt, false, true)
+	if a != "" {
+		newx(et, t, nil, flag1, flag2, a)
+		if len(arg) == 0 {
+			return
 		}
-		nf = narg-na;
-		f = runemalloc(nf);
-		runemove(f, arg, nf);
-		rs = dirname(et, f, nf);
-		memset(&e, 0, sizeof e);
-		e.name = rs.r;
-		e.nname = rs.nr;
-		e.bname = runetobyte(rs.r, rs.nr);
-		e.jump = true;
-		openfile(et, &e);
-		free(e.name);
-		free(e.bname);
-		arg = skipbl(a, na, &narg);
+	}
+	s := wsre.ReplaceAllString(string(arg), " ")
+	filenames := strings.Split(s, " ")
+	if len(filenames) == 1 && filenames[0] == "" && et.col != nil {
+		w := et.col.Add(nil, nil, -1)
+		w.SetTag()
+		xfidlog(w, "new")
+		return
+	}
+
+	for _, f := range filenames {
+		fmt.Printf("filename = %#v\n", f)
+		rs := et.DirName(f)
+		fmt.Printf("rs = %#v\n", rs)
+		e := Expand{}
+		e.name = rs
+		e.bname = string(rs)
+		e.jump = true
+		fmt.Printf("e = %#v\n", e)
+		openfile(et, &e)
 	}
 }
-*/

@@ -1636,12 +1636,12 @@ func (t *Text) Reset() {
 	t.file.b.Reset()
 }
 
-func (t *Text) DirName() string {
+func (t *Text) DirName(name string) string {
 	if t == nil || t.w == nil {
-		return "."
+		return string(cleanrname([]rune(name)))
 	}
 	b := make([]rune, t.w.tag.file.b.Nc())
 	t.w.tag.file.b.Read(0, b)
 	spl := strings.SplitN(string(b), " ", 1)[0]
-	return filepath.Dir(spl)
+	return filepath.Dir(spl) + string(filepath.Separator) + name
 }

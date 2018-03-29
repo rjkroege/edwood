@@ -39,7 +39,7 @@ var exectab = []Exectab{
 	//	{ "Load",		dump,	false,	false,	true /*unused*/		},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Look",		look,		false,	true /*unused*/,		true /*unused*/		},
-	//	{ "New",		new,		false,	true /*unused*/,		true /*unused*/		},
+	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
 	// TODO(rjk): Implement this one.
@@ -57,11 +57,9 @@ var exectab = []Exectab{
 var wsre = regexp.MustCompile("[ \t\n]+")
 
 func lookup(r string) *Exectab {
-	fmt.Println("lookup", r)
 	r = wsre.ReplaceAllString(r, " ")
 	r = strings.TrimLeft(r, " ")
 	words := strings.SplitN(r, " ", 2)
-	fmt.Printf("lookup words %#v\n", words)
 	for _, e := range exectab {
 		if e.name == words[0] {
 			return &e
@@ -151,9 +149,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 					break
 				}
 			}
-			fmt.Println("expanded selection")
 			if q1 == q0 {
-				fmt.Println("selection chosen")
 				return
 			}
 		}
@@ -225,7 +221,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	}
 
 	b := r
-	dir = t.DirName()
+	dir = t.DirName("")
 	if dir == "." { // sigh
 		dir = ""
 	}

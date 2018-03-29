@@ -185,11 +185,11 @@ func B_cmd(t *Text, cp *Cmd) int {
 	nr = runestrlen(r);
 	r = skipbl(r, nr, &nr);
 	if nr == 0  {
-		new(t, t, nil, 0, 0, r, 0);
+		newx(t, t, nil, 0, 0, r, 0);
 	else while(nr > 0){
 		s = findbl(r, nr, &nr);
 		*s = '\0';
-		new(t, t, nil, 0, 0, r, runestrlen(r));
+		newx(t, t, nil, 0, 0, r, runestrlen(r));
 		if nr > 0  {
 			r = skipbl(s+1, nr-1, &nr);
 	}
@@ -637,7 +637,7 @@ func runpipe(t *Text, cmd int, cr []rune, state int) {
 
 	dir = ""
 	if t != nil {
-		dir = t.DirName()
+		dir = t.DirName("")
 	}
 	if len(dir) == 1 && dir[0] == '.' { // sigh
 		dir = dir[0:0]
