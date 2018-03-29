@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -79,6 +80,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		seltext = t
 	}
 	e, expanded = expand(t, q0, q1)
+	fmt.Printf("look3 exapanded to '%v'\n", e)
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		// send alphanumeric expansion to external client
 		if expanded == false {
@@ -295,9 +297,6 @@ func plumbshow (Plumbmsg *m) (void) {
 // using our buffer streaming thing.  Frankly, even scanning the buffer
 // using the streamer would probably be easier to read/more idiomatic.
 func search(ct *Text, r []rune) bool {
-	Untested()
-	defer Untested()
-
 	var (
 		n, maxn int
 	)
@@ -394,7 +393,7 @@ func includefile (Rune *dir, Rune *file, int nfile) (Runestr) {
 	m = runestrlen(dir);
 	a = emalloc((m+1+nfile)*UTFmax+1);
 	sprint(a, "%S/%.*S", dir, nfile, file);
-	n = access(a, 0);
+	n = access(a);
 	free(a);
 	if n < 0
 		return runestr(nil, 0);
@@ -407,8 +406,13 @@ func includefile (Rune *dir, Rune *file, int nfile) (Runestr) {
 }
 
 static	Rune	*objdir;
+*/
+func includename(t *Text, r string) string {
+	Unimpl()
+	return ""
+}
 
-func includename (Text *t, Rune *r, int n) (Runestr) {
+/*
 	Window *w;
 	char buf[128];
 	Rune Lsysinclude[] = { '/', 's', 'y', 's', '/', 'i', 'n', 'c', 'l', 'u', 'd', 'e', 0 };
@@ -501,119 +505,151 @@ Rescue:
 	return r
 }
 
-func expandfile(t *Text, q0 int, q1 int) (Expand, bool) {
-	Unimpl()
-	return Expand{}, false
-} /*
-	int i, n, nname, colon, eval;
-	uint amin, amax;
-	Rune *r, c;
-	Window *w;
-	Runestr rs;
-
-	amax = q1;
+func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
+	var colon int
+	defer Untested()
+	amax := q1
 	if q1 == q0 {
-		colon = -1;
-		while(q1<t.file.b.nc && isfilec(c=textreadc(t, q1))){
-			if c == ':' {
-				colon = q1;
-				break;
+		colon = -1
+		for q1 < t.file.b.Nc() {
+			c := t.ReadC(q1)
+			if isfilec(c) {
+				if c == ':' {
+					colon = q1
+					break
+				}
+			} else {
+				break
 			}
-			q1++;
+			q1++
 		}
-		while(q0>0 && (isfilec(c=textreadc(t, q0-1)) || isaddrc(c) || isregexc(c))){
-			q0--;
-			if colon<0 && c==':'
-				colon = q0;
+		for q0 > 0 {
+			c := t.ReadC(q0 - 1)
+			if isfilec(c) || isaddrc(c) || isregexc(c) {
+				if colon < 0 && c == ':' {
+					colon = q0 - 1
+				}
+			} else {
+				break
+			}
+			q0--
 		}
-		 / if it looks like it might begin file: , consume address chars after :
-		 / otherwise terminate expansion at :
+		// if it looks like it might begin file: , consume address chars after :
+		// otherwise terminate expansion at :
 		if colon >= 0 {
-			q1 = colon;
-			if colon<t.file.b.nc-1 && isaddrc(textreadc(t, colon+1)) {
-				q1 = colon+1;
-				while(q1<t.file.b.nc && isaddrc(textreadc(t, q1)))
-					q1++;
+			q1 = colon
+			if colon < t.file.b.Nc()-1 {
+				c := t.ReadC(colon + 1)
+				if isaddrc(c) {
+					q1 = colon + 1
+					for q1 < t.file.b.Nc() {
+						c := t.ReadC(q1)
+						if isaddrc(c) {
+							q1++
+						}
+					}
+				}
 			}
 		}
-		if q1 > q0
-			if colon >= 0 {	// stop at white space
-				for amax=colon+1; amax<t.file.b.nc; amax++
-					if (c=textreadc(t, amax))==' ' || c=='\t' || c=='\n'
-						break;
-			}else
-				amax = t.file.b.nc;
+		if q1 > q0 {
+			if colon >= 0 { // stop at white space
+				for amax = colon + 1; amax < t.file.b.Nc(); amax++ {
+					c := t.ReadC(amax)
+					if c == ' ' || c == '\t' || c == '\n' {
+						break
+					}
+				}
+			} else {
+				amax = t.file.b.Nc()
+			}
+		}
+		fmt.Println("Expand went to range", q0, q1)
 	}
-	amin = amax;
-	e.q0 = q0;
-	e.q1 = q1;
-	n = q1-q0;
-	if n == 0
-		return false;
+	amin := amax
+	e.q0 = q0
+	e.q1 = q1
+	n := q1 - q0
+	if n == 0 {
+		return e, false
+	}
 	// see if it's a file name
-	r = runemalloc(n);
-	bufread(&t.file.b, q0, r, n);
+	rb := make([]rune, n)
+	t.file.b.Read(q0, rb[:n])
+	r := string(rb[:n])
 	// first, does it have bad chars?
-	nname = -1;
-	for i=0; i<n; i++ {
-		c = r[i];
-		if c==':' && nname<0 {
-			if q0+i+1<t.file.b.nc && (i==n-1 || isaddrc(textreadc(t, q0+i+1)))
-				amin = q0+i;
-			else
-				goto Isntfile;
-			nname = i;
+	nname := -1
+	for i := 0; i < n; i++ {
+		c := r[i]
+		if c == ':' && nname < 0 {
+			cc := t.ReadC(q0 + i + 1)
+			if q0+i+1 < t.file.b.Nc() && (i == n-1 || isaddrc(cc)) {
+				amin = q0 + i
+			} else {
+				return e, false
+			}
+			nname = i
 		}
 	}
-	if nname == -1
-		nname = n;
-	for i=0; i<nname; i++
-		if !isfilec(r[i])
-			goto Isntfile;
-	 //* See if it's a file name in <>, and turn that into an include
-	 //* file name if so.  Should probably do it for "" too, but that's not
-	 //* restrictive enough syntax and checking for a #include earlier on the
-	 //* line would be silly.
-	if q0>0 && textreadc(t, q0-1)=='<' && q1<t.file.b.nc && textreadc(t, q1)=='>' {
-		rs = includename(t, r, nname);
-		r = rs.r;
-		nname = rs.nr;
+	if nname == -1 {
+		nname = n
 	}
-	else if amin == q0
-		goto Isfile;
-	else{
-		rs = dirname(t, r, nname);
-		r = rs.r;
-		nname = rs.nr;
+	for i := 0; i < nname; i++ {
+		Untested()
+		if !isfilec(rb[i]) {
+			return e, false
+		}
 	}
-	e.bname = runetobyte(r, nname);
+
+	Isfile := func() {
+		e.name = r
+		e.at = t
+		e.a0 = amin + 1
+		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
+			func(q int) rune { return t.ReadC(q) }, false)
+	}
+	//* See if it's a file name in <>, and turn that into an include
+	//* file name if so.  Should probably do it for "" too, but that's not
+	//* restrictive enough syntax and checking for a #include earlier on the
+	//* line would be silly.
+	// TODO(flux) This is even crazier when working in Go - is this even
+	// a feature we want to support?
+	if q0 > 0 && t.ReadC(q0-1) == '<' && q1 < t.file.b.Nc() && t.ReadC(q1) == '>' {
+		r = includename(t, r)
+	} else {
+		if amin == q0 {
+			Isfile()
+			return e, true
+		} else {
+			r = t.DirName(r)
+		}
+	}
+	e.bname = r
 	// if it's already a window name, it's a file
-	w = lookfile(r, nname);
-	if w != nil
-		goto Isfile;
-	// if it's the name of a file, it's a file
-	if ismtpt(e.bname) || access(e.bname, 0) < 0 {
-		free(e.bname);
-		e.bname = nil;
-		goto Isntfile;
+	w := lookfile(r)
+	if w != nil {
+		Isfile()
+		return e, true
 	}
-
-  Isfile:
-	e.name = r;
-	e.nname = nname;
-	e.u.at = t;
-	e.a0 = amin+1;
-	eval = false;
-	address(true, nil, range(-1,-1), range(0,0), t, e.a0, amax, tgetc, &eval, (uint*)&e.a1);
-	return true;
-
-   Isntfile:
-	free(r);
-	return false;
+	// if it's the name of a file, it's a file
+	if ismtpt(e.bname) || !access(e.bname) {
+		return e, false
+	}
+	Isfile()
+	return e, true
 }
-*/
+
+func access(name string) bool {
+	f, err := os.Open(name)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	return true
+}
+
 func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 	Untested()
+	defer Untested()
 	e := Expand{}
 	e.agetc = func(q int) rune {
 		if q < t.Nc() {

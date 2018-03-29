@@ -12,7 +12,7 @@ const (
 )
 
 // Return if r is valid character in an address
-func isaddrc(r int) bool {
+func isaddrc(r rune) bool {
 	if r != 0 && utfrune([]rune("0123456789+-/$.#,;?"), r) != -1 {
 		return true
 	}
@@ -22,7 +22,7 @@ func isaddrc(r int) bool {
 //* quite hard: could be almost anything but white space, but we are a little conservative,
 //* aiming for regular expressions of alphanumerics and no white space
 
-func isregexc(r int) bool {
+func isregexc(r rune) bool {
 	if r == 0 {
 		return false
 	}

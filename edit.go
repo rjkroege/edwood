@@ -27,16 +27,16 @@ type Cmd struct {
 	mtaddr *Addr  /* address for m, t */
 	next   *Cmd   /* pointer to next element in braces */
 	num    int
-	flag   int /* whatever */
-	cmdc   int /* command character; 'x' etc. */
+	flag   int  /* whatever */
+	cmdc   rune /* command character; 'x' etc. */
 }
 
 type Cmdtab struct {
-	cmdc    int                   /* command character */
+	cmdc    rune                  /* command character */
 	text    byte                  /* takes a textual argument? */
 	regexp  byte                  /* takes a regular expression? */
 	addr    byte                  /* takes an address (m or t)? */
-	defcmd  int                   /* default command; 0==>none */
+	defcmd  rune                  /* default command; 0==>none */
 	defaddr Defaddr               /* default address */
 	count   int                   /* takes a count e.g. s2/// */
 	token   []rune                /* takes text terminated by one of these */
@@ -227,20 +227,20 @@ func editcmd(ct *Text, r []rune) {
 	row.AllWindows(allupdate)
 }
 
-func getch() int {
+func getch() rune {
 	if cmdp == len(cmdstartp) {
 		return -1
 	}
 	c := cmdstartp[cmdp]
 	cmdp++
-	return int(c)
+	return c
 }
 
-func nextc() int {
+func nextc() rune {
 	if cmdp == len(cmdstartp) {
 		return -1
 	}
-	return int(cmdstartp[cmdp])
+	return cmdstartp[cmdp]
 }
 
 func ungetch() {
@@ -252,7 +252,8 @@ func ungetch() {
 
 func getnum(signok int) int64 {
 	var n int64
-	var c, sign int
+	var sign int
+	var c rune
 
 	n = 0
 	sign = 1
@@ -276,8 +277,8 @@ func getnum(signok int) int64 {
 	return int64(sign) * n
 }
 
-func cmdskipbl() int {
-	var c int
+func cmdskipbl() rune {
+	var c rune
 	for {
 		c = getch()
 		if !(c == ' ' || c == '\t') {
@@ -307,14 +308,14 @@ func newaddr() *Addr {
 	return &Addr{}
 }
 
-func okdelim(c int) {
+func okdelim(c rune) {
 	if c == '\\' || ('a' <= c && c <= 'z' || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')) {
 		editerror("bad delimiter %c\n", c)
 	}
 }
 
 func atnl() {
-	var c int
+	var c rune
 	cmdskipbl()
 	c = getch()
 	if c != '\n' {
@@ -322,12 +323,12 @@ func atnl() {
 	}
 }
 
-func Straddc(s String, c int) String {
-	return append(s, rune(c))
+func Straddc(s String, c rune) String {
+	return append(s, c)
 }
 
-func getrhs(s String, delim int, cmd int) {
-	var c int
+func getrhs(s String, delim rune, cmd int) {
+	var c rune
 
 	for {
 		c = getch()
@@ -359,7 +360,7 @@ func getrhs(s String, delim int, cmd int) {
 
 func collecttoken(end []rune) String {
 	s := newstring(0)
-	var c int
+	var c rune
 
 	for {
 		c = nextc()
@@ -382,7 +383,8 @@ func collecttoken(end []rune) String {
 }
 
 func collecttext() String {
-	var begline, i, c, delim int
+	var begline, i int
+	var c, delim rune
 
 	s := newstring(0)
 	if cmdskipbl() == '\n' {
@@ -420,7 +422,7 @@ func collecttext() String {
 	return s
 }
 
-func cmdlookup(c int) int {
+func cmdlookup(c rune) int {
 	for i, cmd := range cmdtab {
 		if cmd.cmdc == c {
 			return i
@@ -430,7 +432,8 @@ func cmdlookup(c int) int {
 }
 
 func parsecmd(nest int) *Cmd {
-	var i, c int
+	var i int
+	var c rune
 	var ct *Cmdtab
 	var cp, ncp *Cmd
 	var cmd Cmd
@@ -478,7 +481,7 @@ func parsecmd(nest int) *Cmd {
 					if nextc() == c {
 						getch()
 						if nextc() == 'g' {
-							cmd.flag = getch()
+							cmd.flag = int(getch())
 						}
 					}
 
@@ -543,9 +546,10 @@ Return:
 	return cp
 }
 
-func getregexp(delim int) String {
+func getregexp(delim rune) String {
 	var buf, r String
-	var i, c int
+	var i int
+	var c rune
 
 	buf = allocstring(0)
 	for i = 0; ; i++ {
@@ -588,7 +592,7 @@ func simpleaddr() *Addr {
 	)
 	switch cmdskipbl() {
 	case '#':
-		addr.typ = getch()
+		addr.typ = int(getch())
 		addr.num = uint64(getnum(1))
 	case '0':
 		fallthrough
@@ -616,8 +620,8 @@ func simpleaddr() *Addr {
 	case '?':
 		fallthrough
 	case '"':
-		addr.typ = getch()
-		addr.re = getregexp(addr.typ)
+		addr.typ = int(getch())
+		addr.re = getregexp(rune(addr.typ))
 	case '.':
 		fallthrough
 	case '$':
@@ -627,7 +631,7 @@ func simpleaddr() *Addr {
 	case '-':
 		fallthrough
 	case '\'':
-		addr.typ = getch()
+		addr.typ = int(getch())
 	default:
 		return nil
 	}
@@ -678,7 +682,7 @@ func compoundaddr() *Addr {
 	var next *Addr
 
 	addr.left = simpleaddr()
-	addr.typ = cmdskipbl()
+	addr.typ = int(cmdskipbl())
 	if addr.typ != ',' && addr.typ != ';' {
 		return addr.left
 	}

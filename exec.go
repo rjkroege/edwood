@@ -538,6 +538,7 @@ func look(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 		search(t, []rune(r))
 	}
 }
+
 func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 
 	if et == nil || et.w == nil {
@@ -811,7 +812,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			Hard()
 			return
 		}
-		if utfrune([]rune("#;&|^$=`'{}()<>[]*?^~`/"), int(r)) != -1 {
+		if utfrune([]rune("#;&|^$=`'{}()<>[]*?^~`/"), r) != -1 {
 			Hard()
 			return
 		}

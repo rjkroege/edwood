@@ -612,7 +612,7 @@ func X_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func runpipe(t *Text, cmd int, cr []rune, state int) {
+func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	var (
 		r, s []rune
 		dir  string

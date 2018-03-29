@@ -95,9 +95,9 @@ func runestrchr(s []rune, r rune) int {
 	return -1
 }
 
-func utfrune(s []rune, r int) int {
+func utfrune(s []rune, r rune) int {
 	for i, c := range s {
-		if c == rune(r) {
+		if c == r {
 			return i
 		}
 	}
