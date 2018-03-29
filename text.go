@@ -847,7 +847,7 @@ func (t *Text) Type(r rune) {
 			seq++
 			t.file.Mark()
 		}
-		paste(t, t, nil, true, false, nil)
+		paste(t, t, nil, true, false, "")
 		t.Show(t.q0, t.q1, true)
 		t.iq1 = t.q1
 		return
@@ -1161,7 +1161,7 @@ func (t *Text) Select() {
 					state = None
 				} else {
 					if state != Paste {
-						paste(t, t, nil, true, false, nil)
+						paste(t, t, nil, true, false, "")
 						state = Paste
 					}
 				}

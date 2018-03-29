@@ -689,10 +689,11 @@ func lookid (int id, int dump) (Window*) {
 }
 */
 
-func openfile (t * Text, e * Expand) (*Window) {
-Unimpl()
-return nil
+func openfile(t *Text, e *Expand) *Window {
+	Unimpl()
+	return nil
 }
+
 /*
 	Range r;
 	Window *w, *ow;

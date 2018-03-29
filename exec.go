@@ -23,7 +23,7 @@ type Exectab struct {
 
 var exectab = []Exectab{
 	//	{ "Abort",		doabort,	false,	true /*unused*/,		true /*unused*/,		},
-	{ "Cut",		cut,		true,	true,	true	},
+	{"Cut", cut, true, true, true},
 	{"Del", del, false, false, true /*unused*/},
 	//	{ "Delcol",		delcol,	false,	true /*unused*/,		true /*unused*/		},
 	{"Delete", del, false, true, true /*unused*/},
@@ -41,13 +41,13 @@ var exectab = []Exectab{
 	//	{ "Look",		look,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "New",		new,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Newcol",	newcol,	false,	true /*unused*/,		true /*unused*/		},
-	//	{ "Paste",		paste,	true,	true,	true /*unused*/		},
+	{"Paste", paste, true, true, true /*unused*/},
 	// TODO(rjk): Implement this one.
 	//	{ "Put",		put,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Redo",		undo,	false,	false,	true /*unused*/		},
 	//	{ "Send",		sendx,	true,	true /*unused*/,		true /*unused*/		},
-	//	{ "Snarf",		cut,		false,	true,	false	},
+	{"Snarf", cut, false, true, false},
 	//	{ "Sort",		sort,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Tab",		tab,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Undo",		undo,	false,	true,	true /*unused*/		},
@@ -252,76 +252,125 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 	}
 }
 
-func cut(et *Text, t *Text, _*Text, dosnarf bool, docut bool, _ string) {
-var (
-	q0, q1, n, c int
-)
+func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
+	var (
+		q0, q1, n, c int
+	)
 	/*
 	 * if not executing a mouse chord (et != t) and snarfing (dosnarf)
 	 * and executed Cut or Snarf in window tag (et.w != nil),
 	 * then use the window body selection or the tag selection
 	 * or do nothing at all.
 	 */
-	if et!=t && dosnarf && et.w!=nil {
-		if et.w.body.q1>et.w.body.q0 {
-			t = &et.w.body;
+	if et != t && dosnarf && et.w != nil {
+		if et.w.body.q1 > et.w.body.q0 {
+			t = &et.w.body
 			if docut {
-				t.file.Mark();	/* seq has been incremented by execute */
+				t.file.Mark() /* seq has been incremented by execute */
 			}
-		}else{
-			 if et.w.tag.q1>et.w.tag.q0 {
-				t = &et.w.tag;
-			}else{
-				t = nil;
+		} else {
+			if et.w.tag.q1 > et.w.tag.q0 {
+				t = &et.w.tag
+			} else {
+				t = nil
 			}
 		}
 	}
-	if t == nil {	/* no selection */
-		return;
+	if t == nil { /* no selection */
+		return
 	}
-	if t.w!=nil && et.w!=t.w {
-		c = 'M';
+	if t.w != nil && et.w != t.w {
+		c = 'M'
 		if et.w != nil {
-			c = et.w.owner;
+			c = et.w.owner
 		}
-		t.w.Lock(c);
+		t.w.Lock(c)
 		defer t.w.Unlock()
 	}
 	if t.q0 == t.q1 {
-		return;
+		return
 	}
 	if dosnarf {
-		q0 = t.q0;
-		q1 = t.q1;
-		snarfbuf.Delete(0, snarfbuf.Nc());
+		q0 = t.q0
+		q1 = t.q1
+		snarfbuf.Delete(0, snarfbuf.Nc())
 		r := make([]rune, RBUFSIZE)
-		for (q0 < q1){
-			n = q1 - q0;
+		for q0 < q1 {
+			n = q1 - q0
 			if n > RBUFSIZE {
-				n = RBUFSIZE;
+				n = RBUFSIZE
 			}
-			t.file.b.Read(q0, r[:n]);
-			snarfbuf.Insert(snarfbuf.Nc(), r[:n]);
-			q0 += n;
+			t.file.b.Read(q0, r[:n])
+			snarfbuf.Insert(snarfbuf.Nc(), r[:n])
+			q0 += n
 		}
-		acmeputsnarf();
+		acmeputsnarf()
 	}
 	if docut {
-		t.Delete(t.q0, t.q1, true);
-		t.SetSelect(t.q0, t.q0);
+		t.Delete(t.q0, t.q1, true)
+		t.SetSelect(t.q0, t.q0)
 		if t.w != nil {
-			t.ScrDraw();
-			t.w.SetTag();
+			t.ScrDraw()
+			t.w.SetTag()
 		}
-	}else{ 
-		if dosnarf 	{/* Snarf command */
-			argtext = t;
+	} else {
+		if dosnarf { /* Snarf command */
+			argtext = t
 		}
 	}
 }
 
-func paste(et *Text, t *Text, _0 *Text, selectall bool, tobody bool, _2 []rune) {
-	Unimpl()
+func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
+	var (
+		c            int
+		q, q0, q1, n int
+	)
+
+	/* if tobody, use body of executing window  (Paste or Send command)  */
+	if tobody && et != nil && et.w != nil {
+		t = &et.w.body
+		t.file.Mark() /* seq has been incremented by execute */
+	}
+	if t == nil {
+		return
+	}
+
+	acmegetsnarf()
+	if t == nil || snarfbuf.Nc() == 0 {
+		return
+	}
+	if t.w != nil && et.w != t.w {
+		c = 'M'
+		if et.w != nil {
+			c = et.w.owner
+		}
+		t.w.Lock(c)
+		defer t.w.Unlock()
+	}
+	cut(t, t, nil, false, true, "")
+	q = 0
+	q0 = t.q0
+	q1 = t.q0 + snarfbuf.Nc()
+	r := make([]rune, RBUFSIZE)
+	for q0 < q1 {
+		n = q1 - q0
+		if n > RBUFSIZE {
+			n = RBUFSIZE
+		}
+		snarfbuf.Read(q, r[:n])
+		t.Insert(q0, r[:n], true)
+		q += n
+		q0 += n
+	}
+	if selectall {
+		t.SetSelect(t.q0, q1)
+	} else {
+		t.SetSelect(q1, q1)
+	}
+	if t.w != nil {
+		t.ScrDraw()
+		t.w.SetTag()
+	}
 }
 
 func get(et *Text, t *Text, argt *Text, flag1 bool, _0 bool, arg []rune) {

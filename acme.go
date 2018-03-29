@@ -708,11 +708,12 @@ func acmeerrorinit() {
 	}()
 }
 
-const MAXSNARF = 100*1024
+const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-Unimpl()
+	Unimpl()
 }
+
 /*
 {
 	int i, n;
@@ -736,6 +737,31 @@ Unimpl()
 	s = fmtstrflush(&f);
 	if(s && s[0])
 		putsnarf(s);
+	free(s);
+}
+*/
+
+func acmegetsnarf() {
+	Unimpl()
+}
+
+/*
+	char *s;
+	int nb, nr, nulls, len;
+	Rune *r;
+
+	s = getsnarf();
+	if s == nil || s[0]==0 {
+		free(s);
+		return;
+	}
+
+	len = strlen(s);
+	r = runemalloc(len+1);
+	cvttorunes(s, len, r, &nb, &nr, &nulls);
+	bufreset(&snarfbuf);
+	bufinsert(&snarfbuf, 0, r, nr);
+	free(r);
 	free(s);
 }
 */
