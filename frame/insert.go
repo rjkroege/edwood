@@ -227,7 +227,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		}
 		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
 	} else if pt1.Y != pt0.Y {
-		log.Println("suspect branch in Insert")
 		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
@@ -237,19 +236,20 @@ func (f *Frame) Insert(r []rune, p0 int) {
 			f.chop(ppt1, p0, nn0)
 		}
 		if pt1.Y < y {
+			// log.Println("suspect case in frame", "pt1",  pt1, "pt0", pt0, "f.Rect", f.Rect, "q1", q1,  "y", y)
+			// log.Println(" f.Font.DefaultHeight()",  f.Font.DefaultHeight())
 			rect = f.Rect
 			rect.Min.Y = q1
 			rect.Max.Y = y
-			// TODO(rjk): This bitblit considered harmful. It damages the
-			// the output. Investigate further.
-			//			if q1 < y {
-			//				log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
-			//				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
-			//			}
+			// TODO(rjk): This bitblit may be harmful. Investigate further.
+			if q1 < y {
+				// log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
+				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
+			}
 			rect.Min = pt1
 			rect.Max.X = pt1.X + (f.Rect.Max.X - pt0.X)
-			rect.Max.Y += q1
-			log.Println("second blit op on ", rect, "from", pt0)
+			rect.Max.Y = q1
+			// log.Println("second blit op on ", rect, "from", pt0)
 			f.Background.Draw(rect, f.Background, nil, pt0)
 		}
 	}
