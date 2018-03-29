@@ -29,8 +29,8 @@ var (
 	// git clone https://go.googlesource.com/image and install
 	// image/font/gofont/ttfs
 	fontnames = [2]string{
-		"/mnt/font/GoRegular/17a/font",
-		"/mnt/font/GoRegular/17a/font",
+		"/lib/font/bit/lucsans/euro.8.font",
+		"/lib/font/bit/lucm/unicode.9.font",
 	}
 
 	command           *Command

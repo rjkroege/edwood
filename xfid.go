@@ -688,7 +688,7 @@ forloop:
 			}
 			w.col.Close(w, true)
 		case "get": // get file
-			get(&w.body, nil, nil, false, XXX, nil)
+			get(&w.body, nil, nil, false, XXX, "")
 		case "put": // put file
 			put(&w.body, nil, nil, XXX, XXX, nil)
 		case "dot=addr": // set dot

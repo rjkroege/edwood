@@ -32,7 +32,7 @@ var exectab = []Exectab{
 	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	//	{ "Font",		fontx,	false,	true /*unused*/,		true /*unused*/		},
-	//	{ "Get",		get,		false,	true,	true /*unused*/		},
+	{"Get", get, false, true, true /*unused*/},
 	//	{ "ID",		id,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
@@ -396,9 +396,84 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 }
 
-func get(et *Text, t *Text, argt *Text, flag1 bool, _0 bool, arg []rune) {
-	Unimpl()
+func getname(t *Text, argt *Text, arg string, isput bool) string {
+	r, _ := getarg(argt, false, true)
+	promote := false
+	if r == "" {
+		promote = true
+	} else {
+		if isput {
+			/* if are doing a Put, want to synthesize name even for non-existent file */
+			/* best guess is that file name doesn't contain a slash */
+			promote = true
+			if strings.Index(r, "/") != -1 {
+				t = argt
+				arg = r
+			}
+		}
+	}
+	if promote {
+		if arg == "" {
+			return t.file.name
+		}
+		/* prefix with directory name if necessary */
+		r = filepath.Join(t.DirName(""), arg)
+	}
+	return r
 }
+
+func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
+
+	if flag1 {
+		if et == nil || et.w == nil {
+			return
+		}
+	}
+	if !et.w.isdir && (et.w.body.file.b.Nc() > 0 && !et.w.Clean(true)) {
+		return
+	}
+	w := et.w
+	t = &w.body
+	name := getname(t, argt, arg, false)
+	fmt.Printf("getname returned '%v'\n", name)
+	if name == "" {
+		warning(nil, "no file name\n")
+		return
+	}
+	if len(t.file.text) > 1 {
+		isdir, _ := isDir(name)
+		if isdir {
+			warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
+			return
+		}
+	}
+	r := string(name)
+	for _, u := range t.file.text {
+		u.Reset()
+		u.w.DirFree()
+	}
+	samename := r == t.file.name
+	t.Load(0, name, samename)
+	var dirty bool
+	if samename {
+		t.file.mod = false
+		dirty = false
+	} else {
+		t.file.mod = true
+		dirty = true
+	}
+	for _, u := range t.file.text {
+		u.w.dirty = dirty
+	}
+	w.SetTag()
+	t.file.unread = false
+	for _, u := range t.file.text {
+		u.w.tag.SetSelect(u.w.tag.file.b.Nc(), u.w.tag.file.b.Nc())
+		u.ScrDraw()
+	}
+	xfidlog(w, "get")
+}
+
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg []rune) {
 	Unimpl()
 }
