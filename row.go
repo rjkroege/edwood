@@ -314,10 +314,10 @@ func (r *Row) Load(file string, initing bool) error {
 	return nil
 }
 
-func (r *Row) AllWindows(f func(*Window, interface{}), arg interface{}) {
+func (r *Row) AllWindows(f func(*Window)) {
 	for _, c := range r.col {
 		for _, w := range c.w {
-			f(w, arg)
+			f(w)
 		}
 	}
 }

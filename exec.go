@@ -34,7 +34,7 @@ var exectab = []Exectab{
 	//	{ "Get",		get,		false,	true,	true /*unused*/		},
 	//	{ "ID",		id,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
-	//	{ "Indent",		indent,	false,	true /*unused*/,		true /*unused*/		},
+	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Load",		dump,	false,	false,	true /*unused*/		},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
@@ -60,9 +60,10 @@ func lookup(r string) *Exectab {
 	fmt.Println("lookup", r)
 	r = wsre.ReplaceAllString(r, " ")
 	r = strings.TrimLeft(r, " ")
-	r = strings.SplitN(r, " ", 1)[0]
+	words := strings.SplitN(r, " ", 2)
+	fmt.Printf("lookup words %#v\n", words)
 	for _, e := range exectab {
-		if e.name == r {
+		if e.name == words[0] {
 			return &e
 		}
 	}
@@ -654,4 +655,58 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	Fail()
 	return
 
+}
+
+const (
+	IGlobal = iota - 2
+	IError
+	Ion
+	Ioff
+)
+
+func indentval(s string) int {
+	if len(s) < 2 {
+		return IError
+	}
+	switch s {
+	case "ON":
+		globalautoindent = true
+		warning(nil, "Indent ON\n")
+		return IGlobal
+	case "OFF":
+		globalautoindent = false
+		warning(nil, "Indent OFF\n")
+		return IGlobal
+	case "on":
+		return Ion
+	case "off":
+		return Ioff
+	default:
+		return Ioff
+	}
+}
+
+func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
+	Untested()
+	var autoindent int
+	fmt.Printf("indent arg = %v\n", arg)
+	w := (*Window)(nil)
+	if et != nil && et.w != nil {
+		w = et.w
+	}
+	autoindent = IError
+	r, a := getarg(argt, false, true)
+	fmt.Printf("getarg returned '%v', '%v'\n", r, a)
+	if len(r) > 0 {
+		autoindent = indentval(r)
+	} else {
+		autoindent = indentval(strings.SplitN(arg, " ", 2)[0])
+	}
+	if autoindent == IGlobal {
+		row.AllWindows(func(w *Window) { w.autoindent = globalautoindent })
+	} else {
+		if w != nil && autoindent >= 0 {
+			w.autoindent = autoindent == Ion
+		}
+	}
 }

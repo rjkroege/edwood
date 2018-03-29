@@ -143,17 +143,17 @@ func editthread() {
 	editerrc <- ""
 }
 
-func allelogterm(w *Window, _ interface{}) {
+func allelogterm(w *Window) {
 	w.body.file.elog.Term()
 }
 
-func alleditinit(w *Window, _ interface{}) {
+func alleditinit(w *Window) {
 	w.tag.Commit(true)
 	w.body.Commit(true)
 	w.body.file.editclean = false
 }
 
-func allupdate(w *Window, _ interface{}) {
+func allupdate(w *Window) {
 	var (
 		t *Text
 		f *File
@@ -187,7 +187,7 @@ func allupdate(w *Window, _ interface{}) {
 
 func editerror(format string, args ...interface{}) {
 	s := fmt.Errorf(format, args...)
-	row.AllWindows(allelogterm, nil) /* truncate the edit logs */
+	row.AllWindows(allelogterm) /* truncate the edit logs */
 	editerrc <- s
 	close(endeditthreadc) // exit.
 }
@@ -199,7 +199,7 @@ func editcmd(ct *Text, r []rune) {
 		return
 	}
 
-	row.AllWindows(alleditinit, nil)
+	row.AllWindows(alleditinit)
 	cmdstartp = make([]rune, len(r), len(r)+1)
 	copy(cmdstartp, r)
 	if r[len(r)-1] != '\n' {
@@ -224,7 +224,7 @@ func editcmd(ct *Text, r []rune) {
 	}
 
 	/* update everyone whose edit log has data */
-	row.AllWindows(allupdate, nil)
+	row.AllWindows(allupdate)
 }
 
 func getch() int {

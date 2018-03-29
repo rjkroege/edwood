@@ -295,6 +295,7 @@ func plumbshow (Plumbmsg *m) (void) {
 // using the streamer would probably be easier to read/more idiomatic.
 func search(ct *Text, r []rune) bool {
 	Untested()
+	defer Untested()
 	var (
 		n, maxn int
 	)

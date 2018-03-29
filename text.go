@@ -726,7 +726,15 @@ func (t *Text) Type(r rune) {
 	case draw.KeyRight:
 		t.TypeCommit()
 		if t.q1 < t.file.b.Nc() {
-			t.Show(t.q1+1, t.q1+1, true)
+			// This is a departure from the plan9/plan9port acme
+			// Instead of always going right one char from q1, it
+			// collapses multi-character selections first, behaving
+			// like every other selection on modern systems. -flux
+			if t.q0 != t.q1 {
+				t.Show(t.q1, t.q1, true)
+			} else {
+				t.Show(t.q1+1, t.q1+1, true)
+			}
 		}
 		return
 	case draw.KeyDown:
@@ -952,8 +960,8 @@ func (t *Text) Type(r rune) {
 				rp[nr] = r
 				nr++
 			}
+			rp = rp[:nr]
 		}
-		break /* fall through to normal code */
 	}
 	/* otherwise ordinary character; just insert, typically in caches of all texts */
 	for _, u := range t.file.text { // u is *Text
