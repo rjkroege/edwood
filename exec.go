@@ -38,7 +38,7 @@ var exectab = []Exectab{
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Load",		dump,	false,	false,	true /*unused*/		},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
-	//	{ "Look",		look,		false,	true /*unused*/,		true /*unused*/		},
+	{"Look", look, false, true /*unused*/, true /*unused*/},
 	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
@@ -425,6 +425,24 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	// and runwait task catches, and records the process in command list (by
 	// pumping it down the ccommand chanel)
 	go runwaittask(c, cpid)
+}
+
+func look(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
+	if et != nil && et.w != nil {
+		t = &et.w.body
+		if len(arg) > 0 {
+			search(t, []rune(arg))
+			return
+		}
+		r, _ := getarg(argt, false, false)
+		if r == "" {
+			n := t.q1 - t.q0
+			rb := make([]rune, n)
+			t.file.b.Read(t.q0, rb[:n])
+			r = string(rb) // TODO(flux) Too many gross []rune-string conversions in here
+		}
+		search(t, []rune(r))
+	}
 }
 
 func runwaittask(c *Command, cpid chan *os.Process) {
