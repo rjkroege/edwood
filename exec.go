@@ -47,7 +47,7 @@ var exectab = []Exectab{
 	//	{ "Put",		put,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Redo",		undo,	false,	false,	true /*unused*/		},
-	//	{ "Send",		sendx,	true,	true /*unused*/,		true /*unused*/		},
+	{"Send", sendx, true, true /*unused*/, true /*unused*/},
 	{"Snarf", cut, false, true, false},
 	//	{ "Sort",		sort,		false,	true /*unused*/,		true /*unused*/		},
 	{"Tab", tab, false, true /*unused*/, true /*unused*/},
@@ -426,6 +426,24 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	// and runwait task catches, and records the process in command list (by
 	// pumping it down the ccommand chanel)
 	go runwaittask(c, cpid)
+}
+
+func sendx(et *Text, t *Text, _ *Text, _, _ bool, _ string) {
+	if et.w == nil {
+		return
+	}
+	t = &et.w.body
+	if t.q0 != t.q1 {
+		cut(t, t, nil, true, false, "")
+	}
+	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	paste(t, t, nil, true, true, "")
+	if t.ReadC(t.file.b.Nc()-1) != '\n' {
+		t.Insert(t.file.b.Nc(), []rune("\n"), true)
+		t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	}
+	t.iq1 = t.q1
+	t.Show(t.q1, t.q1, true)
 }
 
 func look(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
