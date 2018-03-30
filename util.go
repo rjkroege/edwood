@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"unicode"
 )
 
 func min(a, b int) int {
@@ -71,8 +70,23 @@ func restoremouse(w *Window) bool {
 	return false
 }
 
+// TODO(flux) The "correct" answer here is return unicode.IsNumber(c) || unicode.IsLetter(c)
 func isalnum(c rune) bool {
-	return unicode.IsNumber(c) || unicode.IsLetter(c)
+	/*
+	 * Hard to get absolutely right.  Use what we know about ASCII
+	 * and assume anything above the Latin control characters is
+	 * potentially an alphanumeric.
+	 */
+	if(c <= ' ') {
+		return false;
+	}
+	if(0x7F<=c && c<=0xA0) {
+		return false;
+	}
+	if(utfrune([]rune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~"), c)!=-1) {
+		return false;
+	}
+	return true;
 }
 
 func runeeq(s1, s2 []rune) bool {

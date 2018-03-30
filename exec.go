@@ -49,12 +49,12 @@ var exectab = []Exectab{
 	// TODO(rjk): Implement this one.
 	//	{ "Put",		put,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
-	{"Redo", undo, false, false, true /*unused*/},
+	{ "Redo",		undo,	false,	false,	true /*unused*/		},
 	{"Send", sendx, true, true /*unused*/, true /*unused*/},
 	{"Snarf", cut, false, true, false},
-	//	{ "Sort",		sort,		false,	true /*unused*/,		true /*unused*/		},
+	{ "Sort",		sortx,		false,	true /*unused*/,		true /*unused*/		},
 	{"Tab", tab, false, true /*unused*/, true /*unused*/},
-	{"Undo", undo, false, true, true /*unused*/},
+	{ "Undo",		undo,	false,	true,	true /*unused*/		},
 	{"Zerox", zeroxx, false, true /*unused*/, true /*unused*/},
 }
 
@@ -481,42 +481,49 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg []rune) {
 	Unimpl()
 }
 
-func seqof(w *Window, isundo bool) int {
+func sortx(et, _, _ *Text, _, _ bool, _ string) {
+	if et.col != nil {
+		et.col.Sort()
+	}
+}
+
+func seqof (w * Window, isundo  bool) (int) {
 	/* if it's undo, see who changed with us */
 	if isundo {
-		return w.body.file.seq
+		return w.body.file.seq;
 	}
 	/* if it's redo, see who we'll be sync'ed up with */
 	return w.body.file.RedoSeq()
 }
 
-func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
+func undo (et * Text, _ * Text, _ * Text, flag1, _ bool, _ string) {
 
-	if et == nil || et.w == nil {
-		return
+	if et==nil || et.w== nil {
+		return;
 	}
-	seq := seqof(et.w, flag1)
+	seq := seqof(et.w, flag1);
 	if seq == 0 {
 		/* nothing to undo */
-		return
+		return;
 	}
 	/*
 	 * Undo the executing window first. Its display will update. other windows
 	 * in the same file will not call show() and jump to a different location in the file.
 	 * Simultaneous changes to other files will be chaotic, however.
 	 */
-	et.w.Undo(flag1)
+	et.w.Undo(flag1);
 	for _, c := range row.col {
 		for _, w := range c.w {
 			if w == et.w {
-				continue
+				continue;
 			}
 			if seqof(w, flag1) == seq {
-				w.Undo(flag1)
+				w.Undo(flag1);
 			}
 		}
 	}
 }
+
 
 func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg string, iseditcmd bool) {
 	Untested()
