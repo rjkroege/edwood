@@ -631,7 +631,7 @@ func simpleaddr() *Addr {
 	case '-':
 		fallthrough
 	case '\'':
-		addr.typ =getch()
+		addr.typ = getch()
 	default:
 		return nil
 	}

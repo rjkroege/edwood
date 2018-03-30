@@ -825,11 +825,11 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyCmd + 'z': /* %Z: undo */
 		t.TypeCommit()
-		undo(t, nil, nil, true, false, nil)
+		undo(t, nil, nil, true, false, "")
 		return
 	case draw.KeyCmd + 'Z': /* %-shift-Z: redo */
 		t.TypeCommit()
-		undo(t, nil, nil, false, false, nil)
+		undo(t, nil, nil, false, false, "")
 		return
 
 	}
