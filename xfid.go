@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
+	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -127,29 +130,33 @@ func xfidopen(x *Xfid) {
 				return
 			}
 			var err error
+			// TODO(flux): Move the TempFile and CloseOnExec and Remove
+			// into a tempfile() call
 			w.rdselfd, err = ioutil.TempFile("", "acme")
 			if err != nil {
 				w.Unlock()
 				respond(x, &fc, fmt.Errorf("can't create temp file"))
 				return
 			}
+			syscall.CloseOnExec(int(w.rdselfd.Fd()))
+			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 			q0 = t.q0
 			q1 = t.q1
+			r := make([]rune, RBUFSIZE)
 			for q0 < q1 {
-				n = int(q1 - q0)
-				if n > BUFSIZE/utf8.UTFMax {
-					n = BUFSIZE / utf8.UTFMax
+				n = q1 - q0
+				if n > RBUFSIZE {
+					n = RBUFSIZE
 				}
-				r := make([]rune, (n))
-				t.file.b.Read(q0, r)
-				s := string(r)
+				t.file.b.Read(q0, r[:n])
+				s := string(r[:n])
 				n, err = w.rdselfd.Write([]byte(s))
 				if err != nil || n != len(s) {
 					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
 					break
 				}
-				q0 += (n)
+				q0 += n
 			}
 		case QWwrsel:
 			w.nopen[q]++
@@ -285,10 +292,8 @@ func xfidread(x *Xfid) {
 	if w == nil {
 		fc.Count = 0
 		switch q {
-		case Qcons:
-			fallthrough
-		case Qlabel:
-			break
+		case Qcons: //breal
+		case Qlabel: //break
 		case Qindex:
 			xfidindexread(x)
 			return
@@ -365,22 +370,21 @@ func xfidread(x *Xfid) {
 
 	case QWrdsel:
 		w.rdselfd.Seek(int64(off), 0)
-		n := x.fcall.Count
+		n = int(x.fcall.Count)
 		if n > BUFSIZE {
 			n = BUFSIZE
 		}
 		b := make([]byte, n)
-		nread, err := w.rdselfd.Read(b)
-		n = uint32(nread)
-		if err != nil || n < 0 {
+		n, err := w.rdselfd.Read(b[:n])
+		if err != nil && err != io.EOF {
 			respond(x, &fc, fmt.Errorf("I/O error in temp file: %v", err))
 			break
 		}
-		fc.Count = n
-		fc.Data = b
+		fc.Count = uint32(n)
+		fc.Data = b[:n]
 		respond(x, &fc, nil)
 	default:
-		respond(x, &fc, fmt.Errorf("unknown qid %d in read", q)) // TODO(flux) compare to the C code - there's a bug and leaks buf, not even passing it.
+		respond(x, &fc, fmt.Errorf("unknown qid %d in read", q))
 	}
 	w.Unlock()
 }
@@ -690,7 +694,7 @@ forloop:
 		case "get": // get file
 			get(&w.body, nil, nil, false, XXX, "")
 		case "put": // put file
-			put(&w.body, nil, nil, XXX, XXX, nil)
+			put(&w.body, nil, nil, XXX, XXX, "")
 		case "dot=addr": // set dot
 			w.body.Commit(true)
 			clampaddr(w)
@@ -924,7 +928,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 			nr = BUFSIZE / utf8.UTFMax
 		}
 		r := make([]rune, nr)
-		t.file.b.Read(q, r)
+		t.file.b.Read(q, r[:nr])
 		b := r //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
 		if boff >= off {
 			m = len(b)

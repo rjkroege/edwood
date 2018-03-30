@@ -77,16 +77,16 @@ func isalnum(c rune) bool {
 	 * and assume anything above the Latin control characters is
 	 * potentially an alphanumeric.
 	 */
-	if(c <= ' ') {
-		return false;
+	if c <= ' ' {
+		return false
 	}
-	if(0x7F<=c && c<=0xA0) {
-		return false;
+	if 0x7F <= c && c <= 0xA0 {
+		return false
 	}
-	if(utfrune([]rune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~"), c)!=-1) {
-		return false;
+	if utfrune([]rune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~"), c) != -1 {
+		return false
 	}
-	return true;
+	return true
 }
 
 func runeeq(s1, s2 []rune) bool {
@@ -158,7 +158,6 @@ func errorwin(md *MntDir, owner int) *Window {
 		/* window was deleted too fast */
 		w.Unlock()
 	}
-	fmt.Println("Back from errorwin")
 	return w
 }
 

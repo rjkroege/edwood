@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"os"
+	"time"
 )
 
 type File struct {
@@ -14,7 +15,7 @@ type File struct {
 	elog    Elog
 	name    string //[]rune
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
-	mtime   int64
+	mtime   time.Time
 	// dev       int
 	unread    bool
 	editclean bool

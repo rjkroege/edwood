@@ -46,15 +46,14 @@ var exectab = []Exectab{
 	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
-	// TODO(rjk): Implement this one.
-	//	{ "Put",		put,		false,	true /*unused*/,		true /*unused*/		},
+	{"Put", put, false, true /*unused*/, true /*unused*/},
 	//	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
-	{ "Redo",		undo,	false,	false,	true /*unused*/		},
+	{"Redo", undo, false, false, true /*unused*/},
 	{"Send", sendx, true, true /*unused*/, true /*unused*/},
 	{"Snarf", cut, false, true, false},
-	{ "Sort",		sortx,		false,	true /*unused*/,		true /*unused*/		},
+	{"Sort", sortx, false, true /*unused*/, true /*unused*/},
 	{"Tab", tab, false, true /*unused*/, true /*unused*/},
-	{ "Undo",		undo,	false,	true,	true /*unused*/		},
+	{"Undo", undo, false, true, true /*unused*/},
 	{"Zerox", zeroxx, false, true /*unused*/, true /*unused*/},
 }
 
@@ -477,8 +476,127 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	xfidlog(w, "get")
 }
 
-func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg []rune) {
+func checksha1(name string, f *File, d *os.FileInfo) {
 	Unimpl()
+	/*
+		int fd, n;
+		DigestState *h;
+		uchar out[20];
+		uchar *buf;
+
+		fd = open(name, OREAD);
+		if(fd < 0)
+			return;
+		h = sha1(nil, 0, nil, nil);
+		buf = emalloc(8192);
+		while((n = read(fd, buf, 8192)) > 0)
+			sha1(buf, n, nil, h);
+		free(buf);
+		close(fd);
+		sha1(nil, 0, out, h);
+		if(memcmp(out, f->sha1, sizeof out) == 0) {
+			f->dev = d->dev;
+			f->qidpath = d->qid.path;
+			f->mtime = d->mtime;
+		}
+	*/
+}
+
+// TODO(flux): dev and qidpath?
+// TODO(flux): sha1?
+func putfile(f *File, q0 int, q1 int, name string) {
+	w := f.curtext.w
+	d, err := os.Stat(name)
+	if err == nil && name == f.name {
+		if /*f.dev!=d.dev || f.qidpath!=d.qid.path ||*/ f.mtime != d.ModTime() {
+			checksha1(name, f, &d)
+		}
+		if /*f.dev!=d.dev || f.qidpath!=d.qid.path || */ f.mtime != d.ModTime() {
+			if f.unread {
+				warning(nil, "%s not written; file already exists\n", name)
+			} else {
+				warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.mtime, d.ModTime())
+			}
+			//	f.dev = d.dev;
+			//	f.qidpath = d.qid.path;
+			f.mtime = d.ModTime()
+			return
+		}
+	}
+	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	if err != nil {
+		warning(nil, "can't create file %s: %r\n", name)
+		return
+	}
+	defer fd.Close()
+
+	//h = sha1(nil, 0, nil, nil);
+
+	d, err = fd.Stat()
+	isapp := (err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0)
+	if isapp {
+		warning(nil, "%s not written; file is append only\n", name)
+		return
+	}
+	r := make([]rune, RBUFSIZE)
+	n := 0
+	for q := q0; q < q1; q += n {
+		n = q1 - q
+		if n > RBUFSIZE {
+			n = RBUFSIZE
+		}
+		f.b.Read(q, r[:n])
+		s := string(r[:n])
+		fmt.Printf("Writing '%v'\n", s)
+		//sha1((uchar*)s, m, nil, h);
+		nwritten, err := fd.Write([]byte(s))
+		if err != nil || nwritten != len(s) {
+			warning(nil, "can't write file %s: %r\n", name)
+			return
+		}
+	}
+	if name == f.name {
+		if q0 != 0 || q1 != f.b.Nc() {
+			f.mod = true
+			w.dirty = true
+			f.unread = true
+		} else {
+			d1, err := fd.Stat()
+			if err != nil {
+				d = d1
+			}
+			//f.qidpath = d.qid.path;
+			//f.dev = d.dev;
+			f.mtime = d.ModTime()
+			//sha1(nil, 0, f.sha1, h);
+			//h = nil;
+			f.mod = false
+			w.dirty = false
+			f.unread = false
+		}
+		for _, u := range f.text {
+			u.w.putseq = f.seq
+			u.w.dirty = w.dirty
+		}
+	}
+
+	w.SetTag()
+	return
+}
+
+func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
+	if et == nil || et.w == nil || et.w.isdir {
+		return
+	}
+	w := et.w
+	f := w.body.file
+	name := getname(&w.body, argt, arg, true)
+	if name == "" {
+		warning(nil, "no file name\n")
+		return
+	}
+	putfile(f, 0, f.b.Nc(), name)
+	xfidlog(w, "put")
 }
 
 func sortx(et, _, _ *Text, _, _ bool, _ string) {
@@ -487,43 +605,42 @@ func sortx(et, _, _ *Text, _, _ bool, _ string) {
 	}
 }
 
-func seqof (w * Window, isundo  bool) (int) {
+func seqof(w *Window, isundo bool) int {
 	/* if it's undo, see who changed with us */
 	if isundo {
-		return w.body.file.seq;
+		return w.body.file.seq
 	}
 	/* if it's redo, see who we'll be sync'ed up with */
 	return w.body.file.RedoSeq()
 }
 
-func undo (et * Text, _ * Text, _ * Text, flag1, _ bool, _ string) {
+func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 
-	if et==nil || et.w== nil {
-		return;
+	if et == nil || et.w == nil {
+		return
 	}
-	seq := seqof(et.w, flag1);
+	seq := seqof(et.w, flag1)
 	if seq == 0 {
 		/* nothing to undo */
-		return;
+		return
 	}
 	/*
 	 * Undo the executing window first. Its display will update. other windows
 	 * in the same file will not call show() and jump to a different location in the file.
 	 * Simultaneous changes to other files will be chaotic, however.
 	 */
-	et.w.Undo(flag1);
+	et.w.Undo(flag1)
 	for _, c := range row.col {
 		for _, w := range c.w {
 			if w == et.w {
-				continue;
+				continue
 			}
 			if seqof(w, flag1) == seq {
-				w.Undo(flag1);
+				w.Undo(flag1)
 			}
 		}
 	}
 }
-
 
 func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg string, iseditcmd bool) {
 	Untested()
@@ -702,9 +819,9 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 
 func runwaittask(c *Command, cpid chan *os.Process) {
 	c.proc = <-cpid
-	c.pid = c.proc.Pid
 
-	if c.pid != 0 { /* successful exec */
+	if c.proc != nil { /* successful exec */
+		c.pid = c.proc.Pid
 		ccommand <- c
 	} else {
 		if c.iseditcommand {
@@ -717,7 +834,7 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 	fid, err := fsys.Open(path, mode)
 	if err != nil {
-		warning(nil, "Failed to open %v", path)
+		warning(nil, "Failed to open %v: %v", path, err)
 		return nil
 	}
 
@@ -727,22 +844,39 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 		acmeerror("fsopenfd: Could not make pipe", nil)
 	}
 
-	go func() {
-		var buf [BUFSIZE]byte
-		var werr error
-		for {
-			n, err := fid.Read(buf[:])
-			if n != 0 {
-				_, werr = w.Write(buf[0:n])
+	if mode == plan9.OREAD {
+		go func() {
+			var buf [BUFSIZE]byte
+			var werr error
+			for {
+				n, err := fid.Read(buf[:])
+				if n != 0 {
+					_, werr = w.Write(buf[:n])
+				}
+				if err != nil || werr != nil {
+					w.Close()
+					return
+				}
 			}
-			if err != nil || werr != nil {
-				w.Close()
-				return
+		}()
+		return r
+	} else {
+		go func() {
+			var buf [BUFSIZE]byte
+			var werr error
+			for {
+				n, err := r.Read(buf[:])
+				if n != 0 {
+					_, werr = fid.Write(buf[:n])
+				}
+				if err != nil || werr != nil {
+					w.Close()
+					return
+				}
 			}
-		}
-	}()
-
-	return r
+		}()
+		return w
+	}
 }
 
 func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) {
@@ -757,6 +891,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		shell string
 	)
 	Fail := func() {
+		Untested()
 		// threadexec hasn't happened, so send a zero
 		sfd[0].Close()
 		if sfd[2] != sfd[1] {
@@ -766,6 +901,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		cpid <- nil
 	}
 	Hard := func() {
+		Untested()
 		//* ugly: set path = (. $cputype /bin)
 		//* should honor $path if unusual.
 		/* TODO(flux): This looksl ike plan9 magic
@@ -819,7 +955,6 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	c.name = name
 	// t is the full path, trimmed of left whitespace.
 	pipechar = 0
-
 	if t[0] == '<' || t[0] == '|' || t[0] == '>' {
 		pipechar = int(t[0])
 		t = t[1:]
@@ -858,7 +993,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			return
 		}
 		fs, err := client.MountService("acme") //, fmt.Sprintf("%d", c.md.id))
-		if err == nil {
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "child: can't mount acme: %v\n", err)
 			fsysdelid(c.md)
 			c.md = nil
@@ -923,6 +1058,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	}
 
 	t = wsre.ReplaceAllString(string(t), " ")
+	t = strings.TrimLeft(t, " ")
 	c.av = strings.Split(t, " ")
 	if arg != "" {
 		c.av = append(c.av, arg)
@@ -941,6 +1077,8 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	if err == nil {
 		if cpid != nil {
 			cpid <- cmd.Process
+		} else {
+			cpid <- nil
 		}
 		// Where do we wait TODO(flux)
 		return

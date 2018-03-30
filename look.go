@@ -64,7 +64,6 @@ func startplumbing (void) (void) {
 */
 
 func look3(t *Text, q0 int, q1 int, external bool) {
-	Untested()
 	var (
 		n, c, f int
 		ct      *Text
@@ -80,7 +79,6 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		seltext = t
 	}
 	e, expanded = expand(t, q0, q1)
-	fmt.Printf("look3 exapanded to '%v'\n", e)
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		// send alphanumeric expansion to external client
 		if expanded == false {
@@ -192,6 +190,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		return
 	}
 	if e.name != "" || e.at != nil {
+		e.agetc = func(q int) rune { return e.at.ReadC(q) }
 		openfile(t, &e)
 	} else {
 		if t.w == nil {
@@ -507,7 +506,6 @@ Rescue:
 
 func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 	var colon int
-	defer Untested()
 	amax := q1
 	if q1 == q0 {
 		colon = -1
@@ -546,6 +544,8 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 						c := t.ReadC(q1)
 						if isaddrc(c) {
 							q1++
+						} else {
+							break
 						}
 					}
 				}
@@ -563,7 +563,6 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 				amax = t.file.b.Nc()
 			}
 		}
-		fmt.Println("Expand went to range", q0, q1)
 	}
 	amin := amax
 	e.q0 = q0
@@ -594,18 +593,9 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 		nname = n
 	}
 	for i := 0; i < nname; i++ {
-		Untested()
 		if !isfilec(rb[i]) {
 			return e, false
 		}
-	}
-
-	Isfile := func() {
-		e.name = r
-		e.at = t
-		e.a0 = amin + 1
-		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
-			func(q int) rune { return t.ReadC(q) }, false)
 	}
 	//* See if it's a file name in <>, and turn that into an include
 	//* file name if so.  Should probably do it for "" too, but that's not
@@ -617,24 +607,36 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 		r = includename(t, r)
 	} else {
 		if amin == q0 {
-			Isfile()
+			e.name = string([]rune(r)[:nname])
+			e.at = t
+			e.a0 = amin + 1
+			_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
+				func(q int) rune { return t.ReadC(q) }, false)
 			return e, true
 		} else {
-			r = t.DirName(r)
+			r = t.DirName(string([]rune(r)[:nname]))
 		}
 	}
 	e.bname = r
 	// if it's already a window name, it's a file
 	w := lookfile(r)
 	if w != nil {
-		Isfile()
+		e.name = r
+		e.at = t
+		e.a0 = amin + 1
+		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
+			func(q int) rune { return t.ReadC(q) }, false)
 		return e, true
 	}
 	// if it's the name of a file, it's a file
 	if ismtpt(e.bname) || !access(e.bname) {
 		return e, false
 	}
-	Isfile()
+	e.name = r
+	e.at = t
+	e.a0 = amin + 1
+	_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
+		func(q int) rune { return t.ReadC(q) }, false)
 	return e, true
 }
 
@@ -648,8 +650,6 @@ func access(name string) bool {
 }
 
 func expand(t *Text, q0 int, q1 int) (Expand, bool) {
-	Untested()
-	defer Untested()
 	e := Expand{}
 	e.agetc = func(q int) rune {
 		if q < t.Nc() {
@@ -668,8 +668,8 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 			e.jump = false
 		}
 	}
-
-	if e, ok := expandfile(t, q0, q1); ok {
+	ok := true
+	if e, ok = expandfile(t, q0, q1); ok {
 		return e, true
 	}
 
@@ -687,8 +687,6 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 }
 
 func lookfile(s string) *Window {
-	Untested()
-
 	// avoid terminal slash on directories
 	s = strings.TrimRight(s, "/")
 	for _, c := range row.col {

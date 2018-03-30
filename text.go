@@ -339,7 +339,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			t.file.sha1 = sha1
 		}
 		//t.file.dev = d.dev;
-		t.file.mtime = d.ModTime().UnixNano()
+		t.file.mtime = d.ModTime()
 		t.file.qidpath = d.Name() // TODO(flux): Gross hack to use filename as unique ID of file.
 	}
 	fd.Close()
@@ -1007,7 +1007,7 @@ func (t *Text) Type(r rune) {
 		}
 		if u.ncache+nr > u.ncachealloc {
 			u.ncachealloc += 10 + nr
-			u.cache = append(u.cache, make([]rune,u.ncachealloc)...)//runerealloc(u.cache, u.ncachealloc);
+			u.cache = append(u.cache, make([]rune, u.ncachealloc)...) //runerealloc(u.cache, u.ncachealloc);
 		}
 		//runemove(u.cache+u.ncache, rp, nr);
 		copy(u.cache[u.ncache:], rp[:nr])
@@ -1655,8 +1655,11 @@ func (t *Text) DirName(name string) string {
 	if t == nil || t.w == nil {
 		return string(cleanrname([]rune(name)))
 	}
+	if filepath.IsAbs(name) {
+		return filepath.Clean(name)
+	}
 	b := make([]rune, t.w.tag.file.b.Nc())
 	t.w.tag.file.b.Read(0, b)
 	spl := strings.SplitN(string(b), " ", 1)[0]
-	return filepath.Dir(spl) + string(filepath.Separator) + name
+	return filepath.Clean(filepath.Dir(spl) + string(filepath.Separator) + name)
 }

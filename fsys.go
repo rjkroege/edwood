@@ -504,7 +504,7 @@ func fsyscreate(x *Xfid, f *Fid) *Xfid {
 //	return *(int*)a - *(int*)b;
 //}
 
-// TODO(flux): I'm pretty sure handling of int32 sized files is broken by type casts to int.
+// TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
 func fsysread(x *Xfid, f *Fid) *Xfid {
 	var (
 		t           plan9.Fcall

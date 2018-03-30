@@ -13,7 +13,7 @@ const (
 
 // Return if r is valid character in an address
 func isaddrc(r rune) bool {
-	if r != 0 && utfrune([]rune("0123456789+-/$.#,;?"), r) != -1 {
+	if utfrune([]rune("0123456789+-/$.#,;?"), r) != -1 {
 		return true
 	}
 	return false
