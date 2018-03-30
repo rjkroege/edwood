@@ -242,14 +242,15 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 
 	r1 := r
 	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*tagfont.Height)
+
+	/* If needed, recompute number of lines in tag. */
 	if !safe || !w.tagsafe || w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
 		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*tagfont.Height)
 	}
 
-	y := r1.Max.Y
-
 	// Resize/redraw tag TODO(flux)
+	y := r1.Max.Y
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.tag.Resize(r1, true)
 		y = w.tag.fr.Rect.Max.Y

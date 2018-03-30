@@ -578,7 +578,6 @@ func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 	var (
 		newfont *draw.Font
 	)
-
 	if et == nil || et.w == nil {
 		return
 	}
@@ -603,21 +602,19 @@ func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 			file = wrd
 		}
 	}
-
 	if file == "" {
 		// this implements the toggle
 		newfont = fontget(0, false, false, "", row.display)
 		if newfont != nil {
 			if newfont.Name == t.fr.Font.Impl().Name {
-				fix = 0
-			} else {
 				fix = 1
+			} else {
+				fix = 0
 			}
 		}
 	}
 	if file != "" {
-		aa := string(file)
-		newfont = fontget(fix, explicit, false, aa, row.display)
+		newfont = fontget(fix, explicit, false, string(file), row.display)
 	} else {
 		newfont = fontget(fix, false, false, "", row.display)
 	}
