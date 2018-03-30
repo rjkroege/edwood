@@ -991,7 +991,7 @@ func (t *Text) Type(r rune) {
 		}
 		if u.ncache+nr > u.ncachealloc {
 			u.ncachealloc += 10 + nr
-			u.cache = make([]rune, u.ncachealloc) //runerealloc(u.cache, u.ncachealloc);
+			u.cache = append(u.cache, make([]rune,u.ncachealloc)...)//runerealloc(u.cache, u.ncachealloc);
 		}
 		//runemove(u.cache+u.ncache, rp, nr);
 		copy(u.cache[u.ncache:], rp[:nr])
