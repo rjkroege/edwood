@@ -1,10 +1,11 @@
 package main
 
 import (
-	"9fans.net/go/draw"
 	"image"
 	"sync"
 	"unicode/utf8"
+
+	"9fans.net/go/draw"
 )
 
 type Row struct {
@@ -23,11 +24,11 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
 	row.col = []*Column{}
 	row.r = r
-	tagfile := NewTagFile()
 	r1 := r
 	r1.Max.Y = r1.Min.Y + tagfont.Height
 	t := &row.tag
-	t.Init(tagfile, r1, fontget(0, false, false, "", row.display), tagcolors, row.display)
+	f := new(File)
+	t.Init(f.AddText(t), r1, fontget(0, false, false, "", row.display), tagcolors, row.display)
 	t.what = Rowtag
 	t.row = row
 	t.w = nil
