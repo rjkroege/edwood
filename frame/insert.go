@@ -222,10 +222,10 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	}
 	if n0 == f.nbox {
 		div := f.Font.DefaultHeight()
-		if pt1.X > f.Rect.Min.X {
-			div++
-		}
 		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
+		if pt1.X > f.Rect.Min.X {
+			f.NLines++
+		}
 	} else if pt1.Y != pt0.Y {
 		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()

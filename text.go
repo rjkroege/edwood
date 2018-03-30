@@ -12,8 +12,6 @@ import (
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
-
-	"log"
 )
 
 const (
@@ -102,7 +100,23 @@ func (t *Text) Nc() int {
 	return t.file.b.Nc()
 }
 
+// whatstring provides an easy-reading version of the Text usage.
+func (t *Text) whatstring() string {
+	switch t.what {
+	case Body:
+		return "Body"
+	case Rowtag:
+		return "Rowtag"
+	case Tag:
+		return "Tag"
+	}
+	return "Columntag"
+}
+
 func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
+	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
+	// defer log.Println("--- Text Redraw end")
+	// TODO(rjk): It is possible that this does unnecessary work.
 	t.fr.Init(r, f, b, t.fr.Cols)
 	rr := t.fr.Rect
 	rr.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap) /* back fill to scroll bar */
@@ -132,6 +146,8 @@ func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
 }
 
 func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
+	// log.Println("--- Text Resize start", r, keepextra, t.whatstring())
+	// defer log.Println("--- Text Resize end")
 	if r.Dy() <= 0 {
 		r.Max.Y = r.Min.Y
 	} else {
@@ -495,8 +511,8 @@ func (t *Text) inSelection(q0 int) bool {
 
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
 func (t *Text) Fill() {
-	// log.Println("Test.Fill Start")
-	// defer log.Println("Test.Fill End")
+	// log.Println("Text.Fill Start", t.whatstring())
+	// defer log.Println("Text.Fill End")
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
 	// characters possible?
@@ -1066,8 +1082,8 @@ func framescroll(f *frame.Frame, dl int) {
 }
 
 func (t *Text) Select() {
-	log.Println("Text.Select Begin")
-	defer log.Println("Text.Select End")
+	// log.Println("Text.Select Begin")
+	// defer log.Println("Text.Select End")
 
 	const (
 		None = iota
