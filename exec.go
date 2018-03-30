@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
@@ -508,10 +509,10 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	w := f.curtext.w
 	d, err := os.Stat(name)
 	if err == nil && name == f.name {
-		if /*f.dev!=d.dev || f.qidpath!=d.qid.path ||*/ f.mtime != d.ModTime() {
+		if /*f.dev!=d.dev || f.qidpath!=d.qid.path ||*/ d.ModTime().Sub(f.mtime) > time.Millisecond {
 			checksha1(name, f, &d)
 		}
-		if /*f.dev!=d.dev || f.qidpath!=d.qid.path || */ f.mtime != d.ModTime() {
+		if /*f.dev!=d.dev || f.qidpath!=d.qid.path || */ d.ModTime().Sub(f.mtime) > time.Millisecond {
 			if f.unread {
 				warning(nil, "%s not written; file already exists\n", name)
 			} else {
