@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,8 +11,10 @@ import (
 	"strings"
 	"syscall"
 
+	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"github.com/rjkroege/edwood/frame"
 )
 
 type Exectab struct {
@@ -31,7 +34,7 @@ var exectab = []Exectab{
 	//	{ "Dump",		dump,	false,	true,	true /*unused*/		},
 	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
-	//	{ "Font",		fontx,	false,	true /*unused*/,		true /*unused*/		},
+	{"Font", fontx, false, true /*unused*/, true /*unused*/},
 	{"Get", get, false, true, true /*unused*/},
 	//	{ "ID",		id,		false,	true /*unused*/,		true /*unused*/		},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
@@ -570,6 +573,70 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		warning(nil, "%s: Tab %d\n", w.body.file.name, w.body.tabstop)
 	}
 }
+
+func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
+	var (
+		newfont *draw.Font
+	)
+
+	if et == nil || et.w == nil {
+		return
+	}
+	t = &et.w.body
+	file := ""
+	// Parse parameter.  It might be in arg, or argt, or both
+	r, _ := getarg(argt, false, true)
+	r = r + " " + arg
+	r = wsre.ReplaceAllString(string(r), " ")
+	words := strings.Split(arg, " ")
+	fix := 1
+	explicit := false
+	for _, wrd := range words {
+		switch wrd {
+		case "fix":
+			fix = 1
+			explicit = true
+		case "var":
+			fix = 0
+			explicit = true
+		default: // File/fontname
+			file = wrd
+		}
+	}
+
+	if file == "" {
+		// this implements the toggle
+		newfont = fontget(0, false, false, "", row.display)
+		if newfont != nil {
+			if newfont.Name == t.fr.Font.Impl().Name {
+				fix = 0
+			} else {
+				fix = 1
+			}
+		}
+	}
+	if file != "" {
+		aa := string(file)
+		newfont = fontget(fix, explicit, false, aa, row.display)
+	} else {
+		newfont = fontget(fix, false, false, "", row.display)
+	}
+	if newfont != nil {
+		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
+		t.font = newfont
+		t.fr.Init(t.w.r, newfont, row.display.ScreenImage, t.fr.Cols)
+		t.fr.InitTick()
+		if t.w.isdir {
+			t.all.Min.X++ // force recolumnation; disgusting!
+			for i, dir := range t.w.dirnames {
+				t.w.widths[i] = newfont.StringWidth(dir)
+			}
+		}
+		// avoid shrinking of window due to quantization
+		t.w.col.Grow(t.w, -1)
+	}
+}
+
 func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 	if t != nil && t.w != nil && t.w != et.w {
 		c := int('M')

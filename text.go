@@ -1195,7 +1195,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	)
 	if t.what != Body {
 		if doselect {
-			t.SetSelect(0, q1)
+			t.SetSelect(q0, q1)
 		}
 		return
 	}
@@ -1429,7 +1429,6 @@ func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
 
 func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
 	q0, q1, buts := t.Select23(but2col, 4)
-	fmt.Println("buts =", buts, q0, q1)
 	if (buts & 4) != 0 {
 		return q0, q1, nil, false
 	}

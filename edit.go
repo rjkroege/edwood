@@ -7,7 +7,7 @@ import (
 type String []rune
 
 type Addr struct {
-	typ  int /* # (byte addr), l (line addr), / ? . $ + - , ; */
+	typ  rune /* # (byte addr), l (line addr), / ? . $ + - , ; */
 	re   String
 	left *Addr /* left side of , and ; */
 	num  uint64
@@ -27,7 +27,7 @@ type Cmd struct {
 	mtaddr *Addr  /* address for m, t */
 	next   *Cmd   /* pointer to next element in braces */
 	num    int
-	flag   int  /* whatever */
+	flag   rune /* whatever */
 	cmdc   rune /* command character; 'x' etc. */
 }
 
@@ -327,7 +327,7 @@ func Straddc(s String, c rune) String {
 	return append(s, c)
 }
 
-func getrhs(s String, delim rune, cmd int) {
+func getrhs(s String, delim rune, cmd rune) {
 	var c rune
 
 	for {
@@ -481,7 +481,7 @@ func parsecmd(nest int) *Cmd {
 					if nextc() == c {
 						getch()
 						if nextc() == 'g' {
-							cmd.flag = int(getch())
+							cmd.flag = getch()
 						}
 					}
 
@@ -592,7 +592,7 @@ func simpleaddr() *Addr {
 	)
 	switch cmdskipbl() {
 	case '#':
-		addr.typ = int(getch())
+		addr.typ = getch()
 		addr.num = uint64(getnum(1))
 	case '0':
 		fallthrough
@@ -620,7 +620,7 @@ func simpleaddr() *Addr {
 	case '?':
 		fallthrough
 	case '"':
-		addr.typ = int(getch())
+		addr.typ = getch()
 		addr.re = getregexp(rune(addr.typ))
 	case '.':
 		fallthrough
@@ -631,7 +631,7 @@ func simpleaddr() *Addr {
 	case '-':
 		fallthrough
 	case '\'':
-		addr.typ = int(getch())
+		addr.typ =getch()
 	default:
 		return nil
 	}
@@ -682,7 +682,7 @@ func compoundaddr() *Addr {
 	var next *Addr
 
 	addr.left = simpleaddr()
-	addr.typ = int(cmdskipbl())
+	addr.typ = cmdskipbl()
 	if addr.typ != ',' && addr.typ != ';' {
 		return addr.left
 	}

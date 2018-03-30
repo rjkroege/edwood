@@ -76,7 +76,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 	w.tag.w = w
 	w.taglines = 1
-	w.tagsafe = true
+	w.tagsafe = false
 	w.tagexpand = true
 	w.body.w = w
 	w.incl = []string{}
@@ -193,8 +193,44 @@ func (w *Window) moveToDel() {
 }
 
 func (w *Window) TagLines(r image.Rectangle) int {
-	// Unimpl()
-	return 1
+	var n int
+
+	if !w.tagexpand && !w.showdel {
+		return 1
+	}
+	w.showdel = false
+	w.tag.fr.NoRedraw = true
+	w.tag.Resize(r, true)
+	w.tag.fr.NoRedraw = false
+	w.tagsafe = false
+
+	if !w.tagexpand {
+		/* use just as many lines as needed to show the Del */
+		n = w.delRunePos()
+		if n < 0 {
+			return 1
+		}
+		p := w.tag.fr.Ptofchar(n).Sub(w.tag.fr.Rect.Min)
+		return 1 + p.Y/w.tag.fr.Font.DefaultHeight()
+	}
+
+	/* can't use more than we have */
+	if w.tag.fr.GetFrameFillStatus().Nlines >= w.tag.fr.GetFrameFillStatus().Maxlines {
+		return w.tag.fr.GetFrameFillStatus().Maxlines
+	}
+
+	/* if tag ends with \n, include empty line at end for typing */
+	n = w.tag.fr.GetFrameFillStatus().Nlines
+	if w.tag.file.b.Nc() > 0 {
+		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
+		if c == '\n' {
+			n++
+		}
+	}
+	if n == 0 {
+		n = 1
+	}
+	return n
 }
 
 func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
@@ -393,6 +429,16 @@ func (w *Window) ClearTag() {
 }
 
 func (w *Window) SetTag() {
+	f := w.body.file
+	for _, u := range f.text {
+		v := u.w
+		if v.col.safe || v.body.fr.GetFrameFillStatus().Maxlines > 0 {
+			v.SetTag1()
+		}
+	}
+}
+
+func (w *Window) SetTag1() {
 	Ldelsnarf := (" Del Snarf")
 	Lundo := (" Undo")
 	Lredo := (" Redo")
