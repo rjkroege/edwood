@@ -45,6 +45,9 @@ func (b *Buffer) Load(q0 int, fd *os.File) (n int, h FileHash, hasNulls bool, er
 
 func (b *Buffer) Read(q0 int, r []rune) (n int, err error) {
 	n = len(r)
+	if q0 + n > b.Nc() {
+		n = b.Nc() - q0
+	}
 	if !(q0 <= (len(*b)) && q0+n <= (len(*b))) {
 		panic("internal error: Buffer.Read")
 	}
