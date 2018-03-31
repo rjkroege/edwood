@@ -288,7 +288,6 @@ func mousethread(display *draw.Display) {
 	runtime.LockOSThread()
 
 	for {
-		// TODO(flux) lock row and flush warnings?
 		row.lk.Lock()
 		flushwarnings()
 		row.lk.Unlock()
@@ -301,6 +300,7 @@ func mousethread(display *draw.Display) {
 			fmt.Println("RESIZE!")
 			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
 			iconinit(display)
+			ScrlResize(display)
 			row.Resize(display.ScreenImage.R)
 		case mousectl.Mouse = <-mousectl.C:
 			MovedMouse(mousectl.Mouse)
@@ -711,38 +711,16 @@ func acmeerrorinit() {
 const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-	Unimpl()
+	r := make([]rune, snarfbuf.Nc())
+	snarfbuf.Read(0, r[:snarfbuf.Nc()])
+	row.display.WriteSnarf([]byte(string(r)))
 }
-
-/*
-{
-	int i, n;
-	Fmt f;
-	char *s;
-
-	if(snarfbuf.nc==0)
-		return;
-	if(snarfbuf.nc > MAXSNARF)
-		return;
-
-	fmtstrinit(&f);
-	for(i=0; i<snarfbuf.nc; i+=n){
-		n = snarfbuf.nc-i;
-		if(n >= NSnarf)
-			n = NSnarf;
-		bufread(&snarfbuf, i, snarfrune, n);
-		if(fmtprint(&f, "%.*S", n, snarfrune) < 0)
-			break;
-	}
-	s = fmtstrflush(&f);
-	if(s && s[0])
-		putsnarf(s);
-	free(s);
-}
-*/
 
 func acmegetsnarf() {
-	Unimpl()
+	r := make([]byte, MAXSNARF)
+	n, _, _ := row.display.ReadSnarf(r)
+	snarfbuf.Reset()
+	snarfbuf.Insert(0, []rune(string(r[:n])))
 }
 
 /*
