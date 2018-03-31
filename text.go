@@ -302,13 +302,9 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			return 0, fmt.Errorf("failed to Readdirnames: %s\n", filename)
 		}
 		for i, dn := range dirNames {
-			f, err := os.Open(dn)
+			s, err := os.Stat(filepath.Join(fd.Name(), dn))
 			if err != nil {
-				warning(nil, "can't open %s: %v\n", dn, err)
-			}
-			s, err := f.Stat()
-			if err != nil {
-				warning(nil, "can't fstat %s: %r\n", dn, err)
+				warning(nil, "can't stat %s: %v\n", dn, err)
 			} else {
 				if s.IsDir() {
 					dirNames[i] = dn + "/"
@@ -693,6 +689,7 @@ func (t *Text) Type(r rune) {
 		nnb, nb, n, i int
 		nr            int
 	)
+	// Avoid growing column and row tags.
 	if t.what != Body && t.what != Tag && r == '\n' {
 		return
 	}
