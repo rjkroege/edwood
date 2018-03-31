@@ -284,7 +284,6 @@ func xfidread(x *Xfid) {
 		fc  plan9.Fcall
 		n   int
 		b   string
-		buf string
 		w   *Window
 	)
 	q := FILE(x.f.qid)
@@ -342,7 +341,7 @@ func xfidread(x *Xfid) {
 			x.fcall.Count = uint32(uint64(n) - off)
 		}
 		fc.Count = x.fcall.Count
-		fc.Data = []byte(buf[off:])
+		fc.Data = []byte(b[off:])
 		respond(x, &fc, nil)
 
 	case QWevent:
