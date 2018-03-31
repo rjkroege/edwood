@@ -855,6 +855,7 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 					_, werr = w.Write(buf[:n])
 				}
 				if err != nil || werr != nil {
+					fid.Close()
 					w.Close()
 					return
 				}
@@ -871,7 +872,8 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 					_, werr = fid.Write(buf[:n])
 				}
 				if err != nil || werr != nil {
-					w.Close()
+					r.Close()
+					fid.Close()
 					return
 				}
 			}

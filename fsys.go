@@ -618,12 +618,12 @@ func fsyswstat(x *Xfid, f *Fid) *Xfid {
 }
 
 func newfid(fid uint32) *Fid {
-	ff := fids[fid]
-	if ff == nil {
+	ff, ok := fids[fid]
+	if !ok {
 		ff = &Fid{}
+		ff.fid = fid
 		fids[fid] = ff
 	}
-	ff.fid = fid
 	return ff
 }
 
