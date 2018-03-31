@@ -728,7 +728,11 @@ func (t *Text) Type(r rune) {
 	case draw.KeyLeft:
 		t.TypeCommit()
 		if t.q0 > 0 {
-			t.Show(t.q0-1, t.q0-1, true)
+			if t.q0 != t.q1 {
+				t.Show(t.q0, t.q0, true)
+			} else {
+				t.Show(t.q0-1, t.q0-1, true)
+			}
 		}
 		return
 	case draw.KeyRight:
@@ -868,6 +872,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q1
 		return
 	}
+	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		if t.ncache != 0 {
 			acmeerror("text.type", nil)
@@ -899,6 +904,16 @@ func (t *Text) Type(r rune) {
 			t.TypeCommit()
 		}
 		t.iq1 = t.q0
+		return
+	case 0x7F:/* Del: erase character right */
+		if t.q1 >= t.Nc()-1 {
+			return // End of file
+		}
+		t.TypeCommit() // Avoid messing with the cache?
+		if !wasrange {
+			t.q1++
+			cut(t, t, nil, false, true, "")
+		}
 		return
 	case 0x08:
 		fallthrough /* ^H: erase character */
