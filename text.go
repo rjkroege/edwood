@@ -1014,11 +1014,15 @@ func (t *Text) Type(r rune) {
 		}
 		if u.ncache+nr > u.ncachealloc {
 			u.ncachealloc += 10 + nr
-			u.cache = append(u.cache, make([]rune, u.ncachealloc)...) //runerealloc(u.cache, u.ncachealloc);
+			u.cache = append(u.cache, make([]rune, 10 + nr)...) //runerealloc(u.cache, u.ncachealloc);
 		}
 		//runemove(u.cache+u.ncache, rp, nr);
 		copy(u.cache[u.ncache:], rp[:nr])
 		u.ncache += nr
+		if t.what == Tag { // TODO(flux): This is hideous work-around for
+						// what looks like a subtle bug near here.
+			t.w.Commit(t)
+		}
 	}
 	t.SetSelect(t.q0+nr, t.q0+nr)
 	if r == '\n' && t.w != nil {
