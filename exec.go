@@ -33,7 +33,7 @@ var exectab = []Exectab{
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
 	// TODO(rjk): https://github.com/rjkroege/edwood/issues/12 
-	//	{ "Dump",		dump,	false,	true,	true /*unused*/		},
+	{ "Dump",		dump,	false,	true,	true /*unused*/		},
 	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
@@ -42,7 +42,7 @@ var exectab = []Exectab{
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
-	//	{ "Load",		dump,	false,	false,	true /*unused*/		},
+	{ "Load",		dump,	false,	false,	true /*unused*/		},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
 	{"Look", look, false, true /*unused*/, true /*unused*/},
 	{"New", newx, false, true /*unused*/, true /*unused*/},
@@ -1132,5 +1132,22 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		if w != nil && autoindent >= 0 {
 			w.autoindent = autoindent == Ion
 		}
+	}
+}
+
+func  dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
+	name := ""
+
+	if arg != "" {
+		name = arg
+	} else {
+		r, _ := getarg(argt, false, true)
+		name = string(r)
+	}
+
+	if(isdump) {
+		row.Dump(name)
+	} else {
+		row.Load(name, false)
 	}
 }
