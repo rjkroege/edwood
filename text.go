@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha1"
 	"fmt"
 	"image"
 	"math"
@@ -282,7 +281,6 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	var count int
 	q1 := (0)
 	hasNulls := false
-	var sha1 [sha1.Size]byte
 	if d.IsDir() {
 		/* this is checked in get() but it's possible the file changed underfoot */
 		if len(t.file.text) > 1 {
@@ -323,7 +321,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	} else {
 		t.w.isdir = false
 		t.w.filemenu = true
-		count, sha1, hasNulls, err = t.file.Load(q0, fd)
+		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)
 		if err != nil {
 			warning(nil, "Error reading file %s: %v", filename, err)
 			return 0, fmt.Errorf("Error reading file %s: %v", filename, err)
@@ -331,16 +329,13 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		q1 = q0 + count
 	}
 	if setqid {
-		if q0 == 0 {
-			t.file.sha1 = sha1
-		}
 		//t.file.dev = d.dev;
 		t.file.mtime = d.ModTime()
 		t.file.qidpath = d.Name() // TODO(flux): Gross hack to use filename as unique ID of file.
 	}
 	fd.Close()
 	n := q1 - q0
-	if q0 < t.org { // TODO(flux) I don't understand this test, moving origin of frame past the text.
+	if q0 < t.org {
 		t.org += n
 	} else {
 		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.

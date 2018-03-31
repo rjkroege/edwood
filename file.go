@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 )
@@ -26,7 +28,7 @@ type File struct {
 	text    []*Text
 	dumpid  int
 
-	sha1 [sha1.Size]byte // Used to check if the file has changed on disk since loaded
+	hash FileHash // Used to check if the file has changed on disk since loaded
 }
 
 type Undo struct {
@@ -38,9 +40,34 @@ type Undo struct {
 	buf []rune
 }
 
-func (f *File) Load(q0 int, fd *os.File) (n int, h [sha1.Size]byte, hasNulls bool, err error) {
+type FileHash [sha1.Size]byte
+
+func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
+	var h FileHash
 	n, h, hasNulls, err = f.b.Load(q0, fd)
-	return n, h, hasNulls, err
+	if sethash {
+		f.hash = h
+	}
+	return n, hasNulls, err
+}
+
+func HashFile(filename string) (h FileHash, err error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return h, err
+	}
+	d, err := ioutil.ReadAll(fd)
+	if err != nil {
+		return h, err
+	}
+	return sha1.Sum(d), nil
+}
+
+func (h0 FileHash)Eq(h1 FileHash) bool {
+	return bytes.Compare(h0[:], h1[:])==0
+}
+func calcFileHash(b []byte) FileHash {
+	return sha1.Sum(b)
 }
 
 func (f *File) AddText(t *Text) *File {

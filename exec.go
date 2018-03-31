@@ -477,49 +477,40 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	xfidlog(w, "get")
 }
 
-func checksha1(name string, f *File, d *os.FileInfo) {
-	Unimpl()
-	/*
-		int fd, n;
-		DigestState *h;
-		uchar out[20];
-		uchar *buf;
+func checkhash(name string, f *File, d os.FileInfo) {
+	Untested()
 
-		fd = open(name, OREAD);
-		if(fd < 0)
-			return;
-		h = sha1(nil, 0, nil, nil);
-		buf = emalloc(8192);
-		while((n = read(fd, buf, 8192)) > 0)
-			sha1(buf, n, nil, h);
-		free(buf);
-		close(fd);
-		sha1(nil, 0, out, h);
-		if(memcmp(out, f->sha1, sizeof out) == 0) {
-			f->dev = d->dev;
-			f->qidpath = d->qid.path;
-			f->mtime = d->mtime;
-		}
-	*/
+	h, err := HashFile(name)
+	if err != nil {
+		warning(nil, "Failed to open %v to compute hash", name)
+		return
+	}
+	if h.Eq(f.hash) {
+		//	f->dev = d->dev;
+		f.qidpath = d.Name()
+		f.mtime = d.ModTime()
+	}
+
 }
 
 // TODO(flux): dev and qidpath?
-// TODO(flux): sha1?
+// I haven't spelunked into plan9port to see what it returns for qidpath for regular
+// files.  inode?  For now, use the filename.  Awful.
 func putfile(f *File, q0 int, q1 int, name string) {
 	w := f.curtext.w
 	d, err := os.Stat(name)
 	if err == nil && name == f.name {
-		if /*f.dev!=d.dev || f.qidpath!=d.qid.path ||*/ d.ModTime().Sub(f.mtime) > time.Millisecond {
-			checksha1(name, f, &d)
+		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
+			checkhash(name, f, d)
 		}
-		if /*f.dev!=d.dev || f.qidpath!=d.qid.path || */ d.ModTime().Sub(f.mtime) > time.Millisecond {
+		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
 			if f.unread {
 				warning(nil, "%s not written; file already exists\n", name)
 			} else {
 				warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.mtime, d.ModTime())
 			}
 			//	f.dev = d.dev;
-			//	f.qidpath = d.qid.path;
+			f.qidpath = d.Name()
 			f.mtime = d.ModTime()
 			return
 		}
