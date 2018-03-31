@@ -722,24 +722,3 @@ func acmegetsnarf() {
 	snarfbuf.Reset()
 	snarfbuf.Insert(0, []rune(string(r[:n])))
 }
-
-/*
-	char *s;
-	int nb, nr, nulls, len;
-	Rune *r;
-
-	s = getsnarf();
-	if s == nil || s[0]==0 {
-		free(s);
-		return;
-	}
-
-	len = strlen(s);
-	r = runemalloc(len+1);
-	cvttorunes(s, len, r, &nb, &nr, &nulls);
-	bufreset(&snarfbuf);
-	bufinsert(&snarfbuf, 0, r, nr);
-	free(r);
-	free(s);
-}
-*/
