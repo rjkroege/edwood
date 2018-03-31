@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"9fans.net/go/plan9/client"
+
+"runtime/debug"
 )
 
 var (
@@ -504,7 +506,7 @@ Rescue:
 	return r
 }
 
-func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
+func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	var colon int
 	amax := q1
 	if q1 == q0 {
@@ -569,7 +571,7 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 	e.q1 = q1
 	n := q1 - q0
 	if n == 0 {
-		return e, false
+		return false
 	}
 	// see if it's a file name
 	rb := make([]rune, n)
@@ -584,7 +586,7 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 			if q0+i+1 < t.file.b.Nc() && (i == n-1 || isaddrc(cc)) {
 				amin = q0 + i
 			} else {
-				return e, false
+				return false
 			}
 			nname = i
 		}
@@ -594,7 +596,7 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 	}
 	for i := 0; i < nname; i++ {
 		if !isfilec(rb[i]) {
-			return e, false
+			return false
 		}
 	}
 	//* See if it's a file name in <>, and turn that into an include
@@ -612,7 +614,7 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 			e.a0 = amin + 1
 			_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
 				func(q int) rune { return t.ReadC(q) }, false)
-			return e, true
+			return true
 		} else {
 			r = t.DirName(string([]rune(r)[:nname]))
 		}
@@ -626,18 +628,18 @@ func expandfile(t *Text, q0 int, q1 int) (e Expand, success bool) {
 		e.a0 = amin + 1
 		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
 			func(q int) rune { return t.ReadC(q) }, false)
-		return e, true
+		return true
 	}
 	// if it's the name of a file, it's a file
 	if ismtpt(e.bname) || !access(e.bname) {
-		return e, false
+		return false
 	}
 	e.name = r
 	e.at = t
 	e.a0 = amin + 1
 	_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
 		func(q int) rune { return t.ReadC(q) }, false)
-	return e, true
+	return true
 }
 
 func access(name string) bool {
@@ -669,7 +671,7 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 		}
 	}
 	ok := true
-	if e, ok = expandfile(t, q0, q1); ok {
+	if ok = expandfile(t, q0, q1, &e); ok {
 		return e, true
 	}
 
@@ -808,6 +810,8 @@ func openfile(t *Text, e *Expand) *Window {
 	seltext = t
 	if e.jump {
 		row.display.MoveTo(t.fr.Ptofchar(t.fr.P0).Add(image.Pt(4, tagfont.Height-4)))
+	} else {
+		debug.PrintStack()
 	}
 	return w
 }
