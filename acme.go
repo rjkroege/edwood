@@ -45,8 +45,8 @@ func timefmt( /*Fmt* */ ) int {
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
 var bartflagflag = flag.Bool("b", false, "Bart's Flag")
 var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
-var fixedfontflag = flag.String("f", fontnames[0], "Variable Width Font")
-var varfontflag = flag.String("F", fontnames[1], "Fixed Width Font")
+var varfontflag = flag.String("f", fontnames[0], "Variable Width Font")
+var fixedfontflag = flag.String("F", fontnames[1], "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
@@ -64,8 +64,8 @@ func main() {
 	flag.Parse()
 	ncol = *ncolflag
 	globalautoindent = *globalautoindentflag
-	fontnames[0] = *fixedfontflag
-	fontnames[1] = *varfontflag
+	fontnames[0] = *varfontflag
+	fontnames[1] = *fixedfontflag
 	loadfile := *loadfileflag
 	mtpt = *mtptflag
 	bartflag = *bartflagflag
