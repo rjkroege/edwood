@@ -194,7 +194,6 @@ func (w *Window) moveToDel() {
 
 func (w *Window) TagLines(r image.Rectangle) int {
 	var n int
-
 	if !w.tagexpand && !w.showdel {
 		return 1
 	}
@@ -244,7 +243,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
 
 	/* If needed, recompute number of lines in tag. */
-	if !safe || !w.tagsafe || w.tag.all.Eq(r1) {
+	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
 		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
 	}

@@ -482,7 +482,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 			c = 'I'
 		}
 		if n <= EVENTSIZE {
-			t.w.Event("%c%d %d 0 %d %.*S\n", c, q0, q0+n, n, n, r)
+			t.w.Event("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
 		} else {
 			t.w.Event("%c%d %d 0 0 \n", c, q0, q0+n, n)
 		}
@@ -597,7 +597,9 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		} else {
 			p0 = q0 - t.org
 		}
-		t.fr.Delete((p0), (p1))
+		if p0 != p1 {
+			t.fr.Delete((p0), (p1))
+		}
 		t.Fill()
 	}
 	if t.w != nil {
