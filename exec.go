@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/frame"
@@ -32,8 +31,8 @@ var exectab = []Exectab{
 	{"Del", del, false, false, true /*unused*/},
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
-	// TODO(rjk): https://github.com/rjkroege/edwood/issues/12 
-	{ "Dump",		dump,	false,	true,	true /*unused*/		},
+	// TODO(rjk): https://github.com/rjkroege/edwood/issues/12
+	{"Dump", dump, false, true, true /*unused*/},
 	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
@@ -42,7 +41,7 @@ var exectab = []Exectab{
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
-	{ "Load",		dump,	false,	false,	true /*unused*/		},
+	{"Load", dump, false, false, true /*unused*/},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
 	{"Look", look, false, true /*unused*/, true /*unused*/},
 	{"New", newx, false, true /*unused*/, true /*unused*/},
@@ -725,9 +724,6 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 }
 
 func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
-	var (
-		newfont *draw.Font
-	)
 	if et == nil || et.w == nil {
 		return
 	}
@@ -738,39 +734,30 @@ func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 	r = r + " " + arg
 	r = wsre.ReplaceAllString(string(r), " ")
 	words := strings.Split(arg, " ")
-	fix := 1
-	explicit := false
+
 	for _, wrd := range words {
 		switch wrd {
 		case "fix":
-			fix = 1
-			explicit = true
+			file = *fixedfontflag
 		case "var":
-			fix = 0
-			explicit = true
+			file = *varfontflag
 		default: // File/fontname
 			file = wrd
 		}
 	}
+
 	if file == "" {
-		// this implements the toggle
-		newfont = fontget(0, false, false, "", row.display)
-		if newfont != nil {
-			if newfont.Name == t.fr.Font.Impl().Name {
-				fix = 1
-			} else {
-				fix = 0
-			}
+		if t.font == *varfontflag {
+			file = *fixedfontflag
+		} else {
+			file = *varfontflag
 		}
 	}
-	if file != "" {
-		newfont = fontget(fix, explicit, false, string(file), row.display)
-	} else {
-		newfont = fontget(fix, false, false, "", row.display)
-	}
-	if newfont != nil {
+
+	if newfont := fontget(file, row.display); newfont != nil {
+		// TODO(rjk): maybe Frame should know how to clear itself on init?
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
-		t.font = newfont
+		t.font = file
 		t.fr.Init(t.w.r, newfont, row.display.ScreenImage, t.fr.Cols)
 		t.fr.InitTick()
 		if t.w.isdir {
@@ -1135,7 +1122,7 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 }
 
-func  dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
+func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 	name := ""
 
 	if arg != "" {
@@ -1145,7 +1132,7 @@ func  dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 		name = string(r)
 	}
 
-	if(isdump) {
+	if isdump {
 		row.Dump(name)
 	} else {
 		row.Load(name, false)

@@ -41,7 +41,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	c.tag.col = c
 	tagfile := NewFile("")
 	r1 := r
-	r1.Max.Y = r1.Min.Y + tagfont.Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
 	c.tag.Init(tagfile.AddText(&c.tag), r1, tagfont, tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
@@ -269,7 +269,7 @@ func (c *Column) Resize(r image.Rectangle) {
 		} else {
 			r1.Max.Y = r1.Min.Y + (w.r.Dy()+c.display.ScaleSize(Border))*r.Dy()/c.r.Dy()
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+tagfont.Height)
+		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height)
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
 		c.display.ScreenImage.Draw(r2, c.display.Black, nil, image.ZP)
@@ -462,11 +462,11 @@ Pack:
 func (c *Column) DragWin(w *Window, but int) {
 
 	var (
-		r     image.Rectangle
-		i, b  int
-		p, op image.Point
-		v, win     *Window
-		nc    *Column
+		r      image.Rectangle
+		i, b   int
+		p, op  image.Point
+		v, win *Window
+		nc     *Column
 	)
 	clearmouse()
 	// setcursor(mousectl, &boxcursor); // TODO(flux) - No SetCursor in draw!

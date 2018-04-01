@@ -70,7 +70,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 	//	var r1, br image.Rectangle
 	//	var f *File
-	var rf *draw.Font
+	var rf string
 	//	var rp []rune
 	//	var nc int
 
@@ -93,8 +93,8 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	r1 := r
 
 	w.tagtop = r
-	w.tagtop.Max.Y = r.Min.Y + tagfont.Height
-	r1.Max.Y = r1.Min.Y + w.taglines*tagfont.Height
+	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height
+	r1.Max.Y = r1.Min.Y + w.taglines*fontget(tagfont, w.display).Height
 
 	f := NewTagFile()
 	f.AddText(&w.tag)
@@ -109,7 +109,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 		w.tag.SetSelect(len(w.tag.file.b), len(w.tag.file.b))
 	}
 	r1 = r
-	r1.Min.Y += w.taglines*tagfont.Height + 1
+	r1.Min.Y += w.taglines*fontget(tagfont, w.display).Height + 1
 	if r1.Max.Y < r1.Min.Y {
 		r1.Max.Y = r1.Min.Y
 	}
@@ -120,9 +120,9 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 		f = clone.body.file
 		w.body.org = clone.body.org
 		w.isscratch = clone.isscratch
-		rf = fontget(0, false, false, clone.body.font.Name, dis)
+		rf = clone.body.font
 	} else {
-		rf = fontget(0, false, false, "", dis)
+		rf = tagfont
 	}
 	f = f.AddText(&w.body)
 	w.body.Init(f, r1, rf, textcolors, w.display)
@@ -238,15 +238,15 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	mouseinbody := mouse.Point.In(w.body.all)
 
 	w.tagtop = r
-	w.tagtop.Max.Y = r.Min.Y + tagfont.Height
+	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height
 
 	r1 := r
-	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*tagfont.Height)
+	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
 
 	/* If needed, recompute number of lines in tag. */
 	if !safe || !w.tagsafe || w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
-		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*tagfont.Height)
+		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
 	}
 
 	// Resize/redraw tag TODO(flux)
@@ -321,7 +321,7 @@ func (w *Window) Unlock() {
 func (w *Window) MouseBut() {
 	if w.display != nil {
 		w.display.MoveTo(w.tag.scrollr.Min.Add(
-			image.Pt(w.tag.scrollr.Dx(), tagfont.Height).Div(2)))
+			image.Pt(w.tag.scrollr.Dx(), fontget(tagfont, w.display).Height).Div(2)))
 	}
 }
 
@@ -625,7 +625,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 		w.body.Nc(), isdir, dirty)
 	if fonts {
 		return fmt.Sprintf("%s%11d %q %11d ", buf, w.body.fr.Rect.Dx(),
-			w.body.font.Name, w.body.fr.GetMaxtab())
+			w.body.font, w.body.fr.GetMaxtab())
 	}
 	return buf
 }

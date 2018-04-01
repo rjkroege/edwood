@@ -24,15 +24,7 @@ const (
 )
 
 var (
-	snarfrune [NSnarf + 1]rune
-
-	// git clone https://go.googlesource.com/image and install
-	// image/font/gofont/ttfs
-	fontnames = [2]string{
-		"/lib/font/bit/lucsans/euro.8.font",
-		"/lib/font/bit/lucm/unicode.9.font",
-	}
-
+	snarfrune         [NSnarf + 1]rune
 	command           *Command
 	swapscrollButtons bool
 )
@@ -45,8 +37,8 @@ func timefmt( /*Fmt* */ ) int {
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
 var bartflagflag = flag.Bool("b", false, "Bart's Flag")
 var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
-var varfontflag = flag.String("f", fontnames[0], "Variable Width Font")
-var fixedfontflag = flag.String("F", fontnames[1], "Fixed Width Font")
+var varfontflag = flag.String("f", "/lib/font/bit/lucsans/euro.8.font", "Variable Width Font")
+var fixedfontflag = flag.String("F", "/lib/font/bit/lucm/unicode.9.font", "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
@@ -64,8 +56,6 @@ func main() {
 	flag.Parse()
 	ncol = *ncolflag
 	globalautoindent = *globalautoindentflag
-	fontnames[0] = *varfontflag
-	fontnames[1] = *fixedfontflag
 	loadfile := *loadfileflag
 	mtpt = *mtptflag
 	bartflag = *bartflagflag
@@ -89,7 +79,7 @@ func main() {
 		// rowloadfonts(loadfile) // Overrides fonts selected up to here.
 	}
 
-	os.Setenv("font", fontnames[0])
+	os.Setenv("font", *varfontflag)
 
 	// TODO(flux): this must be 9p open?  It's unused in the C code after its opening.
 	// Is it just somehow to keep it open?
@@ -100,7 +90,7 @@ func main() {
 	var err error
 	var display *draw.Display
 	// TODO(rjk): Upstream draw does not have a cexit parameter.
-	display, err = draw.Init(nil, fontnames[0], "acme", *winsize)
+	display, err = draw.Init(nil, *varfontflag, "acme", *winsize)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,9 +98,7 @@ func main() {
 	keyboardctl = display.InitKeyboard()
 	mainpid = os.Getpid()
 
-	// TODO(flux): Original Acme does a bunch of font cache setup here.
-	// I suspect it's not useful in the modern world.
-	tagfont = display.DefaultFont
+	tagfont = *varfontflag
 
 	iconinit(display)
 	// rxinit(); // TODO(flux) looks unneeded now
@@ -211,28 +199,17 @@ func readfile(c *Column, filename string) {
 
 var fontCache map[string]*draw.Font = make(map[string]*draw.Font)
 
-func fontget(fix int, save bool, setfont bool, name string, display *draw.Display) (font *draw.Font) {
-	font = nil
-	if name == "" {
-		name = fontnames[fix]
-	}
+func fontget(name string, display *draw.Display) *draw.Font {
+	var font *draw.Font
 	var ok bool
 	if font, ok = fontCache[name]; !ok {
 		f, err := display.OpenFont(name)
 		if err != nil {
-			warning(nil, "can't open font file %s: %r\n", name)
+			warning(nil, "can't open font file %s: %v\n", name, err)
 			return nil
 		}
 		fontCache[name] = f
 		font = f
-	}
-	if save {
-		reffonts[fix] = font
-		fontnames[fix] = name
-	}
-	if setfont {
-		tagfont = font // TODO(flux): Global font stuff is just nasty.
-		iconinit(display)
 	}
 	return font
 }
@@ -253,7 +230,7 @@ func iconinit(display *draw.Display) {
 	}
 
 	// ...
-	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), tagfont.Height+1)
+	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(tagfont, display).Height+1)
 	button, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Notacolor)
 	button.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)

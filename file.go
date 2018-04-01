@@ -63,8 +63,8 @@ func HashFile(filename string) (h FileHash, err error) {
 	return sha1.Sum(d), nil
 }
 
-func (h0 FileHash)Eq(h1 FileHash) bool {
-	return bytes.Compare(h0[:], h1[:])==0
+func (h0 FileHash) Eq(h1 FileHash) bool {
+	return bytes.Compare(h0[:], h1[:]) == 0
 }
 func calcFileHash(b []byte) FileHash {
 	return sha1.Sum(b)

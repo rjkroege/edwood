@@ -9,7 +9,7 @@ import (
 
 	"9fans.net/go/plan9/client"
 
-"runtime/debug"
+	"runtime/debug"
 )
 
 var (
@@ -809,7 +809,7 @@ func openfile(t *Text, e *Expand) *Window {
 	t.w.SetTag()
 	seltext = t
 	if e.jump {
-		row.display.MoveTo(t.fr.Ptofchar(t.fr.P0).Add(image.Pt(4, tagfont.Height-4)))
+		row.display.MoveTo(t.fr.Ptofchar(t.fr.P0).Add(image.Pt(4, fontget(tagfont, row.display).Height-4)))
 	} else {
 		debug.PrintStack()
 	}

@@ -52,7 +52,8 @@ type Text struct {
 	display *draw.Display
 	file    *File
 	fr      *frame.Frame
-	font    *draw.Font
+	font    string
+
 	org     int // Origin of the frame within the buffer
 	q0      int
 	q1      int
@@ -75,7 +76,7 @@ type Text struct {
 	needundo    bool
 }
 
-func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
+func (t *Text) Init(f *File, r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
 	if t == nil {
 		t = new(Text)
 	}
@@ -90,8 +91,8 @@ func (t *Text) Init(f *File, r image.Rectangle, rf *draw.Font, cols [frame.NumCo
 	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
-	t.fr = frame.NewFrame(r, rf, t.display.ScreenImage, cols)
-	t.Redraw(r, rf, t.display.ScreenImage, -1)
+	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
+	t.Redraw(r, fontget(rf, t.display), t.display.ScreenImage, -1)
 	return t
 }
 
@@ -905,7 +906,7 @@ func (t *Text) Type(r rune) {
 		}
 		t.iq1 = t.q0
 		return
-	case 0x7F:/* Del: erase character right */
+	case 0x7F: /* Del: erase character right */
 		if t.q1 >= t.Nc()-1 {
 			return // End of file
 		}
@@ -1014,13 +1015,13 @@ func (t *Text) Type(r rune) {
 		}
 		if u.ncache+nr > u.ncachealloc {
 			u.ncachealloc += 10 + nr
-			u.cache = append(u.cache, make([]rune, 10 + nr)...) //runerealloc(u.cache, u.ncachealloc);
+			u.cache = append(u.cache, make([]rune, 10+nr)...) //runerealloc(u.cache, u.ncachealloc);
 		}
 		//runemove(u.cache+u.ncache, rp, nr);
 		copy(u.cache[u.ncache:], rp[:nr])
 		u.ncache += nr
 		if t.what == Tag { // TODO(flux): This is hideous work-around for
-						// what looks like a subtle bug near here.
+			// what looks like a subtle bug near here.
 			t.w.Commit(t)
 		}
 	}

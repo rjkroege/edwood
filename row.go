@@ -25,10 +25,10 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	row.col = []*Column{}
 	row.r = r
 	r1 := r
-	r1.Max.Y = r1.Min.Y + tagfont.Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height
 	t := &row.tag
 	f := new(File)
-	t.Init(f.AddText(t), r1, fontget(0, false, false, "", row.display), tagcolors, row.display)
+	t.Init(f.AddText(t), r1, tagfont, tagcolors, row.display)
 	t.what = Rowtag
 	t.row = row
 	t.w = nil
@@ -97,7 +97,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	deltax := rect.Min.X - or.Min.X
 	row.r = rect
 	r1 := rect
-	r1.Max.Y = r1.Min.Y + tagfont.Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, r.display).Height
 	row.tag.Resize(r1, true)
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
