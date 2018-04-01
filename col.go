@@ -531,6 +531,8 @@ Found:
 	if p.Y > w.r.Max.Y-w.tagtop.Dy()-c.row.display.ScaleSize(Border) {
 		p.Y = w.r.Max.Y - w.tagtop.Dy() - c.row.display.ScaleSize(Border)
 	}
+	r = v.r
+	r.Max.Y = p.Y
 	if r.Max.Y > v.body.fr.Rect.Min.Y {
 		r.Max.Y -= (r.Max.Y - v.body.fr.Rect.Min.Y) % v.body.fr.Font.DefaultHeight()
 		if v.body.fr.Rect.Min.Y == v.body.fr.Rect.Max.Y {
