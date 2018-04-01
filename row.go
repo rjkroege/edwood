@@ -1,7 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"image"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"unicode/utf8"
 
@@ -300,9 +305,149 @@ func (row *Row) Clean() bool {
 	return clean
 }
 
-func (r *Row) Dump(file string) {
-	Unimpl()
+// firstbufline returns the first line of a buffer.
+// TODO(rjk): Why don't we save more than the first line of a tag. I want the whole tag saved.
+func firstbufline(b *Buffer) string {
+	ru := make([]rune, RBUFSIZE)
+	n, _ := b.Read(0, ru)
 
+	su := string(ru[0:n])
+	// TODO(rjk): I presume that we'll eventually use string everywhere.
+	if o := strings.IndexRune(su, '\n'); o > -1 {
+		su = su[0:o]
+	}
+	return su
+}
+
+func (r *Row) Dump(file string) {
+	dumped := false
+
+	if len(r.col) == 0 {
+		return
+	}
+
+	if file == "" {
+		if home == "" {
+			warning(nil, "can't find file for dump: $home not defined\n")
+			return
+		}
+
+		// Lower risk of simultaneous use of edwood and acme.
+		file = filepath.Join(home, "edwood.dump")
+	}
+
+	fd, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		warning(nil, "can't open %s: %v\n", err)
+		return
+	}
+	defer fd.Close()
+
+	b := bufio.NewWriter(fd)
+
+	fmt.Fprintf(b, "%s\n", wdir)
+	fmt.Fprintf(b, "%s\n", *varfontflag)
+	fmt.Fprintf(b, "%s\n", *fixedfontflag)
+
+	for i, c := range r.col {
+		fmt.Fprintf(b, "%11.7f", 100.0*float64(c.r.Min.X-row.r.Min.X)/float64(r.r.Dx()))
+		if i == len(r.col)-1 {
+			b.WriteRune('\n')
+		} else {
+			b.WriteRune(' ')
+		}
+	}
+
+	for _, c := range r.col {
+		for _, w := range c.w {
+			w.body.file.dumpid = 0
+		}
+	}
+
+	fmt.Fprintf(b, "w %s\n", firstbufline(&r.tag.file.b))
+	for i, c := range r.col {
+		fmt.Fprintf(b, "c%11d %s\n", i, firstbufline(&c.tag.file.b))
+	}
+
+	for i, c := range r.col {
+	NextWindow:
+		for j, w := range c.w {
+			// Do we need to Commit on the other tags?
+			w.Commit(&w.tag)
+			t := &w.body
+
+			/* windows owned by others get special treatment */
+			if w.nopen[QWevent] > 0 {
+				if w.dumpstr == "" {
+					continue
+				}
+			}
+
+			/* zeroxes of external windows are tossed */
+			if len(t.file.text) > 1 {
+				for _, t1 := range t.file.text {
+					if w == t1.w {
+						continue
+					}
+
+					if t1.w.nopen[QWevent] != 0 {
+						continue NextWindow
+					}
+				}
+			}
+
+			// We always include the font name.
+			fontname := t.font
+
+			if t.file.dumpid > 0 {
+				dumped = false
+				fmt.Fprintf(b, "x%11d %11d %11d %11d %11.7f %s\n", i, t.file.dumpid,
+					w.body.q0, w.body.q1,
+					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
+					fontname)
+			} else if w.dumpstr != "" {
+				dumped = false
+				fmt.Fprintf(b, "e%11d %11d %11d %11d %11.7f %s\n", i, t.file.dumpid,
+					0, 0,
+					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
+					fontname)
+			} else if w.dirty == false && access(t.file.name) || w.isdir {
+				dumped = false
+				t.file.dumpid = w.id
+				fmt.Fprintf(b, "f%11d %11d %11d %11d %11.7f %s\n", i, w.id,
+					w.body.q0, w.body.q1,
+					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
+					fontname)
+			} else {
+				dumped = true
+				t.file.dumpid = w.id
+				fmt.Fprintf(b, "F%11d %11d %11d %11d %11.7f %11d %s\n", i, j,
+					w.body.q0, w.body.q1,
+					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
+					w.body.file.b.Nc(), fontname)
+			}
+			b.WriteString(w.CtlPrint(false))
+			fmt.Fprintf(b, "%s\n", firstbufline(&w.tag.file.b))
+			if dumped {
+				for q0, q1 := 0, t.file.b.Nc(); q0 < q1; {
+					ru := make([]rune, RBUFSIZE)
+					n, _ := t.file.b.Read(q0, ru)
+					su := string(ru[0:n])
+					fmt.Fprintf(b, "%s", su)
+					q0 += n
+				}
+			}
+			if w.dumpstr != "" {
+				if w.dumpdir != "" {
+					fmt.Fprintf(b, "%s\n%s\n", w.dumpdir, w.dumpstr)
+				} else {
+					fmt.Fprintf(b, "\n%s\n", w.dumpstr)
+				}
+			}
+		}
+	}
+
+	b.Flush()
 }
 
 func (r *Row) LoadFonts(file string) {

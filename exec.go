@@ -31,7 +31,6 @@ var exectab = []Exectab{
 	{"Del", del, false, false, true /*unused*/},
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
-	// TODO(rjk): https://github.com/rjkroege/edwood/issues/12
 	{"Dump", dump, false, true, true /*unused*/},
 	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
