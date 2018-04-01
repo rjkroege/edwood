@@ -281,10 +281,10 @@ func xfidclose(x *Xfid) {
 
 func xfidread(x *Xfid) {
 	var (
-		fc  plan9.Fcall
-		n   int
-		b   string
-		w   *Window
+		fc plan9.Fcall
+		n  int
+		b  string
+		w  *Window
 	)
 	q := FILE(x.f.qid)
 	w = x.f.w
@@ -341,7 +341,7 @@ func xfidread(x *Xfid) {
 			x.fcall.Count = uint32(uint64(n) - off)
 		}
 		fc.Count = x.fcall.Count
-		fc.Data = []byte(b[off:])
+		fc.Data = []byte(b[off : off+uint64(x.fcall.Count)])
 		respond(x, &fc, nil)
 
 	case QWevent:
@@ -1005,7 +1005,7 @@ func xfideventread(x *Xfid, w *Window) {
 
 	i := 0
 	x.flushed = false
-	for len(w.events) == 0 { // TODO(flux): Yes, that seems to be the case.  I suspect the response message makes an event?
+	for len(w.events) == 0 {
 		if i != 0 {
 			if !x.flushed {
 				respond(x, &fc, fmt.Errorf("window shut down"))
@@ -1019,14 +1019,17 @@ func xfideventread(x *Xfid, w *Window) {
 		i++
 	}
 
-	n := uint32(len(w.events))
-	if n > x.fcall.Count {
-		n = x.fcall.Count
+	n := len(w.events)
+	if uint32(n) > x.fcall.Count {
+		n = int(x.fcall.Count)
 	}
-	fc.Count = n
-	fc.Data = w.events // TODO(flux) the original doesn't make  copy, so I'm guessing respond consumes ahead of the copy below.
+	fc.Count = uint32(n)
+	fc.Data = w.events[:n]
 	respond(x, &fc, nil)
+	nn := len(w.events)
 	copy(w.events[0:], w.events[n:])
+
+	w.events = w.events[0 : nn-n]
 }
 
 func xfidindexread(x *Xfid) {
