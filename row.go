@@ -137,13 +137,13 @@ func (row *Row) DragCol(c *Column, _ int) {
 		d       *Column
 	)
 	clearmouse()
-	// setcursor(mousectl, &boxcursor); TODO(flux)
+	row.display.SetCursor(&boxcursor); 
 	b = mouse.Buttons
 	op = mouse.Point
 	for mouse.Buttons == b {
 		mousectl.Read()
 	}
-	// setcursor(mousectl, nil);
+	row.display.SetCursor(nil);
 	if mouse.Buttons != 0 {
 		for mouse.Buttons != 0 {
 			mousectl.Read()

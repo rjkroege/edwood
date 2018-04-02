@@ -469,13 +469,13 @@ func (c *Column) DragWin(w *Window, but int) {
 		nc     *Column
 	)
 	clearmouse()
-	// setcursor(mousectl, &boxcursor); // TODO(flux) - No SetCursor in draw!
+	c.display.SetCursor(&boxcursor);
 	b = mouse.Buttons
 	op = mouse.Point
 	for mouse.Buttons == b {
 		mousectl.Read()
 	}
-	// setcursor(mousectl, nil);// TODO(flux) - No SetCursor in draw!
+	c.display.SetCursor(nil);
 	if mouse.Buttons != 0 {
 		for mouse.Buttons != 0 {
 			mousectl.Read()
