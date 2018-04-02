@@ -482,9 +482,9 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 			c = 'I'
 		}
 		if n <= EVENTSIZE {
-			t.w.Event("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
+			t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
 		} else {
-			t.w.Event("%c%d %d 0 0 \n", c, q0, q0+n, n)
+			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+n)
 		}
 	}
 }
@@ -587,19 +587,17 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		t.org -= n
 	} else if q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
 		p1 := q1 - t.org
-		p0 := (0)
 		if p1 > (t.fr.GetFrameFillStatus().Nchars) {
 			p1 = (t.fr.GetFrameFillStatus().Nchars)
 		}
+		p0 := 0
 		if q0 < t.org {
 			t.org = q0
 			p0 = 0
 		} else {
 			p0 = q0 - t.org
 		}
-		if p0 != p1 {
-			t.fr.Delete((p0), (p1))
-		}
+		t.fr.Delete((p0), (p1))
 		t.Fill()
 	}
 	if t.w != nil {
@@ -607,7 +605,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		if t.what == Body {
 			c = 'D'
 		}
-		t.w.Event("%c%d %d 0 0 \n", c, q0, q1)
+		t.w.Eventf("%c%d %d 0 0 \n", c, q0, q1)
 	}
 }
 

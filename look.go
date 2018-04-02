@@ -104,9 +104,9 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		if n <= EVENTSIZE {
 			r = make([]rune, n)
 			t.file.b.Read(q0, r)
-			t.w.Event("%c%d %d %d %d %v\n", c, q0, q1, f, n, string(r))
+			t.w.Eventf("%c%d %d %d %d %v\n", c, q0, q1, f, n, string(r))
 		} else {
-			t.w.Event("%c%d %d %d 0 \n", c, q0, q1, f, n)
+			t.w.Eventf("%c%d %d %d 0 \n", c, q0, q1, f)
 		}
 		if q0 == e.q0 && q1 == e.q1 {
 			return
@@ -130,9 +130,9 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		}
 		f &= ^2
 		if n <= EVENTSIZE {
-			t.w.Event("%c%d %d %d %d %v\n", c, e.q0, e.q1, f, n, string(r))
+			t.w.Eventf("%c%d %d %d %d %v\n", c, e.q0, e.q1, f, n, string(r))
 		} else {
-			t.w.Event("%c%d %d %d 0 \n", c, e.q0, e.q1, f, n)
+			t.w.Eventf("%c%d %d %d 0 \n", c, e.q0, e.q1, f)
 		}
 		return
 	}

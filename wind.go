@@ -629,7 +629,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 	return buf
 }
 
-func (w *Window) Event(format string, args ...interface{}) {
+func (w *Window) Eventf(format string, args ...interface{}) {
 	var (
 		x *Xfid
 	)
@@ -640,7 +640,6 @@ func (w *Window) Event(format string, args ...interface{}) {
 		acmeerror("no window owner", nil)
 	}
 	b := []byte(fmt.Sprintf(format, args...))
-
 	w.events = append(w.events, byte(w.owner))
 	w.events = append(w.events, b...)
 	w.nevents = len(w.events)

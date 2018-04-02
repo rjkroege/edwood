@@ -184,26 +184,26 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		n = aq1 - aq0
 		if n <= EVENTSIZE {
-			t.w.Event("%c%d %d %d %d %v\n", c, aq0, aq1, f, n, string(r))
+			t.w.Eventf("%c%d %d %d %d %v\n", c, aq0, aq1, f, n, string(r))
 		} else {
-			t.w.Event("%c%d %d %d 0 \n", c, aq0, aq1, f, n)
+			t.w.Eventf("%c%d %d %d 0 \n", c, aq0, aq1, f)
 		}
 		if q0 != aq0 || q1 != aq1 {
 			n = q1 - q0
 			r := make([]rune, n)
 			t.file.b.Read(q0, r)
 			if n <= EVENTSIZE {
-				t.w.Event("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
+				t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
 			} else {
-				t.w.Event("%c%d %d 0 0 \n", c, q0, q1, n)
+				t.w.Eventf("%c%d %d 0 0 \n", c, q0, q1)
 			}
 		}
 		if a != "" {
-			t.w.Event("%c0 0 0 %d %v\n", c, len(a), a)
+			t.w.Eventf("%c0 0 0 %d %v\n", c, len(a), a)
 			if aa != "" {
-				t.w.Event("%c0 0 0 %d %v\n", c, len(aa), aa)
+				t.w.Eventf("%c0 0 0 %d %v\n", c, len(aa), aa)
 			} else {
-				t.w.Event("%c0 0 0 0 \n", c)
+				t.w.Eventf("%c0 0 0 0 \n", c)
 			}
 		}
 		return
