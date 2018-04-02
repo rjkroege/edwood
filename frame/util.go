@@ -53,6 +53,9 @@ func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 			ret.Y = p.Y + f.Font.DefaultHeight()
 		}
 	}
+	if ret.Y > f.Rect.Max.Y {
+		ret.Y = f.Rect.Max.Y
+	}
 	return ret
 }
 
@@ -61,6 +64,9 @@ func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 	if _, ok := f.canfit(p, b); !ok {
 		ret.X = f.Rect.Min.X
 		ret.Y = p.Y + f.Font.DefaultHeight()
+		if ret.Y > f.Rect.Max.Y {
+			ret.Y = f.Rect.Max.Y
+		}
 	}
 	return ret
 }
