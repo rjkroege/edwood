@@ -758,7 +758,6 @@ forloop:
 func xfideventwrite(x *Xfid, w *Window) {
 	var (
 		fc     plan9.Fcall
-		m, n   int
 		err    error
 		t      *Text
 		q0, q1 int
@@ -777,79 +776,25 @@ func xfideventwrite(x *Xfid, w *Window) {
 	                  text, which may itself contain newlines.
 	   		%c%c%d %d %d %d %s\n
 	*/
-	events := string(x.fcall.Data)
-	n = 0
-	for events != "" {
+	lines := strings.Split(string(x.fcall.Data), "\n")
+	for _, events := range lines  {
+		if events == "" { continue }
 		w.owner = int(events[0])
-		n++
 		c := events[1]
-		n++
-		events = events[2:]
-
-		for events[0] == ' ' {
-			events = events[1:]
-			n++
-		}
-		e := strings.SplitN(events, " ", 2)
-		n += len(e[0]) + 1
-		num, err = strconv.ParseInt(e[0], 10, 32)
+		words := strings.Split(wsre.ReplaceAllString(events[2:], " "), " ")
+		num, err = strconv.ParseInt(words[0], 10, 32)
 		if err != nil {
 			err = Ebadevent
 			break
 		}
 		q0 = int(num)
-		events = e[1]
-
-		for events[0] == ' ' {
-			events = events[1:]
-			n++
-		}
-		e = strings.SplitN(events, " ", 2)
-		n += len(e[0]) + 1
-		num, err = strconv.ParseInt(e[0], 10, 32)
+		num, err = strconv.ParseInt(words[1], 10, 32)
 		if err != nil {
 			err = Ebadevent
 			break
 		}
 		q1 = int(num)
-		events = e[1]
 
-		for events[0] == ' ' {
-			events = events[1:]
-			n++
-		}
-		n += len(e[0]) + 1
-		e = strings.SplitN(events, " ", 2)
-		num, err = strconv.ParseInt(e[0], 10, 32)
-		if err != nil {
-			err = Ebadevent
-			break
-		}
-		//flag := int(num)
-		events = e[1]
-
-		for events[0] == ' ' {
-			events = events[1:]
-			n++
-		}
-		n += len(e[0]) + 1
-		e = strings.SplitN(events, " ", 2)
-		num, err = strconv.ParseInt(e[0], 10, 32)
-		if err != nil {
-			err = Ebadevent
-			break
-		}
-		m = int(num)
-		events = e[1]
-
-		for events[0] == ' ' {
-			events = events[1:]
-			n++
-		}
-
-		if m != len(x.fcall.Data)-n {
-			panic("mis-shaped event")
-		}
 		if 'a' <= c && c <= 'z' {
 			t = &w.tag
 		} else {
@@ -867,11 +812,11 @@ func xfideventwrite(x *Xfid, w *Window) {
 
 		row.lk.Lock() // just like mousethread
 		switch c {
-		case 'x':
+		case 'x': fallthrough
 		case 'X':
 			execute(t, q0, q1, true, nil)
 			break
-		case 'l':
+		case 'l': fallthrough
 		case 'L':
 			look3(t, q0, q1, true)
 			break
@@ -883,9 +828,10 @@ func xfideventwrite(x *Xfid, w *Window) {
 	}
 
 	if err != nil {
-		n = 0
+		fc.Count = 0
+	} else {
+		fc.Count = uint32(len(x.fcall.Data))
 	}
-	fc.Count = uint32(n)
 	respond(x, &fc, err)
 	return
 }

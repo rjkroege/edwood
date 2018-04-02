@@ -1708,6 +1708,12 @@ func (t *Text) DirName(name string) string {
 	}
 	b := make([]rune, t.w.tag.file.b.Nc())
 	t.w.tag.file.b.Read(0, b)
-	spl := strings.SplitN(string(b), " ", 1)[0]
-	return filepath.Clean(filepath.Dir(spl) + string(filepath.Separator) + name)
+	spl := strings.SplitN(string(b), " ", 2)[0]
+	if !strings.HasSuffix(spl, string(filepath.Separator)) {
+		spl = filepath.Dir(spl)
+	}
+	spl = filepath.Clean(spl + string(filepath.Separator) + name)
+fmt.Println("Full path is", spl)
+	return spl
+
 }

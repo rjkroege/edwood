@@ -643,11 +643,10 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 }
 
 func access(name string) bool {
-	f, err := os.Open(name)
+	_, err := os.Stat(name)
 	if err != nil {
 		return false
 	}
-	f.Close()
 	return true
 }
 
