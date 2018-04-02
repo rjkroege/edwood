@@ -917,7 +917,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			shell = "rc"
 		}
 		rcarg = []string{shell, "-c", t}
-		cmd := exec.Command(rcarg[0], rcarg...)
+		cmd := exec.Command(rcarg[0], rcarg[1:]...)
 		cmd.Dir = dir
 		cmd.Stdin = sfd[0]
 		cmd.Stdout = sfd[1]
