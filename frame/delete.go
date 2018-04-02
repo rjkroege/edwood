@@ -14,11 +14,11 @@ func (f *Frame) Delete(p0, p1 int) int {
 	//log.Println("Delete")
 	var r image.Rectangle
 
+	if p1 > f.NChars {
+		p1 = f.NChars-1
+	}
 	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
 		return 0
-	}
-	if p1 > f.NChars {
-		p1 = f.NChars
 	}
 
 	//log.Println("Delete is doing something")
