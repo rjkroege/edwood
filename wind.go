@@ -611,6 +611,8 @@ func (w *Window) Clean(conservative bool) bool {
 	return true
 }
 
+// CtlPrint generates the contents of the fsys's acme/<id>/ctl pseduo-file if fonts is true.
+// Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
 	if w.isdir {
@@ -623,8 +625,9 @@ func (w *Window) CtlPrint(fonts bool) string {
 	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.Nc(),
 		w.body.Nc(), isdir, dirty)
 	if fonts {
-		return fmt.Sprintf("%s%11d %q %11d ", buf, w.body.fr.Rect.Dx(),
-			w.body.font, w.body.fr.GetMaxtab())
+		// fsys exposes the actual physical font name.
+		return fmt.Sprintf("%s%11d %s %11d ", buf, w.body.fr.Rect.Dx(),
+			fontget(w.body.font, w.display).Name, w.body.fr.GetMaxtab())
 	}
 	return buf
 }
