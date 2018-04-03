@@ -13,6 +13,7 @@ import (
 
 	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
+	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/frame"
 )
 
@@ -124,7 +125,7 @@ var (
 	dodollarsigns     bool
 	mtpt              string
 
-	//	cplumb chan *Plumbmsg
+	cplumb chan *plumb.Message
 	cwait      chan *os.ProcessState
 	ccommand   chan *Command
 	ckill      chan string

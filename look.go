@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"image"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"9fans.net/go/plumb"
 
 	"runtime/debug"
 )
@@ -18,52 +22,51 @@ var (
 	nuntitled    int
 )
 
-/*
-func plumbthread (void *v) (void) {
-	CFid *fid;
-	Plumbmsg *m;
-	Timer *t;
-
-	USED(v);
-	threadsetname("plumbproc");
-
+func plumbthread(){
 	 // Loop so that if plumber is restarted, acme need not be.
 	for ;; {
+Untested()
+		var fid *client.Fid
+		var err error
 		 // Connect to plumber.
-		plumbunmount();
-		while((fid = plumbopenfid("edit", OREAD|OCEXEC)) == nil){
-			t = timerstart(2000);
-			recv(t.c, nil);
-			timerstop(t);
+		for {
+Untested()
+			if fid, err = plumb.Open("edit", plan9.OREAD|plan9.OCEXEC); err != nil {
+				time.Sleep(2000 * time.Millisecond) // Try every 2 seconds?
+			} else { break }
 		}
 		plumbeditfid = fid;
-		plumbsendfid = plumbopenfid("send", OWRITE|OCEXEC);
+		plumbsendfid, err = plumb.Open("send", plan9.OWRITE|plan9.OCEXEC)
+		if err != nil {
+			continue
+		}
 
+Untested()
+		plumbeditfidbr := bufio.NewReader(plumbeditfid)
 		 // Relay messages.
 		for ;; {
-			m = plumbrecvfid(plumbeditfid);
-			if m == nil
+Untested()
+			var m *plumb.Message = &plumb.Message{}
+			err := m.Recv(plumbeditfidbr);
+			if err != nil {
 				break;
-			sendp(cplumb, m);
+			}
+			cplumb <- m
 		}
 
 		 // Lost connection.
-		fid = plumbsendfid;
 		plumbsendfid = nil;
-		fsclose(fid);
 
-		fid = plumbeditfid;
 		plumbeditfid = nil;
-		fsclose(fid);
+		fid.Close()
 	}
 }
 
-func startplumbing (void) (void) {
-	cplumb = chancreate(sizeof(Plumbmsg*), 0);
-	chansetname(cplumb, "cplumb");
-	threadcreate(plumbthread, nil, STACK);
+func startplumbing () {
+	cplumb = make(chan *plumb.Message)
+	go plumbthread()
 }
-*/
+
 
 func look3(t *Text, q0 int, q1 int, external bool) {
 	var (
@@ -215,56 +218,48 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 	}
 }
 
-/*
 
-func plumbgetc (void *a, uint n) (int) {
-	Rune *r;
+func plumblook (m *plumb.Message) {
+	var e Expand
+	var addr string
 
-	r = a;
-	if n>runestrlen(r)
-		return 0;
-	return r[n];
-}
-
-func plumblook (Plumbmsg *m) (void) {
-	Expand e;
-	char *addr;
-
-	if m.ndata >= BUFSIZE {
-		warning(nil, "insanely long file name (%d bytes) in plumb message (%.32s...)\n", m.ndata, m.data);
+	if len(m.Data) >= BUFSIZE {
+		warning(nil, "insanely long file name (%d bytes) in plumb message (%.32s...)\n", len(m.Data), m.Data);
 		return;
 	}
 	e.q0 = 0;
 	e.q1 = 0;
-	if m.data[0] == '\0'
-		return;
-	e.u.ar = nil;
-	e.bname = m.data;
-	e.name = bytetorune(e.bname, &e.nname);
+	if len(m.Data) == 0 {
+		return
+	}
+	e.ar = nil;
+	e.bname = string(m.Data);
+	e.name = e.bname
 	e.jump = true;
 	e.a0 = 0;
 	e.a1 = 0;
-	addr = plumblookup(m.attr, "addr");
-	if addr != nil {
-		e.u.ar = bytetorune(addr, &e.a1);
-		e.agetc = plumbgetc;
+	addr = findattr(m.Attr, "addr");
+	if addr != "" {
+		e.ar = []rune(addr)
+		e.a1 = len(e.ar)
+		e.agetc = func(q int)rune{return e.ar[q]}
 	}
-	drawtopwindow();
+	// drawtopwindow(); TODO(flux): Get focus
 	openfile(nil, &e);
-	free(e.name);
-	free(e.u.at);
 }
 
-func plumbshow (Plumbmsg *m) (void) {
+func plumbshow (m *plumb.Message) {
+Unimpl()
+/*
 	Window *w;
 	Rune rb[256], *r;
 	int nb, nr;
 	Runestr rs;
 	char *name, *p, namebuf[16];
 
-	drawtopwindow();
+	// drawtopwindow(); TODO(flux): Get focus
 	w = makenewwindow(nil);
-	name = plumblookup(m.attr, "filename");
+	name = findattr(&m.attr, "filename");
 	if name == nil {
 		name = namebuf;
 		nuntitled++;
@@ -291,8 +286,9 @@ func plumbshow (Plumbmsg *m) (void) {
 	textscrdraw(&w.body);
 	textsetselect(&w.tag, w.tag.file.b.nc, w.tag.file.b.nc);
 	xfidlog(w, "new");
-}
 */
+}
+
 
 // TODO(flux): This just looks for r in ct; a regexp could do it too,
 // using our buffer streaming thing.  Frankly, even scanning the buffer

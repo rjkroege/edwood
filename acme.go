@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"9fans.net/go/draw"
+	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/frame"
 )
 
@@ -103,7 +104,6 @@ func main() {
 	iconinit(display)
 	// rxinit(); // TODO(flux) looks unneeded now
 
-	//cplumb = make(chan *Plumbmsg)
 	// cwait = make(chan Waitmsg)
 	ccommand = make(chan *Command)
 	ckill = make(chan string)
@@ -115,12 +115,12 @@ func main() {
 	cerr = make(chan error)
 	cedit = make(chan int)
 	cexit = make(chan struct{})
-	cwarn = make(chan uint) /* TODO(flux): (really chan(unit)[1]) */
+	cwarn = make(chan uint)
 
 	mousectl = display.InitMouse()
 	mouse = &mousectl.Mouse
 
-	// startplumbing() // TODO(flux): plumbing
+	startplumbing()
 	fsysinit()
 
 	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
@@ -283,9 +283,28 @@ func mousethread(display *draw.Display) {
 			MovedMouse(mousectl.Mouse)
 		case <-cwarn:
 			break
-			//case pm := <-cplumb:
+		case pm := <-cplumb:
+			if pm.Type == "text" {
+fmt.Println("Got a message:", pm)
+				act := findattr(pm.Attr, "action")
+				if act == "" || act == "showfile" {
+					plumblook(pm)
+				} else if act == "showdata" {
+					plumbshow(pm)
+				}
+			}
 		}
 	}
+}
+
+func findattr(attr *plumb.Attribute, s string) string {
+	for attr != nil {
+		if attr.Name == s {
+			return attr.Value
+		}
+		attr = attr.Next
+	}
+	return ""
 }
 
 func MovedMouse(m draw.Mouse) {
