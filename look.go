@@ -249,44 +249,25 @@ func plumblook (m *plumb.Message) {
 }
 
 func plumbshow (m *plumb.Message) {
-Unimpl()
-/*
-	Window *w;
-	Rune rb[256], *r;
-	int nb, nr;
-	Runestr rs;
-	char *name, *p, namebuf[16];
-
 	// drawtopwindow(); TODO(flux): Get focus
-	w = makenewwindow(nil);
-	name = findattr(&m.attr, "filename");
-	if name == nil {
-		name = namebuf;
+	w := makenewwindow(nil);
+	name := findattr(m.Attr, "filename");
+	if name == "" {
 		nuntitled++;
-		snprint(namebuf, sizeof namebuf, "Untitled-%d", nuntitled);
+		name = fmt.Sprintf("Untitled-%d", nuntitled);
 	}
-	p = nil;
-	if name[0]!='/' && m.wdir!=nil && m.wdir[0]!='\0' {
-		nb = strlen(m.wdir) + 1 + strlen(name) + 1;
-		p = emalloc(nb);
-		snprint(p, nb, "%s/%s", m.wdir, name);
-		name = p;
+	if name[0]!='/' && m.Dir!="" {
+		name = fmt.Sprintf("%s/%s", m.Dir, name);
 	}
-	cvttorunes(name, strlen(name), rb, &nb, &nr, nil);
-	free(p);
-	rs = cleanrname(runestr(rb, nr));
-	winsetname(w, rs.r, rs.nr);
-	r = runemalloc(m.ndata);
-	cvttorunes(m.data, m.ndata, r, &nb, &nr, nil);
-	textinsert(&w.body, 0, r, nr, true);
-	free(r);
-	w.body.file.mod = FALSE;
+	name = filepath.Clean(name)
+	w.SetName(name)
+	w.body.Insert(0, []rune(string(m.Data)), true)
+	w.body.file.mod = false;
 	w.dirty = false;
-	winsettag(w);
-	textscrdraw(&w.body);
-	textsetselect(&w.tag, w.tag.file.b.nc, w.tag.file.b.nc);
+	w.SetTag()
+	w.body.ScrDraw();
+	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc());
 	xfidlog(w, "new");
-*/
 }
 
 
