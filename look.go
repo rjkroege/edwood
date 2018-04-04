@@ -22,51 +22,50 @@ var (
 	nuntitled    int
 )
 
-func plumbthread(){
-	 // Loop so that if plumber is restarted, acme need not be.
-	for ;; {
-Untested()
+func plumbthread() {
+	// Loop so that if plumber is restarted, acme need not be.
+	for {
 		var fid *client.Fid
 		var err error
-		 // Connect to plumber.
+		// Connect to plumber.
 		for {
-Untested()
 			if fid, err = plumb.Open("edit", plan9.OREAD|plan9.OCEXEC); err != nil {
 				time.Sleep(2000 * time.Millisecond) // Try every 2 seconds?
-			} else { break }
+			} else {
+				break
+			}
 		}
-		plumbeditfid = fid;
+		plumbeditfid = fid
 		plumbsendfid, err = plumb.Open("send", plan9.OWRITE|plan9.OCEXEC)
 		if err != nil {
 			continue
 		}
 
-Untested()
+		Untested()
 		plumbeditfidbr := bufio.NewReader(plumbeditfid)
-		 // Relay messages.
-		for ;; {
-Untested()
+		// Relay messages.
+		for {
+			Untested()
 			var m *plumb.Message = &plumb.Message{}
-			err := m.Recv(plumbeditfidbr);
+			err := m.Recv(plumbeditfidbr)
 			if err != nil {
-				break;
+				break
 			}
 			cplumb <- m
 		}
 
-		 // Lost connection.
-		plumbsendfid = nil;
+		// Lost connection.
+		plumbsendfid = nil
 
-		plumbeditfid = nil;
+		plumbeditfid = nil
 		fid.Close()
 	}
 }
 
-func startplumbing () {
+func startplumbing() {
 	cplumb = make(chan *plumb.Message)
 	go plumbthread()
 }
-
 
 func look3(t *Text, q0 int, q1 int, external bool) {
 	var (
@@ -140,55 +139,52 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		return
 	}
 	if plumbsendfid != nil {
-		Unimpl() /*
-		   // send whitespace-delimited word to plumber
-		   m = emalloc(sizeof(Plumbmsg));
-		   m.src = estrdup("acme");
-		   m.dst = nil;
-		   dir = dirname(t, nil, 0);
-		   if dir.nr==1 && dir.r[0]=='.' { // sigh
-		           free(dir.r);
-		           dir.r = nil;
-		           dir.nr = 0;
-		   }
-		   if dir.nr == 0
-		           m.wdir = estrdup(wdir);
-		   else
-		           m.wdir = runetobyte(dir.r, dir.nr);
-		   free(dir.r);
-		   m.type = estrdup("text");
-		   m.attr = nil;
-		   buf[0] = '\0';
-		   if q1 == q0 {
-		           if t.q1>t.q0 && t.q0<=q0 && q0<=t.q1){
-		                   q0 = t.q0;
-		                   q1 = t.q1;
-		           }else{
-		                   p = q0;
-		                   while(q0>0 && (c=tgetc(t, q0-1))!=' ' && c!='\t' && c!='\n')
-		                           q0--;
-		                   while(q1<t.file.b.nc && (c=tgetc(t, q1))!=' ' && c!='\t' && c!='\n')
-		                           q1++;
-		                   if q1 == q0 {
-		                           plumbfree(m);
-		                           goto Return;
-		                   }
-		                   sprint(buf, "click=%d", p-q0);
-		                   m.attr = plumbunpackattr(buf);
-		           }
-		   }
-		   r = runemalloc(q1-q0);
-		   bufread(&t.file.b, q0, r, q1-q0);
-		   m.data = runetobyte(r, q1-q0);
-		   m.ndata = strlen(m.data);
-		   free(r);
-		   if m.ndata<messagesize-1024 && plumbsendtofid(plumbsendfid, m) >= 0 {
-		           plumbfree(m);
-		           goto Return;
-		   }
-		   plumbfree(m);
-		   // plumber failed to match; fall through
-		*/
+		// send whitespace-delimited word to plumber
+		m := plumb.Message{}
+		m.Src = "acme"
+		m.Dst = ""
+		dir := t.DirName("")
+		if dir == "." { // sigh
+			dir = ""
+		}
+		m.Dir = dir
+		m.Type = "text"
+		m.Attr = nil
+		if q1 == q0 {
+			if t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1 {
+				q0 = t.q0
+				q1 = t.q1
+			} else {
+				p := q0
+				for q0 > 0 {
+					c := t.ReadC(q0 - 1)
+					if c != ' ' && c != '\t' && c != '\n' {
+						q0--
+					} else {
+						break
+					}
+				}
+				for q1 < t.file.b.Nc() {
+					c := t.ReadC(q1)
+					if c != ' ' && c != '\t' && c != '\n' {
+						q1++
+					} else {
+						break
+					}
+				}
+				if q1 == q0 {
+					return
+				}
+				s := fmt.Sprintf("%d", p-q0)
+				m.Attr = &plumb.Attribute{Name: "click", Value: s, Next: nil}
+			}
+		}
+		r = make([]rune, q1-q0)
+		t.file.b.Read(q0, r[:q1-q0])
+		m.Data = []byte(string(r[:q1-q0]))
+		if m.Send(plumbsendfid) != nil {
+			return
+		}
 	}
 	// interpret alphanumeric string ourselves
 	if expanded == false {
@@ -218,58 +214,56 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 	}
 }
 
-
-func plumblook (m *plumb.Message) {
+func plumblook(m *plumb.Message) {
 	var e Expand
 	var addr string
 
 	if len(m.Data) >= BUFSIZE {
-		warning(nil, "insanely long file name (%d bytes) in plumb message (%.32s...)\n", len(m.Data), m.Data);
-		return;
+		warning(nil, "insanely long file name (%d bytes) in plumb message (%.32s...)\n", len(m.Data), m.Data)
+		return
 	}
-	e.q0 = 0;
-	e.q1 = 0;
+	e.q0 = 0
+	e.q1 = 0
 	if len(m.Data) == 0 {
 		return
 	}
-	e.ar = nil;
-	e.bname = string(m.Data);
+	e.ar = nil
+	e.bname = string(m.Data)
 	e.name = e.bname
-	e.jump = true;
-	e.a0 = 0;
-	e.a1 = 0;
-	addr = findattr(m.Attr, "addr");
+	e.jump = true
+	e.a0 = 0
+	e.a1 = 0
+	addr = findattr(m.Attr, "addr")
 	if addr != "" {
 		e.ar = []rune(addr)
 		e.a1 = len(e.ar)
-		e.agetc = func(q int)rune{return e.ar[q]}
+		e.agetc = func(q int) rune { return e.ar[q] }
 	}
 	// drawtopwindow(); TODO(flux): Get focus
-	openfile(nil, &e);
+	openfile(nil, &e)
 }
 
-func plumbshow (m *plumb.Message) {
+func plumbshow(m *plumb.Message) {
 	// drawtopwindow(); TODO(flux): Get focus
-	w := makenewwindow(nil);
-	name := findattr(m.Attr, "filename");
+	w := makenewwindow(nil)
+	name := findattr(m.Attr, "filename")
 	if name == "" {
-		nuntitled++;
-		name = fmt.Sprintf("Untitled-%d", nuntitled);
+		nuntitled++
+		name = fmt.Sprintf("Untitled-%d", nuntitled)
 	}
-	if name[0]!='/' && m.Dir!="" {
-		name = fmt.Sprintf("%s/%s", m.Dir, name);
+	if name[0] != '/' && m.Dir != "" {
+		name = fmt.Sprintf("%s/%s", m.Dir, name)
 	}
 	name = filepath.Clean(name)
 	w.SetName(name)
 	w.body.Insert(0, []rune(string(m.Data)), true)
-	w.body.file.mod = false;
-	w.dirty = false;
+	w.body.file.mod = false
+	w.dirty = false
 	w.SetTag()
-	w.body.ScrDraw();
-	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc());
-	xfidlog(w, "new");
+	w.body.ScrDraw()
+	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
+	xfidlog(w, "new")
 }
-
 
 // TODO(flux): This just looks for r in ct; a regexp could do it too,
 // using our buffer streaming thing.  Frankly, even scanning the buffer

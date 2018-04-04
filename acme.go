@@ -90,11 +90,15 @@ func main() {
 
 	var err error
 	var display *draw.Display
-	// TODO(rjk): Upstream draw does not have a cexit parameter.
 	display, err = draw.Init(nil, *varfontflag, "acme", *winsize)
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := display.Attach(draw.Refnone); err != nil {
+		panic("failed to attach to window")
+	}
+	display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
+
 	mousectl = display.InitMouse()
 	keyboardctl = display.InitKeyboard()
 	mainpid = os.Getpid()
@@ -102,7 +106,6 @@ func main() {
 	tagfont = *varfontflag
 
 	iconinit(display)
-	// rxinit(); // TODO(flux) looks unneeded now
 
 	// cwait = make(chan Waitmsg)
 	ccommand = make(chan *Command)
@@ -274,7 +277,6 @@ func mousethread(display *draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			fmt.Println("RESIZE!")
 			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
 			iconinit(display)
 			ScrlResize(display)
@@ -285,7 +287,6 @@ func mousethread(display *draw.Display) {
 			break
 		case pm := <-cplumb:
 			if pm.Type == "text" {
-fmt.Println("Got a message:", pm)
 				act := findattr(pm.Attr, "action")
 				if act == "" || act == "showfile" {
 					plumblook(pm)
