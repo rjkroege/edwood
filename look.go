@@ -41,11 +41,9 @@ func plumbthread() {
 			continue
 		}
 
-		Untested()
 		plumbeditfidbr := bufio.NewReader(plumbeditfid)
 		// Relay messages.
 		for {
-			Untested()
 			var m *plumb.Message = &plumb.Message{}
 			err := m.Recv(plumbeditfidbr)
 			if err != nil {
@@ -158,19 +156,17 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 				p := q0
 				for q0 > 0 {
 					c := t.ReadC(q0 - 1)
-					if c != ' ' && c != '\t' && c != '\n' {
-						q0--
-					} else {
+					if !(c != ' ' && c != '\t' && c != '\n') {
 						break
 					}
+					q0--
 				}
 				for q1 < t.file.b.Nc() {
 					c := t.ReadC(q1)
-					if c != ' ' && c != '\t' && c != '\n' {
-						q1++
-					} else {
+					if !(c != ' ' && c != '\t' && c != '\n') {
 						break
 					}
+					q1++
 				}
 				if q1 == q0 {
 					return
@@ -182,7 +178,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		r = make([]rune, q1-q0)
 		t.file.b.Read(q0, r[:q1-q0])
 		m.Data = []byte(string(r[:q1-q0]))
-		if m.Send(plumbsendfid) != nil {
+		if m.Send(plumbsendfid) == nil {
 			return
 		}
 	}
