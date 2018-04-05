@@ -508,5 +508,18 @@ func TestFindbox(t *testing.T) {
 			[]*frbox{},
 			0,
 		},
+		FindBoxModelTest{
+			"find at end",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				nbox:   2,
+				nalloc: 2,
+				box:    []*frbox{makeBox("hi"), makeBox("world")},
+			},
+			func(f *Frame) int { return f.findbox(0, 0, 7) },
+			2, 2,
+			[]*frbox{hibox, worldbox},
+			2,
+		},
 	})
 }
