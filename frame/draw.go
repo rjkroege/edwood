@@ -8,8 +8,7 @@ import (
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 	// log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
-	for nb := 0; nb < f.nbox; nb++ {
-		b := f.box[nb]
+	for _, b  := range f.box {
 		pt = f.cklinewrap(pt, b)
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
@@ -121,7 +120,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 	}
 
 	nb := 0
-	for ; nb < f.nbox && p < p1; nb++ {
+	for ; nb < len(f.box) && p < p1; nb++ {
 		b := f.box[nb]
 		nr := nrune(b)
 		if p+nr <= p0 {
@@ -174,7 +173,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		p += nr
 	}
 
-	if p1 > p0 && nb > 0 && nb < f.nbox && f.box[nb-1].Nrune > 0 && !trim {
+	if p1 > p0 && nb > 0 && nb < len(f.box) && f.box[nb-1].Nrune > 0 && !trim {
 		qt := pt
 		pt = f.cklinewrap(pt, f.box[nb])
 		if pt.Y > qt.Y {
@@ -182,6 +181,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			// f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
 	}
+
 	return pt
 }
 
@@ -250,8 +250,8 @@ func (f *Frame) Tick(pt image.Point, ticked bool) {
 }
 
 func (f *Frame) _draw(pt image.Point) image.Point {
-	//	log.Println("_draw")
-	for nb := 0; nb < f.nbox; nb++ {
+	// f.LogBoxes("_draw -- start")
+	for nb := 0; nb < len(f.box); nb++ {
 		b := f.box[nb]
 		if b == nil {
 			f.Logboxes("-- Frame._draw has invalid box mode --")
@@ -260,7 +260,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 		pt = f.cklinewrap0(pt, b)
 		if pt.Y == f.Rect.Max.Y {
 			f.NChars -= f.strlen(nb)
-			f.delbox(nb, f.nbox-1)
+			f.delbox(nb, len(f.box)-1)
 			break
 		}
 
@@ -283,13 +283,14 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 			}
 		}
 	}
+	// f.LogBoxes("_draw -- end")
 	return pt
 }
 
 func (f *Frame) strlen(nb int) int {
-	var n int
-	for n = 0; nb < f.nbox; nb++ {
-		n += nrune(f.box[nb])
+	n := 0	
+	for _, b := range f.box[nb:] {
+		n += nrune(b)
 	}
 	return n
 }

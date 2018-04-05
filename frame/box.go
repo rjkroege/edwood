@@ -7,85 +7,61 @@ import (
 	"unicode/utf8"
 )
 
-const slop = 25
-
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
-	if bn > f.nbox {
-		panic(fmt.Sprint("Frame.addbox", " bn=", bn, " f.nbox=", f.nbox))
+	if bn > len(f.box) {
+		panic(fmt.Sprint("Frame.addbox", " bn=", bn, " len(f.box)", len(f.box)))
 	}
-
-	if f.nbox+n > f.nalloc {
-		f.growbox(n + slop)
-	}
-
-	// TODO(rjk): This does some extra work becasue nbox != len(f.box)
-	// Use a slice and remove nbox and nalloc.
+	f.box = append(f.box, make([]*frbox, n)...)
 	copy(f.box[bn+n:], f.box[bn:])
-	f.nbox += int(n)
 }
 
-func (f *Frame) closebox(n0, n1 int) {
-	if n0 >= f.nbox || n1 >= f.nbox || n1 < n0 {
-		panic(fmt.Sprint("Frame.closebox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
-	}
-	// TODO(rjk): Use copy.
-	n1++
 
-	for i := n1; i < f.nbox; i++ {
-		f.box[i-(n1-n0)] = f.box[i]
+func (f *Frame) closebox(n0, n1 int) {
+	if n0 >= len(f.box) || n1 >=len(f.box) || n1 < n0 {
+		panic(fmt.Sprint("Frame.closebox bounds bad", " n0=", n0, " n1=", n1, " len(box)", len(f.box)))
 	}
-	f.nbox -= n1 - n0
-	for i := f.nbox; i < f.nbox+(n1-n0); i++ {
-		f.box[i] = nil
-	}
+
+	n1++
+	copy(f.box[n0:], f.box[n1:])
+	f.box = f.box[0:len(f.box) - (n1 - n0)]
 }
 
 func (f *Frame) delbox(n0, n1 int) {
-	if n0 >= f.nbox || n1 >= f.nbox || n1 < n0 {
-		panic(fmt.Sprint("Frame.delbox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
-	}
-	f.freebox(n0, n1)
+	// TODO(rjk): One of delbox and closebox don't belong.
 	f.closebox(n0, n1)
 }
 
-func (f *Frame) freebox(n0, n1 int) {
-	if n1 < n0 {
-		return
-	}
-	if n0 >= f.nbox || n1 >= f.nbox {
-		panic(fmt.Sprint("Frame.freebox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
-	}
-	n1++
-	for i := n0; i < n1; i++ {
-		f.box[i] = nil
-	}
+func (b *frbox) clone() *frbox {
+	// Shallow copy.
+	cp := new(frbox)
+	*cp = *b
+
+	// Now deep copy the byte array
+	// TODO(rjk): Adjust when we use strings.
+	cp.Ptr  = make([]byte, len(b.Ptr))
+	copy(cp.Ptr, b.Ptr)
+	return cp
 }
 
-// growbox adds delta new frbox pointers to f.box
-func (f *Frame) growbox(delta int) {
-	f.nalloc += delta
-	f.box = append(f.box, make([]*frbox, delta)...)
-}
-
-func (f *Frame) dupbox(bn int) {
-	if f.box[bn].Nrune < 0 {
+// dupbox duplicates box i. box i must exist.
+func (f *Frame) dupbox(i int) {
+	if  i >= len(f.box) {
+		f.Logboxes("-- dupbox sadness -- ")
+		panic(fmt.Sprint("dupbox i is out of bounds", " i=", i))
+	}
+	if f.box[i].Nrune < 0 {
 		panic("dupbox invalid Nrune")
 	}
 
-	cp := new(frbox)
-	*cp = *f.box[bn]
+	nb := f.box[i].clone()
+	f.box = append(f.box, nil)
+	copy(f.box[i+1:], f.box[i:])
+	f.box[i] = nb
 
-	f.addbox(bn, 1)
-	f.box[bn+1] = cp
-
-	if f.box[bn].Nrune >= 0 {
-		p := make([]byte, len(f.box[bn].Ptr))
-		copy(p, f.box[bn].Ptr)
-		f.box[bn+1].Ptr = p
-	}
 }
 
+// TODO(rjk): Nicer way when we have a string for box contents.
 func runeindex(p []byte, n int) int {
 	offs := 0
 	for i := 0; i < n; i++ {
@@ -100,10 +76,12 @@ func runeindex(p []byte, n int) int {
 }
 
 // truncatebox drops the  last n characters from box b without allocation.
+// TODO(rjk): make a method on a frbox
+// TODO(rjk): measure height.
 func (f *Frame) truncatebox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
+		f.Logboxes("-- truncatebox panic -- ")
 		panic(fmt.Sprint("Frame.truncatebox", " Nrune=", b.Nrune, " n=", n))
-		panic("truncatebox")
 	}
 	b.Nrune -= n
 	b.Ptr = b.Ptr[0:runeindex(b.Ptr, b.Nrune)]
@@ -111,9 +89,11 @@ func (f *Frame) truncatebox(b *frbox, n int) {
 }
 
 // chopbox removes the first n chars from box b without allocation.
+// TODO(rjk): measure height
 func (f *Frame) chopbox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < n {
-		panic("chopbox")
+		f.Logboxes("-- panic in chopbox --")
+		panic(fmt.Sprint("chopbox", " b.Nrune=", b.Nrune, " n=", n))
 	}
 	i := runeindex(b.Ptr, n)
 	b.Ptr = b.Ptr[i:]
@@ -122,7 +102,12 @@ func (f *Frame) chopbox(b *frbox, n int) {
 }
 
 // splitbox duplicates box [bn] and divides it at rune n into prefix and suffix boxes.
+// It is an error to try to split a non-existent box?
+// TODO(rjk): Figure out if you want this to be so.
 func (f *Frame) splitbox(bn, n int) {
+	if bn > len(f.box) {
+		panic(fmt.Sprint("splitbox", "bn=", bn, "n=", n))
+	}
 	f.dupbox(bn)
 	f.truncatebox(f.box[bn], f.box[bn].Nrune-n)
 	f.chopbox(f.box[bn+1], n)
@@ -144,13 +129,15 @@ func (f *Frame) mergebox(bn int) {
 }
 
 // findbox finds the box containing q and puts q on a box boundary starting from
-// rune p in box bn.
+// rune p in box bn. NB: p must be the first rune in box[bn].
 func (f *Frame) findbox(bn, p, q int) int {
-	for i := bn; bn < f.nbox && p+nrune(f.box[i]) <= q; i++ {
-		p += nrune(f.box[i])
+	for _, b := range f.box[bn:] {
+		if p + nrune(b) > q {
+			break
+		}
+		p += nrune(b)
 		bn++
 	}
-
 	if p != q {
 		f.splitbox(bn, q-p)
 		bn++
@@ -168,24 +155,17 @@ func (f *Frame) validateboxmodel(format string, args ...interface{}) {
 	}
 
 	// Test 0. No holes in the array of boxes.
-	for _, b := range f.box[0:f.nbox] {
+	for _, b := range f.box {
 		if b == nil {
 			log.Printf(format, args...)
 			f.Logboxes("-- holes in nbox portion of box array --")
 			panic("-- holes in nbox portion of box array --")
 		}
 	}
-	for _, b := range f.box[f.nbox:] {
-		if b != nil {
-			log.Printf(format, args...)
-			f.Logboxes("-- duplicate box references left over in unused space --")
-			panic("-- duplicate box references left over in unused space --")
-		}
-	}
 
 	// Test 1. NChars is valid
 	total := 0
-	for _, b := range f.box[0:f.nbox] {
+	for _, b := range f.box {
 		if b.Nrune < 0 {
 			total += 1
 		} else {
@@ -199,7 +179,7 @@ func (f *Frame) validateboxmodel(format string, args ...interface{}) {
 	}
 
 	// TODO(rjk): Every box is sane.
-	for _, b := range f.box[0:f.nbox] {
+	for _, b := range f.box {
 		// Nrune is right for this box.
 		if b.Nrune >= 0 {
 			s := string(b.Ptr)

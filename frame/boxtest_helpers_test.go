@@ -102,13 +102,10 @@ func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *Frame, 
 	}
 }
 
-// testcore checks if the frame's box model matches the provided afterboxes, nbox, nalloc. Use this to implement Verify methods.
-func testcore(t *testing.T, prefix, name string, frame *Frame, nbox, nalloc int, afterboxes []*frbox) {
-	if got, want := frame.nbox, nbox; got != want {
-		t.Errorf("%s-%s: nbox got %d but want %d\n", prefix, name, got, want)
-	}
-	if got, want := frame.nalloc, nalloc; got != want {
-		t.Errorf("%s-%s: nalloc got %d but want %d\n", prefix, name, got, want)
+// testcore checks if the frame's box model matches the provided afterboxes, nbox, Use this to implement Verify methods.
+func testcore(t *testing.T, prefix, name string, frame *Frame, nbox int, afterboxes []*frbox) {
+	if got, want := len(frame.box), nbox; got != want {
+		t.Errorf("%s-%s: len(frame.box) got %d but want %d\n", prefix, name, got, want)
 	}
 	if frame.box == nil {
 		t.Errorf("%s-%s: ran add but did not succeed in creating boxex", prefix, name)

@@ -85,9 +85,6 @@ type Frame struct {
 	Scroll func(*Frame, int) // function provided by application
 
 	box []*frbox // the boxes of text in this frame.
-	// TODO(rjk): This shouldn't exist. box is a slice and can manage this itself.
-	// private
-	nbox, nalloc int
 
 	P0, P1 int // bounds of a selection
 	MaxTab int // max size of a tab (in pixels)
@@ -135,8 +132,6 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.Font = &frfont{ft}
 	f.Display = b.Display
 	f.MaxTab = 8 * ft.StringWidth("0")
-	f.nbox = 0
-	f.nalloc = 0
 	f.NChars = 0
 	f.NLines = 0
 	f.P0 = 0
@@ -215,14 +210,7 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 // /unnecessary to call InitTick unless the font size has changed.) No
 // /redrawing is necessary.
 func (f *Frame) Clear(freeall bool) {
-	if f.nbox != 0 {
-		f.delbox(0, f.nbox-1)
-	}
-	if f.box != nil {
-		f.box = nil
-		f.nbox = 0
-		f.nalloc = 0
-	}
+	f.box = make([]*frbox, 0, 25)
 	if freeall {
 		f.TickImage.Free()
 		f.TickBack.Free()

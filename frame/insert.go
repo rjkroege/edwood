@@ -1,6 +1,7 @@
 package frame
 
 import (
+	"fmt"
 	"image"
 	"unicode/utf8"
 
@@ -21,14 +22,11 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 		Background: f.Background,
 		Font:       f.Font,
 		MaxTab:     f.MaxTab,
-		nbox:       0,
-		nalloc:     0,
 		NChars:     0,
 		box:        []*frbox{},
 	}
 
 	copy(frame.Cols[:], f.Cols[:])
-	delta := DELTA
 	nl := 0
 
 	// TODO(rjk): There are no boxes allocated?
@@ -36,39 +34,34 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 
 	offs := 0
 	for nb := 0; offs < len(r) && nl <= f.MaxLines; nb++ {
-		if nb >= len(frame.box) {
-			// We have no boxes on start. So add on demand.
-			// TODO(rjk): consider removing delta, DELTA, nalloc if possible
-			// This is not idiomatic.
-			frame.growbox(delta)
-			if delta < 10000 {
-				delta *= 2
-			}
-		}
-		b := frame.box[nb]
-		if b == nil {
-			b = new(frbox)
-			frame.box[nb] = b
-		}
-		c = r[offs]
-		if c == '\t' || c == '\n' {
-			b.Bc = c
-			b.Wid = 5000 // TODO(flux): This won't be wide enough for 8k screens
-			if c == '\n' {
-				b.Minwid = 0
-				nl++
-			} else {
-				b.Minwid = byte(frame.Font.StringWidth(" "))
-			}
-			b.Nrune = -1
+		switch c = r[offs]; c {
+		case '\t':
+			frame.box = append(frame.box, &frbox{
+				Bc: c,
+				Wid: 10000,
+				Minwid: byte(frame.Font.StringWidth(" ")),
+				Nrune: -1,
+			})
+
 			frame.NChars++
 			offs++
-		} else {
+		case '\n':
+			frame.box = append(frame.box, &frbox{
+				Bc: c,
+				Wid: 10000,
+				Minwid: 0,
+				Nrune: -1,
+			})
+
+			frame.NChars++
+			offs++
+			nl++
+		default:
 			s := 0
 			nr := 0
 			w := 0
-			tmp := make([]byte, TMPSIZE+3)
 
+			tmp := make([]byte, TMPSIZE+3)
 			for offs < len(r) {
 				c := r[offs]
 				if c == '\t' || c == '\n' {
@@ -79,26 +72,23 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 					break
 				}
 				w += frame.Font.RunesWidth(r[offs : offs+1])
+
 				offs++
 				s += rw
 				nr++
 			}
-			// not idiomatic.
-			//			tmp[s] = 0
-			//			s++
 			p := make([]byte, s)
+			copy(p, tmp[:s])
 
-			//	log.Println(nb, len(frame.box), frame.box[0])
-
-			b = frame.box[nb]
-			b.Ptr = p
-			copy(b.Ptr, tmp[:s])
-			b.Wid = w
-			b.Nrune = nr
+			frame.box = append(frame.box, &frbox{
+				Ptr: p,
+				Wid:  w,
+				Nrune:  nr,
+			})
 			frame.NChars += nr
 		}
-		frame.nbox++
 	}
+
 	*ppt = f.cklinewrap0(*ppt, frame.box[0])
 	return frame._draw(*ppt), frame
 }
@@ -106,23 +96,18 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 func (f *Frame) chop(pt image.Point, p, bn int) {
 	for {
 		b := f.box[bn]
-		// Safe but not necessarily a good idea.
-		if bn >= f.nbox {
-			f.Logboxes("-- Frame.chop bn=%d, f.nbox=%d --", bn, f.nbox)
-			panic("Frame.chop endofframe")
-		}
 		pt = f.cklinewrap(pt, b)
-		if pt.Y >= f.Rect.Max.Y {
+		if bn >= len(f.box) || pt.Y >= f.Rect.Max.Y {
 			break
 		}
 		p += nrune(b)
-		f.advance(&pt, b)
+		pt = f.advance(pt, b)
 		bn++
 	}
 	f.NChars = p
 	f.NLines = f.MaxLines
-	if bn < f.nbox { // BUG
-		f.delbox(bn, f.nbox-1)
+	if bn < len(f.box) { // BUG
+		f.delbox(bn, len(f.box)-1)
 	}
 }
 
@@ -154,8 +139,12 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	var col, tcol *draw.Image
 
 	pts := make([]points, 0, 5)
-
+	
 	n0 := f.findbox(0, 0, p0)
+	if n0 > len(f.box) {
+		f.Logboxes("-- boxes after findbox when findbox has failed to return a valid box index --")
+		panic(fmt.Sprint("findbox is sads", "n0:", n0))
+	}
 
 	//	f.Logboxes("at end of findbox")
 
@@ -167,7 +156,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	pt1, nframe := f.bxscan(r, &ppt0)
 	ppt1 := pt1
 
-	if n0 < f.nbox {
+	if n0 < len(f.box) {
 		pt0 = f.cklinewrap(pt0, f.box[n0])
 		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
 	}
@@ -189,10 +178,14 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	 * If pt1 goes off the rectangle, we can toss everything from there on
 	 */
 	npts := 0
-	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < f.nbox; npts++ {
+	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < len(f.box); npts++ {
 		b := f.box[n0]
 		pt0 = f.cklinewrap(pt0, b)
-		pt1 = f.cklinewrap0(pt1, b)
+		pt1 = f.cklinewrap0(pt1, b)		
+		if pt1.Y > f.Rect.Max.Y {
+			f.Logboxes("-- pt1 violated invariant at box --")
+			panic(fmt.Sprint("frame.Insert pt1 too far", " pt1=", pt1, " box=", b))
+		}
 
 		if b.Nrune > 0 {
 			n, fits := f.canfit(pt1, b)
@@ -209,7 +202,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		if pt1.Y == f.Rect.Max.Y {
 			break
 		}
-		f.advance(&pt0, b)
+		pt0 = f.advance(pt0, b)
 		pt1.X += f.newwid(pt1, b)
 		cn0 += nrune(b)
 		n0++
@@ -219,11 +212,11 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		nframe.validateboxmodel("frame.Insert pt1 too far, nframe validation, %v", pt1)
 		panic("frame.Insert pt1 too far")
 	}
-	if pt1.Y == f.Rect.Max.Y && n0 < f.nbox {
+	if pt1.Y == f.Rect.Max.Y && n0 < len(f.box) {
 		f.NChars -= f.strlen(n0)
-		f.delbox(n0, f.nbox-1)
+		f.delbox(n0, len(f.box)-1)
 	}
-	if n0 == f.nbox {
+	if n0 == len(f.box) {
 		div := f.Font.DefaultHeight()
 		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
 		if pt1.X > f.Rect.Min.X {
@@ -346,10 +339,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	nframe.drawtext(ppt0, tcol, col)
 
 	// Actually add boxes.
-	f.addbox(nn0, nframe.nbox)
-	for n := 0; n < nframe.nbox; n++ {
-		f.box[nn0+n] = nframe.box[n]
-	}
+	f.addbox(nn0, len(nframe.box))
+	copy(f.box[nn0:], nframe.box)
 
 	// f.Logboxes("after adding")
 
@@ -358,8 +349,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		ppt0.X -= f.box[nn0].Wid
 	}
 
-	n0 += nframe.nbox
-	if n0 < f.nbox-1 {
+	n0 += len(nframe.box)
+	if n0 <len( f.box) -1 {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0+1)

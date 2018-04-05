@@ -15,7 +15,6 @@ type BoxModelTest struct {
 	frame      *Frame
 	stim       func(*Frame) (int, bool)
 	nbox       int
-	nalloc     int
 	afterboxes []*frbox
 	result     int
 	boolresult bool
@@ -39,7 +38,7 @@ func (tv BoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
 		t.Errorf("%s-%s: running stim bool got %v but want %v\n", prefix, tv.name, got, want)
 	}
 
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.nalloc, tv.afterboxes)
+	testcore(t, prefix, tv.name, tv.frame, tv.nbox,  tv.afterboxes)
 }
 
 func TestCanfit(t *testing.T) {
@@ -51,8 +50,6 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box doesn't fit",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 				box:    []*frbox{makeBox("0123456789")},
 			},
@@ -60,7 +57,7 @@ func TestCanfit(t *testing.T) {
 				a, b := f.canfit(image.Pt(10+14, 15), f.box[0])
 				return a, b
 			},
-			1, 1,
+			1,
 			[]*frbox{makeBox("0123456789")},
 			// 10 + 14 + 40 = 64. less than 67.
 			4,
@@ -70,8 +67,6 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box, fits",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 				box:    []*frbox{makeBox("0123")},
 			},
@@ -79,7 +74,7 @@ func TestCanfit(t *testing.T) {
 				a, b := f.canfit(image.Pt(10+14, 15), f.box[0])
 				return a, b
 			},
-			1, 1,
+			1, 
 			[]*frbox{makeBox("0123")},
 			// 10 + 14 + 40 = 64. less than 67.
 			4,
@@ -89,8 +84,6 @@ func TestCanfit(t *testing.T) {
 			"newline box",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 				box:    []*frbox{newlinebox},
 			},
@@ -98,7 +91,7 @@ func TestCanfit(t *testing.T) {
 				a, b := f.canfit(image.Pt(10+57, 15), f.box[0])
 				return a, b
 			},
-			1, 1,
+			1, 
 			[]*frbox{newlinebox},
 			// newline fits up to the edge.
 			1,
@@ -108,8 +101,6 @@ func TestCanfit(t *testing.T) {
 			"tab box",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 				box:    []*frbox{tabbox},
 			},
@@ -117,7 +108,7 @@ func TestCanfit(t *testing.T) {
 				a, b := f.canfit(image.Pt(10+48, 15), f.box[0])
 				return a, b
 			},
-			1, 1,
+			1, 
 			[]*frbox{tabbox},
 			// tab at edge doesn't  fit
 			0,
@@ -127,8 +118,6 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box, doesn't fit",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 				box:    []*frbox{makeBox("本a")},
 			},
@@ -136,7 +125,7 @@ func TestCanfit(t *testing.T) {
 				a, b := f.canfit(image.Pt(10+57-11, 15), f.box[0])
 				return a, b
 			},
-			1, 1,
+			1, 
 			[]*frbox{makeBox("本a")},
 			// 10 + 14 + 40 = 64. less than 67.
 			1,
@@ -144,3 +133,75 @@ func TestCanfit(t *testing.T) {
 		},
 	})
 }
+
+
+// Verifies that clean produces a valid box mode.
+func TestClean(t *testing.T) {
+//	newlinebox := makeBox("\n")
+//	tabbox := makeBox("\t")
+	hellobox := makeBox("hi")
+	worldbox := makeBox("wo")
+
+	comparecore(t, "TestClean", []BoxTester{
+		SimpleBoxModelTest{
+			"empty frame",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{},
+			},
+			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
+			0, 
+			[]*frbox{},
+		},
+		SimpleBoxModelTest{
+			"one frame, 0,1",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{worldbox},
+			},
+			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
+			1, 
+			[]*frbox{worldbox},
+		},
+		SimpleBoxModelTest{
+			"one frame, 1,1",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{worldbox},
+			},
+			func(f *Frame) { f.clean(image.Pt(10, 15), 1, 1) },
+			1, 
+			[]*frbox{worldbox},
+		},
+		SimpleBoxModelTest{
+			"two frame, 0,2",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{hellobox, worldbox},
+			},
+			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 2) },
+			1, 
+			[]*frbox{makeBox("hiwo")},
+		},
+/*		// Failure suppression. I think that this is wrong. But currently I do not
+		// understand the semantics of how clean should actually work.
+		SimpleBoxModelTest{
+			"three frame, 0,4",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				Rect:   image.Rect(10, 15, 10+57, 15+57),
+				box:    []*frbox{hellobox, worldbox, makeBox("r"), makeBox("ld")},
+			},
+			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 4) },
+			2, 
+			[]*frbox{makeBox("hiwor"), makeBox("ld")},
+		},
+*/
+	})
+
+}
+

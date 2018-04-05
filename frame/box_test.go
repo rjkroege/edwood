@@ -9,7 +9,6 @@ type SimpleBoxModelTest struct {
 	frame      *Frame
 	stim       func(*Frame)
 	nbox       int
-	nalloc     int
 	afterboxes []*frbox
 }
 
@@ -19,7 +18,7 @@ func (bx SimpleBoxModelTest) Try() interface{} {
 }
 
 func (tv SimpleBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.nalloc, tv.afterboxes)
+	testcore(t, prefix, tv.name, tv.frame, tv.nbox,  tv.afterboxes)
 }
 
 func TestRunIndex(t *testing.T) {
@@ -54,8 +53,6 @@ func TestRunIndex(t *testing.T) {
 func TestTruncatebox(t *testing.T) {
 	frame := &Frame{
 		Font:   Fakemetrics(fixedwidth),
-		nbox:   0,
-		nalloc: 0,
 	}
 
 	testvector := []struct {
@@ -87,8 +84,6 @@ func TestTruncatebox(t *testing.T) {
 func TestChopbox(t *testing.T) {
 	frame := &Frame{
 		Font:   Fakemetrics(fixedwidth),
-		nbox:   0,
-		nalloc: 0,
 	}
 
 	testvector := []struct {
@@ -125,86 +120,46 @@ func TestAddbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"empty frame",
 			&Frame{
-				nbox:   0,
-				nalloc: 0,
 			},
 			func(f *Frame) { f.addbox(0, 1) },
-			1, 26,
-			[]*frbox{},
+			1, 
+			[]*frbox{nil},
 		},
 		SimpleBoxModelTest{
 			"one element frame",
 			&Frame{
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{hellobox, nil},
+				box:    []*frbox{hellobox},
 			},
 			func(f *Frame) { f.addbox(0, 1) },
-			2, 2,
+			2,
 			[]*frbox{hellobox, hellobox},
 		},
 		SimpleBoxModelTest{
 			"two element frame",
 			&Frame{
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
 			func(f *Frame) { f.addbox(0, 1) },
-			3, 28,
+			3, 
 			[]*frbox{hellobox, hellobox, worldbox},
 		},
 		SimpleBoxModelTest{
 			"two element frame",
 			&Frame{
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
 			func(f *Frame) { f.addbox(1, 1) },
-			3, 28,
+			3, 
 			[]*frbox{hellobox, worldbox, worldbox},
 		},
-	})
-}
-
-func TestFreebox(t *testing.T) {
-	hellobox := makeBox("hi")
-	worldbox := makeBox("world")
-
-	comparecore(t, "TestFreebox", []BoxTester{
 		SimpleBoxModelTest{
-			"one element frame",
+			"at very end of 2 element frame",
 			&Frame{
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{hellobox, nil},
-			},
-			func(f *Frame) { f.freebox(0, 0) },
-			1, 2,
-			[]*frbox{nil},
-		},
-		SimpleBoxModelTest{
-			"two element frame 0",
-			&Frame{
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
-			func(f *Frame) { f.freebox(0, 0) },
-			2, 2,
-			[]*frbox{nil, worldbox},
-		},
-		SimpleBoxModelTest{
-			"two element frame 1",
-			&Frame{
-				nbox:   3,
-				nalloc: 3,
-				box:    []*frbox{hellobox, worldbox, hellobox},
-			},
-			func(f *Frame) { f.freebox(1, 1) },
-			3, 3,
-			[]*frbox{hellobox, nil, hellobox},
+			func(f *Frame) { f.addbox(2, 2) },
+			4, 
+			[]*frbox{hellobox, worldbox, nil, nil},
 		},
 	})
 }
@@ -217,45 +172,37 @@ func TestClosebox(t *testing.T) {
 		SimpleBoxModelTest{
 			"one element frame",
 			&Frame{
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{hellobox, nil},
+				box:    []*frbox{hellobox},
 			},
-			func(f *Frame) { f.closebox(0, 0) },
-			0, 2,
-			[]*frbox{nil},
+			func(f *Frame) { f.closebox(0, 0) }, 
+			0, 
+			[]*frbox{},
 		},
 		SimpleBoxModelTest{
 			"two element frame 0",
 			&Frame{
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
 			func(f *Frame) { f.closebox(0, 0) },
-			1, 2,
+			1, 
 			[]*frbox{worldbox},
 		},
 		SimpleBoxModelTest{
 			"two element frame 1",
 			&Frame{
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hellobox, worldbox},
 			},
 			func(f *Frame) { f.closebox(1, 1) },
-			1, 2,
+			1, 
 			[]*frbox{hellobox},
 		},
 		SimpleBoxModelTest{
 			"three element frame",
 			&Frame{
-				nbox:   3,
-				nalloc: 3,
 				box:    []*frbox{hellobox, worldbox, hellobox},
 			},
 			func(f *Frame) { f.closebox(1, 1) },
-			2, 3,
+			2, 
 			[]*frbox{hellobox, hellobox},
 		},
 	})
@@ -267,12 +214,10 @@ func TestDupbox(t *testing.T) {
 	stim := SimpleBoxModelTest{
 		"one element frame",
 		&Frame{
-			nbox:   1,
-			nalloc: 2,
-			box:    []*frbox{hellobox, nil},
+			box:    []*frbox{hellobox},
 		},
 		func(f *Frame) { f.dupbox(0) },
-		2, 2,
+		2, 
 		[]*frbox{hellobox, hellobox},
 	}
 	comparecore(t, "TestDupbox", []BoxTester{
@@ -295,62 +240,64 @@ func TestSplitbox(t *testing.T) {
 			"one element frame",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{makeBox("hiworld"), nil},
+				box:    []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
-			2, 2,
+			2, 
 			[]*frbox{hibox, worldbox},
 		},
 		SimpleBoxModelTest{
 			"two element frame 1",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 3,
-				box:    []*frbox{worldbox, makeBox("hiworld"), nil},
+				box:    []*frbox{worldbox, makeBox("hiworld")},
 			},
 			func(f *Frame) { f.splitbox(1, 2) },
-			3, 3,
+			3, 
 			[]*frbox{worldbox, hibox, worldbox},
 		},
 		SimpleBoxModelTest{
 			"one element 0, 0",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{makeBox("hi"), nil},
+				box:    []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 0) },
-			2, 2,
+			2, 
 			[]*frbox{zerobox, hibox},
 		},
 		SimpleBoxModelTest{
 			"one element 0, 2",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{makeBox("hi"), nil},
+				box:    []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
-			2, 2,
+			2, 
 			[]*frbox{hibox, zerobox},
 		},
 		SimpleBoxModelTest{
 			"one element 0, 2",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 2,
-				box:    []*frbox{makeBox("hi"), nil},
+				box:    []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
-			2, 2,
+			2, 
 			[]*frbox{hibox, zerobox},
 		},
+/*
+		SimpleBoxModelTest{
+			"no element 0, 0",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				box:    []*frbox{},
+			},
+			func(f *Frame) { f.splitbox(0, 0) },
+			2, 
+			[]*frbox{hibox, zerobox},
+		},
+*/
 	})
 }
 
@@ -365,51 +312,43 @@ func TestMergebox(t *testing.T) {
 			"two -> 1",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hibox, worldbox},
 			},
 			func(f *Frame) { f.mergebox(0) },
-			1, 2,
+			1, 
 			[]*frbox{hiworldbox},
 		},
 		SimpleBoxModelTest{
 			"two null -> 1",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{hibox, zerobox},
 			},
 			func(f *Frame) { f.mergebox(0) },
-			1, 2,
+			1, 
 			[]*frbox{hibox},
 		},
 		SimpleBoxModelTest{
 			"three -> 2",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   3,
-				nalloc: 3,
 				box:    []*frbox{makeBox("hi"), worldbox, hibox},
 			},
 			func(f *Frame) { f.mergebox(0) },
-			2, 3,
+			2, 
 			[]*frbox{hiworldbox, hibox},
 		},
 		SimpleBoxModelTest{
 			"three -> 1",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   3,
-				nalloc: 3,
 				box:    []*frbox{makeBox("hi"), makeBox("world"), makeBox("hi")},
 			},
 			func(f *Frame) {
 				f.mergebox(1)
 				f.mergebox(0)
 			},
-			1, 3,
+			1,
 			[]*frbox{makeBox("hiworldhi")},
 		},
 	})
@@ -420,7 +359,6 @@ type FindBoxModelTest struct {
 	frame      *Frame
 	stim       func(*Frame) int
 	nbox       int
-	nalloc     int
 	afterboxes []*frbox
 	foundbox   int
 }
@@ -431,7 +369,7 @@ func (bx FindBoxModelTest) Try() interface{} {
 
 func (tv FindBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
 	r := result.(int)
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.nalloc, tv.afterboxes)
+	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.afterboxes)
 	if got, want := r, tv.foundbox; got != want {
 		t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, tv.name, got, want)
 	}
@@ -447,12 +385,10 @@ func TestFindbox(t *testing.T) {
 			"find in 1",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				box:    []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 2) },
-			2, 27,
+			2, 
 			[]*frbox{hibox, worldbox},
 			1,
 		},
@@ -460,12 +396,10 @@ func TestFindbox(t *testing.T) {
 			"find at beginning",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   1,
-				nalloc: 1,
 				box:    []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 0) },
-			1, 1,
+			1, 
 			[]*frbox{hiworldbox},
 			0,
 		},
@@ -473,12 +407,10 @@ func TestFindbox(t *testing.T) {
 			"find at edge",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 2) },
-			2, 2,
+			2, 
 			[]*frbox{hibox, worldbox},
 			1,
 		},
@@ -486,12 +418,10 @@ func TestFindbox(t *testing.T) {
 			"find continuing",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(1, 0, 2) },
-			3, 28,
+			3, 
 			[]*frbox{hibox, makeBox("wo"), makeBox("rld")},
 			2,
 		},
@@ -499,12 +429,10 @@ func TestFindbox(t *testing.T) {
 			"find in empty",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   0,
-				nalloc: 2,
-				box:    []*frbox{nil, nil},
+				box:    []*frbox{},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 0) },
-			0, 2,
+			0, 
 			[]*frbox{},
 			0,
 		},
@@ -512,13 +440,22 @@ func TestFindbox(t *testing.T) {
 			"find at end",
 			&Frame{
 				Font:   Fakemetrics(fixedwidth),
-				nbox:   2,
-				nalloc: 2,
 				box:    []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 7) },
-			2, 2,
+			2,
 			[]*frbox{hibox, worldbox},
+			2,
+		},
+		FindBoxModelTest{
+			"find very near end",
+			&Frame{
+				Font:   Fakemetrics(fixedwidth),
+				box:    []*frbox{makeBox("hi"), makeBox("world")},
+			},
+			func(f *Frame) int { return f.findbox(1, 2, 6) },
+			3,
+			[]*frbox{hibox, makeBox("worl"), makeBox("d")},
 			2,
 		},
 	})

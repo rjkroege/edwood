@@ -2,7 +2,6 @@ package frame
 
 import (
 	"image"
-	//"log"
 )
 
 // Delete deletes from the Frame the text between p0 and p1; p1 points at
@@ -25,7 +24,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	//log.Println("Delete is doing something")
 
 	n0 := f.findbox(0, 0, p0)
-	if n0 == f.nbox {
+	if n0 == len(f.box) {
 		panic("off end in Frame.Delete")
 	}
 
@@ -38,7 +37,9 @@ func (f *Frame) Delete(p0, p1 int) int {
 
 	nn0 := n0
 	ppt0 := pt0
-	f.freebox(n0, n1-1)
+
+	// If the previous code was safe, this is harmless.
+	// f.freebox(n0, n1-1)
 	f.Modified = true
 
 	/*
@@ -49,11 +50,11 @@ func (f *Frame) Delete(p0, p1 int) int {
 	 *  - cn1 is char position of n1
 	 *  - f->p0 and f->p1 are not adjusted until after all deletion is done
 	 */
-	b := f.box[n1]
 	off := n1
 	cn1 := p1
 
-	for pt1.X != pt0.X && n1 < f.nbox {
+	for pt1.X != pt0.X && n1 < len(f.box) {
+		b := f.box[n1]
 		pt0 = f.cklinewrap0(pt0, b)
 		pt1 = f.cklinewrap(pt1, b)
 		n, fits := f.canfit(pt0, b)
@@ -94,25 +95,25 @@ func (f *Frame) Delete(p0, p1 int) int {
 			f.Background.Draw(r, col, nil, pt0)
 			cn1++
 		}
-		f.advance(&pt1, b)
+		pt1 = f.advance(pt1, b)
 		pt0.X += f.newwid(pt0, b)
 		f.box[n0] = f.box[n1]
 		n0++
 		n1++
 		off++
-		b = f.box[off]
 	}
 
-	if n1 == f.nbox && pt0.X != pt1.X {
+	if n1 == len(f.box) && pt0.X != pt1.X {
 		f.SelectPaint(pt0, pt1, f.Cols[ColBack])
 	}
 	if pt1.Y != pt0.Y {
+		// What is going on here?
 		pt2 := f.ptofcharptb(32767, pt1, n1)
 		if pt2.Y > f.Rect.Max.Y {
 			panic("Frame.ptofchar in Frame.delete")
 		}
 
-		if n1 < f.nbox {
+		if n1 < len(f.box) {
 			height := f.Font.DefaultHeight()
 			q0 := pt0.Y + height
 			q1 := pt1.Y + height
@@ -129,13 +130,14 @@ func (f *Frame) Delete(p0, p1 int) int {
 			f.SelectPaint(pt0, pt2, f.Cols[ColBack])
 		}
 	}
+	// We crash here. 
 	f.closebox(n0, n1-1)
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-int(f.box[nn0-1].Wid) >= int(f.Rect.Min.X) {
 		nn0--
 		ppt0.X -= int(f.box[nn0].Wid)
 	}
 
-	if n0 < f.nbox-1 {
+	if n0 < len(f.box)-1 {
 		f.clean(ppt0, nn0, n0+1)
 	} else {
 		f.clean(ppt0, nn0, n0)
