@@ -898,8 +898,8 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		boff += uint64(nb)
 		q += len(r)
 	}
-	fc.Count = uint32(n)
-	fc.Data = []byte(string(b1))[:n]
+	fc.Data = []byte(string(b1[:n]))
+	fc.Count = uint32(len(fc.Data))
 	respond(x, &fc, nil)
 }
 
