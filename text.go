@@ -543,7 +543,7 @@ func (t *Text) Fill() {
 		}
 
 		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
-		if t.fr.LastLineFull != 0 {
+		if nl == 0 || t.fr.LastLineFull != 0 {
 			break
 		}
 	}
