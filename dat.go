@@ -171,9 +171,7 @@ type MntDir struct {
 	id    int64
 	ref   int
 	dir   string
-	ndir  int
 	next  *MntDir
-	nincl int
 	incl  []string
 }
 

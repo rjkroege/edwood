@@ -973,9 +973,16 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			fmt.Fprintf(os.Stderr, "child: can't allocate mntdir\n")
 			return
 		}
-		fs, err := client.MountService("acme") //, fmt.Sprintf("%d", c.md.id))
+		conn, err := client.DialService("acme")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "child: can't mount acme: %v\n", err)
+			fmt.Fprintf(os.Stderr, "child: can't connect to acme: %v\n", err)
+			fsysdelid(c.md)
+			c.md = nil
+			return
+		}
+		fs, err  := conn.Attach(nil, getuser(), fmt.Sprintf("%d", c.md.id))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "child: can't attach to acme: %v\n", err)
 			fsysdelid(c.md)
 			c.md = nil
 			return
