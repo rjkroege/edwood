@@ -33,6 +33,9 @@ func region(a, b int) int {
 // so long as a button is down in downevent. Selection stops when the
 // staring point buttondown is altered.
 func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
+	// log.Println("--- Select Start ---")
+	// defer log.Println("--- Select End ---")
+
 	omp := downevent.Point
 	omb := downevent.Buttons
 
@@ -79,6 +82,8 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 		}
 
 		q := f.Charofpt(mp)
+
+		// log.Printf("select, before state table p0=%d p1=%d q=%d pin=%d", p0, p1, q, pin)
 		switch {
 		case p0 == p1 && q == p0:
 			pin = 0
@@ -90,15 +95,26 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 			p0 = q
 		case pin == -1 && q < p1:
 			p0 = q
-		case pin == -1 && q > p1:
+		case pin == -1 && q > p1: // We skipped equality.
+			p0 = p1
 			p1 = q
 			pin = 1
+		case pin == -1 && q == p1:
+			p0 = q
+			p1 = q
+			pin = 0
 		case pin == 1 && q > p0:
 			p1 = q
-		case pin == 1 && q < p0:
+		case pin == 1 && q == p0:
+			pin = 0
+			p0 = q
+			p1 = q
+		case pin == 1 && q < p0: // We skipped equality.
 			pin = -1
+			p1 = p0
 			p0 = q
 		}
+		// log.Printf("select, after state table p0=%d p1=%d q=%d pin=%d", p0, p1, q, pin)
 
 		f.DrawSel(f.Ptofchar(p0), p0, p1, true)
 

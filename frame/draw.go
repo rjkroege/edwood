@@ -47,6 +47,8 @@ func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point
 // DrawSel does the minimum work needed to clear a highlight and (in particular)
 // multiple calls to DrawSel with highlighted false will be cheap.
 func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
+	//  log.Println("Frame DrawSel Start", p0, p1, highlighted, f.P0, f.P1, f.Ticked)
+	//  defer log.Println("Frame DrawSel End",  f.P0, f.P1, f.Ticked)
 	if p0 > p1 {
 		panic("Drawsel0: p0 and p1 must be ordered")
 	}
@@ -55,17 +57,22 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
-	if f.P0 != f.P1 {
+	if f.P0 != f.P1 && f.highlighton {
 		// Clear the selection so that subsequent code can
 		// update correctly.
 		back := f.Cols[ColBack]
 		text := f.Cols[ColText]
 		f.Drawsel0(f.Ptofchar(f.P0), f.P0, f.P1, back, text)
+
+		// Avoid multiple draws.
+		f.highlighton = false
 	}
 
 	// We've already done everything necessary above if not
 	// highlighting so simply return.
 	if !highlighted {
+		// This has to be updated here so that select can
+		// correctly update the selection during a drag loop.
 		f.P0 = p0
 		f.P1 = p1
 		return
@@ -87,6 +94,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	f.Drawsel0(pt, p0, p1, back, text)
 	f.P0 = p0
 	f.P1 = p1
+	f.highlighton = true
 }
 
 // TODO(rjk): This function is convoluted.
@@ -101,6 +109,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 //
 // Function does not mutate f.p0, f.p1 (well... actually, it does.)
 func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
+	// log.Println("Frame Drawsel0 Start", p0, p1,  f.P0, f.P1)
+	// defer log.Println("Frame Drawsel0 End", f.P0, f.P1 )
 	p := 0
 	trim := false
 	x := 0

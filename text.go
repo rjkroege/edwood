@@ -1281,10 +1281,9 @@ func (t *Text) ReadC(q int) (r rune) {
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
-	// log.Println("Text SetSelect Start", q0, q1)
-	// defer log.Println("Text SetSelect End", q0, q1)
+	//  log.Println("Text SetSelect Start", q0, q1)
+	// adefer log.Println("Text SetSelect End", q0, q1)
 
-	/* (getP0((t.fr))) and (getP1((t.fr))) are always right; t.q0 and t.q1 may be off */
 	t.q0 = q0
 	t.q1 = q1
 	/* compute desired p0,p1 from q0,q1 */
@@ -1305,47 +1304,11 @@ func (t *Text) SetSelect(q0, q1 int) {
 	if p1 > (t.fr.GetFrameFillStatus().Nchars) {
 		p1 = (t.fr.GetFrameFillStatus().Nchars)
 	}
-	if(p0==getP0(t.fr) && p1==getP1(t.fr)){
-		if(p0 == p1 && ticked != t.fr.Ticked) {
-			t.fr.Tick(t.fr.Ptofchar(p0), ticked);
-		}
-		return;
-	}
 	if p0 > p1 {
 		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.GetFrameFillStatus().Nchars))
 	}
 
-	/* screen disagrees with desired selection */
-	if getP1(t.fr)<=p0 || p1<=getP0(t.fr) || p0==p1 || getP1(t.fr)==getP0(t.fr) {
-		/* no overlap or too easy to bother trying */
-		t.fr.DrawSel(t.fr.Ptofchar(getP0(t.fr)), getP0(t.fr), getP1(t.fr), false);
-		if p0 != p1 || ticked {
-			t.fr.DrawSel(t.fr.Ptofchar(p0), p0, p1, true);
-		}
-		goto Return;
-	}
-	/* overlap; avoid unnecessary painting */
-	if p0 < getP0(t.fr) {
-		/* extend selection backwards */
-		t.fr.DrawSel(t.fr.Ptofchar(p0), p0, getP0(t.fr), true);
-	}else { 
-		if p0 > getP0(t.fr) {
-			/* trim first part of selection */
-			t.fr.DrawSel(t.fr.Ptofchar(getP0(t.fr)), getP0(t.fr), p0, false);
-		}
-	}
-	if p1 > getP1(t.fr) {
-		/* extend selection forwards */
-		t.fr.DrawSel(t.fr.Ptofchar(getP1(t.fr)), getP1(t.fr), p1, true);
-	}else {
-		if p1 < getP1(t.fr) {
-			/* trim last part of selection */
-			t.fr.DrawSel(t.fr.Ptofchar(p1), p1, getP1(t.fr), false);
-		}
-	}
-
-    Return:
-	t.fr.SetSelectionExtent(p0,p1)
+	t.fr.DrawSel(t.fr.Ptofchar(p0), p0, p1, ticked)
 }
 
 func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 int) {

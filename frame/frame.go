@@ -113,6 +113,8 @@ type Frame struct {
 	// Use this if the Frame is being used "headless" to measure some text.
 	NoRedraw  bool
 	TickScale int // tick scaling factor
+
+	highlighton bool // True if the highlight is painted.
 }
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
