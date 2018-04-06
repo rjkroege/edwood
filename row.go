@@ -58,8 +58,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 	}
 	/* look for column we'll land on */
 	var colidx int
-	for colidx = 0; colidx < len(row.col); colidx++ {
-		d = row.col[colidx]
+	for colidx, d = range row.col {
 		if x < d.r.Max.X {
 			break
 		}
@@ -74,9 +73,9 @@ func (row *Row) Add(c *Column, x int) *Column {
 		}
 		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
 		r1 := r
-		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-50)
-		if r1.Dx() < 50 {
-			r1.Max.X = r1.Min.X + 50
+		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
+		if r1.Dx() < row.display.ScaleSize(50) {
+			r1.Max.X = r1.Min.X + row.display.ScaleSize(50)
 		}
 		d.Resize(r1)
 		r1.Min.X = r1.Max.X
@@ -92,7 +91,9 @@ func (row *Row) Add(c *Column, x int) *Column {
 	}
 	c.row = row
 	c.tag.row = row
-	row.col = append(row.col, c)
+	row.col = append(row.col, nil)
+	copy(row.col[colidx+1:], row.col[colidx:])
+	row.col[colidx] = c
 	clearmouse()
 	return c
 }
