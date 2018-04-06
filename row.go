@@ -180,11 +180,11 @@ Found:
 		return
 	}
 	d = row.col[i-1]
-	if p.X < d.r.Min.X+80+row.display.ScaleSize(Scrollwid) {
-		p.X = d.r.Min.X + 80 + row.display.ScaleSize(Scrollwid)
+	if p.X < d.r.Min.X+row.display.ScaleSize(80+Scrollwid) {
+		p.X = d.r.Min.X + row.display.ScaleSize(80 + Scrollwid)
 	}
-	if p.X > c.r.Max.X-80-row.display.ScaleSize(Scrollwid) {
-		p.X = c.r.Max.X - 80 - row.display.ScaleSize(Scrollwid)
+	if p.X > c.r.Max.X-row.display.ScaleSize(80-Scrollwid) {
+		p.X = c.r.Max.X - row.display.ScaleSize(80 - Scrollwid)
 	}
 	r = d.r
 	r.Max.X = c.r.Max.X
@@ -193,7 +193,7 @@ Found:
 	d.Resize(r)
 	r = c.r
 	r.Min.X = p.X
-	r.Min.X = r.Min.X
+	r.Max.X = r.Min.X
 	r.Max.X += row.display.ScaleSize(Border)
 	row.display.ScreenImage.Draw(r, row.display.Black, nil, image.ZP)
 	r.Min.X = r.Max.X
