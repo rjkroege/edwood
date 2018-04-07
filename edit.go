@@ -79,7 +79,7 @@ var cmdtab = []Cmdtab{
 	{'d', 0, 0, 0, 0, aDot, 0, nil, d_cmd},
 	{'e', 0, 0, 0, 0, aNo, 0, wordx, e_cmd},
 	{'f', 0, 0, 0, 0, aNo, 0, wordx, f_cmd},
-	{'g', 0, 1, 0, 'p', aDot, 0, nil, g_cmd},
+	{'g', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to g_cmd in init() to avoid initialization loop
 	{'i', 1, 0, 0, 0, aDot, 0, nil, i_cmd},
 	{'m', 0, 0, 1, 0, aDot, 0, nil, m_cmd},
 	{'p', 0, 0, 0, 0, aDot, 0, nil, p_cmd},
@@ -87,7 +87,7 @@ var cmdtab = []Cmdtab{
 	{'s', 0, 1, 0, 0, aDot, 1, nil, s_cmd},
 	{'t', 0, 0, 1, 0, aDot, 0, nil, m_cmd},
 	{'u', 0, 0, 0, 0, aNo, 2, nil, u_cmd},
-	{'v', 0, 1, 0, 'p', aDot, 0, nil, g_cmd},
+	{'v', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to g_cmd in init() to avoid initialization loop
 	{'w', 0, 0, 0, 0, aAll, 0, wordx, w_cmd},
 	{'x', 0, 1, 0, 'p', aDot, 0, nil, x_cmd},
 	{'y', 0, 1, 0, 'p', aDot, 0, nil, x_cmd},
@@ -106,6 +106,15 @@ var cmdtab = []Cmdtab{
 	{'!',	0,	0,	0,	0,	aNo,	0,	linex,	plan9_cmd,},
 	*/
 	//	{0,	0,	0,	0,	0,	0,	0,	0},
+}
+
+func init() {
+	for i, c := range cmdtab {
+		switch c.cmdc {
+		case 'g', 'v':
+			cmdtab[i].fn = g_cmd
+		}
+	}
 }
 
 var (
@@ -349,14 +358,14 @@ func collecttoken(end []rune) string {
 
 	for {
 		c = nextc()
-		if c == ' ' || c == '\t' {
+		if !(c == ' ' || c == '\t')  || c == -1 {
 			break
 		}
 		s = s + string(getch()) /* blanks significant for getname() */
 	}
 	for {
 		c = getch()
-		if !(c > 0 && utfrune(end, c) == 0) {
+		if !(c > 0 && utfrune(end, c) == 0) || c == -1{
 			break
 		}
 		s = s + string(c)

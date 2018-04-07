@@ -111,6 +111,8 @@ func (e *Elog) Replace(q0, q1 int, r []rune) {
 
 	// TODO(flux): try to merge with previous
 
+	e.extend()
+	eo = e.last()
 	eo.t = Replace
 	eo.q0 = q0
 	eo.nd = q1 - q0

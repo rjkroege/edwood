@@ -12,7 +12,7 @@ type AcmeRegexp struct {
 }
 
 func rxcompile(r string) (*AcmeRegexp, error) {
-	re, err := regexp.Compile(string(r))
+	re, err := regexp.Compile("(?m)" + string(r))
 	if err != nil {
 		return nil, err
 	}

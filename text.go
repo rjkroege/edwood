@@ -584,7 +584,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 	if q1 <= t.org {
 		t.org -= n
-	} else if q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
+	} else if t.fr != nil && q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
 		p1 := q1 - t.org
 		if p1 > (t.fr.GetFrameFillStatus().Nchars) {
 			p1 = (t.fr.GetFrameFillStatus().Nchars)

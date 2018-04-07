@@ -150,21 +150,14 @@ func a_cmd(t *Text, cp *Cmd) bool {
 }
 
 func b_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	File *f;
-
-	USED(t);
-	f = tofile(cp.u.text);
+	f := tofile(cp.text);
 	if nest == 0  {
 		pfilename(f);
+	}
 	curtext = f.curtext;
 	return true;
 }
-*/
+
 func B_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
 	return false
@@ -194,31 +187,21 @@ func B_cmd(t *Text, cp *Cmd) bool {
 }
 */
 func c_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	elogreplace(t.file, addr.r.q0, addr.r.q1, cp.u.text.r, cp.u.text.n);
+	t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text));
 	t.q0 = addr.r.q0;
 	t.q1 = addr.r.q1;
 	return true;
 }
-*/
-func d_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
 
-/*
-	USED(cp);
+func d_cmd(t *Text, cp *Cmd) bool {
 	if addr.r.q1 > addr.r.q0  {
-		elogdelete(t.file, addr.r.q0, addr.r.q1);
+		t.file.elog.Delete(addr.r.q0, addr.r.q1);
+	}
 	t.q0 = addr.r.q0;
 	t.q1 = addr.r.q0;
 	return true;
 }
-
+/*
 func D1 (Text *t) () {
 	if t.w.body.file.ntext>1 || winclean(t.w, false)  {
 		colclose(t.col, t.w, true);
@@ -296,19 +279,21 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	char *s, tmp[128];
 	Dir *d;
 
-	f = t.file;
-	q0 = addr.r.q0;
-	q1 = addr.r.q1;
+	f := t.file;
+	q0 := addr.r.q0;
+	q1 := addr.r.q1;
 	if cp.cmdc == 'e' {
-		if winclean(t.w, true)==false  {
+		if t.w.Clean(true)==false  {
 			editerror("");	// winclean generated message already
+		}
 		q0 = 0;
-		q1 = f.b.nc;
+		q1 = f.b.Nc();
 	}
-	allreplaced = (q0==0 && q1==f.b.nc);
-	name = cmdname(f, cp.u.text, cp.cmdc=='e');
+	allreplaced := (q0==0 && q1==f.b.Nc());
+	name = cmdname(f, cp.text, cp.cmdc=='e');
 	if name == nil  {
 		editerror(Enoname);
+	}
 	i = runestrlen(name);
 	samename = runeeq(name, i, t.file.name, t.file.nname);
 	s = runetobyte(name, i);
@@ -340,50 +325,37 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	return true;
 }
 */
-var Lempty []rune = []rune{0}
 
 func f_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *name;
-	String *str;
-	String empty;
-
-	if cp.u.text == nil {
-		empty.n = 0;
-		empty.r = Lempty;
-		str = &empty;
-	}else
-		str = cp.u.text;
-	name = cmdname(t.file, str, true);
-	free(name);
+	str := ""
+	if cp.text == "" {
+		str = ""
+	}else {
+		str = cp.text;
+	}
+	cmdname(t.file, str, true);
 	pfilename(t.file);
 	return true;
 }
-*/
-func g_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
 
-/*
+func g_cmd(t *Text, cp *Cmd) bool {
 	if t.file != addr.f {
 		warning(nil, "internal error: g_cmd f!=addr.f\n");
 		return false;
 	}
-	if rxcompile(cp.re.r) == false  {
+	are, err := rxcompile(cp.re)
+	if  err != nil  {
 		editerror("bad regexp in g command");
-	if rxexecute(t, nil, addr.r.q0, addr.r.q1, &sel) ^ cp.cmdc=='v'){
+	}
+	sel := are.rxexecute(t, nil, addr.r.q0, addr.r.q1, 1)
+	if  (len(sel) > 0) != (cp.cmdc=='v') {
 		t.q0 = addr.r.q0;
 		t.q1 = addr.r.q1;
-		return cmdexec(t, cp.u.cmd);
+		return cmdexec(t, cp.cmd);
 	}
 	return true;
 }
-*/
+
 func i_cmd(t *Text, cp *Cmd) bool {
 	return appendx(t.file, cp, addr.r.q0);
 }
@@ -839,17 +811,24 @@ func pdisplay (File *f) (int) {
 	f.curtext.q1 = addr.r.q1;
 	return true;
 }
+*/
 
-func pfilename (File *f) () {
-	int dirty;
-	Window *w;
-
-	w = f.curtext.w;
+func pfilename (f *File) {
+	w := f.curtext.w;
 	// same check for dirty as in settag, but we know ncache==0
-	dirty = !w.isdir && !w.isscratch && f.mod;
-	warning(nil, "%c%c%c %.*S\n", " '"[dirty],
-		'+', " ."[curtext!=nil && curtext.file==f], f.nname, f.name);
+	dirty := !w.isdir && !w.isscratch && f.mod;
+	dirtychar := ' '
+	if dirty {
+		dirtychar = '\''
+	}
+	fc := ' '
+	if curtext!=nil && curtext.file==f {
+		fc = '.'
+	}
+	warning(nil, "%c%c%c %s\n", dirtychar,
+		'+', fc, f.name);
 }
+/*
 
 func loopcmd (File *f, Cmd *cp, Range *rp, long nrp) () {
 	long i;
@@ -1326,73 +1305,56 @@ func lineaddr (l int, addr  Address, sign  int) (Address) {
 	}
 	return a;
 }
-/*
-struct Filecheck
-{
-	File	*f;
-	Rune	*r;
-	int nr;
+
+type Filecheck struct {
+	f *File
+	r string
 };
 
-func allfilecheck (Window *w, void *v) () {
-	struct Filecheck *fp;
-	File *f;
-
-	fp = v;
-	f = w.body.file;
+func allfilecheck (w *Window, fp *Filecheck) () {
+	f := w.body.file;
 	if w.body.file == fp.f  {
 		return;
-	if runeeq(fp.r, fp.nr, f.name, f.nname)  {
-		warning(nil, "warning: duplicate file name \"%.*S\"\n", fp.nr, fp.r);
+	}
+	if fp.r == f.name {
+		warning(nil, "warning: duplicate file name \"%s\"\n", fp.r);
+	}
 }
 
-Rune*
-cmdname(File *f, String *str, int set)
-{
-	Rune *r, *s;
-	int n;
-	struct Filecheck fc;
-	Runestr newname;
-
-	r = nil;
-	n = str.n;
-	s = str.r;
-	if n == 0 {
+func cmdname(f *File, str string, set bool) string {
+	var fc Filecheck
+	r := "";
+	s := "";
+	if str == "" {
 		// no name; use existing
-		if f.nname == 0  {
-			return nil;
-		r = runemalloc(f.nname+1);
-		runemove(r, f.name, f.nname);
-		return r;
+		if f.name == "" {
+			return "";
+		}
+		return f.name
 	}
-	s = skipbl(s, n, &n);
-	if n == 0  {
+	s = strings.TrimLeft(str, " \t");
+	if s == "" {
 		goto Return;
+	}
 
 	if s[0] == '/' {
-		r = runemalloc(n+1);
-		runemove(r, s, n);
+		r = s
 	}else{
-		newname = dirname(f.curtext, runestrdup(s), n);
-		n = newname.nr;
-		r = runemalloc(n+1);	// NUL terminate
-		runemove(r, newname.r, n);
-		free(newname.r);
+		r = f.curtext.DirName(s);
 	}
 	fc.f = f;
 	fc.r = r;
-	fc.nr = n;
-	allwindows(allfilecheck, &fc);
-	if f.nname == 0  {
+	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) } );
+	if f.name == ""  {
 		set = true;
+	}
 
     Return:
-	if set && !runeeq(r, n, f.name, f.nname) {
-		filemark(f);
-		f.mod = TRUE;
+	if set && !(r == f.name) {
+		f.Mark();
+		f.mod = true;
 		f.curtext.w.dirty = true;
-		winsetname(f.curtext.w, r, n);
+		f.curtext.w.SetName(r);
 	}
 	return r;
 }
-*/
