@@ -187,7 +187,6 @@ func fsysdelid(idm *MntDir) {
 	defer mnt.lk.Unlock()
 	idm.ref--
 	if idm.ref > 0 {
-		mnt.lk.Unlock()
 		return
 	}
 	prev = nil
