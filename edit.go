@@ -4,13 +4,11 @@ import (
 	"fmt"
 )
 
-type String []rune
-
 type Addr struct {
 	typ  rune /* # (byte addr), l (line addr), / ? . $ + - , ; */
-	re   String
+	re   string
 	left *Addr /* left side of , and ; */
-	num  uint64
+	num  int
 	next *Addr /* or right side of , and ; */
 }
 
@@ -21,9 +19,9 @@ type Address struct {
 
 type Cmd struct {
 	addr   *Addr  /* address (range of text) */
-	re     String /* regular expression for e.g. 'x' */
+	re     string /* regular expression for e.g. 'x' */
 	cmd    *Cmd   /* target of x, g, {, etc. */
-	text   String /* text of a, c, i; rhs of s */
+	text   string /* text of a, c, i; rhs of s */
 	mtaddr *Addr  /* address for m, t */
 	next   *Cmd   /* pointer to next element in braces */
 	num    int
@@ -40,7 +38,7 @@ type Cmdtab struct {
 	defaddr Defaddr               /* default address */
 	count   int                   /* takes a count e.g. s2/// */
 	token   []rune                /* takes text terminated by one of these */
-	fn      func(*Text, *Cmd) int /* function to call with parse tree */
+	fn      func(*Text, *Cmd) bool /* function to call with parse tree */
 }
 
 const INCR = 25 /* delta when growing list */
@@ -55,7 +53,7 @@ type List struct { /* code depends on a long being able to hold a pointer */
 		listptr	*void
 		void*	*ptr;
 		byte*	*ucharptr;
-		String	*stringptr;
+		string	*stringptr;
 	*/
 }
 
@@ -116,16 +114,15 @@ var (
 	editerrc       chan error
 	endeditthreadc chan struct{}
 
-	lastpat String
+	lastpat string
 	patset  bool
 
 //	curtext	*Text
 )
 
 func editthread() {
-	editerrc := make(chan string)
 	endeditthreadc = make(chan struct{})
-
+loop:
 	for {
 		select {
 		case <-endeditthreadc:
@@ -133,14 +130,14 @@ func editthread() {
 		default:
 			cmd := parsecmd(0)
 			if cmd == nil {
-				break
+				break loop
 			}
-			if cmdexec(curtext, cmd) == 0 {
-				break
+			if !cmdexec(curtext, cmd) {
+				break loop
 			}
 		}
 	}
-	editerrc <- ""
+	editerrc <- nil
 }
 
 func allelogterm(w *Window) {
@@ -214,7 +211,7 @@ func editcmd(ct *Text, r []rune) {
 	resetxec()
 	if editerrc == nil {
 		editerrc = make(chan error)
-		lastpat = []rune{}
+		lastpat = ""
 	}
 	go editthread()
 	err = <-editerrc
@@ -222,7 +219,6 @@ func editcmd(ct *Text, r []rune) {
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
 	}
-
 	/* update everyone whose edit log has data */
 	row.AllWindows(allupdate)
 }
@@ -250,8 +246,8 @@ func ungetch() {
 	}
 }
 
-func getnum(signok int) int64 {
-	var n int64
+func getnum(signok int) int {
+	var n int
 	var sign int
 	var c rune
 
@@ -263,7 +259,7 @@ func getnum(signok int) int64 {
 	}
 	c = nextc()
 	if c < '0' || '9' < c { /* no number defaults to 1 */
-		return int64(sign)
+		return sign
 	}
 
 	for {
@@ -271,10 +267,10 @@ func getnum(signok int) int64 {
 		if !('0' <= c && c <= '9') {
 			break
 		}
-		n = n*10 + int64(c-'0')
+		n = n*10 + int(c-'0')
 	}
 	ungetch()
-	return int64(sign) * n
+	return sign * n
 }
 
 func cmdskipbl() rune {
@@ -292,16 +288,8 @@ func cmdskipbl() rune {
 	return c
 }
 
-func allocstring(n int) String {
-	return make([]rune, 0, n)
-}
-
 func newcmd() *Cmd {
 	return &Cmd{}
-}
-
-func newstring(n int) String {
-	return String(make([]rune, 0, n))
 }
 
 func newaddr() *Addr {
@@ -323,11 +311,7 @@ func atnl() {
 	}
 }
 
-func Straddc(s String, c rune) String {
-	return append(s, c)
-}
-
-func getrhs(s String, delim rune, cmd rune) {
+func getrhs(delim rune, cmd rune) (s string) {
 	var c rune
 
 	for {
@@ -348,18 +332,19 @@ func getrhs(s String, delim rune, cmd rune) {
 					c = '\n'
 				} else {
 					if c != delim && (cmd == 's' || c != '\\') { /* s does its own */
-						s = Straddc(s, '\\')
+						s = s + "\\" // TODO(flux): Use a stringbuilder
 					}
 				}
 			}
 		}
-		s = Straddc(s, c)
+		s = s + string(c)
 	}
 	ungetch() /* let client read whether delimiter, '\n' or whatever */
+	return
 }
 
-func collecttoken(end []rune) String {
-	s := newstring(0)
+func collecttoken(end []rune) string {
+	s := ""
 	var c rune
 
 	for {
@@ -367,14 +352,14 @@ func collecttoken(end []rune) String {
 		if c == ' ' || c == '\t' {
 			break
 		}
-		s = Straddc(s, getch()) /* blanks significant for getname() */
+		s = s + string(getch()) /* blanks significant for getname() */
 	}
 	for {
 		c = getch()
 		if !(c > 0 && utfrune(end, c) == 0) {
 			break
 		}
-		s = Straddc(s, c)
+		s = s + string(c)
 	}
 	if c != '\n' {
 		atnl()
@@ -382,11 +367,11 @@ func collecttoken(end []rune) String {
 	return s
 }
 
-func collecttext() String {
+func collecttext() string {
 	var begline, i int
 	var c, delim rune
 
-	s := newstring(0)
+	s := ""
 	if cmdskipbl() == '\n' {
 		getch()
 		i = 0
@@ -398,10 +383,10 @@ func collecttext() String {
 					break
 				}
 				i++
-				s = Straddc(s, c)
+				s = s + string(c)
 			}
 			i++
-			s = Straddc(s, '\n')
+			s = s + "\n"
 			if c < 0 {
 				return s
 			}
@@ -413,7 +398,7 @@ func collecttext() String {
 	} else {
 		delim = getch()
 		okdelim(delim)
-		getrhs(s, delim, 'a')
+		s = getrhs(delim, 'a')
 		if nextc() == delim {
 			getch()
 		}
@@ -476,8 +461,8 @@ func parsecmd(nest int) *Cmd {
 				okdelim(c)
 				cmd.re = getregexp(c)
 				if ct.cmdc == 's' {
-					cmd.text = newstring(0)
-					getrhs(cmd.text, c, 's')
+					cmd.text = ""
+					cmd.text = getrhs(c, 's')
 					if nextc() == c {
 						getch()
 						if nextc() == 'g' {
@@ -488,9 +473,11 @@ func parsecmd(nest int) *Cmd {
 				}
 			}
 		}
-		cmd.mtaddr = simpleaddr()
-		if ct.addr != 0 && cmd.mtaddr == nil {
-			editerror("bad address")
+		if ct.addr != 0 {
+			cmd.mtaddr = simpleaddr()
+		 	if cmd.mtaddr == nil {
+				editerror("bad address")
+			}
 		}
 		switch {
 		case ct.defcmd != 0:
@@ -546,12 +533,12 @@ Return:
 	return cp
 }
 
-func getregexp(delim rune) String {
-	var buf, r String
+func getregexp(delim rune) string {
+	var buf string
 	var i int
 	var c rune
 
-	buf = allocstring(0)
+	buf = ""
 	for i = 0; ; i++ {
 		c = getch()
 		if c == '\\' {
@@ -559,7 +546,7 @@ func getregexp(delim rune) String {
 				c = getch()
 			} else {
 				if nextc() == '\\' {
-					buf = Straddc(buf, c)
+					buf = buf + string(c)
 					c = getch()
 				}
 			}
@@ -568,7 +555,7 @@ func getregexp(delim rune) String {
 				break
 			}
 		}
-		buf = Straddc(buf, c)
+		buf = buf + string(c)
 	}
 	if c != delim && c != 0 {
 		ungetch()
@@ -580,9 +567,7 @@ func getregexp(delim rune) String {
 	if len(lastpat) == 0 {
 		editerror("no regular expression defined")
 	}
-	r = newstring(len(lastpat)) // TODO(flux): clean up these []rune allocations
-	copy(r, lastpat)            /* newstring put \0 at end */
-	return r
+	return lastpat
 }
 
 func simpleaddr() *Addr {
@@ -593,7 +578,7 @@ func simpleaddr() *Addr {
 	switch cmdskipbl() {
 	case '#':
 		addr.typ = getch()
-		addr.num = uint64(getnum(1))
+		addr.num = getnum(1)
 	case '0':
 		fallthrough
 	case '1':
@@ -613,7 +598,7 @@ func simpleaddr() *Addr {
 	case '8':
 		fallthrough
 	case '9':
-		addr.num = uint64(getnum(1))
+		addr.num = (getnum(1))
 		addr.typ = 'l'
 	case '/':
 		fallthrough

@@ -18,7 +18,7 @@ func testRegexpForward(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		are, err := rxcompile([]rune(test.re))
+		are, err := rxcompile(test.re)
 		if err != nil {
 			t.Errorf("Failed to compile tests[%d].re = '%v'", i, test.re)
 		}
@@ -54,7 +54,7 @@ func TestRegexpBackward(t *testing.T) {
 		{"aaaa", "a", RangeSet{{3, 4}, {2, 3}}, 2},
 	}
 	for i, test := range tests {
-		are, err := rxcompile([]rune(test.re))
+		are, err := rxcompile(test.re)
 		if err != nil {
 			t.Errorf("Failed to compile tests[%d].re = '%v'", i, test.re)
 		}

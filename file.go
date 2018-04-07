@@ -15,7 +15,7 @@ type File struct {
 	epsilon []*Undo
 	elogbuf *Buffer
 	elog    Elog
-	name    string //[]rune
+	name    string
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
 	mtime   time.Time
 	// dev       int

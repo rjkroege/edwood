@@ -11,7 +11,7 @@ type AcmeRegexp struct {
 	re *regexp.Regexp
 }
 
-func rxcompile(r []rune) (*AcmeRegexp, error) {
+func rxcompile(r string) (*AcmeRegexp, error) {
 	re, err := regexp.Compile(string(r))
 	if err != nil {
 		return nil, err

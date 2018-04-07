@@ -76,12 +76,11 @@ type Text struct {
 	needundo    bool
 }
 
-func (t *Text) Init(f *File, r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
+func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
 	if t == nil {
 		t = new(Text)
 	}
 	t.display = dis
-	t.file = f
 	t.all = r
 	t.scrollr = r
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
@@ -472,7 +471,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if q0 < t.org {
 		t.org += n
 	} else {
-		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
+		if t.fr != nil && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
 			t.fr.Insert(r[:n], int(q0-t.org))
 		}
 	}
@@ -1297,6 +1296,7 @@ func (t *Text) SetSelect(q0, q1 int) {
 		ticked = false
 		p1 = 0
 	}
+	if t.fr == nil { return }
 	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
 		ticked = false
 		p0 = (t.fr.GetFrameFillStatus().Nchars)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -31,15 +32,16 @@ func resetxec() {
 	clearcollection()
 }
 
-func mkaddr(a *Address, f *File) {
+func mkaddr(f *File) (a Address) {
 	a.r.q0 = int(f.curtext.q0)
 	a.r.q1 = int(f.curtext.q1)
 	a.f = f
+	return a
 }
 
 var none Address = Address{Range{0, 0}, nil}
 
-func cmdexec(t *Text, cp *Cmd) int {
+func cmdexec(t *Text, cp *Cmd) bool {
 	w := (*Window)(nil)
 	if t != nil {
 		w = t.w
@@ -75,7 +77,7 @@ func cmdexec(t *Text, cp *Cmd) int {
 		}
 		if cp.addr != nil { // may be false for '\n' (only
 			if f != nil {
-				mkaddr(&dot, f)
+				dot = mkaddr(f)
 				addr = cmdaddress(ap, dot, 0)
 			} else { // a "
 				addr = cmdaddress(ap, none, 0)
@@ -86,7 +88,7 @@ func cmdexec(t *Text, cp *Cmd) int {
 	}
 	switch cp.cmdc {
 	case '{':
-		mkaddr(&dot, f)
+		dot = mkaddr(f)
 		if cp.addr != nil {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
@@ -103,10 +105,9 @@ func cmdexec(t *Text, cp *Cmd) int {
 		if i < 0 {
 			editerror("unknown command %c in cmdexec", cp.cmdc)
 		}
-		i = (cmdtab[i].fn)(t, cp)
-		return i
+		return (cmdtab[i].fn)(t, cp)
 	}
-	return 1
+	return true
 }
 
 func edittext(w *Window, q int, r []rune) error {
@@ -144,18 +145,13 @@ func filelist(t *Text, r []rune) []rune {
 	return collection
 }
 
-func a_cmd(t *Text, cp *Cmd) int {
-	Unimpl()
-	return 0
+func a_cmd(t *Text, cp *Cmd) bool {
+	return appendx(t.file, cp, addr.r.q1);
 }
 
-/*	return append(t.file, cp, addr.r.q1);
-}
-
-*/
-func b_cmd(t *Text, cp *Cmd) int {
+func b_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -169,9 +165,9 @@ func b_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func B_cmd(t *Text, cp *Cmd) int {
+func B_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -197,9 +193,9 @@ func B_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func c_cmd(t *Text, cp *Cmd) int {
+func c_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -209,9 +205,9 @@ func c_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func d_cmd(t *Text, cp *Cmd) int {
+func d_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -228,9 +224,9 @@ func D1 (Text *t) () {
 		colclose(t.col, t.w, true);
 }
 */
-func D_cmd(t *Text, cp *Cmd) int {
+func D_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -288,9 +284,9 @@ readloader(void *v, uint q0, Rune *r, int nr)
 	return 0;
 }
 */
-func e_cmd(t *Text, cp *Cmd) int {
+func e_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -346,9 +342,9 @@ func e_cmd(t *Text, cp *Cmd) int {
 */
 var Lempty []rune = []rune{0}
 
-func f_cmd(t *Text, cp *Cmd) int {
+func f_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -368,9 +364,9 @@ func f_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func g_cmd(t *Text, cp *Cmd) int {
+func g_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -388,14 +384,10 @@ func g_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func i_cmd(t *Text, cp *Cmd) int {
-	Unimpl()
-	return 0
+func i_cmd(t *Text, cp *Cmd) bool {
+	return appendx(t.file, cp, addr.r.q0);
 }
-
 /*
-	return append(t.file, cp, addr.r.q0);
-}
 
 func copy (File *f, Address addr2) () {
 	long p;
@@ -426,15 +418,15 @@ func move (File *f, Address addr2) () {
 		editerror("move overlaps itself");
 }
 */
-func m_cmd(t *Text, cp *Cmd) int {
+func m_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
 	Address dot, addr2;
 
-	mkaddr(&dot, t.file);
+	dot = mkaddr(t.file);
 	addr2 = cmdaddress(cp.u.mtaddr, dot, 0);
 	if cp.cmdc == 'm'  {
 		move(t.file, addr2);
@@ -443,9 +435,9 @@ func m_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func p_cmd(t *Text, cp *Cmd) int {
+func p_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -453,9 +445,9 @@ func p_cmd(t *Text, cp *Cmd) int {
 	return pdisplay(t.file);
 }
 */
-func s_cmd(t *Text, cp *Cmd) int {
+func s_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -545,9 +537,9 @@ Err:
 	return false;
 }
 */
-func u_cmd(t *Text, cp *Cmd) int {
+func u_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -567,9 +559,9 @@ func u_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func w_cmd(t *Text, cp *Cmd) int {
+func w_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -587,9 +579,9 @@ func w_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func x_cmd(t *Text, cp *Cmd) int {
+func x_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -600,9 +592,9 @@ func x_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func X_cmd(t *Text, cp *Cmd) int {
+func X_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -677,9 +669,9 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	}
 }
 
-func pipe_cmd(t *Text, cp *Cmd) int {
-	runpipe(t, cp.cmdc, cp.text, Inserting)
-	return 1
+func pipe_cmd(t *Text, cp *Cmd) bool {
+	runpipe(t, cp.cmdc, []rune(cp.text), Inserting)
+	return true
 }
 
 /*
@@ -758,9 +750,9 @@ func printposn (Text *t, int mode) () {
 	}
 }
 */
-func eq_cmd(t *Text, cp *Cmd) int {
+func eq_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -787,9 +779,9 @@ func eq_cmd(t *Text, cp *Cmd) int {
 	return true;
 }
 */
-func nl_cmd(t *Text, cp *Cmd) int {
+func nl_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
-	return 0
+	return false
 }
 
 /*
@@ -799,7 +791,7 @@ func nl_cmd(t *Text, cp *Cmd) int {
 	f = t.file;
 	if(cp.addr == 0 {
 		// First put it on newline boundaries
-		mkaddr(&a, f);
+		a = mkaddr(f);
 		addr = lineaddr(0, a, -1);
 		a = lineaddr(0, a, 1);
 		addr.r.q1 = a.r.q1;
@@ -811,14 +803,17 @@ func nl_cmd(t *Text, cp *Cmd) int {
 	textshow(t, addr.r.q0, addr.r.q1, 1);
 	return true;
 }
+*/
 
-func append (File *f, Cmd *cp, long p) (int) {
-	if cp.u.text.n > 0  {
-		eloginsert(f, p, cp.u.text.r, cp.u.text.n);
+func appendx(f * File, cp * Cmd, p  int) (bool) {
+	if len(cp.text) > 0  {
+		f.elog.Insert(p, []rune(cp.text));
+	}
 	f.curtext.q0 = p;
 	f.curtext.q1 = p;
 	return true;
 }
+/*
 
 func pdisplay (File *f) (int) {
 	long p1, p2;
@@ -1018,7 +1013,7 @@ func filelooper (Cmd *cp, int XY) () {
 	--nest;
 }
 */
-func nextmatch(f *File, r []rune, p int, sign int) {
+func nextmatch(f *File, r string, p int, sign int) {
 	are, err := rxcompile(r)
 	if err != nil {
 		editerror("bad regexp in command address")
@@ -1056,217 +1051,220 @@ func nextmatch(f *File, r []rune, p int, sign int) {
 	}
 }
 
-/*
-File	*matchfile(String*);
-Address	charaddr(long, Address, int);
-Address	lineaddr(long, Address, int);
-*/
+
 func cmdaddress(ap *Addr, a Address, sign int) Address {
-	Unimpl()
-	return Address{Range{0, 0}, nil}
-}
-
-/*	File *f = a.f;
-	Address a1, a2;
-
-	do{
+	f := a.f;
+	var a1, a2 Address
+	var qbydir int
+	for {
 		switch(ap.typ){
-		case 'l':
-		case '#':
-			a = (*(ap.typ=='#'?charaddr:lineaddr))(ap.num, a, sign);
-			break;
-
+		case 'l': a = lineaddr(ap.num, a, sign)
+		case '#': a = charaddr(ap.num, a, sign)
 		case '.':
-			mkaddr(&a, f);
-			break;
+			a = mkaddr(f);
 
 		case '$':
-			a.r.q0 = a.r.q1 = f.b.nc;
-			break;
+			a.r.q0 = f.b.Nc()
+			a.r.q1 = a.r.q0
 
 		case '\'':
 editerror("can't handle '");
 //			a.r = f.mark;
-			break;
 
 		case '?':
 			sign = -sign;
 			if sign == 0  {
 				sign = -1;
-			// fall through
+			}
+			fallthrough
 		case '/':
-			nextmatch(f, ap.u.re, sign>=0? a.r.q1 : a.r.q0, sign);
+			//sign>=0? a.r.q1 : a.r.q0
+			if sign >= 0 { qbydir = a.r.q1 } else { qbydir = a.r.q0 }
+			nextmatch(f, ap.re, qbydir, sign);
 			a.r = sel[0];
-			break;
 
 		case '"':
-			f = matchfile(ap.u.re);
-			mkaddr(&a, f);
-			break;
+			f = matchfile(ap.re);
+			a = mkaddr(f);
 
 		case '*':
-			a.r.q0 = 0, a.r.q1 = f.b.nc;
-			return a;
+			a.r.q0 = 0
+			a.r.q1 = f.b.Nc()
 
-		case ',':
+		case ',': fallthrough
 		case ';':
-			if ap.u.left  {
-				a1 = cmdaddress(ap.u.left, a, 0);
-			else
-				a1.f = a.f, a1.r.q0 = a1.r.q1 = 0;
+			if ap.left != nil {
+				a1 = cmdaddress(ap.left, a, 0);
+			} else {
+				a1.f = a.f
+				a1.r.q0 = 0
+				a1.r.q1 = 0
+			}
 			if ap.typ == ';' {
 				f = a1.f;
 				a = a1;
 				f.curtext.q0 = a1.r.q0;
 				f.curtext.q1 = a1.r.q1;
 			}
-			if ap.next  {
+			if ap.next != nil {
 				a2 = cmdaddress(ap.next, a, 0);
-			else
-				a2.f = a.f, a2.r.q0 = a2.r.q1 = f.b.nc;
+			} else {
+				a2.f = a.f
+				 a2.r.q0 = 0
+				a2.r.q1 = f.b.Nc()
+			}
 			if a1.f != a2.f  {
-				editerror("addresses in different files"); {
-			a.f = a1.f, a.r.q0 = a1.r.q0, a.r.q1 = a2.r.q1;
+				editerror("addresses in different files");
+			}
+			a.f = a1.f
+			a.r.q0 = a1.r.q0
+			a.r.q1 = a2.r.q1;
 			if a.r.q1 < a.r.q0  {
 				editerror("addresses out of order");
+			}
 			return a;
 
-		case '+':
+		case '+': fallthrough
 		case '-':
 			sign = 1;
 			if ap.typ == '-'  {
 				sign = -1;
-			if ap.next==0 || ap.next.typ=='+' || ap.next.typ=='-'  {
-				a = lineaddr(1L, a, sign);
+			}
+			if ap.next==nil || ap.next.typ=='+' || ap.next.typ=='-'  {
+				a = lineaddr(1, a, sign);
+			}
 			break;
 		default:
-			error("cmdaddress");
+			acmeerror("cmdaddress", nil);
 			return a;
 		}
-	}while(ap = ap.next);	// assign =
+		ap = ap.next
+		if ap == nil { break }
+	}
 	return a;
 }
 
-struct Tofile{
-	File		*f;
-	String	*r;
+type Tofile struct{
+	f *File
+	r string
 };
 
-func alltofile (Window *w, void *v) () {
-	Text *t;
-	struct Tofile *tp;
-
-	tp = v;
+func alltofile (w * Window, tp *Tofile) () {
 	if tp.f != nil  {
 		return;
+	}
 	if w.isscratch || w.isdir  {
 		return;
-	t = &w.body;
+	}
+	t := &w.body;
 	// only use this window if it's the current window for the file  {
 	if t.file.curtext != t  {
 		return;
+	}
 //	if w.nopen[QWevent] > 0   {
 //		return;
-	if runeeq(tp.r.r, tp.r.n, t.file.name, t.file.nname)) {
+	if tp.r == t.file.name {
 		tp.f = t.file;
+	}
 }
 
-File*
-tofile(String *r)
-{
-	struct Tofile t;
-	String rr;
+func tofile(r string) *File {
+	var t Tofile
 
-	rr.r = skipbl(r.r, r.n, &rr.n);
+	t.r  = strings.TrimLeft(r, " \t\n");
 	t.f = nil;
-	t.r = &rr;
-	allwindows(alltofile, &t);
+	row.AllWindows(func(w *Window){alltofile(w,&t)});
 	if t.f == nil  {
-		editerror("no such file\"%S\"", rr.r);
+		editerror("no such file\"%v\"", t.r);
+	}
 	return t.f;
 }
 
-func allmatchfile (Window *w, void *v) () {
-	struct Tofile *tp;
-	Text *t;
-
-	tp = v;
+func allmatchfile (w * Window, tp *Tofile) () {
 	if w.isscratch || w.isdir  {
 		return;
-	t = &w.body;
+	}
+	t := &w.body;
 	// only use this window if it's the current window for the file  {
 	if t.file.curtext != t  {
 		return;
+	}
 //	if w.nopen[QWevent] > 0   {
 //		return;
-	if filematch(w.body.file, tp.r)){
-		if(tp.f != nil  {
-			editerror("too many files match \"%S\"", tp.r.r);
+	if filematch(w.body.file, tp.r){
+		if tp.f != nil  {
+			editerror("too many files match \"%v\"", tp.r);
+		}
 		tp.f = w.body.file;
 	}
 }
 
-File*
-matchfile(String *r)
-{
-	struct Tofile tf;
+func matchfile(r string) *File {
+	var tf Tofile
 
 	tf.f = nil;
 	tf.r = r;
-	allwindows(allmatchfile, &tf);
+	row.AllWindows(func(w *Window){ allmatchfile(w, &tf) });
 
 	if tf.f == nil  {
-		editerror("no file matches \"%S\"", r.r);
+		editerror("no file matches \"%v\"", r);
+	}
 	return tf.f;
 }
 
-func filematch (File *f, String *r) (int) {
-	char *buf;
-	Rune *rbuf;
-	Window *w;
-	int match, i, dirty;
-	Rangeset s;
-
+func filematch (f * File, r string) (bool) {
 	// compile expr first so if we get an error, we haven't allocated anything  {
-	if rxcompile(r.r) == false  {
+	are, err := rxcompile(r)
+	if  err != nil  {
 		editerror("bad regexp in file match");
-	buf = fbufalloc();
-	w = f.curtext.w;
+	}
+	w := f.curtext.w;
 	// same check for dirty as in settag, but we know ncache==0
-	dirty = !w.isdir && !w.isscratch && f.mod;
-	snprint(buf, BUFSIZE, "%c%c%c %.*S\n", " '"[dirty],
-		'+', " ."[curtext!=nil && curtext.file==f], f.nname, f.name);
-	rbuf = bytetorune(buf, &i);
-	fbuffree(buf);
-	match = rxexecute(nil, rbuf, 0, i, &s);
-	free(rbuf);
-	return match;
+	dirty := !w.isdir && !w.isscratch && f.mod;
+	dmark := ' '
+	if dirty { dmark = '\'' }
+	fmark := ' '
+	if curtext!=nil && curtext.file==f {fmark = '.'}
+	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.name);
+	
+	s := are.rxexecute(nil, []rune(buf), 0, len([]rune(buf)), 1);
+	return len(s) > 0;
 }
 
-func charaddr (long l, Address addr, int sign) (Address) {
+func charaddr (l  int, addr  Address, sign  int) (Address) {
 	if sign == 0  {
-		addr.r.q0 = addr.r.q1 = l;
-	else if sign < 0  {
-		addr.r.q1 = addr.r.q0 -= l;
-	else if sign > 0  {
-		addr.r.q0 = addr.r.q1 += l;
-	if addr.r.q0<0 || addr.r.q1>addr.f.b.nc  {
+		addr.r.q0 = l
+		addr.r.q1 = l
+	} else if sign < 0  {
+		addr.r.q0 -= l;
+		addr.r.q1 = addr.r.q0
+	} else if sign > 0  {
+		addr.r.q1 += l;
+		addr.r.q0 = addr.r.q1 
+	}
+	if addr.r.q0<0 || addr.r.q1>addr.f.b.Nc()  {
 		editerror("address out of range");
+	}
 	return addr;
 }
 
-func lineaddr (long l, Address addr, int sign) (Address) {
-	int n;
+func lineaddr (l int, addr  Address, sign  int) (Address) {
+/*	int n;
 	int c;
 	File *f = addr.f;
 	Address a;
 	long p;
-
+*/
+	var a Address
+	f := addr.f
 	a.f = f;
+	n := 0
+	p := 0
 	if sign >= 0 {
 		if l == 0 {
 			if sign==0 || addr.r.q1==0 {
-				a.r.q0 = a.r.q1 = 0;
+				a.r.q0 = 0
+				a.r.q1 = 0;
 				return a;
 			}
 			a.r.q0 = addr.r.q1;
@@ -1277,45 +1275,58 @@ func lineaddr (long l, Address addr, int sign) (Address) {
 				n = 1;
 			}else{
 				p = addr.r.q1-1;
-				n = textreadc(f.curtext, p++)=='\n';
+				if f.curtext.ReadC(p)=='\n' {
+					n = 1
+				}
+				p++
 			}
-			while(n < l){
-				if p >= f.b.nc  {
+			for (n < l){
+				if p >= f.b.Nc()  {
 					editerror("address out of range");
-				if textreadc(f.curtext, p++) == '\n'  {
+				}
+				if f.curtext.ReadC(p) == '\n'  {
 					n++;
+				}
+				p++
 			}
 			a.r.q0 = p;
 		}
-		while(p < f.b.nc && textreadc(f.curtext, p++)!='\n')
-			;
+		for (p < f.b.Nc() && f.curtext.ReadC(p)!='\n') {
+			p++
+		}
 		a.r.q1 = p;
 	}else{
 		p = addr.r.q0;
 		if l == 0  {
 			a.r.q1 = addr.r.q0;
-		else{
+		}else{
 			for n = 0; n<l;  {	// always runs once
 				if p == 0 {
-					if ++n != l  {
+					n++
+					if n != l  {
 						editerror("address out of range");
+					}
 				}else{
-					c = textreadc(f.curtext, p-1);
-					if c != '\n' || ++n != l  {
+					c := f.curtext.ReadC(p-1);
+					n++
+					if c != '\n' || n != l  {
 						p--;
+					}
 				}
 			}
 			a.r.q1 = p;
 			if p > 0  {
 				p--;
+			}
 		}
-		while(p > 0 && textreadc(f.curtext, p-1)!='\n')	// lines start after a newline
+		for (p > 0 && f.curtext.ReadC(p-1)!='\n') {	// lines start after a newline
 			p--;
+		}
 		a.r.q0 = p;
 	}
 	return a;
 }
-
+/*
 struct Filecheck
 {
 	File	*f;

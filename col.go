@@ -39,10 +39,12 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	}
 	c.r = r
 	c.tag.col = c
-	tagfile := NewFile("")
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
-	c.tag.Init(tagfile.AddText(&c.tag), r1, tagfont, tagcolors, c.display)
+	
+	tagfile := NewFile("")
+	c.tag.file = tagfile.AddText(&c.tag)
+	c.tag.Init(r1, tagfont, tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)

@@ -33,7 +33,8 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height
 	t := &row.tag
 	f := new(File)
-	t.Init(f.AddText(t), r1, tagfont, tagcolors, row.display)
+	t.file = f.AddText(t)
+	t.Init(r1, tagfont, tagcolors, row.display)
 	t.what = Rowtag
 	t.row = row
 	t.w = nil

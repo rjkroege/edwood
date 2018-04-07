@@ -66,14 +66,8 @@ func NewWindow() *Window {
 	return &Window{}
 }
 
-func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
-
-	//	var r1, br image.Rectangle
-	//	var f *File
-	var rf string
-	//	var rp []rune
-	//	var nc int
-
+// Initialize the headless parts of the window.
+func (w *Window) initHeadless(clone *Window) *Window {
 	w.tag.w = w
 	w.taglines = 1
 	w.tagsafe = false
@@ -82,7 +76,6 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	w.incl = []string{}
 	WinId++
 	w.id = WinId
-	w.display = dis
 	w.ref.Inc()
 	if globalincref {
 		w.ref.Inc()
@@ -90,15 +83,47 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
+
+	f := NewTagFile()
+	f.AddText(&w.tag)
+	w.tag.file = f
+
+	// Body setup.
+	f = NewFile("")
+	if clone != nil {
+		f = clone.body.file
+		w.body.org = clone.body.org
+		w.isscratch = clone.isscratch
+	}
+	w.body.file = f.AddText(&w.body)
+
+	w.filemenu = true
+	w.autoindent = globalautoindent
+
+	if clone != nil {
+		w.dirty = clone.dirty
+		w.autoindent = clone.autoindent
+	}
+	return w
+}
+
+func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
+
+	//	var r1, br image.Rectangle
+	//	var f *File
+	var rf string
+	//	var rp []rune
+	//	var nc int
+
+	w.initHeadless(clone)
+	w.display = dis
 	r1 := r
 
 	w.tagtop = r
 	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height
 	r1.Max.Y = r1.Min.Y + w.taglines*fontget(tagfont, w.display).Height
 
-	f := NewTagFile()
-	f.AddText(&w.tag)
-	w.tag.Init(f, r1, tagfont, tagcolors, w.display)
+	w.tag.Init(r1, tagfont, tagcolors, w.display)
 	w.tag.what = Tag
 
 	/* tag is a copy of the contents, not a tracked image */
@@ -114,18 +139,12 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 		r1.Max.Y = r1.Min.Y
 	}
 
-	// Body setup.
-	f = NewFile("")
 	if clone != nil {
-		f = clone.body.file
-		w.body.org = clone.body.org
-		w.isscratch = clone.isscratch
 		rf = clone.body.font
 	} else {
 		rf = tagfont
 	}
-	f = f.AddText(&w.body)
-	w.body.Init(f, r1, rf, textcolors, w.display)
+	w.body.Init(r1, rf, textcolors, w.display)
 	w.body.what = Body
 	r1.Min.Y -= 1
 	r1.Max.Y = r1.Min.Y + 1
@@ -141,12 +160,8 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	if w.display != nil {
 		w.display.ScreenImage.Draw(br, button, nil, button.R.Min)
 	}
-	w.filemenu = true
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
-	w.autoindent = globalautoindent
 	if clone != nil {
-		w.dirty = clone.dirty
-		w.autoindent = clone.autoindent
 		w.body.SetSelect(clone.body.q0, clone.body.q1)
 		w.SetTag()
 	}

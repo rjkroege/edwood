@@ -169,7 +169,7 @@ func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int)
 		return r, false
 	}
 	if len(pat) > 0 {
-		pattern, err = rxcompile([]rune(pat))
+		pattern, err = rxcompile(pat)
 		if err != nil {
 			return r, false
 		}

@@ -32,7 +32,7 @@ var exectab = []Exectab{
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
 	{"Dump", dump, false, true, true /*unused*/},
-	//	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
+	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
 	{"Get", get, false, true, true /*unused*/},
@@ -233,6 +233,20 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		t.w.ref.Inc()
 	}
 	run(t.w, string(b), dir, true, aa, a, false)
+}
+
+func edit(et * Text, _ * Text, argt * Text, _, _  bool, arg string) {
+
+	if(et == nil) {
+		return;
+	}
+	r, _ := getarg(argt, false, true);
+	seq++;
+	if(r != ""){
+		editcmd(et, []rune(r));
+	}else {
+		editcmd(et, []rune(arg));
+	}
 }
 
 func xexit(*Text, *Text, *Text, bool, bool, string) {
