@@ -89,8 +89,8 @@ var cmdtab = []Cmdtab{
 	{'u', 0, 0, 0, 0, aNo, 2, nil, u_cmd},
 	{'v', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to g_cmd in init() to avoid initialization loop
 	{'w', 0, 0, 0, 0, aAll, 0, wordx, w_cmd},
-	{'x', 0, 1, 0, 'p', aDot, 0, nil, x_cmd},
-	{'y', 0, 1, 0, 'p', aDot, 0, nil, x_cmd},
+	{'x', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to x_cmd in init() to avoid initialization loop
+	{'y', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to x_cmd in init() to avoid initialization loop
 	{'=', 0, 0, 0, 0, aDot, 0, linex, eq_cmd},
 	{'B', 0, 0, 0, 0, aNo, 0, linex, B_cmd},
 	{'D', 0, 0, 0, 0, aNo, 0, linex, D_cmd},
@@ -113,6 +113,8 @@ func init() {
 		switch c.cmdc {
 		case 'g', 'v':
 			cmdtab[i].fn = g_cmd
+		case 'x', 'y':
+			cmdtab[i].fn = x_cmd
 		}
 	}
 }

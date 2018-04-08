@@ -359,64 +359,49 @@ func g_cmd(t *Text, cp *Cmd) bool {
 func i_cmd(t *Text, cp *Cmd) bool {
 	return appendx(t.file, cp, addr.r.q0);
 }
-/*
 
-func copy (File *f, Address addr2) () {
-	long p;
-	int ni;
-	Rune *buf;
-
-	buf = fbufalloc();
-	for p=addr.r.q0; p<addr.r.q1; p+=ni {
+func copyx (f * File, addr2  Address) () {
+	ni := 0;
+	buf := make([]rune, RBUFSIZE)
+	for p:=addr.r.q0; p<addr.r.q1; p+=ni {
 		ni = addr.r.q1-p;
 		if ni > RBUFSIZE  {
 			ni = RBUFSIZE;
-		bufread(&f.b, p, buf, ni);
-		eloginsert(addr2.f, addr2.r.q1, buf, ni);
+		}
+		f.b.Read(p, buf[:ni]);
+		addr2.f.elog.Insert(addr2.r.q1, buf[:ni]);
 	}
-	fbuffree(buf);
 }
 
-func move (File *f, Address addr2) () {
+func move (f * File, addr2  Address) () {
 	if addr.f!=addr2.f || addr.r.q1<=addr2.r.q0 {
-		elogdelete(f, addr.r.q0, addr.r.q1);
-		copy(f, addr2);
+		f.elog.Delete(addr.r.q0, addr.r.q1);
+		copyx(f, addr2);
 	}else if addr.r.q0 >= addr2.r.q1 {
-		copy(f, addr2);
-		elogdelete(f, addr.r.q0, addr.r.q1);
+		copyx(f, addr2);
+		f.elog.Delete(addr.r.q0, addr.r.q1);
 	}else if addr.r.q0==addr2.r.q0 && addr.r.q1==addr2.r.q1 {
 		; // move to self; no-op
-	}else
+	}else {
 		editerror("move overlaps itself");
+	}
 }
-*/
+
 func m_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Address dot, addr2;
-
-	dot = mkaddr(t.file);
-	addr2 = cmdaddress(cp.u.mtaddr, dot, 0);
+	dot := mkaddr(t.file);
+	addr2 := cmdaddress(cp.mtaddr, dot, 0);
 	if cp.cmdc == 'm'  {
 		move(t.file, addr2);
-	else
-		copy(t.file, addr2);
+	}else{
+		copyx(t.file, addr2);
+	}
 	return true;
 }
-*/
-func p_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
 
-/*
-	USED(cp);
+func p_cmd(t *Text, cp *Cmd) bool {
 	return pdisplay(t.file);
 }
-*/
+
 func s_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
 	return false
@@ -509,61 +494,46 @@ Err:
 	return false;
 }
 */
+
 func u_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	int n, oseq, flag;
-
-	n = cp.num;
-	flag = true;
+	n := cp.num;
+	flag := true;
 	if n < 0 {
 		n = -n;
 		flag = false;
 	}
-	oseq = -1;
-	while(n-.0 && t.file.seq!=oseq){
+	oseq := -1;
+	for(n>0 && t.file.seq!=oseq){
+		n--
 		oseq = t.file.seq;
-		undo(t, nil, nil, flag, 0, nil, 0);
+		undo(t, nil, nil, flag, false, "");
 	}
 	return true;
 }
-*/
+
 func w_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *r;
-	File *f;
-
-	f = t.file;
-	if(f.seq == seq  {
-		editerror("can't write file with pending modifications"); {
-	r = cmdname(f, cp.u.text, false);
-	if r == nil  {
-		editerror("no name specified for 'w' command"); {
-	putfile(f, addr.r.q0, addr.r.q1, r, runestrlen(r));
-	// r is freed by putfile
+	f := t.file;
+	if f.seq == seq  {
+		editerror("can't write file with pending modifications"); 
+	}
+	r := cmdname(f, cp.text, false);
+	if r == ""  {
+		editerror("no name specified for 'w' command"); 
+	}
+	putfile(f, addr.r.q0, addr.r.q1, r);
 	return true;
 }
-*/
+
 func x_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
 
-/*
-	if cp.re) {
+	if cp.re != "" {
 		looper(t.file, cp, cp.cmdc=='x');
-	else
+	}else{
 		linelooper(t.file, cp);
+	}
 	return true;
 }
-*/
+
 func X_cmd(t *Text, cp *Cmd) bool {
 	Unimpl()
 	return false
@@ -785,33 +755,27 @@ func appendx(f * File, cp * Cmd, p  int) (bool) {
 	f.curtext.q1 = p;
 	return true;
 }
-/*
 
-func pdisplay (File *f) (int) {
-	long p1, p2;
-	int np;
-	Rune *buf;
-
-	p1 = addr.r.q0;
-	p2 = addr.r.q1;
-	if p2 > f.b.nc) {
-		p2 = f.b.nc;
-	buf = fbufalloc();
-	while(p1 < p2){
-		np = p2-p1;
+func pdisplay (f *File) (bool) {
+	p1 := addr.r.q0;
+	p2 := addr.r.q1;
+	if p2 > f.b.Nc() {
+		p2 = f.b.Nc()
+	}
+	buf := make([]rune, RBUFSIZE);
+	for(p1 < p2){
+		np := p2-p1;
 		if np>RBUFSIZE-1  {
 			np = RBUFSIZE-1;
-		bufread(&f.b, p1, buf, np);
-		buf[np] = '\0';
-		warning(nil, "%S", buf);
+		}
+		f.b.Read(p1, buf[:np]);
+		warning(nil, "%s", string(buf[:np]));
 		p1 += np;
 	}
-	fbuffree(buf);
 	f.curtext.q0 = addr.r.q0;
 	f.curtext.q1 = addr.r.q1;
 	return true;
 }
-*/
 
 func pfilename (f *File) {
 	w := f.curtext.w;
@@ -828,36 +792,34 @@ func pfilename (f *File) {
 	warning(nil, "%c%c%c %s\n", dirtychar,
 		'+', fc, f.name);
 }
-/*
 
-func loopcmd (File *f, Cmd *cp, Range *rp, long nrp) () {
-	long i;
-
-	for i=0; i<nrp; i++ {
-		f.curtext.q0 = rp[i].q0;
-		f.curtext.q1 = rp[i].q1;
+func loopcmd (f * File, cp * Cmd, rp []Range) () {
+	for _, r := range rp {
+		f.curtext.q0 = r.q0;
+		f.curtext.q1 = r.q1;
 		cmdexec(f.curtext, cp);
 	}
 }
 
-func looper (File *f, Cmd *cp, int xy) () {
-	long p, op, nrp;
-	Range r, tr;
-	Range *rp;
-
-	r = addr.r;
-	op= xy? -1 : r.q0;
+func looper(f * File, cp * Cmd, xy  bool) () {
+	rp := []Range{}
+	tr := Range{}
+	r := addr.r;
+	op := -1
+	if !xy { op = r.q0 }
 	nest++;
-	if rxcompile(cp.re.r) == false  {
+	are, err := rxcompile(cp.re)
+	if  err != nil  {
 		editerror("bad regexp in %c command", cp.cmdc);
 	}
-	nrp = 0;
-	rp = nil;
-	for p = r.q0; p<=r.q1;  {
-		if !rxexecute(f.curtext, nil, p, r.q1, &sel) { // no match, but y should still run
+	for p := r.q0; p<=r.q1;  {
+		sel := are.rxexecute(f.curtext, nil, p, r.q1, 1)
+		if len(sel) == 0 { // no match, but y should still run
 			if xy || op>r.q1  {
 				break;
-			tr.q0 = op, tr.q1 = r.q1;
+			}
+			tr.q0 = op
+			tr.q1 = r.q1;
 			p = r.q1+1;	// exit next loop
 		}else{
 			if sel[0].q0==sel[0].q1 {	// empty match?
@@ -866,38 +828,38 @@ func looper (File *f, Cmd *cp, int xy) () {
 					continue;
 				}
 				p = sel[0].q1+1;
-			}else
+			}else {
 				p = sel[0].q1;
+			}
 			if xy  {
 				tr = sel[0];
-			else
-				tr.q0 = op, tr.q1 = sel[0].q0;
+			} else {
+				tr.q0 = op
+				 tr.q1 = sel[0].q0;
+			}
+			op = sel[0].q1;
 		}
-		op = sel[0].q1;
-		nrp++;
-		rp = erealloc(rp, nrp*sizeof(Range));
-		rp[nrp-1] = tr;
+		rp = append(rp, tr)
 	}
-	loopcmd(f, cp.u.cmd, rp, nrp);
-	free(rp);
-	--nest;
+	loopcmd(f, cp.cmd, rp);
+	nest--;
 }
 
-func linelooper (File *f, Cmd *cp) () {
-	long nrp, p;
-	Range r, linesel;
-	Address a, a3;
-	Range *rp;
+func linelooper (f * File, cp * Cmd) () {
+//	long nrp, p;
+//	Range r, linesel;
+//	Address a, a3;
+	rp := []Range{}
 
 	nest++;
-	nrp = 0;
-	rp = nil;
-	r = addr.r;
+	r := addr.r;
+	var a3 Address
 	a3.f = f;
-	a3.r.q0 = a3.r.q1 = r.q0;
-	a = lineaddr(0, a3, 1);
-	linesel = a.r;
-	for p = r.q0; p<r.q1; p = a3.r.q1 {
+	a3.r.q0 = r.q0
+	a3.r.q1 = r.q0;
+	a := lineaddr(0, a3, 1);
+	linesel := a.r;
+	for p := r.q0; p<r.q1; p = a3.r.q1 {
 		a3.r.q0 = a3.r.q1;
 		if p!=r.q0 || linesel.q1==p {
 			a = lineaddr(1, a3, 1);
@@ -905,31 +867,32 @@ func linelooper (File *f, Cmd *cp) () {
 		}
 		if linesel.q0 >= r.q1  {
 			break;
+		}
 		if linesel.q1 >= r.q1  {
 			linesel.q1 = r.q1;
+		}
 		if linesel.q1 > linesel.q0  {
 			if linesel.q0>=a3.r.q1 && linesel.q1>a3.r.q1 {
 				a3.r = linesel;
-				nrp++;
-				rp = erealloc(rp, nrp*sizeof(Range));
-				rp[nrp-1] = linesel;
+				rp = append(rp, linesel)
 				continue;
 			}
+		}
 		break;
 	}
-	loopcmd(f, cp.u.cmd, rp, nrp);
-	free(rp);
-	--nest;
+	loopcmd(f, cp.cmd, rp);
+	nest--;
 }
 
-struct Looper
-{
-	Cmd *cp;
-	int	XY;
-	Window	**w;
-	int	nw;
-} loopstruct;	// only one; X and Y can't nest
+type Looper struct {
+	cp	*Cmd	
+	XY	bool	
+	w []*Window
+} 
 
+var loopstruct Looper // only one; X and Y can't nest
+
+/*
 func alllooper (Window *w, void *v) () {
 	Text *t;
 	struct Looper *lp;

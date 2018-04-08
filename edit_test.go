@@ -49,6 +49,11 @@ func TestEdit(t *testing.T) {
 		{Range{0, 3}, "test", "v/This/d", "s is a\nshort text\nto try addressing\n"},
 		{Range{0, 12}, "test", "v/This/d", "This is a\nshort text\nto try addressing\n"},
 
+		// m/t
+		// 17
+		{Range{0, 4}, "test", "m/try", " is a\nshort text\nto tryThis addressing\n"},
+		{Range{0, 3}, "test", "t/try", "This is a\nshort text\nto tryThi addressing\n"},
+		
 	}
 	
 	buf := make([]rune, 8192)
