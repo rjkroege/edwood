@@ -73,13 +73,15 @@ func (re *AcmeRegexp) rxexecute(t Texter, r []rune, startp int, eof int, nmatch 
 	rngs := RangeSet([]Range{})
 	for len(rngs) < nmatch {
 		reader := NewFRuneReader(source, int(startp), int(eof))
-		loc := re.re.FindReaderIndex(reader)
-		if loc == nil {
+		locs := re.re.FindReaderSubmatchIndex(reader)
+		if locs == nil {
 			return rngs
 		}
-		rng := Range{loc[0] + startp, loc[1] + startp}
-		rngs = append(rngs, rng)
-		startp += loc[1]
+		for i := 0; i < len(locs); i += 2 {
+			rng := Range{locs[i] + startp, locs[i+1] + startp}
+			rngs = append(rngs, rng)
+		}
+		startp += locs[1]
 	}
 	return rngs
 }
@@ -90,13 +92,15 @@ func (re *AcmeRegexp) rxbexecute(t Texter, startp int, nmatch int) (rp RangeSet)
 	rngs := RangeSet([]Range{})
 	for startp >= 0 && len(rngs) < nmatch {
 		reader := NewBRuneReader(source, int(startp))
-		loc := re.re.FindReaderIndex(reader)
-		if loc == nil {
+		locs := re.re.FindReaderSubmatchIndex(reader)
+		if locs == nil {
 			return rngs
 		}
-		rng := Range{startp - loc[1], startp - loc[0]}
-		rngs = append(rngs, rng)
-		startp = startp - loc[1] //TODO(flux): Does this follow "end" semantics, or do I need loc[0]-1
+		for i := 0; i < len(locs); i += 2 {
+			rng := Range{startp - locs[i+1], startp - locs[i]}
+			rngs = append(rngs, rng)
+		}
+		startp = startp - locs[1] //TODO(flux): Does this follow "end" semantics, or do I need loc[0]-1
 	}
 	return rngs
 }

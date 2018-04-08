@@ -94,8 +94,8 @@ var cmdtab = []Cmdtab{
 	{'=', 0, 0, 0, 0, aDot, 0, linex, eq_cmd},
 	{'B', 0, 0, 0, 0, aNo, 0, linex, B_cmd},
 	{'D', 0, 0, 0, 0, aNo, 0, linex, D_cmd},
-	{'X', 0, 1, 0, 'f', aNo, 0, nil, X_cmd},
-	{'Y', 0, 1, 0, 'f', aNo, 0, nil, X_cmd},
+	{'X', 0, 1, 0, 'f', aNo, 0, nil, nil},// Assingned to X_cmd in init() to avoid initialization loop
+	{'Y', 0, 1, 0, 'f', aNo, 0, nil, nil},// Assingned to X_cmd in init() to avoid initialization loop
 	{'<', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'|', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'>', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
@@ -115,6 +115,8 @@ func init() {
 			cmdtab[i].fn = g_cmd
 		case 'x', 'y':
 			cmdtab[i].fn = x_cmd
+		case 'X', 'Y':
+			cmdtab[i].fn = X_cmd
 		}
 	}
 }
@@ -162,31 +164,27 @@ func alleditinit(w *Window) {
 }
 
 func allupdate(w *Window) {
-	var (
-		t *Text
-		f *File
-	)
-
-	t = &w.body
-	f = t.file
+	t := &w.body
+	f := t.file
 	if f.curtext != t { /* do curtext only */
 		return
 	}
-	/* TODO(flux): Apply the elog properly
-	if f.elog.typ == Null {
-		f.elog.Term();
-	} else {
-	*/
-	//	if f.elog.typ != Empty {
-	f.elog.Apply(f.text[0])
-	if f.editclean {
-		f.mod = false
-		for _, t := range f.text {
-			t.w.dirty = false
+	if !f.elog.Empty() {
+		owner := t.w.owner
+		if owner == 0 {
+			t.w.owner = 'E'
 		}
+		f.Mark()
+		f.elog.Apply(f.text[0])
+		if(f.editclean){
+			f.mod = false;
+			for _, t := range f.text {
+				t.w.dirty = false
+			}
+		} 
+
+		t.w.owner = owner
 	}
-	//		}
-	//	}
 
 	t.SetSelect(t.q0, t.q1)
 	t.ScrDraw()
@@ -204,6 +202,11 @@ func editcmd(ct *Text, r []rune) {
 	var err error
 
 	if len(r) == 0 {
+		return
+	}
+
+	if len(r) > 2 * RBUFSIZE {
+		warning(nil, "string too long\n")
 		return
 	}
 

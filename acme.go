@@ -460,7 +460,6 @@ func keyboardthread(display *draw.Display) {
 				display.Flush()
 			}
 		case r := <-keyboardctl.C:
-			fmt.Printf("Keypress: %v\n", r)
 			for {
 				typetext = row.Type(r, mouse.Point)
 				t = typetext

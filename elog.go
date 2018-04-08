@@ -54,7 +54,7 @@ func (e *Elog) Reset() {
 }
 
 func (e *Elog) Term() {
-	(*e).log = (*e).log[0:0]
+	(*e).Reset()
 	(*e).warned = false
 }
 
@@ -186,25 +186,16 @@ func (e *Elog) Delete(q0, q1 int) {
 	}
 }
 
-const tracelog = true
+const tracelog = false
+
+func (e *Elog) Empty() bool {
+	return len(e.log) == 1
+}
 
 // Apply plays back the log, from back to front onto the given text.
 // Unlike the C version, this does not mark the file - that should happen at a higher
 // level.
 func (e *Elog) Apply(t Texter) {
-	/*
-		if len((*e).log) > 1 {
-			f.Mark() // TODO(flux): I think this is equivalent to checking inside
-					// the individual cases (as in the C code), since there's only modifications in the
-					// elog.
-		} else {
-			panic("Really?  Let's try not applying empty logs")
-		}
-	*/
-
-	// Will this always make a copy, or will the compiler turn
-	// the read-only accesses into an in-place read?
-
 	// The log is applied back-to-front - this avoids disturbing the text ahead of the
 	// current application point.
 	for i := len((*e).log) - 1; i >= 1; i-- {

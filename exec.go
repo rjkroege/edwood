@@ -32,7 +32,7 @@ var exectab = []Exectab{
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
 	{"Dump", dump, false, true, true /*unused*/},
-	{ "Edit",		edit,		false,	true /*unused*/,		true /*unused*/		},
+	{ "Edit", edit,	false, true /*unused*/,		true /*unused*/		},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
 	{"Get", get, false, true, true /*unused*/},
@@ -118,7 +118,6 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 }
 
 func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
-	Untested()
 	var (
 		q0, q1 int
 		r      []rune
@@ -129,12 +128,10 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	q0 = aq0
 	q1 = aq1
 	if q1 == q0 { // expand to find word (actually file name)
-		fmt.Println("q1 == q0")
 		// if in selection, choose selection
 		if t.inSelection(q0) {
 			q0 = t.q0
 			q1 = t.q1
-			fmt.Println("selection chosen")
 		} else {
 			for q1 < t.file.b.Nc() {
 				c := t.ReadC(q1)
@@ -257,7 +254,6 @@ func xexit(*Text, *Text, *Text, bool, bool, string) {
 }
 
 func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
-	fmt.Println("Calling del")
 	if et.col == nil || et.w == nil {
 		return
 	}
@@ -451,7 +447,6 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	w := et.w
 	t = &w.body
 	name := getname(t, argt, arg, false)
-	fmt.Printf("getname returned '%v'\n", name)
 	if name == "" {
 		warning(nil, "no file name\n")
 		return
@@ -552,7 +547,6 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		}
 		f.b.Read(q, r[:n])
 		s := string(r[:n])
-		fmt.Printf("Writing '%v'\n", s)
 		//sha1((uchar*)s, m, nil, h);
 		nwritten, err := fd.Write([]byte(s))
 		if err != nil || nwritten != len(s) {

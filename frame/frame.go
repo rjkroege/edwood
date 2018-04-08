@@ -4,7 +4,6 @@ import (
 	"9fans.net/go/draw"
 	"image"
 
-	"log"
 )
 
 const (
@@ -154,7 +153,6 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 
 // InitTick sets up the TickImage (e.g. cursor)
 func (f *Frame) InitTick() {
-	log.Println("InitTick called")
 
 	var err error
 	if f.Cols[ColBack] == nil || f.Display == nil {

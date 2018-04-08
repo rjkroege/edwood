@@ -1676,7 +1676,6 @@ func (t *Text) DirName(name string) string {
 		spl = filepath.Dir(spl)
 	}
 	spl = filepath.Clean(spl + string(filepath.Separator) + name)
-fmt.Println("Full path is", spl)
 	return spl
 
 }
