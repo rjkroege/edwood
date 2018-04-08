@@ -90,7 +90,7 @@ func main() {
 
 	var err error
 	var display *draw.Display
-	display, err = draw.Init(nil, *varfontflag, "acme", *winsize)
+	display, err = draw.Init(nil, *varfontflag, "edwood", *winsize)
 	if err != nil {
 		log.Fatal(err)
 	}
