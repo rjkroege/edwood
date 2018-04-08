@@ -18,7 +18,7 @@ type Column struct {
 	r       image.Rectangle
 	tag     Text
 	row     *Row
-	w       []*Window
+	w       []*Window // These are sorted from top to bottom (increasing Y)
 	safe    bool
 }
 
@@ -164,7 +164,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	w.tag.row = c.row
 	w.body.col = c
 	w.body.row = c.row
-	c.w = append(c.w, w)
+	c.w = append(c.w, nil)
+	copy(c.w[windex+1:], c.w[windex:])
+	c.w[windex] = w
 	c.safe = true
 	if buggered {
 		c.Resize(c.r)
@@ -315,16 +317,17 @@ func (c *Column) Grow(w *Window, but int) {
 			break
 		}
 	}
-	if windex == c.nw() {
-		panic("can't find window") // TODO(flux): implement counterpart to the C version's error()
+	if windex == len(c.w) {
+		acmeerror("can't find window", nil)
 	}
 
 	cr := c.r
 	if but < 0 { // make sure window fills its own space properly
 		r := w.r
-		if windex == int(c.nw()-1) || !c.safe {
-			r.Max.Y = cr.Max.Y
+		if windex == c.nw()-1 || !c.safe { // Last window in column
+			r.Max.Y = cr.Max.Y		// Clamp to column bottom.
 		} else {
+			// Fill space down to the next window.
 			r.Max.Y = c.w[windex+1].r.Min.Y - c.display.ScaleSize(Border)
 		}
 		w.Resize(r, false, true)
@@ -485,6 +488,7 @@ func (c *Column) DragWin(w *Window, but int) {
 		return
 	}
 
+	// Make sure our window was in our column
 	for i, win = range c.w {
 		if win == w {
 			goto Found
