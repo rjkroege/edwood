@@ -500,6 +500,7 @@ func (w *Window) SetTag1() {
 		sb.WriteString(" |")
 		sb.WriteString(Llook)
 		sb.WriteString(Ledit)
+		sb.WriteString(" ")
 	}
 
 	new := Buffer([]rune(sb.String()))

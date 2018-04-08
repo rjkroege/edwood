@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+"runtime/debug"
 )
 
 type Addr struct {
@@ -321,7 +322,8 @@ func atnl() {
 	cmdskipbl()
 	c = getch()
 	if c != '\n' {
-		editerror("newline expected (saw %C)", c)
+debug.PrintStack()
+		editerror("newline expected (saw %c)", c)
 	}
 }
 
@@ -361,20 +363,22 @@ func collecttoken(end []rune) string {
 	s := ""
 	var c rune
 
+fmt.Println("cmdstartp=", cmdstartp[cmdp:])
 	for {
 		c = nextc()
-		if !(c == ' ' || c == '\t')  || c == -1 {
+		if !(c == ' ' || c == '\t'){
 			break
 		}
-		s = s + string(getch()) /* blanks significant for getname() */
+		s += string(getch()) /* blanks significant for getname() */
 	}
 	for {
 		c = getch()
-		if !(c > 0 && utfrune(end, c) == 0) || c == -1{
+		if !(c > 0 && utfrune(end, c) == 0){
 			break
 		}
-		s = s + string(c)
+		s += string(c)
 	}
+fmt.Println("Collecttoken=", s)
 	if c != '\n' {
 		atnl()
 	}

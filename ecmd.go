@@ -129,20 +129,22 @@ func edittext(w *Window, q int, r []rune) error {
 }
 
 // string is known to be NUL-terminated
-func filelist(t *Text, r []rune) []rune {
+func filelist(t *Text, r string) string{
+fmt.Println("Filelist =", r)
 	if len(r) == 0 {
-		return nil
+		return ""
 	}
-	r = skipbl(r)
+	r = strings.TrimLeft(r, " \t")
+	if len(r) == 0 {
+		return ""
+	}
 	if r[0] != '<' {
-		re := make([]rune, len(r)) // TODO(flux): I think this doesn't need the copy, we don't seem to change the strings.
-		copy(re, r)
-		return re
+		return r
 	}
 	// use < command to collect text
 	clearcollection()
-	runpipe(t, '<', r[1:], Collecting)
-	return collection
+	runpipe(t, '<', []rune(r[1:]), Collecting)
+	return string(collection)
 }
 
 func a_cmd(t *Text, cp *Cmd) bool {
@@ -159,33 +161,26 @@ func b_cmd(t *Text, cp *Cmd) bool {
 }
 
 func B_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *list, *r, *s;
-	int nr;
-
-	list = filelist(t, cp.u.text.r, cp.u.text.n);
-	if list == nil  {
+fmt.Printf("B_cmd cp = %+v\n", cp)
+	list := filelist(t, cp.text);
+	if list == ""  {
 		editerror(Enoname);
-	r = list;
-	nr = runestrlen(r);
-	r = skipbl(r, nr, &nr);
-	if nr == 0  {
-		newx(t, t, nil, 0, 0, r, 0);
-	else while(nr > 0){
-		s = findbl(r, nr, &nr);
-		*s = '\0';
-		newx(t, t, nil, 0, 0, r, runestrlen(r));
-		if nr > 0  {
-			r = skipbl(s+1, nr-1, &nr);
+	}
+	r := list;
+	r = strings.TrimLeft(r, " \t");
+	if r == "" {
+		newx(t, t, nil, false, false, r);
+	}else {
+		r = wsre.ReplaceAllString(r, " ")
+		words := strings.Split(r, " ")
+		for _, w := range words {
+			newx(t, t, nil, false, false, w);
+		}
 	}
 	clearcollection();
 	return true;
 }
-*/
+
 func c_cmd(t *Text, cp *Cmd) bool {
 	t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text));
 	t.q0 = addr.r.q0;
