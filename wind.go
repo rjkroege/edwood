@@ -322,14 +322,27 @@ func (w *Window) Lock1(owner int) {
 	w.owner = owner
 }
 
+// Lock locks every text/clone of w
 func (w *Window) Lock(owner int) {
 	w.owner = owner
-	w.lk.Lock()
+	f := w.body.file
+	for _, t := range f.text {
+		t.w.Lock1(owner)
+	}
 }
 
+// Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
 	w.owner = 0
-	w.lk.Unlock()
+	// Special handling for clones, run backwards to 
+	// avoid tripping over Window.CLose indirectly editing f.text and
+	// freeing f on the last iteration of the loop.
+	f := w.body.file
+	for i:=len(f.text)-1; i >=0; i-- {
+		w = f.text[i].w
+		w.lk.Unlock()
+		w.Close()
+	}
 }
 
 func (w *Window) MouseBut() {
