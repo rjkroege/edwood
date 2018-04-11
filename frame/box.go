@@ -1,6 +1,9 @@
 package frame
 
 import (
+	"flag"
+	"fmt"
+	"log"
 	"unicode/utf8"
 )
 
@@ -9,7 +12,7 @@ const slop = 25
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
 func (f *Frame) addbox(bn, n int) {
 	if bn > f.nbox {
-		panic("Frame.addbox")
+		panic(fmt.Sprint("Frame.addbox", " bn=", bn, " f.nbox=", f.nbox))
 	}
 
 	if f.nbox+n > f.nalloc {
@@ -24,7 +27,7 @@ func (f *Frame) addbox(bn, n int) {
 
 func (f *Frame) closebox(n0, n1 int) {
 	if n0 >= f.nbox || n1 >= f.nbox || n1 < n0 {
-		panic("Frame.closebox")
+		panic(fmt.Sprint("Frame.closebox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
 	}
 	// TODO(rjk): Use copy.
 	n1++
@@ -40,7 +43,7 @@ func (f *Frame) closebox(n0, n1 int) {
 
 func (f *Frame) delbox(n0, n1 int) {
 	if n0 >= f.nbox || n1 >= f.nbox || n1 < n0 {
-		panic("Frame.delbox")
+		panic(fmt.Sprint("Frame.delbox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
 	}
 	f.freebox(n0, n1)
 	f.closebox(n0, n1)
@@ -51,7 +54,7 @@ func (f *Frame) freebox(n0, n1 int) {
 		return
 	}
 	if n0 >= f.nbox || n1 >= f.nbox {
-		panic("Frame.freebox")
+		panic(fmt.Sprint("Frame.freebox", " n0=", n0, " n1=", n1, " f.nbox=", f.nbox))
 	}
 	n1++
 	for i := n0; i < n1; i++ {
@@ -99,6 +102,7 @@ func runeindex(p []byte, n int) int {
 // truncatebox drops the  last n characters from box b without allocation.
 func (f *Frame) truncatebox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
+		panic(fmt.Sprint("Frame.truncatebox", " Nrune=", b.Nrune, " n=", n))
 		panic("truncatebox")
 	}
 	b.Nrune -= n
@@ -152,4 +156,77 @@ func (f *Frame) findbox(bn, p, q int) int {
 		bn++
 	}
 	return bn
+}
+
+// TODO(rjk): Consider moving this code to a new file.
+var validate = flag.Bool("validateboxes", false, "Check that box model is valid")
+
+// validateboxmodel returns true if f's box model is valid.
+func (f *Frame) validateboxmodel(format string, args ...interface{}) {
+	if !*validate {
+		return
+	}
+
+	// Test 0. No holes in the array of boxes.
+	for _, b := range f.box[0:f.nbox] {
+		if b == nil {
+			log.Printf(format, args...)
+			f.Logboxes("-- holes in nbox portion of box array --")
+			panic("-- holes in nbox portion of box array --")
+		}
+	}
+	for _, b := range f.box[f.nbox:] {
+		if b != nil {
+			log.Printf(format, args...)
+			f.Logboxes("-- duplicate box references left over in unused space --")
+			panic("-- duplicate box references left over in unused space --")
+		}
+	}
+
+	// Test 1. NChars is valid
+	total := 0
+	for _, b := range f.box[0:f.nbox] {
+		if b.Nrune < 0 {
+			total += 1
+		} else {
+			total += b.Nrune
+		}
+	}
+	if total != f.NChars {
+		log.Printf(format, args...)
+		f.Logboxes("-- runes in boxes != NChars --")
+		panic("-- runes in boxes != NChars --")
+	}
+
+	// TODO(rjk): Every box is sane.
+	for _, b := range f.box[0:f.nbox] {
+		// Nrune is right for this box.
+		if b.Nrune >= 0 {
+			s := string(b.Ptr)
+			c := 0
+			for range s {
+				c++
+			}
+			if c != b.Nrune {
+				log.Printf(format, args...)
+				f.Logboxes("-- box with contents has invalid rune count --")
+				panic("-- box with contents has invalid rune count --")
+			}
+		}
+
+		// The width is right.
+		if b.Nrune >= 0 {
+			s := string(b.Ptr)
+			if b.Wid != f.Font.StringWidth(s) {
+				log.Printf(format, args...)
+				f.Logboxes("-- box with contents has invalid width --")
+				panic("-- box with contents has invalid width --")
+			}
+		}
+
+		// TODO(rjk): newline and tab boxes are rational.
+	}
+
+	// TODO(rjk): Every box fits in Rect.
+
 }

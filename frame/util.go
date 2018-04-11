@@ -140,11 +140,11 @@ func nbyte(f *frbox) int {
 	return len(f.Ptr)
 }
 
-func nrune(f *frbox) int {
-	if f.Nrune < 0 {
+func nrune(b *frbox) int {
+	if b.Nrune < 0 {
 		return 1
 	} else {
-		return f.Nrune
+		return b.Nrune
 	}
 }
 
@@ -153,11 +153,18 @@ func Rpt(min, max image.Point) image.Rectangle {
 }
 
 // Logboxes shows the box model to the log for debugging convenience.
-func (f *Frame) Logboxes(message string) {
-	log.Println(message)
+func (f *Frame) Logboxes(message string, args ...interface{}) {
+	log.Printf(message, args...)
+	log.Printf("nbox=%d nalloc=%d", f.nbox, f.nalloc)
 	for i, b := range f.box {
 		if b != nil {
-			log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
+			if b.Nrune == -1 && b.Bc == '\n' {
+				log.Printf("	box[%d] -> newline\n")
+			} else if b.Nrune == -1 && b.Bc == '\t' {
+				log.Printf("	box[%d] -> tab\n")
+			} else {
+				log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
+			}
 		}
 	}
 }

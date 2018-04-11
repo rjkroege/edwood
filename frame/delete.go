@@ -11,11 +11,12 @@ import (
 // Delete will clear a selection or tick if present but not put it back.
 // TODO(rjk): This code will redraw too much.
 func (f *Frame) Delete(p0, p1 int) int {
-	//log.Println("Delete")
+	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
+	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	var r image.Rectangle
 
 	if p1 > f.NChars {
-		p1 = f.NChars-1
+		p1 = f.NChars - 1
 	}
 	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
 		return 0
@@ -58,7 +59,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 		n, fits := f.canfit(pt0, b)
 
 		if !fits {
-			panic("Frame.canfit == 0")
+			panic("Frame.delete, canfit fits is false")
 		}
 
 		r.Min = pt0

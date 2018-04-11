@@ -253,6 +253,10 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 	//	log.Println("_draw")
 	for nb := 0; nb < f.nbox; nb++ {
 		b := f.box[nb]
+		if b == nil {
+			f.Logboxes("-- Frame._draw has invalid box mode --")
+			panic("-- Frame._draw has invalid box mode --")
+		}
 		pt = f.cklinewrap0(pt, b)
 		if pt.Y == f.Rect.Max.Y {
 			f.NChars -= f.strlen(nb)

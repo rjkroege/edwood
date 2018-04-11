@@ -5,8 +5,6 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
-
-	"log"
 )
 
 var (
@@ -109,7 +107,8 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		b := f.box[bn]
 		// Safe but not necessarily a good idea.
 		if bn >= f.nbox {
-			panic("endofframe")
+			f.Logboxes("-- Frame.chop bn=%d, f.nbox=%d --", bn, f.nbox)
+			panic("Frame.chop endofframe")
 		}
 		pt = f.cklinewrap(pt, b)
 		if pt.Y >= f.Rect.Max.Y {
@@ -143,6 +142,8 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")
+	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
+	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
 
 	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
 		return
@@ -266,7 +267,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	npts--
 	// log.Println("npts", npts, "y", y)
 	for n0 = n0 - 1; npts >= 0; n0-- {
-		log.Println("looping over  boxes..", n0)
+		// log.Println("looping over  boxes..", n0)
 		b := f.box[n0]
 		pt := pts[npts].pt1
 
