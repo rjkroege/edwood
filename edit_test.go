@@ -16,7 +16,7 @@ func TestEdit(t *testing.T) {
 		{Range{0, 0}, "test", "a/junk", "junkThis is a\nshort text\nto try addressing\n"},
 		{Range{7, 12}, "test", "a/junk", "This is a\nshjunkort text\nto try addressing\n"},
 		{Range{0, 0}, "test", "/This/a/junk", "Thisjunk is a\nshort text\nto try addressing\n"},
-//		{Range{0, 0}, "test", "/^/a/junk", "This is a\njunkshort text\nto try addressing\n"},
+		{Range{0, 0}, "test", "/^/a/junk", "This is a\njunkshort text\nto try addressing\n"},
 		{Range{0, 0}, "test", "/$/a/junk", "This is ajunk\nshort text\nto try addressing\n"},
 
 

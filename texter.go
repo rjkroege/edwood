@@ -14,6 +14,7 @@ type Texter interface {
 	Nc() int
 	ReadB(q int, r []rune) (n int, err error)
 	ReadC(q int) rune
+	View(q0, q1 int) []byte // Return a "read only" slice
 }
 
 // TestText implements Texter around a buffer
@@ -26,6 +27,13 @@ func (t TextBuffer) Constrain(q0, q1 int) (p0, p1 int) {
 	p0 = min(q0, (len(t.buf)))
 	p1 = min(q1, (len(t.buf)))
 	return p0, p1
+}
+
+func (t *TextBuffer) View(q0, q1 int) []byte {
+	if q1 > len(t.buf) {
+		q1 = len(t.buf)
+	}
+	return []byte(string(t.buf[q0:q1]))
 }
 
 func (t *TextBuffer) Delete(q0, q1 int, tofile bool) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"regexp"
 )
 
@@ -9,60 +8,24 @@ import (
 
 type AcmeRegexp struct {
 	re *regexp.Regexp
+	exception rune // ^ or $ or 0
 }
 
 func rxcompile(r string) (*AcmeRegexp, error) {
-	re, err := regexp.Compile("(?m)" + string(r))
+	re, err := regexp.Compile("(?m)"+r)
 	if err != nil {
 		return nil, err
 	}
-	return &AcmeRegexp{re}, nil
-}
-
-type FRuneReader struct {
-	buf Texter
-	q   int
-	eof int
-}
-
-type BRuneReader FRuneReader
-
-func NewFRuneReader(b Texter, offset int, eof int) *FRuneReader {
-	if eof > b.Nc() {
-		eof = b.Nc()
+	are := &AcmeRegexp{re, 0}
+	switch r {
+	case "^": are.exception = '^'
+	case "$": are.exception = '$'
 	}
-	if eof < 0 {
-		eof = b.Nc()
-	}
-	return &FRuneReader{b, offset, eof}
-}
-
-func NewBRuneReader(b Texter, offset int) *BRuneReader {
-	frr := NewFRuneReader(b, offset, 0)
-	frr.q = offset - 1
-	return (*BRuneReader)(frr)
-}
-
-func (frr *FRuneReader) ReadRune() (r rune, size int, err error) {
-	if frr.q >= frr.eof {
-		return 0, 0, fmt.Errorf("end of buffer")
-	}
-	rr := frr.buf.ReadC(frr.q)
-	frr.q++
-	return rr, 1, nil
-}
-
-func (brr *BRuneReader) ReadRune() (r rune, size int, err error) {
-	if brr.q < 0 {
-		return 0, 0, fmt.Errorf("end of buffer")
-	}
-	rr := brr.buf.ReadC(brr.q)
-	brr.q--
-	return rr, 1, nil
+	return are, nil
 }
 
 // works on Text if present, rune otherwise
-func (re *AcmeRegexp) rxexecute(t Texter, r []rune, startp int, eof int, nmatch int) (rp RangeSet) {
+func (re *AcmeRegexp) rxexecute(t Texter, r []rune, startp int, eof int, nmatch int) (rp []RangeSet) {
 	var source Texter
 	if t != nil {
 		source = t
@@ -70,23 +33,46 @@ func (re *AcmeRegexp) rxexecute(t Texter, r []rune, startp int, eof int, nmatch 
 		source = &TextBuffer{0, 0, r}
 	}
 
-	rngs := RangeSet([]Range{})
-	for len(rngs) < nmatch {
-		reader := NewFRuneReader(source, int(startp), int(eof))
-		locs := re.re.FindReaderSubmatchIndex(reader)
-		if locs == nil {
-			return rngs
+	if eof == -1 {
+		eof = source.Nc()
+	}
+	view := source.View(startp, eof)
+	rngs := []RangeSet{}
+	locs := re.re.FindAllSubmatchIndex(view, nmatch)
+loop:
+	for _, loc := range locs {
+		// Filter out ^ not at start of a line, $ not at end
+		if len(loc) != 0  && loc[0] == loc[1] { 
+			switch {
+			case re.exception == '^' &&  loc[0] + startp == 0: // start of text is star-of-line
+				break
+			case re.exception == '^' &&  t.ReadC(loc[0]+startp-1) == '\n': // ^ after newline
+				break
+			case re.exception == '$' &&  loc[0] == t.Nc()-startp: // $ at end of text
+				break
+			case re.exception == '$' &&  t.ReadC(loc[0]+startp) == '\n': // $ at newline
+				break
+			default: 
+				continue loop
+			}
 		}
-		for i := 0; i < len(locs); i += 2 {
-			rng := Range{locs[i] + startp, locs[i+1] + startp}
-			rngs = append(rngs, rng)
+		rs := RangeSet([]Range{})
+		for i := 0; i < len(loc); i += 2 {
+			rng := Range{loc[i] + startp, loc[i+1] + startp}
+			rs = append(rs, rng)
 		}
-		startp += locs[1]
+		rngs = append(rngs, rs)
 	}
 	return rngs
 }
 
 func (re *AcmeRegexp) rxbexecute(t Texter, startp int, nmatch int) (rp RangeSet) {
+	Unimpl()
+	return []Range{}
+}
+/* TODO(flux): This is broken, I'm pretty sure.  You can'd just read backwards,
+you also need the backwards regexp
+
 	source := t
 
 	rngs := RangeSet([]Range{})
@@ -104,3 +90,4 @@ func (re *AcmeRegexp) rxbexecute(t Texter, startp int, nmatch int) (rp RangeSet)
 	}
 	return rngs
 }
+*/

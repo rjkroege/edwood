@@ -130,7 +130,6 @@ func edittext(w *Window, q int, r []rune) error {
 
 // string is known to be NUL-terminated
 func filelist(t *Text, r string) string{
-fmt.Println("Filelist =", r)
 	if len(r) == 0 {
 		return ""
 	}
@@ -161,7 +160,6 @@ func b_cmd(t *Text, cp *Cmd) bool {
 }
 
 func B_cmd(t *Text, cp *Cmd) bool {
-fmt.Printf("B_cmd cp = %+v\n", cp)
 	list := filelist(t, cp.text);
 	if list == ""  {
 		editerror(Enoname);
@@ -408,7 +406,8 @@ func s_cmd(t *Text, cp *Cmd) bool {
 	delta := 0;
 	didsub := false;
 	for p1 := addr.r.q0; p1<=addr.r.q1; {
-		if sel = are.rxexecute(t, nil, p1, addr.r.q1, 1); len(sel) > 0 {
+		if sels := are.rxexecute(t, nil, p1, addr.r.q1, 1); len(sels) > 0 {
+			sel = sels[0]
 			if sel[0].q0 == sel[0].q1 {	// empty match?
 				if sel[0].q0 == op {
 					p1++;
@@ -688,7 +687,6 @@ func printposn (t * Text, mode  int) () {
 
 func eq_cmd(t *Text, cp *Cmd) bool {
 	mode := 0
-fmt.Printf("cp = %+v\n", cp)
 	switch(len(cp.text)){
 	case 0:
 		mode = PosnLine;
@@ -782,45 +780,40 @@ func loopcmd (f * File, cp * Cmd, rp []Range) () {
 	}
 }
 
-func looper(f * File, cp * Cmd, xy  bool) () {
+func looper(f * File, cp * Cmd, isX  bool) () {
 	rp := []Range{}
 	tr := Range{}
 	r := addr.r;
-	op := -1
-	if !xy { op = r.q0 }
+	isY := !isX
 	nest++;
 	are, err := rxcompile(cp.re)
 	if  err != nil  {
 		editerror("bad regexp in %c command", cp.cmdc);
 	}
-	for p := r.q0; p<=r.q1;  {
-		sel := are.rxexecute(f.curtext, nil, p, r.q1, 1)
-		if len(sel) == 0 { // no match, but y should still run
-			if xy || op>r.q1  {
-				break;
-			}
-			tr.q0 = op
-			tr.q1 = r.q1;
-			p = r.q1+1;	// exit next loop
-		}else{
-			if sel[0].q0==sel[0].q1 {	// empty match?
-				if sel[0].q0==op {
-					p++;
-					continue;
-				}
-				p = sel[0].q1+1;
-			}else {
-				p = sel[0].q1;
-			}
-			if xy  {
-				tr = sel[0];
+	/*if isX */ op := -1 // Not used in the X case.
+	if isY { op = r.q0 } 
+	sels := are.rxexecute(f.curtext, nil, r.q0, r.q1, -1)
+	if len(sels) == 0 {
+		if isY {
+			rp = append(rp, Range{r.q0, r.q1})
+		}
+	} else {
+		for _, s := range sels {
+			if isX  {
+				tr = s[0];
 			} else {
 				tr.q0 = op
-				 tr.q1 = sel[0].q0;
+				tr.q1 = s[0].q0
 			}
-			op = sel[0].q1;
+			rp = append(rp, tr)
+			op = s[0].q1
 		}
-		rp = append(rp, tr)
+		// For the Y case we need to end the set
+		if isY {
+			tr.q0 = op
+			tr.q1 = r.q1
+			rp = append(rp, tr)
+		}
 	}
 	loopcmd(f, cp.cmd, rp);
 	nest--;
@@ -928,30 +921,40 @@ func filelooper (cp *Cmd, XY bool) () {
 	nest--
 }
 
+// TODO(flux) This actually looks like "find one match after p"
+// This is almost certainly broken for ^
 func nextmatch(f *File, r string, p int, sign int) {
 	are, err := rxcompile(r)
 	if err != nil {
 		editerror("bad regexp in command address")
 	}
+	sel = RangeSet{Range{0,0}}
 	if sign >= 0 {
-		sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
-		if len(sel) == 0 {
+		sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 2)
+		if len(sels) == 0 {
 			editerror("no match for regexp")
+		} else {
+			sel = sels[0]
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q0 == p {
-			p++
-			if p > f.b.Nc() {
-				p = 0
-			}
-			sel = are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, NRange)
-			if len(sel) == 0 {
-				editerror("address")
+			if len(sels) == 2 {
+				sel = sels[1]
+			} else { // wrap around
+				p++ 
+				if p > f.b.Nc() { p = 0 }
+				sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 1)
+				if len(sels) == 0 {
+					editerror("address")
+				} else {
+					sel = sels[0]
+				}
 			}
 		}
 	} else {
 		sel = are.rxbexecute(f.curtext, p, NRange)
 		if len(sel) == 0 {
 			editerror("no match for regexp")
+			sel = RangeSet{Range{0,0}}
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
