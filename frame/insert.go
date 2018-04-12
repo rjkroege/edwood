@@ -10,21 +10,24 @@ import (
 var (
 	DELTA   = 25
 	TMPSIZE = 256
-	frame   Frame
+
+//	frame   Frame
 )
 
-func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
+func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	var c rune
 
-	frame.Rect = f.Rect
-	frame.Display = f.Display
-	frame.Background = f.Background
-	frame.Font = f.Font
-	frame.MaxTab = f.MaxTab
-	frame.nbox = 0
-	frame.nalloc = 0
-	frame.NChars = 0
-	frame.box = []*frbox{}
+	frame := &Frame{
+		Rect:       f.Rect,
+		Display:    f.Display,
+		Background: f.Background,
+		Font:       f.Font,
+		MaxTab:     f.MaxTab,
+		nbox:       0,
+		nalloc:     0,
+		NChars:     0,
+		box:        []*frbox{},
+	}
 
 	copy(frame.Cols[:], f.Cols[:])
 	delta := DELTA
@@ -99,7 +102,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) image.Point {
 		frame.nbox++
 	}
 	*ppt = f.cklinewrap0(*ppt, frame.box[0])
-	return frame._draw(*ppt)
+	return frame._draw(*ppt), frame
 }
 
 func (f *Frame) chop(pt image.Point, p, bn int) {
@@ -163,7 +166,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	pt0 := f.ptofcharnb(p0, n0)
 	ppt0 := pt0
 	opt0 := pt0
-	pt1 := f.bxscan(r, &ppt0)
+	pt1, nframe := f.bxscan(r, &ppt0)
 	ppt1 := pt1
 
 	if n0 < f.nbox {
@@ -341,12 +344,12 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	}
 
 	f.SelectPaint(ppt0, ppt1, col)
-	frame.drawtext(ppt0, tcol, col)
+	nframe.drawtext(ppt0, tcol, col)
 
 	// Actually add boxes.
-	f.addbox(nn0, frame.nbox)
-	for n := 0; n < frame.nbox; n++ {
-		f.box[nn0+n] = frame.box[n]
+	f.addbox(nn0, nframe.nbox)
+	for n := 0; n < nframe.nbox; n++ {
+		f.box[nn0+n] = nframe.box[n]
 	}
 
 	// f.Logboxes("after adding")
@@ -356,21 +359,21 @@ func (f *Frame) Insert(r []rune, p0 int) {
 		ppt0.X -= f.box[nn0].Wid
 	}
 
-	n0 += frame.nbox
+	n0 += nframe.nbox
 	if n0 < f.nbox-1 {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0+1)
 	//	f.Logboxes("after clean")
-	f.NChars += frame.NChars
+	f.NChars += nframe.NChars
 	if f.P0 >= p0 {
-		f.P0 += frame.NChars
+		f.P0 += nframe.NChars
 	}
 	if f.P0 >= f.NChars {
 		f.P0 = f.NChars
 	}
 	if f.P1 >= p0 {
-		f.P1 += frame.NChars
+		f.P1 += nframe.NChars
 	}
 	if f.P1 >= f.NChars {
 		f.P1 += f.NChars

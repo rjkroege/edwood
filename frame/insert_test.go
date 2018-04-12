@@ -10,12 +10,13 @@ import (
 type InsertTestResult struct {
 	ppt      image.Point
 	resultpt image.Point
+	frame    *Frame
 }
 
 type InsertTest struct {
 	name       string
 	frame      *Frame
-	stim       func(*Frame) (image.Point, image.Point)
+	stim       func(*Frame) (image.Point, image.Point, *Frame)
 	nbox       int
 	nalloc     int
 	afterboxes []*frbox
@@ -24,8 +25,8 @@ type InsertTest struct {
 }
 
 func (bx InsertTest) Try() interface{} {
-	a, b := bx.stim(bx.frame)
-	return InsertTestResult{a, b}
+	a, b, c := bx.stim(bx.frame)
+	return InsertTestResult{a, b, c}
 }
 
 func (tv InsertTest) Verify(t *testing.T, prefix string, result interface{}) {
@@ -39,7 +40,7 @@ func (tv InsertTest) Verify(t *testing.T, prefix string, result interface{}) {
 	}
 	// We use the global frame here to make sure that bxscan works as desired.
 	// I note in passing that encapsulation here could be improved.
-	testcore(t, prefix, tv.name, &frame, tv.nbox, tv.nalloc, tv.afterboxes)
+	testcore(t, prefix, tv.name, r.frame, tv.nbox, tv.nalloc, tv.afterboxes)
 }
 
 func mkRu(s string) []rune {
@@ -64,10 +65,10 @@ func TestBxscan(t *testing.T) {
 				nalloc: 0,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point) {
+			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(10, 15)
-				pt2 := f.bxscan(mkRu("本"), &pt1)
-				return pt1, pt2
+				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				return pt1, pt2, f
 			},
 			1, 25,
 			[]*frbox{makeBox("本")},
@@ -82,10 +83,10 @@ func TestBxscan(t *testing.T) {
 				nalloc: 0,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point) {
+			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(56, 15)
-				pt2 := f.bxscan(mkRu("本"), &pt1)
-				return pt1, pt2
+				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				return pt1, pt2, f
 			},
 			1, 25,
 			[]*frbox{makeBox("本")},
@@ -100,10 +101,10 @@ func TestBxscan(t *testing.T) {
 				nalloc: 0,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point) {
+			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(57, 15)
-				pt2 := f.bxscan(mkRu("本"), &pt1)
-				return pt1, pt2
+				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				return pt1, pt2, f
 			},
 			1, 25,
 			[]*frbox{makeBox("本")},
@@ -118,10 +119,10 @@ func TestBxscan(t *testing.T) {
 				nalloc: 0,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point) {
+			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(56, 15)
-				pt2 := f.bxscan(mkRu("本a"), &pt1)
-				return pt1, pt2
+				pt2, f := f.bxscan(mkRu("本a"), &pt1)
+				return pt1, pt2, f
 			},
 			2, 25,
 			[]*frbox{makeBox("本"), makeBox("a")},
@@ -136,10 +137,10 @@ func TestBxscan(t *testing.T) {
 				nalloc: 0,
 				Rect:   image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point) {
+			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(10, 15)
-				pt2 := f.bxscan(mkRu(bigstring), &pt1)
-				return pt1, pt2
+				pt2, f := f.bxscan(mkRu(bigstring), &pt1)
+				return pt1, pt2, f
 			},
 			3, 25,
 			[]*frbox{makeBox("a本ポポポ"), makeBox("ポポhel"), makeBox("lo")},
