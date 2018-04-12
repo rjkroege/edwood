@@ -10,8 +10,6 @@ import (
 var (
 	DELTA   = 25
 	TMPSIZE = 256
-
-//	frame   Frame
 )
 
 func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
@@ -218,6 +216,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	}
 
 	if pt1.Y > f.Rect.Max.Y {
+		nframe.validateboxmodel("frame.Insert pt1 too far, nframe validation, %v", pt1)
 		panic("frame.Insert pt1 too far")
 	}
 	if pt1.Y == f.Rect.Max.Y && n0 < f.nbox {
