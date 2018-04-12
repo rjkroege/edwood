@@ -840,8 +840,6 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	var (
 		fc plan9.Fcall
 		w  *Window
-		//	r []rune
-		b1           []rune
 		q            int
 		off, boff    uint64
 		m, n, nr, nb int
@@ -852,7 +850,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	n = 0
 	//r = make([]rune, BUFSIZE/utf8.UTFMax)
 	//b = make([]rune, BUFSIZE/utf8.UTFMax)
-	b1 = make([]rune, BUFSIZE/utf8.UTFMax)
+	b1 := make([]byte, BUFSIZE)
 	if qid == w.utflastqid && off >= w.utflastboff && w.utflastq <= q1 {
 		boff = w.utflastboff
 		q = w.utflastq
@@ -862,6 +860,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		q = 0
 	}
 	w.utflastqid = qid
+	r := make([]rune, BUFSIZE/utf8.UTFMax)
 	for q < q1 && n < int(x.fcall.Count) {
 		// * Updating here avoids partial rune problem: we're always on a
 		// * char boundary. The cost is we will usually do one more read
@@ -872,15 +871,14 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
-		r := make([]rune, nr)
 		t.file.b.Read(q, r[:nr])
-		b := r //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
+		b := string(r[:nr]) //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
 		if boff >= off {
 			m = len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
 				m = int(off + uint64(x.fcall.Count) - boff)
 			}
-			copy(b1[n:], b[:m])
+			copy(b1[n:], []byte(b[:m]))
 			n += m
 		} else {
 			if boff+uint64(nb) > off {
@@ -898,7 +896,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		boff += uint64(nb)
 		q += len(r)
 	}
-	fc.Data = []byte(string(b1[:n]))
+	fc.Data = b1[:n]
 	fc.Count = uint32(len(fc.Data))
 	respond(x, &fc, nil)
 }
