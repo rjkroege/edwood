@@ -36,7 +36,7 @@ var exectab = []Exectab{
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
 	{"Get", get, false, true, true /*unused*/},
-	//	{ "ID",		id,		false,	true /*unused*/,		true /*unused*/		},
+	{ "ID", id, false,	true /*unused*/, true /*unused*/		},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
@@ -483,6 +483,12 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		u.ScrDraw()
 	}
 	xfidlog(w, "get")
+}
+
+func id(et, _, _ *Text, _, _ bool, _ string) {
+	if et != nil && et.w != nil {
+		warning(nil, "/mnt/acme/%d/\n", et.w.id);
+	}
 }
 
 func checkhash(name string, f *File, d os.FileInfo) {
