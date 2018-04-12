@@ -47,7 +47,7 @@ var exectab = []Exectab{
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
 	{"Put", put, false, true /*unused*/, true /*unused*/},
-	//	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
+	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
 	{"Redo", undo, false, false, true /*unused*/},
 	{"Send", sendx, true, true /*unused*/, true /*unused*/},
 	{"Snarf", cut, false, true, false},
@@ -603,6 +603,30 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 	putfile(f, 0, f.b.Nc(), name)
 	xfidlog(w, "put")
 }
+
+func putall(et , _, _ *Text, _, _ bool, arg string) {
+	for _, col := range row.col {
+		for _, w := range col.w {
+			if(w.isscratch || w.isdir || w.body.file.name=="") {
+				continue
+			}
+			if(w.nopen[QWevent] > 0) {
+				continue
+			}
+			a := string(w.body.file.name)
+			e := access(a);
+			if(w.body.file.mod || w.body.ncache > 0) {
+				if !e {
+					warning(nil, "no auto-Put of %s: %r\n", a);
+				} else {
+					w.Commit(&w.body);
+					put(&w.body, nil, nil, false, false, "");
+				}
+			}
+		}
+	}
+}
+
 
 func sortx(et, _, _ *Text, _, _ bool, _ string) {
 	if et.col != nil {
