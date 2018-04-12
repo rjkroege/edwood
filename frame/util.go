@@ -159,9 +159,9 @@ func (f *Frame) Logboxes(message string, args ...interface{}) {
 	for i, b := range f.box {
 		if b != nil {
 			if b.Nrune == -1 && b.Bc == '\n' {
-				log.Printf("	box[%d] -> newline\n")
+				log.Printf("	box[%d] -> newline\n", i)
 			} else if b.Nrune == -1 && b.Bc == '\t' {
-				log.Printf("	box[%d] -> tab\n")
+				log.Printf("	box[%d] -> tab\n", i)
 			} else {
 				log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
 			}
