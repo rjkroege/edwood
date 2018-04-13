@@ -14,10 +14,10 @@ func (f *Frame) Delete(p0, p1 int) int {
 	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	var r image.Rectangle
 
-	if p1 > f.NChars {
-		p1 = f.NChars - 1
+	if p1 > f.nchars {
+		p1 = f.nchars - 1
 	}
-	if p0 >= f.NChars || p0 == p1 || f.Background == nil {
+	if p0 >= f.nchars || p0 == p1 || f.Background == nil {
 		return 0
 	}
 
@@ -130,7 +130,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 			f.SelectPaint(pt0, pt2, f.Cols[ColBack])
 		}
 	}
-	// We crash here. 
+	// We crash here.
 	f.closebox(n0, n1-1)
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-int(f.box[nn0-1].Wid) >= int(f.Rect.Min.X) {
 		nn0--
@@ -155,15 +155,15 @@ func (f *Frame) Delete(p0, p1 int) int {
 		f.P0 = p0
 	}
 
-	f.NChars -= int(p1 - p0)
+	f.nchars -= int(p1 - p0)
 	if f.P0 == f.P1 {
 		f.Tick(f.Ptofchar(f.P0), true)
 	}
-	pt0 = f.Ptofchar(f.NChars)
-	n := f.NLines
-	f.NLines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
+	pt0 = f.Ptofchar(f.nchars)
+	n := f.nlines
+	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
 	if pt0.X > f.Rect.Min.X {
-		f.NLines++
+		f.nlines++
 	}
-	return n - f.NLines
+	return n - f.nlines
 }

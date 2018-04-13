@@ -8,7 +8,7 @@ import (
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 	// log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
-	for _, b  := range f.box {
+	for _, b := range f.box {
 		pt = f.cklinewrap(pt, b)
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
@@ -197,7 +197,7 @@ func (f *Frame) Redraw() {
 		if ticked {
 			f.Tick(f.Ptofchar(f.P0), false)
 		}
-		f.Drawsel0(f.Ptofchar(0), 0, f.NChars, f.Cols[ColBack], f.Cols[ColText])
+		f.Drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
 			f.Tick(f.Ptofchar(f.P0), true)
 		}
@@ -206,7 +206,7 @@ func (f *Frame) Redraw() {
 	pt = f.Ptofchar(0)
 	pt = f.Drawsel0(pt, 0, f.P0, f.Cols[ColBack], f.Cols[ColText])
 	pt = f.Drawsel0(pt, f.P0, f.P1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.Drawsel0(pt, f.P1, f.NChars, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.Drawsel0(pt, f.P1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 
 }
 
@@ -259,7 +259,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 		}
 		pt = f.cklinewrap0(pt, b)
 		if pt.Y == f.Rect.Max.Y {
-			f.NChars -= f.strlen(nb)
+			f.nchars -= f.strlen(nb)
 			f.delbox(nb, len(f.box)-1)
 			break
 		}
@@ -288,7 +288,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 }
 
 func (f *Frame) strlen(nb int) int {
-	n := 0	
+	n := 0
 	for _, b := range f.box[nb:] {
 		n += nrune(b)
 	}

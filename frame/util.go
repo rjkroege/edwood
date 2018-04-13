@@ -109,7 +109,6 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 	return x - pt.X
 }
 
-
 // TODO(rjk): Possibly does not work correctly.
 // clean merges boxes where possible over boxes [n0, n1)
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
@@ -128,12 +127,12 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 			n1--
 			b = f.box[nb]
 		}
-		pt=f.advance(pt, f.box[nb])
+		pt = f.advance(pt, f.box[nb])
 	}
 
 	for _, b := range f.box[nb:] {
 		pt = f.cklinewrap(pt, b)
-		pt=f.advance(pt, b)
+		pt = f.advance(pt, b)
 	}
 	f.lastlinefull = false
 	if pt.Y >= f.Rect.Max.Y {

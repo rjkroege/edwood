@@ -22,7 +22,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 		Background: f.Background,
 		Font:       f.Font,
 		MaxTab:     f.MaxTab,
-		NChars:     0,
+		nchars:     0,
 		box:        []*frbox{},
 	}
 
@@ -37,23 +37,23 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 		switch c = r[offs]; c {
 		case '\t':
 			frame.box = append(frame.box, &frbox{
-				Bc: c,
-				Wid: 10000,
+				Bc:     c,
+				Wid:    10000,
 				Minwid: byte(frame.Font.StringWidth(" ")),
-				Nrune: -1,
+				Nrune:  -1,
 			})
 
-			frame.NChars++
+			frame.nchars++
 			offs++
 		case '\n':
 			frame.box = append(frame.box, &frbox{
-				Bc: c,
-				Wid: 10000,
+				Bc:     c,
+				Wid:    10000,
 				Minwid: 0,
-				Nrune: -1,
+				Nrune:  -1,
 			})
 
-			frame.NChars++
+			frame.nchars++
 			offs++
 			nl++
 		default:
@@ -81,11 +81,11 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 			copy(p, tmp[:s])
 
 			frame.box = append(frame.box, &frbox{
-				Ptr: p,
-				Wid:  w,
-				Nrune:  nr,
+				Ptr:   p,
+				Wid:   w,
+				Nrune: nr,
 			})
-			frame.NChars += nr
+			frame.nchars += nr
 		}
 	}
 
@@ -104,8 +104,8 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		pt = f.advance(pt, b)
 		bn++
 	}
-	f.NChars = p
-	f.NLines = f.MaxLines
+	f.nchars = p
+	f.nlines = f.MaxLines
 	if bn < len(f.box) { // BUG
 		f.delbox(bn, len(f.box)-1)
 	}
@@ -131,7 +131,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
 	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
 
-	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
+	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
 		return f.lastlinefull
 	}
 
@@ -139,7 +139,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	var col, tcol *draw.Image
 
 	pts := make([]points, 0, 5)
-	
+
 	n0 := f.findbox(0, 0, p0)
 	if n0 > len(f.box) {
 		f.Logboxes("-- boxes after findbox when findbox has failed to return a valid box index --")
@@ -181,7 +181,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < len(f.box); npts++ {
 		b := f.box[n0]
 		pt0 = f.cklinewrap(pt0, b)
-		pt1 = f.cklinewrap0(pt1, b)		
+		pt1 = f.cklinewrap0(pt1, b)
 		if pt1.Y > f.Rect.Max.Y {
 			f.Logboxes("-- pt1 violated invariant at box --")
 			panic(fmt.Sprint("frame.Insert pt1 too far", " pt1=", pt1, " box=", b))
@@ -213,21 +213,21 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		panic("frame.Insert pt1 too far")
 	}
 	if pt1.Y == f.Rect.Max.Y && n0 < len(f.box) {
-		f.NChars -= f.strlen(n0)
+		f.nchars -= f.strlen(n0)
 		f.delbox(n0, len(f.box)-1)
 	}
 	if n0 == len(f.box) {
 		div := f.Font.DefaultHeight()
-		f.NLines = (pt1.Y - f.Rect.Min.Y) / div
+		f.nlines = (pt1.Y - f.Rect.Min.Y) / div
 		if pt1.X > f.Rect.Min.X {
-			f.NLines++
+			f.nlines++
 		}
 	} else if pt1.Y != pt0.Y {
 		y := f.Rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
-		f.NLines += (q1 - q0) / f.Font.DefaultHeight()
-		if f.NLines > f.MaxLines {
+		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
+		if f.nlines > f.MaxLines {
 			// log.Println("f.chop", ppt1, p0, nn0, len(f.box), f.nbox)
 			f.chop(ppt1, p0, nn0)
 		}
@@ -350,23 +350,23 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	}
 
 	n0 += len(nframe.box)
-	if n0 <len( f.box) -1 {
+	if n0 < len(f.box)-1 {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0+1)
 	//	f.Logboxes("after clean")
-	f.NChars += nframe.NChars
+	f.nchars += nframe.nchars
 	if f.P0 >= p0 {
-		f.P0 += nframe.NChars
+		f.P0 += nframe.nchars
 	}
-	if f.P0 >= f.NChars {
-		f.P0 = f.NChars
+	if f.P0 >= f.nchars {
+		f.P0 = f.nchars
 	}
 	if f.P1 >= p0 {
-		f.P1 += nframe.NChars
+		f.P1 += nframe.nchars
 	}
-	if f.P1 >= f.NChars {
-		f.P1 += f.NChars
+	if f.P1 >= f.nchars {
+		f.P1 += f.nchars
 	}
 
 	return f.lastlinefull

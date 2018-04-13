@@ -66,7 +66,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 		if qt.Y >= pt.Y {
 			break
 		}
-		qt=f.advance(qt, b)
+		qt = f.advance(qt, b)
 		p += nrune(b)
 	}
 
@@ -80,7 +80,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 		}
 		if qt.X+b.Wid > pt.X {
 			if b.Nrune < 0 {
-				qt=f.advance(qt, b)
+				qt = f.advance(qt, b)
 			} else {
 				s := 0
 				for ; s < len(b.Ptr); s += w {

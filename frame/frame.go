@@ -3,7 +3,6 @@ package frame
 import (
 	"9fans.net/go/draw"
 	"image"
-
 )
 
 const (
@@ -66,8 +65,8 @@ type FrameFillStatus struct {
 // GetFrameFillStatus returns a snapshot of the capacity of the frame.
 func (f *Frame) GetFrameFillStatus() FrameFillStatus {
 	return FrameFillStatus{
-		Nchars:   f.NChars,
-		Nlines:   f.NLines,
+		Nchars:   f.nchars,
+		Nlines:   f.nlines,
 		Maxlines: f.MaxLines,
 	}
 }
@@ -92,13 +91,12 @@ type Frame struct {
 
 	P0, P1 int // bounds of a selection
 	MaxTab int // max size of a tab (in pixels)
-	NChars int // number of runes in frame
-	NLines int // number of lines with text
+	nchars int // number of runes in frame
+	nlines int // number of lines with text
+
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
 	MaxLines int // total number of lines in frame
 
-	// TODO(rjk): make a bool
-	// ro. Doesn't need a getter. Used only with frinsert and frdelete. Return from there.
 	lastlinefull bool
 
 	Modified  bool
@@ -136,8 +134,8 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.Font = &frfont{ft}
 	f.Display = b.Display
 	f.MaxTab = 8 * ft.StringWidth("0")
-	f.NChars = 0
-	f.NLines = 0
+	f.nchars = 0
+	f.nlines = 0
 	f.P0 = 0
 	f.P1 = 0
 	f.box = nil

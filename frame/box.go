@@ -16,15 +16,14 @@ func (f *Frame) addbox(bn, n int) {
 	copy(f.box[bn+n:], f.box[bn:])
 }
 
-
 func (f *Frame) closebox(n0, n1 int) {
-	if n0 >= len(f.box) || n1 >=len(f.box) || n1 < n0 {
+	if n0 >= len(f.box) || n1 >= len(f.box) || n1 < n0 {
 		panic(fmt.Sprint("Frame.closebox bounds bad", " n0=", n0, " n1=", n1, " len(box)", len(f.box)))
 	}
 
 	n1++
 	copy(f.box[n0:], f.box[n1:])
-	f.box = f.box[0:len(f.box) - (n1 - n0)]
+	f.box = f.box[0 : len(f.box)-(n1-n0)]
 }
 
 func (f *Frame) delbox(n0, n1 int) {
@@ -39,14 +38,14 @@ func (b *frbox) clone() *frbox {
 
 	// Now deep copy the byte array
 	// TODO(rjk): Adjust when we use strings.
-	cp.Ptr  = make([]byte, len(b.Ptr))
+	cp.Ptr = make([]byte, len(b.Ptr))
 	copy(cp.Ptr, b.Ptr)
 	return cp
 }
 
 // dupbox duplicates box i. box i must exist.
 func (f *Frame) dupbox(i int) {
-	if  i >= len(f.box) {
+	if i >= len(f.box) {
 		f.Logboxes("-- dupbox sadness -- ")
 		panic(fmt.Sprint("dupbox i is out of bounds", " i=", i))
 	}
@@ -132,7 +131,7 @@ func (f *Frame) mergebox(bn int) {
 // rune p in box bn. NB: p must be the first rune in box[bn].
 func (f *Frame) findbox(bn, p, q int) int {
 	for _, b := range f.box[bn:] {
-		if p + nrune(b) > q {
+		if p+nrune(b) > q {
 			break
 		}
 		p += nrune(b)
@@ -172,7 +171,7 @@ func (f *Frame) validateboxmodel(format string, args ...interface{}) {
 			total += b.Nrune
 		}
 	}
-	if total != f.NChars {
+	if total != f.nchars {
 		log.Printf(format, args...)
 		f.Logboxes("-- runes in boxes != NChars --")
 		panic("-- runes in boxes != NChars --")
