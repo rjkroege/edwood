@@ -33,7 +33,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	// log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
 
 	offs := 0
-	for nb := 0; offs < len(r) && nl <= f.MaxLines; nb++ {
+	for nb := 0; offs < len(r) && nl <= f.maxlines; nb++ {
 		switch c = r[offs]; c {
 		case '\t':
 			frame.box = append(frame.box, &frbox{
@@ -109,7 +109,7 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		bn++
 	}
 	f.nchars = p
-	f.nlines = f.MaxLines
+	f.nlines = f.maxlines
 	if bn < len(f.box) { // BUG
 		f.delbox(bn, len(f.box)-1)
 	}
@@ -231,7 +231,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
 		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
-		if f.nlines > f.MaxLines {
+		if f.nlines > f.maxlines {
 			// log.Println("f.chop", ppt1, p0, nn0, len(f.box), f.nbox)
 			f.chop(ppt1, p0, nn0)
 		}

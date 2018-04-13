@@ -67,7 +67,7 @@ func (f *Frame) GetFrameFillStatus() FrameFillStatus {
 	return FrameFillStatus{
 		Nchars:   f.nchars,
 		Nlines:   f.nlines,
-		Maxlines: f.MaxLines,
+		Maxlines: f.maxlines,
 	}
 }
 
@@ -95,7 +95,7 @@ type Frame struct {
 	nlines int // number of lines with text
 
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
-	MaxLines int // total number of lines in frame
+	maxlines int // total number of lines in frame
 
 	lastlinefull bool
 
@@ -194,7 +194,7 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	f.Entire = r
 	f.Rect = r
 	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
-	f.MaxLines = (r.Max.Y - r.Min.Y) / height
+	f.maxlines = (r.Max.Y - r.Min.Y) / height
 }
 
 // Clear frees the internal structures associated with f, permitting
