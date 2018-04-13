@@ -124,7 +124,7 @@ var nalloc = 0
 // backspaces are printed; to erase a character, use Delete.
 //
 // Insert will remove the selection or tick  if present but update selection offsets.
-func (f *Frame) Insert(r []rune, p0 int) {
+func (f *Frame) Insert(r []rune, p0 int) bool {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")
@@ -132,7 +132,7 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
 
 	if p0 > f.NChars || len(r) == 0 || f.Background == nil {
-		return
+		return f.lastlinefull
 	}
 
 	var rect image.Rectangle
@@ -368,4 +368,6 @@ func (f *Frame) Insert(r []rune, p0 int) {
 	if f.P1 >= f.NChars {
 		f.P1 += f.NChars
 	}
+
+	return f.lastlinefull
 }
