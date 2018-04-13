@@ -507,7 +507,7 @@ func (t *Text) Fill() {
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
 	// characters possible?
-	if t.fr.LastLineFull != 0 || t.nofill {
+	if t.fr.LastLineFull  || t.nofill {
 		return
 	}
 	if t.ncache > 0 {
@@ -542,7 +542,7 @@ func (t *Text) Fill() {
 		}
 
 		t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars)
-		if nl == 0 || t.fr.LastLineFull != 0 {
+		if nl == 0 || t.fr.LastLineFull {
 			break
 		}
 	}

@@ -135,9 +135,9 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 		pt = f.cklinewrap(pt, b)
 		pt=f.advance(pt, b)
 	}
-	f.LastLineFull = 0
+	f.LastLineFull = false
 	if pt.Y >= f.Rect.Max.Y {
-		f.LastLineFull = 1
+		f.LastLineFull = true
 	}
 	//	f.Logboxes("--- clean: end")
 }

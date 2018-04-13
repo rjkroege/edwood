@@ -95,7 +95,7 @@ type Frame struct {
 
 	// TODO(rjk): make a bool
 	// ro. Doesn't need a getter. Used only with frinsert and frdelete. Return from there.
-	LastLineFull int
+	LastLineFull bool
 
 	Modified  bool
 	TickImage *draw.Image // typing tick
@@ -137,7 +137,7 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.P0 = 0
 	f.P1 = 0
 	f.box = nil
-	f.LastLineFull = 0
+	f.LastLineFull = false
 	f.Cols = cols
 	f.SetRects(r, b)
 
