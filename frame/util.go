@@ -101,8 +101,8 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 		pt.X = f.Rect.Min.X
 		x = pt.X
 	}
-	x += f.MaxTab
-	x -= (x - f.Rect.Min.X) % f.MaxTab
+	x += f.maxtab
+	x -= (x - f.Rect.Min.X) % f.maxtab
 	if x-pt.X < int(b.Minwid) || x > c {
 		x = pt.X + int(b.Minwid)
 	}

@@ -49,11 +49,11 @@ func (ff *frfont) Impl() *draw.Font {
 
 // Maxtab sets the maximum size of a tab in pixels.
 func (f *Frame) Maxtab(m int) {
-	f.MaxTab = m
+	f.maxtab = m
 }
 
 // GetMaxtab returns the current maximum size of a tab in pixels.
-func (f *Frame) GetMaxtab() int { return f.MaxTab }
+func (f *Frame) GetMaxtab() int { return f.maxtab }
 
 // FrameFillStatus is a snapshot of the capacity of the Frame.
 type FrameFillStatus struct {
@@ -90,7 +90,7 @@ type Frame struct {
 	box []*frbox // the boxes of text in this frame.
 
 	P0, P1 int // bounds of a selection
-	MaxTab int // max size of a tab (in pixels)
+	maxtab int // max size of a tab (in pixels)
 	nchars int // number of runes in frame
 	nlines int // number of lines with text
 
@@ -133,7 +133,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
 	f.Font = &frfont{ft}
 	f.Display = b.Display
-	f.MaxTab = 8 * ft.StringWidth("0")
+	f.maxtab = 8 * ft.StringWidth("0")
 	f.nchars = 0
 	f.nlines = 0
 	f.P0 = 0
