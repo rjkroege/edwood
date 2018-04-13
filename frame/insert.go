@@ -94,6 +94,10 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 }
 
 func (f *Frame) chop(pt image.Point, p, bn int) {
+	if bn >= len(f.box) {
+		f.Logboxes(" -- chop, invalid bn=%d --\n", bn)
+		panic("chop bn too large")
+	}
 	for {
 		b := f.box[bn]
 		pt = f.cklinewrap(pt, b)
