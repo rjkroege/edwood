@@ -99,7 +99,7 @@ type Frame struct {
 
 	lastlinefull bool
 
-	Modified  bool
+	modified  bool
 	TickImage *draw.Image // typing tick
 	TickBack  *draw.Image // image under tick
 

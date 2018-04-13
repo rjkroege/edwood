@@ -164,7 +164,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		pt0 = f.cklinewrap(pt0, f.box[n0])
 		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
 	}
-	f.Modified = true
+	f.modified = true
 	/*
 	 * ppt0 and ppt1 are start and end of insertion as they will appear when
 	 * insertion is complete. pt0 is current location of insertion position

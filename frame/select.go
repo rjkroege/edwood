@@ -40,7 +40,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 	omb := downevent.Buttons
 
 	// TODO(rjk): Figure out what Modified is really for.
-	f.Modified = false
+	f.modified = false
 
 	p0 := f.Charofpt(omp)
 	p1 := p0

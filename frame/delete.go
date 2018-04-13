@@ -40,7 +40,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 
 	// If the previous code was safe, this is harmless.
 	// f.freebox(n0, n1-1)
-	f.Modified = true
+	f.modified = true
 
 	/*
 	 * Invariants:
