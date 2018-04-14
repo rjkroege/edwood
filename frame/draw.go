@@ -52,7 +52,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 		panic("Drawsel0: p0 and p1 must be ordered")
 	}
 
-	if f.Ticked {
+	if f.ticked {
 		f.Tick(f.Ptofchar(f.P0), false)
 	}
 
@@ -193,7 +193,7 @@ func (f *Frame) Redraw() {
 	var pt image.Point
 
 	if f.P0 == f.P1 {
-		ticked = f.Ticked
+		ticked = f.ticked
 		if ticked {
 			f.Tick(f.Ptofchar(f.P0), false)
 		}
@@ -212,7 +212,7 @@ func (f *Frame) Redraw() {
 
 func (f *Frame) tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
-	if f.Ticked == ticked || f.TickImage == nil || !pt.In(f.Rect) {
+	if f.ticked == ticked || f.tickimage == nil || !pt.In(f.Rect) {
 		return
 	}
 
@@ -224,13 +224,13 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 	}
 
 	if ticked {
-		f.TickBack.Draw(f.TickBack.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.Display.Black, f.TickImage, image.ZP) // draws an alpha-blended box
+		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
+		f.Background.Draw(r, f.Display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
-		f.Background.Draw(r, f.TickBack, nil, image.ZP)
+		f.Background.Draw(r, f.tickback, nil, image.ZP)
 	}
-	f.Ticked = ticked
+	f.ticked = ticked
 }
 
 // Tick draws (if up is non-zero) or removes (if up is zero) the tick
@@ -240,7 +240,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 // undesirable to use it in the public API.
 func (f *Frame) Tick(pt image.Point, ticked bool) {
 	if f.TickScale != f.Display.ScaleSize(1) {
-		if f.Ticked {
+		if f.ticked {
 			f.tick(pt, false)
 		}
 		f.InitTick()

@@ -100,11 +100,11 @@ type Frame struct {
 	lastlinefull bool
 
 	modified  bool
-	TickImage *draw.Image // typing tick
-	TickBack  *draw.Image // image under tick
+	tickimage *draw.Image // typing tick
+	tickback  *draw.Image // image under tick
 
 	// TODO(rjk): Expose. public ro
-	Ticked bool
+	ticked bool
 
 	// TODO(rjk): Expose public rw.
 	// Set this to true to indicate that the Frame should not emit drawing ops.
@@ -143,7 +143,7 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.Cols = cols
 	f.SetRects(r, b)
 
-	if f.TickImage == nil && f.Cols[ColBack] != nil {
+	if f.tickimage == nil && f.Cols[ColBack] != nil {
 		f.InitTick()
 	}
 }
@@ -160,31 +160,31 @@ func (f *Frame) InitTick() {
 	b := f.Display.ScreenImage
 	ft := f.Font
 
-	if f.TickImage != nil {
-		f.TickImage.Free()
+	if f.tickimage != nil {
+		f.tickimage.Free()
 	}
 
 	height := ft.DefaultHeight()
 
-	f.TickImage, err = f.Display.AllocImage(image.Rect(0, 0, f.TickScale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.TickScale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
 
-	f.TickBack, err = f.Display.AllocImage(f.TickImage.R, b.Pix, false, draw.White)
+	f.tickback, err = f.Display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
 	if err != nil {
-		f.TickImage.Free()
-		f.TickImage = nil
+		f.tickimage.Free()
+		f.tickimage = nil
 		return
 	}
-	f.TickBack.Draw(f.TickBack.R, f.Cols[ColBack], nil, image.ZP)
+	f.tickback.Draw(f.tickback.R, f.Cols[ColBack], nil, image.ZP)
 
-	f.TickImage.Draw(f.TickImage.R, f.Display.Transparent, nil, image.Pt(0, 0))
+	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.TickImage.Draw(image.Rect(f.TickScale*(frtickw/2), 0, f.TickScale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(f.TickScale*(frtickw/2), 0, f.TickScale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.TickImage.Draw(image.Rect(0, 0, f.TickScale*frtickw, f.TickScale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
-	f.TickImage.Draw(image.Rect(0, height-f.TickScale*frtickw, f.TickScale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, 0, f.TickScale*frtickw, f.TickScale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, height-f.TickScale*frtickw, f.TickScale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
@@ -214,10 +214,10 @@ func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 func (f *Frame) Clear(freeall bool) {
 	f.box = make([]*frbox, 0, 25)
 	if freeall {
-		f.TickImage.Free()
-		f.TickBack.Free()
-		f.TickImage = nil
-		f.TickBack = nil
+		f.tickimage.Free()
+		f.tickback.Free()
+		f.tickimage = nil
+		f.tickback = nil
 	}
-	f.Ticked = false
+	f.ticked = false
 }
