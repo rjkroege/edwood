@@ -257,7 +257,7 @@ func (c *Column) Resize(r image.Rectangle) {
 	clearmouse()
 	r1 := r
 	r1.Max.Y = r1.Min.Y + c.tag.fr.Font.Impl().Height
-	c.tag.Resize(r1, true)
+	c.tag.Resize(r1, true, false)
 	if c.display != nil {
 		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
 	}

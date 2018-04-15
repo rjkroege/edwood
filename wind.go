@@ -213,9 +213,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 		return 1
 	}
 	w.showdel = false
-	w.tag.fr.NoRedraw = true
-	w.tag.Resize(r, true)
-	w.tag.fr.NoRedraw = false
+	w.tag.Resize(r, true, true /* noredraw */)
 	w.tagsafe = false
 
 	if !w.tagexpand {
@@ -266,7 +264,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	// Resize/redraw tag TODO(flux)
 	y := r1.Max.Y
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
-		w.tag.Resize(r1, true)
+		w.tag.Resize(r1, true, false /* noredraw */)
 		y = w.tag.fr.Rect.Max.Y
 		w.DrawButton()
 		w.tagsafe = true
@@ -306,7 +304,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y
 		}
-		y = w.body.Resize(r1, keepextra)
+		y = w.body.Resize(r1, keepextra, false /* noredraw */)
 		w.r = r
 		w.r.Max.Y = y
 		w.body.ScrDraw()

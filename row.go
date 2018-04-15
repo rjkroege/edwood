@@ -105,7 +105,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	row.r = rect
 	r1 := rect
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, r.display).Height
-	row.tag.Resize(r1, true)
+	row.tag.Resize(r1, true, false)
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)

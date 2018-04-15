@@ -91,7 +91,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.font = rf
 	t.tabstop = int(maxtab)
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
-	t.Redraw(r, fontget(rf, t.display), t.display.ScreenImage, -1)
+	t.Redraw(r, fontget(rf, t.display), t.display.ScreenImage, -1, false /* noredraw */)
 	return t
 }
 
@@ -112,14 +112,14 @@ func (t *Text) whatstring() string {
 	return "Columntag"
 }
 
-func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
+func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int, noredraw bool) {
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
 	// defer log.Println("--- Text Redraw end")
 	// TODO(rjk): It is possible that this does unnecessary work.
 	t.fr.Init(r, f, b, t.fr.Cols)
 	rr := t.fr.Rect
 	rr.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap) /* back fill to scroll bar */
-	if !t.fr.NoRedraw {
+	if !noredraw {
 		t.fr.Background.Draw(rr, t.fr.Cols[frame.ColBack], nil, image.ZP)
 	}
 	/* use no wider than 3-space tabs in a directory */
@@ -144,7 +144,7 @@ func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int) {
 	}
 }
 
-func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
+func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	// log.Println("--- Text Resize start", r, keepextra, t.whatstring())
 	// defer log.Println("--- Text Resize end")
 	if r.Dy() <= 0 {
@@ -161,8 +161,8 @@ func (t *Text) Resize(r image.Rectangle, keepextra bool) int {
 	t.lastsr = image.ZR
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
-	t.Redraw(r, t.fr.Font.Impl(), t.fr.Background, odx)
-	if keepextra && t.fr.Rect.Max.Y < t.all.Max.Y /* && !t.fr.NoRedraw */ {
+	t.Redraw(r, t.fr.Font.Impl(), t.fr.Background, odx, noredraw)
+	if keepextra && t.fr.Rect.Max.Y < t.all.Max.Y /* && noredraw */ {
 		/* draw background in bottom fringe of window */
 		r.Min.X -= t.display.ScaleSize(Scrollgap)
 		r.Min.Y = t.fr.Rect.Max.Y
@@ -348,7 +348,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			if u.org > u.file.b.Nc() { /* will be 0 because of reset(), but safety first */
 				u.org = 0
 			}
-			u.Resize(u.all, true)
+			u.Resize(u.all, true, false /* noredraw */)
 			u.Backnl(u.org, 0) /* go to beginning of line */
 		}
 		u.SetSelect(q0, q0)

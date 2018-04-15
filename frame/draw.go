@@ -12,7 +12,7 @@ func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 		pt = f.cklinewrap(pt, b)
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
-		if !f.NoRedraw && b.Nrune >= 0 {
+		if !f.noredraw && b.Nrune >= 0 {
 			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
 		}
 		pt.X += b.Wid

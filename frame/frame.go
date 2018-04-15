@@ -109,7 +109,7 @@ type Frame struct {
 	// TODO(rjk): Expose public rw.
 	// Set this to true to indicate that the Frame should not emit drawing ops.
 	// Use this if the Frame is being used "headless" to measure some text.
-	NoRedraw  bool
+	noredraw  bool
 	TickScale int // tick scaling factor
 
 	highlighton bool // True if the highlight is painted.
