@@ -10,13 +10,13 @@ import (
 // TODO(rjk): It is conceivable that we don't need this. It seems like an egregious
 // abstraction violation that it exists.
 func (f *Frame) SetSelectionExtent(p0, p1 int) {
-	f.P0, f.P1 = p0, p1
+	f.sp0, f.sp1 = p0, p1
 }
 
 // GetSelectionExtent returns the rune offsets of the selection maintained by
 // the Frame.
 func (f *Frame) GetSelectionExtent() (int, int) {
-	return f.P0, f.P1
+	return f.sp0, f.sp1
 }
 
 func region(a, b int) int {
@@ -62,13 +62,13 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 				// remove the selection. But not put it back. But it will correct
 				// P1 and P0 to reflect the insertion.
 				// TODO(rjk): Add a unittest to prove this statement.
-				p0 = f.P1
-				p1 = f.P0
+				p0 = f.sp1
+				p1 = f.sp0
 				scrled = true
 			} else if mp.Y > f.Rect.Max.Y {
 				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
-				p0 = f.P1
-				p1 = f.P0
+				p0 = f.sp1
+				p1 = f.sp0
 				scrled = true
 			}
 			if scrled {
@@ -128,7 +128,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 			break
 		}
 	}
-	return f.P0, f.P1
+	return f.sp0, f.sp1
 }
 
 func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {

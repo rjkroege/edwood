@@ -1046,6 +1046,7 @@ func (t *Text) Commit(tofile bool) {
 	t.ncache = 0
 }
 
+// TODO(rjk): Conceivably, this can be removed.
 func getP0(fr *frame.Frame) int {
 	p0, _ := fr.GetSelectionExtent()
 	return p0

@@ -205,7 +205,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		r = make([]rune, n)
 		t.file.b.Read(e.q0, r)
 		if search(ct, r[:n]) && e.jump {
-			row.display.MoveTo(ct.fr.Ptofchar(ct.fr.P0).Add(image.Pt(4, ct.fr.Font.DefaultHeight()-4)))
+			row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.Font.DefaultHeight()-4)))
 		}
 	}
 }
@@ -775,7 +775,7 @@ func openfile(t *Text, e *Expand) *Window {
 	t.w.SetTag()
 	seltext = t
 	if e.jump {
-		row.display.MoveTo(t.fr.Ptofchar(t.fr.P0).Add(image.Pt(4, fontget(tagfont, row.display).Height-4)))
+		row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(tagfont, row.display).Height-4)))
 	} else {
 		debug.PrintStack()
 	}

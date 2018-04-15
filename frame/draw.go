@@ -53,15 +53,15 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	}
 
 	if f.ticked {
-		f.Tick(f.Ptofchar(f.P0), false)
+		f.Tick(f.Ptofchar(f.sp0), false)
 	}
 
-	if f.P0 != f.P1 && f.highlighton {
+	if f.sp0 != f.sp1 && f.highlighton {
 		// Clear the selection so that subsequent code can
 		// update correctly.
 		back := f.Cols[ColBack]
 		text := f.Cols[ColText]
-		f.Drawsel0(f.Ptofchar(f.P0), f.P0, f.P1, back, text)
+		f.Drawsel0(f.Ptofchar(f.sp0), f.sp0, f.sp1, back, text)
 
 		// Avoid multiple draws.
 		f.highlighton = false
@@ -72,8 +72,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if !highlighted {
 		// This has to be updated here so that select can
 		// correctly update the selection during a drag loop.
-		f.P0 = p0
-		f.P1 = p1
+		f.sp0 = p0
+		f.sp1 = p1
 		return
 	}
 
@@ -81,8 +81,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if p0 == p1 {
 		f.Tick(pt, highlighted)
 		f.Display.Flush() // To show the tick.
-		f.P0 = p0
-		f.P1 = p1
+		f.sp0 = p0
+		f.sp1 = p1
 		return
 	}
 
@@ -91,8 +91,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	text := f.Cols[ColHText]
 
 	f.Drawsel0(pt, p0, p1, back, text)
-	f.P0 = p0
-	f.P1 = p1
+	f.sp0 = p0
+	f.sp1 = p1
 	f.highlighton = true
 }
 
@@ -192,21 +192,21 @@ func (f *Frame) Redraw() {
 	ticked := false
 	var pt image.Point
 
-	if f.P0 == f.P1 {
+	if f.sp0 == f.sp1 {
 		ticked = f.ticked
 		if ticked {
-			f.Tick(f.Ptofchar(f.P0), false)
+			f.Tick(f.Ptofchar(f.sp0), false)
 		}
 		f.Drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 		if ticked {
-			f.Tick(f.Ptofchar(f.P0), true)
+			f.Tick(f.Ptofchar(f.sp0), true)
 		}
 	}
 
 	pt = f.Ptofchar(0)
-	pt = f.Drawsel0(pt, 0, f.P0, f.Cols[ColBack], f.Cols[ColText])
-	pt = f.Drawsel0(pt, f.P0, f.P1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.Drawsel0(pt, f.P1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.Drawsel0(pt, 0, f.sp0, f.Cols[ColBack], f.Cols[ColText])
+	pt = f.Drawsel0(pt, f.sp0, f.sp1, f.Cols[ColHigh], f.Cols[ColHText])
+	pt = f.Drawsel0(pt, f.sp1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
 
 }
 
@@ -216,8 +216,8 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 		return
 	}
 
-	pt.X -= f.TickScale
-	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.TickScale, pt.Y+f.Font.DefaultHeight())
+	pt.X -= f.tickscale
+	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.DefaultHeight())
 
 	if r.Max.X > f.Rect.Max.X {
 		r.Max.X = f.Rect.Max.X
@@ -239,7 +239,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 // Commentary: because this code ignores selections, it is conceivably
 // undesirable to use it in the public API.
 func (f *Frame) Tick(pt image.Point, ticked bool) {
-	if f.TickScale != f.Display.ScaleSize(1) {
+	if f.tickscale != f.Display.ScaleSize(1) {
 		if f.ticked {
 			f.tick(pt, false)
 		}

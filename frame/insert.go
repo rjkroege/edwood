@@ -99,6 +99,10 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		panic("chop bn too large")
 	}
 	for {
+		if bn >= len(f.box) {
+			f.Logboxes(" -- chop, invalid bn=%d inside of the loop --\n", bn)
+			panic("chop bn inside of loop is too large")
+		}
 		b := f.box[bn]
 		pt = f.cklinewrap(pt, b)
 		if bn >= len(f.box) || pt.Y >= f.Rect.Max.Y {
@@ -172,7 +176,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	 */
 
 	// Remove the selection or tick.
-	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
+	f.DrawSel(f.Ptofchar(f.sp0), f.sp0, f.sp1, false)
 
 	/*
 	 * Find point where old and new x's line up
@@ -284,7 +288,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.P0 <= cn0 && cn0 < f.P1 { /* b+1 is inside selection */
+				if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -297,7 +301,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max.X = f.Rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
-				if f.P0 <= cn0 && cn0 < f.P1 {
+				if f.sp0 <= cn0 && cn0 < f.sp1 {
 					col = f.Cols[ColHigh]
 				} else {
 					col = f.Cols[ColBack]
@@ -315,7 +319,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max.X = f.Rect.Max.X
 			}
 			cn0--
-			if f.P0 <= cn0 && cn0 < f.P1 {
+			if f.sp0 <= cn0 && cn0 < f.sp1 {
 				col = f.Cols[ColHigh]
 				tcol = f.Cols[ColHText]
 			} else {
@@ -331,7 +335,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		npts--
 	}
 
-	if f.P0 < p0 && p0 <= f.P1 {
+	if f.sp0 < p0 && p0 <= f.sp1 {
 		col = f.Cols[ColHigh]
 		tcol = f.Cols[ColHText]
 	} else {
@@ -360,17 +364,17 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	f.clean(ppt0, nn0, n0+1)
 	//	f.Logboxes("after clean")
 	f.nchars += nframe.nchars
-	if f.P0 >= p0 {
-		f.P0 += nframe.nchars
+	if f.sp0 >= p0 {
+		f.sp0 += nframe.nchars
 	}
-	if f.P0 >= f.nchars {
-		f.P0 = f.nchars
+	if f.sp0 >= f.nchars {
+		f.sp0 = f.nchars
 	}
-	if f.P1 >= p0 {
-		f.P1 += nframe.nchars
+	if f.sp1 >= p0 {
+		f.sp1 += nframe.nchars
 	}
-	if f.P1 >= f.nchars {
-		f.P1 += f.nchars
+	if f.sp1 >= f.nchars {
+		f.sp1 += f.nchars
 	}
 
 	return f.lastlinefull

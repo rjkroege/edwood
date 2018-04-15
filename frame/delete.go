@@ -33,7 +33,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	pt1 := f.Ptofchar(p1)
 
 	// Remove the selection or tick.
-	f.DrawSel(f.Ptofchar(f.P0), f.P0, f.P1, false)
+	f.DrawSel(f.Ptofchar(f.sp0), f.sp0, f.sp1, false)
 
 	nn0 := n0
 	ppt0 := pt0
@@ -89,7 +89,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 				r.Max.X = f.Rect.Max.X
 			}
 			col := f.Cols[ColBack]
-			if f.P0 <= cn1 && cn1 < f.P1 {
+			if f.sp0 <= cn1 && cn1 < f.sp1 {
 				col = f.Cols[ColHigh]
 			}
 			f.Background.Draw(r, col, nil, pt0)
@@ -143,21 +143,21 @@ func (f *Frame) Delete(p0, p1 int) int {
 		f.clean(ppt0, nn0, n0)
 	}
 
-	if f.P1 > p1 {
-		f.P1 -= p1 - p0
-	} else if f.P1 > p0 {
-		f.P1 = p0
+	if f.sp1 > p1 {
+		f.sp1 -= p1 - p0
+	} else if f.sp1 > p0 {
+		f.sp1 = p0
 	}
 
-	if f.P0 > p1 {
-		f.P0 -= p1 - p0
-	} else if f.P0 > p0 {
-		f.P0 = p0
+	if f.sp0 > p1 {
+		f.sp0 -= p1 - p0
+	} else if f.sp0 > p0 {
+		f.sp0 = p0
 	}
 
 	f.nchars -= int(p1 - p0)
-	if f.P0 == f.P1 {
-		f.Tick(f.Ptofchar(f.P0), true)
+	if f.sp0 == f.sp1 {
+		f.Tick(f.Ptofchar(f.sp0), true)
 	}
 	pt0 = f.Ptofchar(f.nchars)
 	n := f.nlines

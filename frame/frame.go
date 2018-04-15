@@ -89,30 +89,27 @@ type Frame struct {
 
 	box []*frbox // the boxes of text in this frame.
 
-	P0, P1 int // bounds of a selection
-	maxtab int // max size of a tab (in pixels)
-	nchars int // number of runes in frame
-	nlines int // number of lines with text
+	sp0, sp1 int // bounds of a selection
+	maxtab   int // max size of a tab (in pixels)
+	nchars   int // number of runes in frame
+	nlines   int // number of lines with text
 
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
 	maxlines int // total number of lines in frame
 
 	lastlinefull bool
 
-	modified  bool
-	tickimage *draw.Image // typing tick
-	tickback  *draw.Image // image under tick
+	modified bool
 
-	// TODO(rjk): Expose. public ro
-	ticked bool
+	tickimage   *draw.Image // typing tick
+	tickback    *draw.Image // image under tick
+	ticked      bool        // Is the tick on.
+	highlighton bool        // True if the highlight is painted.
 
-	// TODO(rjk): Expose public rw.
 	// Set this to true to indicate that the Frame should not emit drawing ops.
 	// Use this if the Frame is being used "headless" to measure some text.
 	noredraw  bool
-	TickScale int // tick scaling factor
-
-	highlighton bool // True if the highlight is painted.
+	tickscale int // tick scaling factor
 }
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
@@ -136,8 +133,8 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.maxtab = 8 * ft.StringWidth("0")
 	f.nchars = 0
 	f.nlines = 0
-	f.P0 = 0
-	f.P1 = 0
+	f.sp0 = 0
+	f.sp1 = 0
 	f.box = nil
 	f.lastlinefull = false
 	f.Cols = cols
@@ -156,7 +153,7 @@ func (f *Frame) InitTick() {
 		return
 	}
 
-	f.TickScale = f.Display.ScaleSize(1)
+	f.tickscale = f.Display.ScaleSize(1)
 	b := f.Display.ScreenImage
 	ft := f.Font
 
@@ -166,7 +163,7 @@ func (f *Frame) InitTick() {
 
 	height := ft.DefaultHeight()
 
-	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.TickScale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
@@ -181,10 +178,10 @@ func (f *Frame) InitTick() {
 
 	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.tickimage.Draw(image.Rect(f.TickScale*(frtickw/2), 0, f.TickScale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.tickimage.Draw(image.Rect(0, 0, f.TickScale*frtickw, f.TickScale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
-	f.tickimage.Draw(image.Rect(0, height-f.TickScale*frtickw, f.TickScale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.
