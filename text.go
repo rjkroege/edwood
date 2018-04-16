@@ -1136,16 +1136,12 @@ func (t *Text) Select() {
 		selectq = q0
 	}
 	if mouse.Buttons == b {
-		t.fr.Scroll = framescroll
-		sP0, sP1 := t.fr.Select(mousectl, mouse)
-
-		// Printouts the world...
+		sP0, sP1 := t.fr.Select(mousectl, mouse, framescroll)
 
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.Nc() {
 			selectq = t.org + sP0
 		}
-		t.fr.Scroll = nil
 		if selectq < t.org {
 			q0 = selectq
 		} else {

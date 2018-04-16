@@ -84,9 +84,6 @@ type Frame struct {
 	Rect       image.Rectangle         // in which the text appears
 	Entire     image.Rectangle         // size of full frame
 
-	// TODO(rjk): Figure out what.
-	Scroll func(*Frame, int) // function provided by application
-
 	box []*frbox // the boxes of text in this frame.
 
 	sp0, sp1 int // bounds of a selection
@@ -96,9 +93,7 @@ type Frame struct {
 
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
 	maxlines int // total number of lines in frame
-
 	lastlinefull bool
-
 	modified bool
 
 	tickimage   *draw.Image // typing tick

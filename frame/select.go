@@ -31,8 +31,9 @@ func region(a, b int) int {
 
 // Select takes ownership of the mouse channel to update the selection
 // so long as a button is down in downevent. Selection stops when the
-// staring point buttondown is altered.
-func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
+// staring point buttondown is altered. getmorelines is a callback provided
+// by the caller to provide n additional lines on demand to the specified frame.
+func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(*Frame, int)) (int, int) {
 	// log.Println("--- Select Start ---")
 	// defer log.Println("--- Select End ---")
 
@@ -40,6 +41,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 	omb := downevent.Buttons
 
 	// TODO(rjk): Figure out what Modified is really for.
+	// Hypothesis: track if we have had inserts and removals during the selection loop.
 	f.modified = false
 
 	p0 := f.Charofpt(omp)
@@ -55,30 +57,28 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 		mb := me.Buttons
 
 		scrled := false
-		if f.Scroll != nil {
-			if mp.Y < f.Rect.Min.Y {
-				f.Scroll(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
-				// As a result of scrolling, we will have called Insert. Insert will
-				// remove the selection. But not put it back. But it will correct
-				// P1 and P0 to reflect the insertion.
-				// TODO(rjk): Add a unittest to prove this statement.
-				p0 = f.sp1
-				p1 = f.sp0
-				scrled = true
-			} else if mp.Y > f.Rect.Max.Y {
-				f.Scroll(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
-				p0 = f.sp1
-				p1 = f.sp0
-				scrled = true
+		if mp.Y < f.Rect.Min.Y {
+			getmorelines(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
+			// As a result of scrolling, we will have called Insert. Insert will
+			// remove the selection. But not put it back. But it will correct
+			// P1 and P0 to reflect the insertion.
+			// TODO(rjk): Add a unittest to prove this statement.
+			p0 = f.sp1
+			p1 = f.sp0
+			scrled = true
+		} else if mp.Y > f.Rect.Max.Y {
+			getmorelines(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
+			p0 = f.sp1
+			p1 = f.sp0
+			scrled = true
+		}
+		if scrled {
+			if reg != region(p1, p0) {
+				tmp := p0
+				p0 = p1
+				p1 = tmp
 			}
-			if scrled {
-				if reg != region(p1, p0) {
-					tmp := p0
-					p0 = p1
-					p1 = tmp
-				}
-				reg = region(p1, p0)
-			}
+			reg = region(p1, p0)
 		}
 
 		q := f.Charofpt(mp)
@@ -119,7 +119,8 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse) (int, int) {
 		f.DrawSel(f.Ptofchar(p0), p0, p1, true)
 
 		if scrled {
-			f.Scroll(f, 0)
+			// TODO(rjk): Document why we need this call and what it's for.
+			getmorelines(f, 0)
 		}
 		if err := f.Display.Flush(); err != nil {
 			panic(err)
