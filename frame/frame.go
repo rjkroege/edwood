@@ -82,7 +82,6 @@ type Frame struct {
 	Background *draw.Image             // on which the frame appears
 	Cols       [NumColours]*draw.Image // background and text colours
 	Rect       image.Rectangle         // in which the text appears
-	Entire     image.Rectangle         // size of full frame
 
 	box []*frbox // the boxes of text in this frame.
 
@@ -183,7 +182,6 @@ func (f *Frame) InitTick() {
 func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	height := f.Font.DefaultHeight()
 	f.Background = b
-	f.Entire = r
 	f.Rect = r
 	f.Rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
 	f.maxlines = (r.Max.Y - r.Min.Y) / height
