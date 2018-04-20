@@ -98,25 +98,23 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		f.Logboxes(" -- chop, invalid bn=%d --\n", bn)
 		panic("chop bn too large")
 	}
-	for {
-		if bn >= len(f.box) {
-			f.Logboxes(" -- chop, invalid bn=%d inside of the loop --\n", bn)
-			panic("chop bn inside of loop is too large")
+
+	//  better version
+	for i, bx := range f.box[bn:] {
+		pt = f.cklinewrap(pt, bx)
+		if pt.Y >= f.Rect.Max.Y {
+			f.nchars = p
+			f.nlines = f.maxlines
+			f.box = f.box[0:bn+i]
+			return
 		}
-		b := f.box[bn]
-		pt = f.cklinewrap(pt, b)
-		if bn >= len(f.box) || pt.Y >= f.Rect.Max.Y {
-			break
-		}
-		p += nrune(b)
-		pt = f.advance(pt, b)
-		bn++
+
+		p += nrune(bx)
+		pt = f.advance(pt, bx)
 	}
+
 	f.nchars = p
 	f.nlines = f.maxlines
-	if bn < len(f.box) { // BUG
-		f.delbox(bn, len(f.box)-1)
-	}
 }
 
 type points struct {
