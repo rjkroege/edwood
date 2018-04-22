@@ -196,7 +196,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		if b.Nrune > 0 {
 			n, fits := f.canfit(pt1, b)
 			if !fits {
-				panic("frame.canfit == 0")
+				f.Logboxes("-- pt1 violated invariant at box %v--", b)									panic("frame.canfit == 0")
 			}
 			if n != b.Nrune {
 				f.splitbox(n0, n)

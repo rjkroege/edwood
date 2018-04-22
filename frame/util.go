@@ -1,10 +1,16 @@
 package frame
 
 import (
+	"fmt"
 	"image"
 	"log"
 	"unicode/utf8"
 )
+
+func (b *frbox) String() string {
+	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b%#v minwid %d", string(b.Ptr),b.Wid,  b.Nrune, 
+}
+
 
 // canfit measures the b's string contents and determines if it fits
 // in the region of the screen between pt and the right edge of the
