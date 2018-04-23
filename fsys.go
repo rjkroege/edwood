@@ -107,7 +107,7 @@ func fsysinit() {
 	syscall.CloseOnExec(pipe[1])
 	reader := os.NewFile(uintptr(pipe[0]), "pipeend0")
 	writer := os.NewFile(uintptr(pipe[1]), "pipeend1")
-	if post9pservice(reader, "acme", mtpt) < 0 {
+	if post9pservice(reader, "edwood", mtpt) < 0 {
 		acmeerror("can't post service", nil)
 	}
 	sfd = writer
