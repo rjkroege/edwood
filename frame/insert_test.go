@@ -95,7 +95,7 @@ func TestBxscan(t *testing.T) {
 				Rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
-				pt1 := image.Pt(57, 15)
+				pt1 := image.Pt(58, 15)
 				pt2, f := f.bxscan(mkRu("本"), &pt1)
 				return pt1, pt2, f
 			},

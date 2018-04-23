@@ -8,7 +8,7 @@ import (
 )
 
 func (b *frbox) String() string {
-	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b%#v minwid %d", string(b.Ptr),b.Wid,  b.Nrune, 
+	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b=%#v minwid=%d", string(b.Ptr),b.Wid,  b.Nrune, b.Bc, int(b.Minwid))
 }
 
 
@@ -29,7 +29,7 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 		}
 	}
 
-	if left > b.Wid {
+	if left >= b.Wid {
 		return b.Nrune, (b.Nrune != 0)
 	}
 
@@ -171,7 +171,7 @@ func (f *Frame) Logboxes(message string, args ...interface{}) {
 			if b.Nrune == -1 && b.Bc == '\n' {
 				log.Printf("	box[%d] -> newline\n", i)
 			} else if b.Nrune == -1 && b.Bc == '\t' {
-				log.Printf("	box[%d] -> tab\n", i)
+				log.Printf("	box[%d] -> tab width=%d\n", i, b.Minwid)
 			} else {
 				log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
 			}
@@ -179,5 +179,5 @@ func (f *Frame) Logboxes(message string, args ...interface{}) {
 			log.Printf("	box[%d] is WRONGLY nil\n", i)
 		}
 	}
-	log.Println("end:", message, f)
+	log.Printf("end: " + message, args...)
 }
