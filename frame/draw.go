@@ -4,6 +4,8 @@ import (
 	"image"
 
 	"9fans.net/go/draw"
+
+	"log"
 )
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
@@ -185,29 +187,23 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 	return pt
 }
 
-// This function is not part of the documented libframe entrypoints.
-// TODO(rjk): discern purpose of this code.
-func (f *Frame) Redraw() {
-	//	log.Println("Redraw")
-	ticked := false
-	var pt image.Point
-
-	if f.sp0 == f.sp1 {
-		ticked = f.ticked
-		if ticked {
-			f.Tick(f.Ptofchar(f.sp0), false)
-		}
-		f.Drawsel0(f.Ptofchar(0), 0, f.nchars, f.Cols[ColBack], f.Cols[ColText])
-		if ticked {
-			f.Tick(f.Ptofchar(f.sp0), true)
-		}
-	}
-
-	pt = f.Ptofchar(0)
-	pt = f.Drawsel0(pt, 0, f.sp0, f.Cols[ColBack], f.Cols[ColText])
-	pt = f.Drawsel0(pt, f.sp0, f.sp1, f.Cols[ColHigh], f.Cols[ColHText])
-	pt = f.Drawsel0(pt, f.sp1, f.nchars, f.Cols[ColBack], f.Cols[ColText])
-
+// Redraw redraws the background of the Frame where the Frame is inside
+// enclosing. Frame is responsible for drawing all of the pixels inside
+// enclosing though may fill less than enclosing with text. (In particular,
+// a margin may be added and the rectangle occupied by text is always
+// a multiple of the fixed line height.)
+// TODO(rjk): Modify this function to redraw the text as well and stop having
+// the drawing of text strings be a side-effect of Insert, Delete, etc.
+// TODO(rjk): Draw text to the bottom of enclosing as opposed to filling the
+// bottom partial text row with blank.
+//
+// Note: this function is not part of the documented libframe entrypoints and
+// is not invoked from Edwood code. Consequently, I am repurposing the name.
+// Future changes will have this function able to clear the Frame and draw the
+// entire box model.
+func (f *Frame) Redraw(enclosing image.Rectangle) {
+	log.Printf("Redraw %v %v", f.Rect, enclosing)
+	f.Background.Draw(enclosing, f.Cols[ColBack], nil, image.ZP)
 }
 
 func (f *Frame) tick(pt image.Point, ticked bool) {

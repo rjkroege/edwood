@@ -110,9 +110,29 @@ type Frame struct {
 // of the size r
 func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) *Frame {
 	f := new(Frame)
-	f.Init(r, ft, b, cols)
+	f.Init(r, ft, b, OptColors(cols))
 	return f
 }
+
+
+// Option handling per https://commandcenter.blogspot.ca/2014/01/self-referential-functions-and-design.html
+
+type option func(*Frame)
+
+// Option sets the options specified.
+func (f *Frame) Option(opts ...option) {
+    for _, opt := range opts {
+        opt(f)
+    }
+}
+
+// Verbosity sets Foo's verbosity level to v.
+func OptColors(cols [NumColours]*draw.Image) option {
+    return func(f *Frame) {
+        f.Cols = cols
+    }
+}
+
 
 // Init prepares the Frame f so characters drawn in it will appear in the
 // single Font ft. It then calls SetRects and InitTick to initialize the
@@ -121,7 +141,7 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 // will occupy. The Image pointer may be null, allowing the other
 // routines to be called to maintain the associated data structure in,
 // for example, an obscured window.
-func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) {
+func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...option) {
 	f.Font = &frfont{ft}
 	f.Display = b.Display
 	f.maxtab = 8 * ft.StringWidth("0")
@@ -131,8 +151,11 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumC
 	f.sp1 = 0
 	f.box = nil
 	f.lastlinefull = false
-	f.Cols = cols
 	f.SetRects(r, b)
+
+	// Update additional options. This is a general mechanism that I will use to replace
+	// several variables that should be made private.
+	f.Option(opts...)
 
 	if f.tickimage == nil && f.Cols[ColBack] != nil {
 		f.InitTick()

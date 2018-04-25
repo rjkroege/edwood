@@ -795,7 +795,7 @@ func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 		// TODO(rjk): maybe Frame should know how to clear itself on init?
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
-		t.fr.Init(t.w.r, newfont, row.display.ScreenImage, t.fr.Cols)
+		t.fr.Init(t.w.r, newfont, row.display.ScreenImage)
 		t.fr.InitTick()
 		if t.w.isdir {
 			t.all.Min.X++ // force recolumnation; disgusting!

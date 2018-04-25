@@ -11,6 +11,8 @@ import (
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
+
+	"log"
 )
 
 const (
@@ -116,11 +118,11 @@ func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int, n
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
 	// defer log.Println("--- Text Redraw end")
 	// TODO(rjk): It is possible that this does unnecessary work.
-	t.fr.Init(r, f, b, t.fr.Cols)
-	rr := t.fr.Rect
-	rr.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap) /* back fill to scroll bar */
+	t.fr.Init(r, f, b)
 	if !noredraw {
-		t.fr.Background.Draw(rr, t.fr.Cols[frame.ColBack], nil, image.ZP)
+		enclosing := r
+		enclosing.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap)
+		t.fr.Redraw(enclosing)
 	}
 	/* use no wider than 3-space tabs in a directory */
 	maxt := int(maxtab)
@@ -148,7 +150,10 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	// log.Println("--- Text Resize start", r, keepextra, t.whatstring())
 	// defer log.Println("--- Text Resize end")
 	if r.Dy() <= 0 {
-		r.Max.Y = r.Min.Y
+		// TODO(rjk): Speculative change to draw better. Original:
+		// r.Max.Y = r.Min.Y
+		log.Println("r.Dy() <= 0 case")
+		r = r.Canon()
 	} else {
 		if !keepextra {
 			r.Max.Y -= r.Dy() % t.fr.Font.DefaultHeight()
@@ -162,13 +167,6 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
 	t.Redraw(r, t.fr.Font.Impl(), t.fr.Background, odx, noredraw)
-	if keepextra && t.fr.Rect.Max.Y < t.all.Max.Y /* && noredraw */ {
-		/* draw background in bottom fringe of window */
-		r.Min.X -= t.display.ScaleSize(Scrollgap)
-		r.Min.Y = t.fr.Rect.Max.Y
-		r.Max.Y = t.all.Max.Y
-		t.display.ScreenImage.Draw(r, t.fr.Cols[frame.ColBack], nil, image.ZP)
-	}
 	return t.all.Max.Y
 }
 

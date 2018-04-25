@@ -83,10 +83,11 @@ func (t *Text) ScrDraw() {
 	r2 = scrpos(r1, t.org, t.org+t.fr.GetFrameFillStatus().Nchars, t.file.b.Nc())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
-		b.Draw(r1, t.fr.Cols[frame.ColBord], nil, image.ZP)
-		b.Draw(r2, t.fr.Cols[frame.ColBack], nil, image.ZP)
+		// rjk is assuming that only body Text instances have scrollers.
+		b.Draw(r1,textcolors[frame.ColBord], nil, image.ZP)
+		b.Draw(r2, textcolors[frame.ColBack], nil, image.ZP)
 		r2.Min.X = r2.Max.X - 1
-		b.Draw(r2, t.fr.Cols[frame.ColBord], nil, image.ZP)
+		b.Draw(r2, textcolors[frame.ColBord], nil, image.ZP)
 		t.fr.Background.Draw(r, b, nil, image.Pt(0, r1.Min.Y))
 		/*flushimage(display, 1); // BUG? */
 	}
