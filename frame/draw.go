@@ -4,8 +4,6 @@ import (
 	"image"
 
 	"9fans.net/go/draw"
-
-	"log"
 )
 
 func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
@@ -108,6 +106,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 //
 // Commentary: this function should conceivably not be part of the public API
 //
+// TODO(rjk): Figure out if this is a true or false statement.
 // Function does not mutate f.p0, f.p1 (well... actually, it does.)
 func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
 	// log.Println("Frame Drawsel0 Start", p0, p1,  f.P0, f.P1)
@@ -198,11 +197,11 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 // bottom partial text row with blank.
 //
 // Note: this function is not part of the documented libframe entrypoints and
-// is not invoked from Edwood code. Consequently, I am repurposing the name.
+// was not invoked from Edwood code. Consequently, I am repurposing the name.
 // Future changes will have this function able to clear the Frame and draw the
 // entire box model.
 func (f *Frame) Redraw(enclosing image.Rectangle) {
-	log.Printf("Redraw %v %v", f.Rect, enclosing)
+	// log.Printf("Redraw %v %v", f.Rect, enclosing)
 	f.Background.Draw(enclosing, f.Cols[ColBack], nil, image.ZP)
 }
 

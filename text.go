@@ -11,8 +11,6 @@ import (
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
-
-	"log"
 )
 
 const (
@@ -152,7 +150,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	if r.Dy() <= 0 {
 		// TODO(rjk): Speculative change to draw better. Original:
 		// r.Max.Y = r.Min.Y
-		log.Println("r.Dy() <= 0 case")
+		// log.Println("r.Dy() <= 0 case")
 		r = r.Canon()
 	} else {
 		if !keepextra {
@@ -1306,143 +1304,17 @@ func (t *Text) SetSelect(q0, q1 int) {
 	t.fr.DrawSel(t.fr.Ptofchar(p0), p0, p1, ticked)
 }
 
-func selrestore(f *frame.Frame, pt0 image.Point, p0, p1 int) {
-	if p1 <= (getP0((f))) || p0 >= (getP1((f))) {
-		/* no overlap */
-		f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		return
-	}
-	if p0 >= (getP0((f))) && p1 <= (getP1((f))) {
-		/* entirely inside */
-		f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
-		return
-	}
 
-	/* they now are known to overlap */
-
-	/* before selection */
-	if p0 < (getP0((f))) {
-		f.Drawsel0(pt0, (p0), (getP0(f)), f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p0 = (getP0((f)))
-		pt0 = f.Ptofchar((p0))
-	}
-	/* after selection */
-	if p1 > (getP1((f))) {
-		f.Drawsel0(f.Ptofchar(getP1((f))), (getP1(f)), int(p1), f.Cols[frame.ColBack], f.Cols[frame.ColText])
-		p1 = (getP1((f)))
-	}
-	/* inside selection */
-	f.Drawsel0(pt0, (p0), (p1), f.Cols[frame.ColHigh], f.Cols[frame.ColHText])
-}
-
-const (
-	DELAY   = 2
-	MINMOVE = 4
-)
-
-// When called, button is down.
-// TODO(rjk): There is considerable overlap between this function and Drawsel
-// Conceivably, this could be eliminated.
-func xselect(f *frame.Frame, mc *draw.Mousectl, col *draw.Image, dis *draw.Display) (p0p, p1p int) {
-	mp := mc.Mouse.Point
-	b := mc.Mouse.Buttons
-	msec := mc.Mouse.Msec
-
-	/* remove tick */
-	if (getP0(f)) == (getP1(f)) {
-		f.Tick(f.Ptofchar(getP0((f))), false)
-	}
-	p0 := (f.Charofpt(mp))
-	p1 := (p0)
-	pt0 := f.Ptofchar((p0))
-	pt1 := f.Ptofchar((p1))
-	reg := 0
-	f.Tick(pt0, true)
-	for {
-		q := (f.Charofpt(mc.Mouse.Point))
-		if p1 != q {
-			if p0 == p1 {
-				f.Tick(pt0, false)
-			}
-			if reg != region(q, p0) { /* crossed starting point; reset */
-				if reg > 0 {
-					selrestore(f, pt0, p0, p1)
-				} else {
-					if reg < 0 {
-						selrestore(f, pt1, p1, p0)
-					}
-				}
-				p1 = p0
-				pt1 = pt0
-				reg = region(q, p0)
-				if reg == 0 {
-					f.Drawsel0(pt0, int(p0), int(p1), col, dis.White)
-				}
-			}
-			qt := f.Ptofchar(int(q))
-			if reg > 0 {
-				if q > p1 {
-					f.Drawsel0(pt1, int(p1), int(q), col, dis.White)
-				} else {
-					if q < p1 {
-						selrestore(f, qt, q, p1)
-					}
-				}
-			} else {
-				if reg < 0 {
-					if q > p1 {
-						selrestore(f, pt1, p1, q)
-					} else {
-						f.Drawsel0(qt, int(q), int(p1), col, dis.White)
-					}
-				}
-			}
-			p1 = q
-			pt1 = qt
-		}
-		if p0 == p1 {
-			f.Tick(pt0, true)
-		}
-		dis.Flush()
-		mc.Read()
-		if mc.Mouse.Buttons != b {
-			break
-		}
-	}
-	if mc.Mouse.Msec-msec < DELAY && p0 != p1 && abs(mp.X-mc.Mouse.Point.X) < MINMOVE && abs(mp.Y-mc.Mouse.Point.Y) < MINMOVE {
-		if reg > 0 {
-			selrestore(f, pt0, p0, p1)
-		} else {
-			if reg < 0 {
-				selrestore(f, pt1, p1, p0)
-			}
-		}
-		p1 = p0
-	}
-	if p1 < p0 {
-		p0, p1 = p1, p0
-	}
-	pt0 = f.Ptofchar(int(p0))
-	if p0 == p1 {
-		f.Tick(pt0, false)
-	}
-	selrestore(f, pt0, p0, p1)
-	/* restore tick */
-	if (getP0(f)) == (getP1(f)) {
-		f.Tick(f.Ptofchar(getP0((f))), true)
-	}
-	dis.Flush()
-	return p0, p1
-}
-
+// TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
+// style? Maybe it is idiomatic?
 func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := xselect(t.fr, mousectl, high, t.display)
+	p0, p1 := t.fr.SelectOpt(mousectl, mouse ,  func(*frame.Frame, int) {}, t.display.White, high)
+
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
 		q0 = p0 + t.org
 		q1 = p1 + t.org
 	}
-
 	for mousectl.Mouse.Buttons != 0 {
 		mousectl.Read()
 	}

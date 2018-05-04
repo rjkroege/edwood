@@ -32,16 +32,6 @@ func abs(x int) int {
 	return x
 }
 
-func region(a, b int) int {
-	if a < b {
-		return -1
-	}
-	if a == b {
-		return 0
-	}
-	return 1
-}
-
 func acmeerror(s string, err error) {
 	fmt.Fprintf(os.Stderr, "acme: %s: %v\n", s, err)
 	// panic(fmt.Sprintf(os.Stderr, "acme: %s: %v\n", s, err))
