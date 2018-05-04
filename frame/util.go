@@ -8,9 +8,8 @@ import (
 )
 
 func (b *frbox) String() string {
-	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b=%#v minwid=%d", string(b.Ptr),b.Wid,  b.Nrune, b.Bc, int(b.Minwid))
+	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b=%#v minwid=%d", string(b.Ptr), b.Wid, b.Nrune, b.Bc, int(b.Minwid))
 }
-
 
 // canfit measures the b's string contents and determines if it fits
 // in the region of the screen between pt and the right edge of the
@@ -179,5 +178,5 @@ func (f *Frame) Logboxes(message string, args ...interface{}) {
 			log.Printf("	box[%d] is WRONGLY nil\n", i)
 		}
 	}
-	log.Printf("end: " + message, args...)
+	log.Printf("end: "+message, args...)
 }

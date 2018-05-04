@@ -29,32 +29,28 @@ func region(a, b int) int {
 	return 1
 }
 
-
 // SelectOpt makes a selection in the same fashion as Select but does it in a
 // temporary way with the specified text colours fg, bg.
-func (f *Frame) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(*Frame, int), fg, bg *draw.Image)  (int, int) {
-	oback := f.Cols[ColHigh]
-	otext := f.Cols[ColHText]
+func (f *Frame) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(*Frame, int), fg, bg *draw.Image) (int, int) {
+	oback := f.cols[ColHigh]
+	otext := f.cols[ColHText]
 	osp0 := f.sp0
 	osp1 := f.sp1
 
 	f.DrawSel(f.Ptofchar(osp0), osp0, osp1, false)
 
+	f.cols[ColHigh] = bg
+	f.cols[ColHText] = fg
 
-	f.Cols[ColHigh] = bg
-	f.Cols[ColHText] = fg
+	defer func() {
+		f.cols[ColHigh] = oback
+		f.cols[ColHText] = otext
+		f.DrawSel(f.Ptofchar(osp0), osp0, osp1, true)
+	}()
 
-
-		defer func() {
-			f.Cols[ColHigh] = oback
-			f.Cols[ColHText] = otext
-			f.DrawSel(f.Ptofchar(osp0), osp0, osp1, true)
-		}()
-
-	return	f.Select(mc, downevent, getmorelines)
+	return f.Select(mc, downevent, getmorelines)
 
 }
-
 
 // Select takes ownership of the mouse channel to update the selection
 // so long as a button is down in downevent. Selection stops when the

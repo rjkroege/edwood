@@ -59,8 +59,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	if f.sp0 != f.sp1 && f.highlighton {
 		// Clear the selection so that subsequent code can
 		// update correctly.
-		back := f.Cols[ColBack]
-		text := f.Cols[ColText]
+		back := f.cols[ColBack]
+		text := f.cols[ColText]
 		f.Drawsel0(f.Ptofchar(f.sp0), f.sp0, f.sp1, back, text)
 
 		// Avoid multiple draws.
@@ -87,8 +87,8 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	}
 
 	// Need to use the highlight colour.
-	back := f.Cols[ColHigh]
-	text := f.Cols[ColHText]
+	back := f.cols[ColHigh]
+	text := f.cols[ColHText]
 
 	f.Drawsel0(pt, p0, p1, back, text)
 	f.sp0 = p0
@@ -178,7 +178,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		qt := pt
 		pt = f.cklinewrap(pt, f.box[nb])
 		if pt.Y > qt.Y {
-			f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.Cols[ColHigh], back, qt)
+			f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.cols[ColHigh], back, qt)
 			// f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
 	}
@@ -202,7 +202,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 // entire box model.
 func (f *Frame) Redraw(enclosing image.Rectangle) {
 	// log.Printf("Redraw %v %v", f.Rect, enclosing)
-	f.Background.Draw(enclosing, f.Cols[ColBack], nil, image.ZP)
+	f.Background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
 }
 
 func (f *Frame) tick(pt image.Point, ticked bool) {

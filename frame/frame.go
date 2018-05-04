@@ -5,6 +5,7 @@ import (
 	"image"
 )
 
+// TODO(rjk): Make this into a struct of colours?
 const (
 	ColBack = iota
 	ColHigh
@@ -80,7 +81,7 @@ type Frame struct {
 	Font       Fontmetrics
 	Display    *draw.Display           // on which the frame is displayed
 	Background *draw.Image             // on which the frame appears
-	Cols       [NumColours]*draw.Image // background and text colours
+	cols       [NumColours]*draw.Image // background and text colours
 	Rect       image.Rectangle         // in which the text appears
 
 	box []*frbox // the boxes of text in this frame.
@@ -91,9 +92,9 @@ type Frame struct {
 	nlines   int // number of lines with text
 
 	// TODO(rjk): figure out what to do about this for multiple line fonts.
-	maxlines int // total number of lines in frame
+	maxlines     int // total number of lines in frame
 	lastlinefull bool
-	modified bool
+	modified     bool
 
 	tickimage   *draw.Image // typing tick
 	tickback    *draw.Image // image under tick
@@ -114,25 +115,23 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 	return f
 }
 
-
 // Option handling per https://commandcenter.blogspot.ca/2014/01/self-referential-functions-and-design.html
 
 type option func(*Frame)
 
 // Option sets the options specified.
 func (f *Frame) Option(opts ...option) {
-    for _, opt := range opts {
-        opt(f)
-    }
+	for _, opt := range opts {
+		opt(f)
+	}
 }
 
 // Verbosity sets Foo's verbosity level to v.
 func OptColors(cols [NumColours]*draw.Image) option {
-    return func(f *Frame) {
-        f.Cols = cols
-    }
+	return func(f *Frame) {
+		f.cols = cols
+	}
 }
-
 
 // Init prepares the Frame f so characters drawn in it will appear in the
 // single Font ft. It then calls SetRects and InitTick to initialize the
@@ -157,7 +156,7 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...op
 	// several variables that should be made private.
 	f.Option(opts...)
 
-	if f.tickimage == nil && f.Cols[ColBack] != nil {
+	if f.tickimage == nil && f.cols[ColBack] != nil {
 		f.InitTick()
 	}
 }
@@ -166,7 +165,7 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...op
 func (f *Frame) InitTick() {
 
 	var err error
-	if f.Cols[ColBack] == nil || f.Display == nil {
+	if f.cols[ColBack] == nil || f.Display == nil {
 		return
 	}
 
@@ -191,7 +190,7 @@ func (f *Frame) InitTick() {
 		f.tickimage = nil
 		return
 	}
-	f.tickback.Draw(f.tickback.R, f.Cols[ColBack], nil, image.ZP)
+	f.tickback.Draw(f.tickback.R, f.cols[ColBack], nil, image.ZP)
 
 	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
 	// vertical line

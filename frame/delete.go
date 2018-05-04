@@ -82,15 +82,15 @@ func (f *Frame) Delete(p0, p1 int) int {
 			if r.Max.X > f.Rect.Max.X {
 				r.Max.X = f.Rect.Max.X
 			}
-			f.Background.Draw(r, f.Cols[ColBack], nil, r.Min)
+			f.Background.Draw(r, f.cols[ColBack], nil, r.Min)
 		} else {
 			r.Max.X += f.newwid(pt0, b)
 			if r.Max.X > f.Rect.Max.X {
 				r.Max.X = f.Rect.Max.X
 			}
-			col := f.Cols[ColBack]
+			col := f.cols[ColBack]
 			if f.sp0 <= cn1 && cn1 < f.sp1 {
-				col = f.Cols[ColHigh]
+				col = f.cols[ColHigh]
 			}
 			f.Background.Draw(r, col, nil, pt0)
 			cn1++
@@ -104,7 +104,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	}
 
 	if n1 == len(f.box) && pt0.X != pt1.X {
-		f.SelectPaint(pt0, pt1, f.Cols[ColBack])
+		f.SelectPaint(pt0, pt1, f.cols[ColBack])
 	}
 	if pt1.Y != pt0.Y {
 		// What is going on here?
@@ -125,9 +125,9 @@ func (f *Frame) Delete(p0, p1 int) int {
 
 			f.Background.Draw(image.Rect(pt0.X, pt0.Y, pt0.X+(f.Rect.Max.X-pt1.X), q0), f.Background, nil, pt1)
 			f.Background.Draw(image.Rect(f.Rect.Min.X, q0, f.Rect.Max.X, q0+(q2-q1)), f.Background, nil, image.Pt(f.Rect.Min.X, q1))
-			f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.Cols[ColBack])
+			f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.cols[ColBack])
 		} else {
-			f.SelectPaint(pt0, pt2, f.Cols[ColBack])
+			f.SelectPaint(pt0, pt2, f.cols[ColBack])
 		}
 	}
 	// We crash here.

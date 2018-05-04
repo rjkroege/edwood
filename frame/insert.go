@@ -26,7 +26,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 		box:        []*frbox{},
 	}
 
-	copy(frame.Cols[:], f.Cols[:])
+	copy(frame.cols[:], f.cols[:])
 	nl := 0
 
 	// TODO(rjk): There are no boxes allocated?
@@ -105,7 +105,7 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 		if pt.Y >= f.Rect.Max.Y {
 			f.nchars = p
 			f.nlines = f.maxlines
-			f.box = f.box[0:bn+i]
+			f.box = f.box[0 : bn+i]
 			return
 		}
 
@@ -288,9 +288,9 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
-					col = f.Cols[ColHigh]
+					col = f.cols[ColHigh]
 				} else {
-					col = f.Cols[ColBack]
+					col = f.cols[ColBack]
 				}
 				f.Background.Draw(rect, col, nil, rect.Min)
 			} else if pt.Y < y {
@@ -301,9 +301,9 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 {
-					col = f.Cols[ColHigh]
+					col = f.cols[ColHigh]
 				} else {
-					col = f.Cols[ColBack]
+					col = f.cols[ColBack]
 				}
 				f.Background.Draw(rect, col, nil, rect.Min)
 			}
@@ -319,11 +319,11 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			}
 			cn0--
 			if f.sp0 <= cn0 && cn0 < f.sp1 {
-				col = f.Cols[ColHigh]
-				tcol = f.Cols[ColHText]
+				col = f.cols[ColHigh]
+				tcol = f.cols[ColHText]
 			} else {
-				col = f.Cols[ColBack]
-				tcol = f.Cols[ColText]
+				col = f.cols[ColBack]
+				tcol = f.cols[ColText]
 			}
 			f.Background.Draw(rect, col, nil, rect.Min)
 			y = 0
@@ -335,11 +335,11 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	}
 
 	if f.sp0 < p0 && p0 <= f.sp1 {
-		col = f.Cols[ColHigh]
-		tcol = f.Cols[ColHText]
+		col = f.cols[ColHigh]
+		tcol = f.cols[ColHText]
 	} else {
-		col = f.Cols[ColBack]
-		tcol = f.Cols[ColText]
+		col = f.cols[ColBack]
+		tcol = f.cols[ColText]
 	}
 
 	f.SelectPaint(ppt0, ppt1, col)
