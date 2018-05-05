@@ -44,7 +44,7 @@ func (f *Frame) ptofcharnb(p int, nb int) image.Point {
 
 func (f *Frame) grid(p image.Point) image.Point {
 	p.Y -= f.rect.Min.Y
-	p.Y -= p.Y % f.Font.DefaultHeight()
+	p.Y -= p.Y % f.defaultfontheight
 	p.Y += f.rect.Min.Y
 	if p.X > f.rect.Max.X {
 		p.X = f.rect.Max.X

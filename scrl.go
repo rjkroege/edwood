@@ -135,7 +135,7 @@ func (t *Text) Scroll(but int) {
 			continue
 		}
 		if but == 1 {
-			p0 = t.Backnl(t.org, (my-s.Min.Y)/t.fr.Font.DefaultHeight())
+			p0 = t.Backnl(t.org, (my-s.Min.Y)/t.fr.DefaultFontHeight())
 		} else {
 			p0 = t.org + t.fr.Charofpt(image.Pt(s.Max.X, my))
 		}

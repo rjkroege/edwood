@@ -21,6 +21,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 		display:    f.display,
 		background: f.background,
 		Font:       f.Font,
+		defaultfontheight: f.defaultfontheight,
 		maxtab:     f.maxtab,
 		nchars:     0,
 		box:        []*frbox{},
@@ -224,16 +225,16 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		f.delbox(n0, len(f.box)-1)
 	}
 	if n0 == len(f.box) {
-		div := f.Font.DefaultHeight()
+		div := f.defaultfontheight
 		f.nlines = (pt1.Y - f.rect.Min.Y) / div
 		if pt1.X > f.rect.Min.X {
 			f.nlines++
 		}
 	} else if pt1.Y != pt0.Y {
 		y := f.rect.Max.Y
-		q0 := pt0.Y + f.Font.DefaultHeight()
-		q1 := pt1.Y + f.Font.DefaultHeight()
-		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
+		q0 := pt0.Y + f.defaultfontheight
+		q1 := pt1.Y + f.defaultfontheight
+		f.nlines += (q1 - q0) / f.defaultfontheight
 		if f.nlines > f.maxlines {
 			// log.Println("f.chop", ppt1, p0, nn0, len(f.box), f.nbox)
 			f.chop(ppt1, p0, nn0)
@@ -277,7 +278,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			rect.Min = pt
 			rect.Max = rect.Min
 			rect.Max.X += b.Wid
-			rect.Max.Y += f.Font.DefaultHeight()
+			rect.Max.Y += f.defaultfontheight
 
 			f.background.Draw(rect, f.background, nil, pts[npts].pt0)
 			/* clear bit hanging off right */
@@ -285,7 +286,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Min = opt0
 				rect.Max = opt0
 				rect.Max.X = f.rect.Max.X
-				rect.Max.Y += f.Font.DefaultHeight()
+				rect.Max.Y += f.defaultfontheight
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
 					col = f.cols[ColHigh]
@@ -298,7 +299,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Max = pt
 				rect.Min.X += b.Wid
 				rect.Max.X = f.rect.Max.X
-				rect.Max.Y += f.Font.DefaultHeight()
+				rect.Max.Y += f.defaultfontheight
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 {
 					col = f.cols[ColHigh]
@@ -313,7 +314,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			rect.Min = pt
 			rect.Max = pt
 			rect.Max.X += b.Wid
-			rect.Max.Y += f.Font.DefaultHeight()
+			rect.Max.Y += f.defaultfontheight
 			if rect.Max.X >= f.rect.Max.X {
 				rect.Max.X = f.rect.Max.X
 			}

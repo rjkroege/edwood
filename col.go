@@ -95,7 +95,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		/*
 		 * if landing window (v) is too small, grow it first.
 		 */
-		minht := v.tag.fr.Font.DefaultHeight() + c.display.ScaleSize(Border) + 1
+		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
 		ffs := v.body.fr.GetFrameFillStatus()
 		for !c.safe || ffs.Maxlines < 3 || v.body.all.Dy() <= minht {
@@ -136,9 +136,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 		}
 		r1 := r
-		y = min(y, ymax-(v.tag.fr.Font.DefaultHeight()*v.taglines+v.body.fr.Font.DefaultHeight()+c.display.ScaleSize(Border)+1))
+		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
 		ffs = v.body.fr.GetFrameFillStatus()
-		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.Font.DefaultHeight())
+		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
 		if c.display != nil {
@@ -256,7 +256,7 @@ func (c *Column) MouseBut() {
 func (c *Column) Resize(r image.Rectangle) {
 	clearmouse()
 	r1 := r
-	r1.Max.Y = r1.Min.Y + c.tag.fr.Font.Impl().Height
+	r1.Max.Y = r1.Min.Y + c.tag.fr.DefaultFontHeight()
 	c.tag.Resize(r1, true, false)
 	if c.display != nil {
 		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
@@ -404,7 +404,7 @@ Pack:
 		r.Min.Y = y1
 		r.Max.Y = y1 + v.tagtop.Dy()
 		if nl[j] != 0 {
-			r.Max.Y += 1 + nl[j]*v.body.fr.Font.DefaultHeight()
+			r.Max.Y += 1 + nl[j]*v.body.fr.DefaultFontHeight()
 		}
 		r.Min.Y = v.Resize(r, c.safe, false)
 		r.Max.Y += c.display.ScaleSize(Border)
@@ -418,7 +418,7 @@ Pack:
 		r := v.r
 		r.Min.Y = y2 - v.tagtop.Dy()
 		if nl[j] != 0 {
-			r.Min.Y -= 1 + nl[j]*v.body.fr.Font.DefaultHeight()
+			r.Min.Y -= 1 + nl[j]*v.body.fr.DefaultFontHeight()
 		}
 		r.Min.Y -= c.display.ScaleSize(Border)
 		ny[j] = r.Min.Y
@@ -428,7 +428,7 @@ Pack:
 	r := w.r
 	r.Min.Y = y1
 	r.Max.Y = y2
-	h := w.body.fr.Font.DefaultHeight() // TODO(flux) Is this the right frame font height to use?
+	h := w.body.fr.DefaultFontHeight() // TODO(flux) Is this the right frame font height to use?
 	if r.Dy() < w.tagtop.Dy()+1+h+c.display.ScaleSize(Border) {
 		r.Max.Y = r.Min.Y + w.tagtop.Dy() + 1 + h + c.display.ScaleSize(Border)
 	}
@@ -450,7 +450,7 @@ Pack:
 		r.Min.Y = y1
 		r.Max.Y = y1 + v.tagtop.Dy()
 		if nl[j] != 0 {
-			r.Max.Y += 1 + nl[j]*v.body.fr.Font.DefaultHeight()
+			r.Max.Y += 1 + nl[j]*v.body.fr.DefaultFontHeight()
 		}
 		y1 = v.Resize(r, c.safe, j == c.nw()-1)
 		if j < c.nw()-1 { // no border on last window
@@ -540,7 +540,7 @@ Found:
 	r = v.r
 	r.Max.Y = p.Y
 	if r.Max.Y > v.body.fr.Rect().Min.Y {
-		r.Max.Y -= (r.Max.Y - v.body.fr.Rect().Min.Y) % v.body.fr.Font.DefaultHeight()
+		r.Max.Y -= (r.Max.Y - v.body.fr.Rect().Min.Y) % v.body.fr.DefaultFontHeight()
 		if v.body.fr.Rect().Min.Y == v.body.fr.Rect().Max.Y {
 			r.Max.Y++
 		}

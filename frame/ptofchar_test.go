@@ -19,6 +19,7 @@ func TestCharofpt(t *testing.T) {
 			"empty",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				rect: image.Rect(10, 15, 10+57, 15+57),
 			},
 			image.Pt(10+56, 15+56),
@@ -28,6 +29,7 @@ func TestCharofpt(t *testing.T) {
 			"one box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("本"),
 				},
@@ -40,6 +42,7 @@ func TestCharofpt(t *testing.T) {
 			"two boxes, target first pixel of first char",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本b"),
@@ -53,6 +56,7 @@ func TestCharofpt(t *testing.T) {
 			"two boxes, last pixel in first char",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本b"),
@@ -66,6 +70,7 @@ func TestCharofpt(t *testing.T) {
 			"two boxes, bottom edge of second char",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本b"),
@@ -79,6 +84,7 @@ func TestCharofpt(t *testing.T) {
 			"two boxes, top edge of second box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本bcd"),
@@ -92,6 +98,7 @@ func TestCharofpt(t *testing.T) {
 			"two boxes, top edge of second box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本bcd"),
@@ -105,6 +112,7 @@ func TestCharofpt(t *testing.T) {
 			"three boxes, top edge of second box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本bcd"),
@@ -119,6 +127,7 @@ func TestCharofpt(t *testing.T) {
 			"three boxes, top edge of second box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
 					makeBox("本bcd"),

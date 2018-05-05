@@ -88,6 +88,8 @@ type Frame struct {
 	cols       [NumColours]*draw.Image // background and text colours
 	rect       image.Rectangle         // in which the text appears
 
+	defaultfontheight int // height of default font
+
 	box []*frbox // the boxes of text in this frame.
 
 	sp0, sp1 int // bounds of a selection
@@ -115,52 +117,128 @@ type Frame struct {
 // of the size r
 func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) *Frame {
 	f := new(Frame)
-	f.Init(r, ft, b, OptColors(cols))
+	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8))
 	return f
 }
 
+// optioncontext is context passed into each option function
+// that aggregates knowledge about additional updates needed
+// to do to the Frame object that should only be one once per 
+// call to Init.
+type optioncontext struct {
+	updatetick bool // True if the tick needs to initialized
+	maxtabchars int // Number of '0' characters that should be the width of a tab.
+}
+
+// TODO(rjk): Relocate the documentation somehow. And maybe the code.
 // Option handling per https://commandcenter.blogspot.ca/2014/01/self-referential-functions-and-design.html
+//
+// Returns true if the option requires resetting the tick.
+// TODO(rjk): It is possible to generalize this as needed with a more
+// complex state object. One might imagine a set of updater functions?
+type option func(*Frame, *optioncontext)
 
-type option func(*Frame)
+// Option sets the options specified and returns true if
+// we need to init the tick.
+func (f *Frame) Option(opts ...option) *optioncontext {
+	ctx := &optioncontext{
+		updatetick: false,
+		maxtabchars: -1,
+	}
 
-// Option sets the options specified.
-func (f *Frame) Option(opts ...option) {
 	for _, opt := range opts {
-		opt(f)
+		opt(f, ctx)
 	}
+	return ctx
 }
 
-// Verbosity sets Foo's verbosity level to v.
+// OptColors sets the default colours.
 func OptColors(cols [NumColours]*draw.Image) option {
-	return func(f *Frame) {
+	return func(f *Frame, ctx *optioncontext)  {
 		f.cols = cols
+		// TODO(rjk): I think so. Make sure that this is required.
+		ctx.updatetick = true
 	}
 }
 
-// Init prepares the Frame f so characters drawn in it will appear in the
-// single Font ft. It then calls SetRects and InitTick to initialize the
-// geometry for the Frame. The Image b is where the Frame is to be drawn;
-// Rectangle r defines the limit of the portion of the Image the text
-// will occupy. The Image pointer may be null, allowing the other
-// routines to be called to maintain the associated data structure in,
-// for example, an obscured window.
-func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...option) {
-	f.Font = &frfont{ft}
-	f.display = b.Display
-	f.maxtab = 8 * ft.StringWidth("0")
+// OptBackground sets the background screen image.
+func OptBackground(b *draw.Image) option {
+	return func(f *Frame, ctx *optioncontext)  {
+		f.background = b
+		// TODO(rjk): This is safe but is it necessary? I think so. 
+		ctx.updatetick = true
+	}
+}
+
+// OptFont sets the default font.
+func OptFont(ft *draw.Font) option {
+	return func(f *Frame, ctx *optioncontext)  {
+		f.Font = &frfont{ft}
+		ctx.updatetick = f.defaultfontheight != f.Font.DefaultHeight()
+	}
+}
+
+// OptFontMetrics sets the default font metrics object.
+func OptFontMetrics(ft Fontmetrics) option {
+	return func(f *Frame, ctx *optioncontext)  {
+		f.Font = ft
+		ctx.updatetick = f.defaultfontheight != f.Font.DefaultHeight()
+	}
+}
+
+// OptMaxTab sets the default tabwidth in `0` characters.
+func OptMaxTab( maxtabchars int) option {
+	return func(f *Frame, ctx *optioncontext)  {
+		ctx.maxtabchars = maxtabchars
+	}
+}
+
+// computemaxtab returns the new ftw value
+func (ctx *optioncontext) computemaxtab(maxtab, ftw int) int {
+	if ctx.maxtabchars < 0 {
+		return maxtab
+	} 
+	return ctx.maxtabchars * ftw
+}
+
+
+func (f *Frame) DefaultFontHeight() int {
+	return f.defaultfontheight
+}
+
+// Init prepares the Frame f for the display of text in rectangle r.
+// Frame f will re-use previously set FontMetrics, colours and
+// destination image for drawing unless these are overriden with
+// one or more instances of the OptColors, OptBackground
+// OptFont or OptFontMetrics option settings.
+// 
+// The background (OptBackground setter) may be null to allow
+// calling the other routines to maintain the model in, for example,
+// an obscured window.
+//
+// Changing the background or font will force the tick to be
+// recreated.
+//
+// TODO(rjk): This may do unnecessary work for some option settings.
+// At some point, consider the code carefully.
+func (f *Frame) Init(r image.Rectangle, opts ...option) {
 	f.nchars = 0
 	f.nlines = 0
 	f.sp0 = 0
 	f.sp1 = 0
 	f.box = nil
 	f.lastlinefull = false
-	f.SetRects(r, b)
 
-	// Update additional options. This is a general mechanism that I will use to replace
-	// several variables that should be made private.
-	f.Option(opts...)
+	// Update additional options. The values are optional so that the frame
+	// will re-use the existing values if new ones are not provided.
+	ctx := f.Option(opts...)
 
-	if f.tickimage == nil && f.cols[ColBack] != nil {
+	f.defaultfontheight = f.Font.DefaultHeight()
+	f.display = f.background.Display
+	f.maxtab = ctx.computemaxtab(f.maxtab, f.Font.StringWidth("0"))
+	f.setrects(r)
+
+	if ctx.updatetick || (f.tickimage == nil && f.cols[ColBack] != nil) {
 		f.InitTick()
 	}
 }
@@ -204,10 +282,9 @@ func (f *Frame) InitTick() {
 	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.display.Opaque, nil, image.Pt(0, 0))
 }
 
-// SetRects initializes the geometry of the frame.
-func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
-	height := f.Font.DefaultHeight()
-	f.background = b
+// setrects initializes the geometry of the frame.
+func (f *Frame) setrects(r image.Rectangle) {
+	height := f.defaultfontheight
 	f.rect = r
 	f.rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
 	f.maxlines = (r.Max.Y - r.Min.Y) / height

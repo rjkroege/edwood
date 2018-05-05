@@ -166,7 +166,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			x = f.rect.Max.X
 		}
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
-		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
+		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.defaultfontheight), back, nil, pt)
 		if b.Nrune >= 0 {
 			f.background.Bytes(pt, text, image.ZP, f.Font.Impl(), ptr[0:runeindex(ptr, nr)])
 		}
@@ -212,7 +212,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 	}
 
 	pt.X -= f.tickscale
-	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.DefaultHeight())
+	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.defaultfontheight)
 
 	if r.Max.X > f.rect.Max.X {
 		r.Max.X = f.rect.Max.X
@@ -272,7 +272,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 		} else {
 			if b.Bc == '\n' {
 				pt.X = f.rect.Min.X
-				pt.Y += f.Font.DefaultHeight()
+				pt.Y += f.defaultfontheight
 			} else {
 				pt.X += f.newwid(pt, b)
 			}

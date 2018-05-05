@@ -81,7 +81,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 
 		scrled := false
 		if mp.Y < f.rect.Min.Y {
-			getmorelines(f, -(f.rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
+			getmorelines(f, -(f.rect.Min.Y-mp.Y)/f.defaultfontheight-1)
 			// As a result of scrolling, we will have called Insert. Insert will
 			// remove the selection. But not put it back. But it will correct
 			// P1 and P0 to reflect the insertion.
@@ -90,7 +90,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 			p1 = f.sp0
 			scrled = true
 		} else if mp.Y > f.rect.Max.Y {
-			getmorelines(f, (mp.Y-f.rect.Max.Y)/f.Font.DefaultHeight()+1)
+			getmorelines(f, (mp.Y-f.rect.Max.Y)/f.defaultfontheight+1)
 			p0 = f.sp1
 			p1 = f.sp0
 			scrled = true
@@ -159,10 +159,10 @@ func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	q0 := p0
 	q1 := p1
 
-	q0.Y += f.Font.DefaultHeight()
-	q1.Y += f.Font.DefaultHeight()
+	q0.Y += f.defaultfontheight
+	q1.Y += f.defaultfontheight
 
-	n := (p1.Y - p0.Y) / f.Font.DefaultHeight()
+	n := (p1.Y - p0.Y) / f.defaultfontheight
 	if f.background == nil {
 		panic("Frame.SelectPaint B == nil")
 	}

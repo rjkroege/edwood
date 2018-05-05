@@ -203,7 +203,7 @@ func (w *Window) moveToDel() {
 		return
 	}
 	if w.display != nil {
-		w.display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.Font.DefaultHeight()-4)))
+		w.display.MoveTo(w.tag.fr.Ptofchar(n).Add(image.Pt(4, w.tag.fr.DefaultFontHeight()-4)))
 	}
 }
 
@@ -223,7 +223,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 			return 1
 		}
 		p := w.tag.fr.Ptofchar(n).Sub(w.tag.fr.Rect().Min)
-		return 1 + p.Y/w.tag.fr.Font.DefaultHeight()
+		return 1 + p.Y/w.tag.fr.DefaultFontHeight()
 	}
 
 	/* can't use more than we have */
@@ -291,7 +291,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	r1.Min.Y = y
 	if !safe || !w.body.all.Eq(r1) {
 		oy := y
-		if y+1+w.body.fr.Font.DefaultHeight() <= r.Max.Y { /* room for one line */
+		if y+1+w.body.fr.DefaultFontHeight() <= r.Max.Y { /* room for one line */
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {

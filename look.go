@@ -205,7 +205,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		r = make([]rune, n)
 		t.file.b.Read(e.q0, r)
 		if search(ct, r[:n]) && e.jump {
-			row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.Font.DefaultHeight()-4)))
+			row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
 		}
 	}
 }

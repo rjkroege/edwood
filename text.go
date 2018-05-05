@@ -91,7 +91,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.font = rf
 	t.tabstop = int(maxtab)
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
-	t.Redraw(r, fontget(rf, t.display), t.display.ScreenImage, -1, false /* noredraw */)
+	t.Redraw(r,  -1, false /* noredraw */)
 	return t
 }
 
@@ -112,16 +112,9 @@ func (t *Text) whatstring() string {
 	return "Columntag"
 }
 
-func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int, noredraw bool) {
+func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
 	// defer log.Println("--- Text Redraw end")
-	// TODO(rjk): It is possible that this does unnecessary work.
-	t.fr.Init(r, f, b)
-	if !noredraw {
-		enclosing := r
-		enclosing.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap)
-		t.fr.Redraw(enclosing)
-	}
 	/* use no wider than 3-space tabs in a directory */
 	maxt := int(maxtab)
 	if t.what == Body {
@@ -131,7 +124,14 @@ func (t *Text) Redraw(r image.Rectangle, f *draw.Font, b *draw.Image, odx int, n
 			maxt = t.tabstop
 		}
 	}
-	t.fr.Maxtab(maxt * f.StringWidth("0"))
+
+	t.fr.Init(r, frame.OptMaxTab(maxt))
+	if !noredraw {
+		enclosing := r
+		enclosing.Min.X -= t.display.ScaleSize(Scrollwid + Scrollgap)
+		t.fr.Redraw(enclosing)
+	}
+
 	if t.what == Body && t.w.isdir && odx != t.all.Dx() {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
@@ -154,7 +154,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 		r = r.Canon()
 	} else {
 		if !keepextra {
-			r.Max.Y -= r.Dy() % t.fr.Font.DefaultHeight()
+			r.Max.Y -= r.Dy() % t.fr.DefaultFontHeight()
 		}
 	}
 	odx := t.all.Dx()
@@ -164,7 +164,8 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	t.lastsr = image.ZR
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
-	t.Redraw(r, t.fr.Font.Impl(), row.display.ScreenImage, odx, noredraw)
+	// TODO(rjk): Remove this Font accessor.
+	t.Redraw(r,odx, noredraw)
 	return t.all.Max.Y
 }
 
@@ -710,7 +711,7 @@ func (t *Text) Type(r rune) {
 	}
 
 	case_Down := func() {
-		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.Font.DefaultHeight()))
+		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.DefaultFontHeight()))
 		t.SetOrigin(q0, true)
 		return
 	}
@@ -1065,7 +1066,7 @@ func (t *Text) FrameScroll(dl int) {
 		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
 			return
 		}
-		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+dl*t.fr.Font.Impl().Height)))
+		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+dl*t.fr.DefaultFontHeight())))
 	}
 	// Insert text into the frame.
 	t.setorigin(q0, true, true)
