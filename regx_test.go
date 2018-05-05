@@ -29,7 +29,7 @@ func testRegexpForward(t *testing.T) {
 			t.Errorf("\trs = %#v", rs)
 		} else {
 			for j, r := range rs {
-// TODO(flux): r[0] below assumes only one element coming back in each RangeSet
+				// TODO(flux): r[0] below assumes only one element coming back in each RangeSet
 				if r[0].q0 != test.expected[j][0].q0 {
 					t.Errorf("Mismatch tests[%d].expected[%d][0].q0=%d, got %d", i, j, tests[i].expected[j][0].q0, r[0].q0)
 				}

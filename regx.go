@@ -7,19 +7,21 @@ import (
 // An interface to regexp for acme.
 
 type AcmeRegexp struct {
-	re *regexp.Regexp
+	re        *regexp.Regexp
 	exception rune // ^ or $ or 0
 }
 
 func rxcompile(r string) (*AcmeRegexp, error) {
-	re, err := regexp.Compile("(?m)"+r)
+	re, err := regexp.Compile("(?m)" + r)
 	if err != nil {
 		return nil, err
 	}
 	are := &AcmeRegexp{re, 0}
 	switch r {
-	case "^": are.exception = '^'
-	case "$": are.exception = '$'
+	case "^":
+		are.exception = '^'
+	case "$":
+		are.exception = '$'
 	}
 	return are, nil
 }
@@ -42,17 +44,17 @@ func (re *AcmeRegexp) rxexecute(t Texter, r []rune, startp int, eof int, nmatch 
 loop:
 	for _, loc := range locs {
 		// Filter out ^ not at start of a line, $ not at end
-		if len(loc) != 0  && loc[0] == loc[1] { 
+		if len(loc) != 0 && loc[0] == loc[1] {
 			switch {
-			case re.exception == '^' &&  loc[0] + startp == 0: // start of text is star-of-line
+			case re.exception == '^' && loc[0]+startp == 0: // start of text is star-of-line
 				break
-			case re.exception == '^' &&  t.ReadC(loc[0]+startp-1) == '\n': // ^ after newline
+			case re.exception == '^' && t.ReadC(loc[0]+startp-1) == '\n': // ^ after newline
 				break
-			case re.exception == '$' &&  loc[0] == t.Nc()-startp: // $ at end of text
+			case re.exception == '$' && loc[0] == t.Nc()-startp: // $ at end of text
 				break
-			case re.exception == '$' &&  t.ReadC(loc[0]+startp) == '\n': // $ at newline
+			case re.exception == '$' && t.ReadC(loc[0]+startp) == '\n': // $ at newline
 				break
-			default: 
+			default:
 				continue loop
 			}
 		}
@@ -70,6 +72,7 @@ func (re *AcmeRegexp) rxbexecute(t Texter, startp int, nmatch int) (rp RangeSet)
 	Unimpl()
 	return []Range{}
 }
+
 /* TODO(flux): This is broken, I'm pretty sure.  You can'd just read backwards,
 you also need the backwards regexp
 

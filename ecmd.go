@@ -129,7 +129,7 @@ func edittext(w *Window, q int, r []rune) error {
 }
 
 // string is known to be NUL-terminated
-func filelist(t *Text, r string) string{
+func filelist(t *Text, r string) string {
 	if len(r) == 0 {
 		return ""
 	}
@@ -147,53 +147,54 @@ func filelist(t *Text, r string) string{
 }
 
 func a_cmd(t *Text, cp *Cmd) bool {
-	return appendx(t.file, cp, addr.r.q1);
+	return appendx(t.file, cp, addr.r.q1)
 }
 
 func b_cmd(t *Text, cp *Cmd) bool {
-	f := tofile(cp.text);
-	if nest == 0  {
-		pfilename(f);
+	f := tofile(cp.text)
+	if nest == 0 {
+		pfilename(f)
 	}
-	curtext = f.curtext;
-	return true;
+	curtext = f.curtext
+	return true
 }
 
 func B_cmd(t *Text, cp *Cmd) bool {
-	list := filelist(t, cp.text);
-	if list == ""  {
-		editerror(Enoname);
+	list := filelist(t, cp.text)
+	if list == "" {
+		editerror(Enoname)
 	}
-	r := list;
-	r = strings.TrimLeft(r, " \t");
+	r := list
+	r = strings.TrimLeft(r, " \t")
 	if r == "" {
-		newx(t, t, nil, false, false, r);
-	}else {
+		newx(t, t, nil, false, false, r)
+	} else {
 		r = wsre.ReplaceAllString(r, " ")
 		words := strings.Split(r, " ")
 		for _, w := range words {
-			newx(t, t, nil, false, false, w);
+			newx(t, t, nil, false, false, w)
 		}
 	}
-	clearcollection();
-	return true;
+	clearcollection()
+	return true
 }
 
 func c_cmd(t *Text, cp *Cmd) bool {
-	t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text));
-	t.q0 = addr.r.q0;
-	t.q1 = addr.r.q1;
-	return true;
+	t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
+	t.q0 = addr.r.q0
+	t.q1 = addr.r.q1
+	return true
 }
 
 func d_cmd(t *Text, cp *Cmd) bool {
-	if addr.r.q1 > addr.r.q0  {
-		t.file.elog.Delete(addr.r.q0, addr.r.q1);
+	if addr.r.q1 > addr.r.q0 {
+		t.file.elog.Delete(addr.r.q0, addr.r.q1)
 	}
-	t.q0 = addr.r.q0;
-	t.q1 = addr.r.q0;
-	return true;
+	t.q0 = addr.r.q0
+	t.q1 = addr.r.q0
+	return true
 }
+
 /*
 func D1 (Text *t) () {
 	if t.w.body.file.ntext>1 || winclean(t.w, false)  {
@@ -323,202 +324,203 @@ func f_cmd(t *Text, cp *Cmd) bool {
 	str := ""
 	if cp.text == "" {
 		str = ""
-	}else {
-		str = cp.text;
+	} else {
+		str = cp.text
 	}
-	cmdname(t.file, str, true);
-	pfilename(t.file);
-	return true;
+	cmdname(t.file, str, true)
+	pfilename(t.file)
+	return true
 }
 
 func g_cmd(t *Text, cp *Cmd) bool {
 	if t.file != addr.f {
-		warning(nil, "internal error: g_cmd f!=addr.f\n");
-		return false;
+		warning(nil, "internal error: g_cmd f!=addr.f\n")
+		return false
 	}
 	are, err := rxcompile(cp.re)
-	if  err != nil  {
-		editerror("bad regexp in g command");
+	if err != nil {
+		editerror("bad regexp in g command")
 	}
 	sel := are.rxexecute(t, nil, addr.r.q0, addr.r.q1, 1)
-	if  (len(sel) > 0) != (cp.cmdc=='v') {
-		t.q0 = addr.r.q0;
-		t.q1 = addr.r.q1;
-		return cmdexec(t, cp.cmd);
+	if (len(sel) > 0) != (cp.cmdc == 'v') {
+		t.q0 = addr.r.q0
+		t.q1 = addr.r.q1
+		return cmdexec(t, cp.cmd)
 	}
-	return true;
+	return true
 }
 
 func i_cmd(t *Text, cp *Cmd) bool {
-	return appendx(t.file, cp, addr.r.q0);
+	return appendx(t.file, cp, addr.r.q0)
 }
 
-func copyx (f * File, addr2  Address) () {
-	ni := 0;
+func copyx(f *File, addr2 Address) {
+	ni := 0
 	buf := make([]rune, RBUFSIZE)
-	for p:=addr.r.q0; p<addr.r.q1; p+=ni {
-		ni = addr.r.q1-p;
-		if ni > RBUFSIZE  {
-			ni = RBUFSIZE;
+	for p := addr.r.q0; p < addr.r.q1; p += ni {
+		ni = addr.r.q1 - p
+		if ni > RBUFSIZE {
+			ni = RBUFSIZE
 		}
-		f.b.Read(p, buf[:ni]);
-		addr2.f.elog.Insert(addr2.r.q1, buf[:ni]);
+		f.b.Read(p, buf[:ni])
+		addr2.f.elog.Insert(addr2.r.q1, buf[:ni])
 	}
 }
 
-func move (f * File, addr2  Address) () {
-	if addr.f!=addr2.f || addr.r.q1<=addr2.r.q0 {
-		f.elog.Delete(addr.r.q0, addr.r.q1);
-		copyx(f, addr2);
-	}else if addr.r.q0 >= addr2.r.q1 {
-		copyx(f, addr2);
-		f.elog.Delete(addr.r.q0, addr.r.q1);
-	}else if addr.r.q0==addr2.r.q0 && addr.r.q1==addr2.r.q1 {
-		; // move to self; no-op
-	}else {
-		editerror("move overlaps itself");
+func move(f *File, addr2 Address) {
+	if addr.f != addr2.f || addr.r.q1 <= addr2.r.q0 {
+		f.elog.Delete(addr.r.q0, addr.r.q1)
+		copyx(f, addr2)
+	} else if addr.r.q0 >= addr2.r.q1 {
+		copyx(f, addr2)
+		f.elog.Delete(addr.r.q0, addr.r.q1)
+	} else if addr.r.q0 == addr2.r.q0 && addr.r.q1 == addr2.r.q1 {
+		// move to self; no-op
+	} else {
+		editerror("move overlaps itself")
 	}
 }
 
 func m_cmd(t *Text, cp *Cmd) bool {
-	dot := mkaddr(t.file);
-	addr2 := cmdaddress(cp.mtaddr, dot, 0);
-	if cp.cmdc == 'm'  {
-		move(t.file, addr2);
-	}else{
-		copyx(t.file, addr2);
+	dot := mkaddr(t.file)
+	addr2 := cmdaddress(cp.mtaddr, dot, 0)
+	if cp.cmdc == 'm' {
+		move(t.file, addr2)
+	} else {
+		copyx(t.file, addr2)
 	}
-	return true;
+	return true
 }
 
 func p_cmd(t *Text, cp *Cmd) bool {
-	return pdisplay(t.file);
+	return pdisplay(t.file)
 }
 
 func s_cmd(t *Text, cp *Cmd) bool {
-	n := cp.num;
-	op := -1;
+	n := cp.num
+	op := -1
 	are, err := rxcompile(cp.re)
-	if  err != nil {
-		editerror("bad regexp in s command");
+	if err != nil {
+		editerror("bad regexp in s command")
 	}
 	rp := []RangeSet{}
-	delta := 0;
-	didsub := false;
-	for p1 := addr.r.q0; p1<=addr.r.q1; {
+	delta := 0
+	didsub := false
+	for p1 := addr.r.q0; p1 <= addr.r.q1; {
 		if sels := are.rxexecute(t, nil, p1, addr.r.q1, 1); len(sels) > 0 {
 			sel = sels[0]
-			if sel[0].q0 == sel[0].q1 {	// empty match?
+			if sel[0].q0 == sel[0].q1 { // empty match?
 				if sel[0].q0 == op {
-					p1++;
-					continue;
+					p1++
+					continue
 				}
-				p1 = sel[0].q1+1;
-			}else {
-				p1 = sel[0].q1;
+				p1 = sel[0].q1 + 1
+			} else {
+				p1 = sel[0].q1
 			}
-			op = sel[0].q1;
+			op = sel[0].q1
 			n--
-			if n>0  {
-				continue;
+			if n > 0 {
+				continue
 			}
 			rp = append(rp, sel)
-		} else { break }
+		} else {
+			break
+		}
 	}
 	rbuf := make([]rune, RBUFSIZE)
-	for m  := range rp {
+	for m := range rp {
 		buf := ""
 		sel = rp[m]
-		for i := 0; i<len(cp.text); i++ {
+		for i := 0; i < len(cp.text); i++ {
 			c := []rune(cp.text)[i]
-			if c=='\\' && i<len(cp.text)-1 {
+			if c == '\\' && i < len(cp.text)-1 {
 				i++
-				c = []rune(cp.text)[i];
-				if '1'<=c && c<='9'  {
-					j := c-'0';
-					if sel[j].q1-sel[j].q0>RBUFSIZE {
-						editerror("replacement string too long");
-						return false;
+				c = []rune(cp.text)[i]
+				if '1' <= c && c <= '9' {
+					j := c - '0'
+					if sel[j].q1-sel[j].q0 > RBUFSIZE {
+						editerror("replacement string too long")
+						return false
 					}
-					t.file.b.Read(sel[j].q0, rbuf[:sel[j].q1-sel[j].q0]);
-					for k:=0; k<sel[j].q1-sel[j].q0; k++ {
+					t.file.b.Read(sel[j].q0, rbuf[:sel[j].q1-sel[j].q0])
+					for k := 0; k < sel[j].q1-sel[j].q0; k++ {
 						buf = buf + string(rbuf[k])
 					}
-				}else {
+				} else {
 					buf += string(c)
 				}
-			}else if c!='&'  {
+			} else if c != '&' {
 				buf += string(c)
-			}else{
-				if sel[0].q1-sel[0].q0>RBUFSIZE {
-					editerror("right hand side too long in substitution");
-					return false;
+			} else {
+				if sel[0].q1-sel[0].q0 > RBUFSIZE {
+					editerror("right hand side too long in substitution")
+					return false
 				}
-				t.file.b.Read(sel[0].q0, rbuf[:sel[0].q1-sel[0].q0]);
-				for k:=0; k<sel[0].q1-sel[0].q0; k++ {
+				t.file.b.Read(sel[0].q0, rbuf[:sel[0].q1-sel[0].q0])
+				for k := 0; k < sel[0].q1-sel[0].q0; k++ {
 					buf += string(rbuf[k])
 				}
 			}
 		}
-		t.file.elog.Replace(sel[0].q0, sel[0].q1,  []rune(buf));
-		delta -= sel[0].q1-sel[0].q0;
-		delta += len([]rune(buf));
-		didsub = true;
-		if  cp.flag == 0  {
-			break;
+		t.file.elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
+		delta -= sel[0].q1 - sel[0].q0
+		delta += len([]rune(buf))
+		didsub = true
+		if cp.flag == 0 {
+			break
 		}
 	}
-	if !didsub && nest==0  {
-		editerror("no substitution");
+	if !didsub && nest == 0 {
+		editerror("no substitution")
 	}
-	t.q0 = addr.r.q0;
-	t.q1 = addr.r.q1;
-	return true;
+	t.q0 = addr.r.q0
+	t.q1 = addr.r.q1
+	return true
 }
 
-
 func u_cmd(t *Text, cp *Cmd) bool {
-	n := cp.num;
-	flag := true;
+	n := cp.num
+	flag := true
 	if n < 0 {
-		n = -n;
-		flag = false;
+		n = -n
+		flag = false
 	}
-	oseq := -1;
-	for(n>0 && t.file.seq!=oseq){
+	oseq := -1
+	for n > 0 && t.file.seq != oseq {
 		n--
-		oseq = t.file.seq;
-		undo(t, nil, nil, flag, false, "");
+		oseq = t.file.seq
+		undo(t, nil, nil, flag, false, "")
 	}
-	return true;
+	return true
 }
 
 func w_cmd(t *Text, cp *Cmd) bool {
-	f := t.file;
-	if f.seq == seq  {
-		editerror("can't write file with pending modifications"); 
+	f := t.file
+	if f.seq == seq {
+		editerror("can't write file with pending modifications")
 	}
-	r := cmdname(f, cp.text, false);
-	if r == ""  {
-		editerror("no name specified for 'w' command"); 
+	r := cmdname(f, cp.text, false)
+	if r == "" {
+		editerror("no name specified for 'w' command")
 	}
-	putfile(f, addr.r.q0, addr.r.q1, r);
-	return true;
+	putfile(f, addr.r.q0, addr.r.q1, r)
+	return true
 }
 
 func x_cmd(t *Text, cp *Cmd) bool {
 
 	if cp.re != "" {
-		looper(t.file, cp, cp.cmdc=='x');
-	}else{
-		linelooper(t.file, cp);
+		looper(t.file, cp, cp.cmdc == 'x')
+	} else {
+		linelooper(t.file, cp)
 	}
-	return true;
+	return true
 }
 
 func X_cmd(t *Text, cp *Cmd) bool {
-	filelooper(cp, cp.cmdc=='X');
-	return true;
+	filelooper(cp, cp.cmdc == 'X')
+	return true
 }
 
 func runpipe(t *Text, cmd rune, cr []rune, state int) {
@@ -591,207 +593,208 @@ func pipe_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-func nlcount (t * Text, q0, q1  int) (nl, pnr int) {
+func nlcount(t *Text, q0, q1 int) (nl, pnr int) {
 
 	buf := make([]rune, RBUFSIZE)
 	i := 0
-	nl = 0;
-	start := q0;
+	nl = 0
+	start := q0
 	nbuf := 0
-	for(q0 < q1){
+	for q0 < q1 {
 		if i == nbuf {
-			nbuf = q1-q0;
-			if nbuf > RBUFSIZE  {
-				nbuf = RBUFSIZE;
+			nbuf = q1 - q0
+			if nbuf > RBUFSIZE {
+				nbuf = RBUFSIZE
 			}
-			t.file.b.Read(q0, buf[:nbuf]);
-			i = 0;
+			t.file.b.Read(q0, buf[:nbuf])
+			i = 0
 		}
-		if buf[i] == '\n'  {
-			start = q0+1;
-			nl++;
+		if buf[i] == '\n' {
+			start = q0 + 1
+			nl++
 		}
 		i++
-		q0++;
+		q0++
 	}
-	return nl, q0 - start;
+	return nl, q0 - start
 }
 
 const (
 	PosnLine = iota
-	PosnChars 
+	PosnChars
 	PosnLineChars
 )
 
-func printposn (t * Text, mode  int) () {
+func printposn(t *Text, mode int) {
 	var l1, l2 int
-	if (t != nil && t.file != nil && t.file.name != "") {
-		warning(nil, "%s:", t.file.name);
+	if t != nil && t.file != nil && t.file.name != "" {
+		warning(nil, "%s:", t.file.name)
 	}
-	switch(mode) {
+	switch mode {
 	case PosnChars:
-		warning(nil, "#%d", addr.r.q0);
-		if addr.r.q1 != addr.r.q0  {
-			warning(nil, ",#%d", addr.r.q1);
+		warning(nil, "#%d", addr.r.q0)
+		if addr.r.q1 != addr.r.q0 {
+			warning(nil, ",#%d", addr.r.q1)
 		}
-		warning(nil, "\n");
-		return;
+		warning(nil, "\n")
+		return
 
 	case PosnLine:
-		l1, _ = nlcount(t, 0, addr.r.q0);
-		l1 ++ 
-		l2, _ = nlcount(t, addr.r.q0, addr.r.q1);
+		l1, _ = nlcount(t, 0, addr.r.q0)
+		l1++
+		l2, _ = nlcount(t, addr.r.q0, addr.r.q1)
 		l2 += l1
 		// check if addr ends with '\n'
-		if addr.r.q1>0 && addr.r.q1>addr.r.q0 && t.ReadC(addr.r.q1-1)=='\n'  {
-			l2--;
+		if addr.r.q1 > 0 && addr.r.q1 > addr.r.q0 && t.ReadC(addr.r.q1-1) == '\n' {
+			l2--
 		}
-		warning(nil, "%d", l1);
-		if l2 != l1  {
-			warning(nil, ",%d", l2);
+		warning(nil, "%d", l1)
+		if l2 != l1 {
+			warning(nil, ",%d", l2)
 		}
-		warning(nil, "\n");
-		return;
+		warning(nil, "\n")
+		return
 
 	case PosnLineChars:
-		l1, r1 := nlcount(t, 0, addr.r.q0);
+		l1, r1 := nlcount(t, 0, addr.r.q0)
 		l1++
-		l2, r2 := nlcount(t, addr.r.q0, addr.r.q1);
+		l2, r2 := nlcount(t, addr.r.q0, addr.r.q1)
 		l2 += l1
-		if l2 == l1  {
+		if l2 == l1 {
 			r2 += r1
 		}
-		warning(nil, "%d+#%d", l1, r1);
-		if l2 != l1  {
-			warning(nil, ",%d+#%d", l2, r2);
+		warning(nil, "%d+#%d", l1, r1)
+		if l2 != l1 {
+			warning(nil, ",%d+#%d", l2, r2)
 		}
-		warning(nil, "\n");
-		return;
+		warning(nil, "\n")
+		return
 	default: // PosnLine
-		l1, _ = nlcount(t, 0, addr.r.q0);
-		l1 ++ 
-		l2, _ = nlcount(t, addr.r.q0, addr.r.q1);
+		l1, _ = nlcount(t, 0, addr.r.q0)
+		l1++
+		l2, _ = nlcount(t, addr.r.q0, addr.r.q1)
 		l2 += l1
 		// check if addr ends with '\n'
-		if addr.r.q1>0 && addr.r.q1>addr.r.q0 && t.ReadC(addr.r.q1-1)=='\n'  {
-			l2--;
+		if addr.r.q1 > 0 && addr.r.q1 > addr.r.q0 && t.ReadC(addr.r.q1-1) == '\n' {
+			l2--
 		}
-		warning(nil, "%d", l1);
-		if l2 != l1  {
-			warning(nil, ",%d", l2);
+		warning(nil, "%d", l1)
+		if l2 != l1 {
+			warning(nil, ",%d", l2)
 		}
-		warning(nil, "\n");
-		return;
+		warning(nil, "\n")
+		return
 	}
 }
 
 func eq_cmd(t *Text, cp *Cmd) bool {
 	mode := 0
-	switch(len(cp.text)){
+	switch len(cp.text) {
 	case 0:
-		mode = PosnLine;
-		break;
+		mode = PosnLine
+		break
 	case 1:
 		if cp.text[0] == '#' {
-			mode = PosnChars;
-			break;
+			mode = PosnChars
+			break
 		}
 		if cp.text[0] == '+' {
-			mode = PosnLineChars;
-			break;
+			mode = PosnLineChars
+			break
 		}
 	default:
-		editerror("newline expected");
+		editerror("newline expected")
 	}
-	printposn(t, mode);
-	return true;
+	printposn(t, mode)
+	return true
 }
 
 func nl_cmd(t *Text, cp *Cmd) bool {
-	f := t.file;
+	f := t.file
 	var a Address
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a = mkaddr(f);
-		addr = lineaddr(0, a, -1);
-		a = lineaddr(0, a, 1);
-		addr.r.q1 = a.r.q1;
-		if addr.r.q0==t.q0 && addr.r.q1==t.q1 {
-			a = mkaddr(f);
-			addr = lineaddr(1, a, 1);
+		a = mkaddr(f)
+		addr = lineaddr(0, a, -1)
+		a = lineaddr(0, a, 1)
+		addr.r.q1 = a.r.q1
+		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
+			a = mkaddr(f)
+			addr = lineaddr(1, a, 1)
 		}
 	}
-	t.Show(addr.r.q0, addr.r.q1, true);
-	return true;
+	t.Show(addr.r.q0, addr.r.q1, true)
+	return true
 }
 
-
-func appendx(f * File, cp * Cmd, p  int) (bool) {
-	if len(cp.text) > 0  {
-		f.elog.Insert(p, []rune(cp.text));
+func appendx(f *File, cp *Cmd, p int) bool {
+	if len(cp.text) > 0 {
+		f.elog.Insert(p, []rune(cp.text))
 	}
-	f.curtext.q0 = p;
-	f.curtext.q1 = p;
-	return true;
+	f.curtext.q0 = p
+	f.curtext.q1 = p
+	return true
 }
 
-func pdisplay (f *File) (bool) {
-	p1 := addr.r.q0;
-	p2 := addr.r.q1;
+func pdisplay(f *File) bool {
+	p1 := addr.r.q0
+	p2 := addr.r.q1
 	if p2 > f.b.Nc() {
 		p2 = f.b.Nc()
 	}
-	buf := make([]rune, RBUFSIZE);
-	for(p1 < p2){
-		np := p2-p1;
-		if np>RBUFSIZE-1  {
-			np = RBUFSIZE-1;
+	buf := make([]rune, RBUFSIZE)
+	for p1 < p2 {
+		np := p2 - p1
+		if np > RBUFSIZE-1 {
+			np = RBUFSIZE - 1
 		}
-		f.b.Read(p1, buf[:np]);
-		warning(nil, "%s", string(buf[:np]));
-		p1 += np;
+		f.b.Read(p1, buf[:np])
+		warning(nil, "%s", string(buf[:np]))
+		p1 += np
 	}
-	f.curtext.q0 = addr.r.q0;
-	f.curtext.q1 = addr.r.q1;
-	return true;
+	f.curtext.q0 = addr.r.q0
+	f.curtext.q1 = addr.r.q1
+	return true
 }
 
-func pfilename (f *File) {
-	w := f.curtext.w;
+func pfilename(f *File) {
+	w := f.curtext.w
 	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod;
+	dirty := !w.isdir && !w.isscratch && f.mod
 	dirtychar := ' '
 	if dirty {
 		dirtychar = '\''
 	}
 	fc := ' '
-	if curtext!=nil && curtext.file==f {
+	if curtext != nil && curtext.file == f {
 		fc = '.'
 	}
 	warning(nil, "%c%c%c %s\n", dirtychar,
-		'+', fc, f.name);
+		'+', fc, f.name)
 }
 
-func loopcmd (f * File, cp * Cmd, rp []Range) () {
+func loopcmd(f *File, cp *Cmd, rp []Range) {
 	for _, r := range rp {
-		f.curtext.q0 = r.q0;
-		f.curtext.q1 = r.q1;
-		cmdexec(f.curtext, cp);
+		f.curtext.q0 = r.q0
+		f.curtext.q1 = r.q1
+		cmdexec(f.curtext, cp)
 	}
 }
 
-func looper(f * File, cp * Cmd, isX  bool) () {
+func looper(f *File, cp *Cmd, isX bool) {
 	rp := []Range{}
 	tr := Range{}
-	r := addr.r;
+	r := addr.r
 	isY := !isX
-	nest++;
+	nest++
 	are, err := rxcompile(cp.re)
-	if  err != nil  {
-		editerror("bad regexp in %c command", cp.cmdc);
+	if err != nil {
+		editerror("bad regexp in %c command", cp.cmdc)
 	}
 	/*if isX */ op := -1 // Not used in the X case.
-	if isY { op = r.q0 } 
+	if isY {
+		op = r.q0
+	}
 	sels := are.rxexecute(f.curtext, nil, r.q0, r.q1, -1)
 	if len(sels) == 0 {
 		if isY {
@@ -799,8 +802,8 @@ func looper(f * File, cp * Cmd, isX  bool) () {
 		}
 	} else {
 		for _, s := range sels {
-			if isX  {
-				tr = s[0];
+			if isX {
+				tr = s[0]
 			} else {
 				tr.q0 = op
 				tr.q1 = s[0].q0
@@ -815,107 +818,108 @@ func looper(f * File, cp * Cmd, isX  bool) () {
 			rp = append(rp, tr)
 		}
 	}
-	loopcmd(f, cp.cmd, rp);
-	nest--;
+	loopcmd(f, cp.cmd, rp)
+	nest--
 }
 
-func linelooper (f * File, cp * Cmd) () {
-//	long nrp, p;
-//	Range r, linesel;
-//	Address a, a3;
+func linelooper(f *File, cp *Cmd) {
+	//	long nrp, p;
+	//	Range r, linesel;
+	//	Address a, a3;
 	rp := []Range{}
 
-	nest++;
-	r := addr.r;
+	nest++
+	r := addr.r
 	var a3 Address
-	a3.f = f;
+	a3.f = f
 	a3.r.q0 = r.q0
-	a3.r.q1 = r.q0;
-	a := lineaddr(0, a3, 1);
-	linesel := a.r;
-	for p := r.q0; p<r.q1; p = a3.r.q1 {
-		a3.r.q0 = a3.r.q1;
-		if p!=r.q0 || linesel.q1==p {
-			a = lineaddr(1, a3, 1);
-			linesel = a.r;
+	a3.r.q1 = r.q0
+	a := lineaddr(0, a3, 1)
+	linesel := a.r
+	for p := r.q0; p < r.q1; p = a3.r.q1 {
+		a3.r.q0 = a3.r.q1
+		if p != r.q0 || linesel.q1 == p {
+			a = lineaddr(1, a3, 1)
+			linesel = a.r
 		}
-		if linesel.q0 >= r.q1  {
-			break;
+		if linesel.q0 >= r.q1 {
+			break
 		}
-		if linesel.q1 >= r.q1  {
-			linesel.q1 = r.q1;
+		if linesel.q1 >= r.q1 {
+			linesel.q1 = r.q1
 		}
-		if linesel.q1 > linesel.q0  {
-			if linesel.q0>=a3.r.q1 && linesel.q1>a3.r.q1 {
-				a3.r = linesel;
+		if linesel.q1 > linesel.q0 {
+			if linesel.q0 >= a3.r.q1 && linesel.q1 > a3.r.q1 {
+				a3.r = linesel
 				rp = append(rp, linesel)
-				continue;
+				continue
 			}
 		}
-		break;
+		break
 	}
-	loopcmd(f, cp.cmd, rp);
-	nest--;
+	loopcmd(f, cp.cmd, rp)
+	nest--
 }
 
 type Looper struct {
-	cp	*Cmd	
-	XY	bool	
-	w []*Window
-} 
+	cp *Cmd
+	XY bool
+	w  []*Window
+}
 
 var loopstruct Looper // only one; X and Y can't nest
 
-
-func alllooper (w *Window, lp *Looper) () {
-	cp := lp.cp;
-	t := &w.body;
+func alllooper(w *Window, lp *Looper) {
+	cp := lp.cp
+	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t  {
-		return;
+	if t.file.curtext != t {
+		return
 	}
 	// no auto-execute on files without names
-	if cp.re=="" && t.file.name=="" {
-		return;
+	if cp.re == "" && t.file.name == "" {
+		return
 	}
-	if cp.re=="" || filematch(t.file, cp.re)==lp.XY{
+	if cp.re == "" || filematch(t.file, cp.re) == lp.XY {
 		lp.w = append(lp.w, w)
 	}
 }
 
-func alllocker (w *Window, v bool) () {
-	if v  {
+func alllocker(w *Window, v bool) {
+	if v {
 		w.ref.Inc()
 	} else {
 		w.Close()
 	}
 }
 
-func filelooper (cp *Cmd, XY bool) () {
+func filelooper(cp *Cmd, XY bool) {
 	if Glooping != 0 {
 		isX := 'Y'
-		if XY { isX = 'X' }
-		editerror("can't nest %c command", isX);
+		if XY {
+			isX = 'X'
+		}
+		editerror("can't nest %c command", isX)
 	}
 	Glooping++
-	nest++;
+	nest++
 
-	loopstruct.cp = cp;
-	loopstruct.XY = XY;
-	loopstruct.w = []*Window{};
-	row.AllWindows(func(w*Window){alllooper(w, &loopstruct)});
+	loopstruct.cp = cp
+	loopstruct.XY = XY
+	loopstruct.w = []*Window{}
+	row.AllWindows(func(w *Window) { alllooper(w, &loopstruct) })
 	//	 * add a ref to all windows to keep safe windows accessed by X
 	//	 * that would not otherwise have a ref to hold them up during
 	//	 * the shenanigans.  note this with globalincref so that any
 	//	 * newly created windows start with an extra reference.
-	row.AllWindows(func(w*Window){alllocker(w, true)})
+	row.AllWindows(func(w *Window) { alllocker(w, true) })
 	globalincref = true
-	for i:=0; i<len(loopstruct.w); i++ {
-		cmdexec(&loopstruct.w[i].body, cp.cmd);
+	for i := 0; i < len(loopstruct.w); i++ {
+		cmdexec(&loopstruct.w[i].body, cp.cmd)
 	}
-	row.AllWindows(func(w*Window){alllocker(w, false)});
-	globalincref = false;
-	loopstruct.w = nil;
+	row.AllWindows(func(w *Window) { alllocker(w, false) })
+	globalincref = false
+	loopstruct.w = nil
 
 	Glooping--
 	nest--
@@ -928,7 +932,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 	if err != nil {
 		editerror("bad regexp in command address")
 	}
-	sel = RangeSet{Range{0,0}}
+	sel = RangeSet{Range{0, 0}}
 	if sign >= 0 {
 		sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 2)
 		if len(sels) == 0 {
@@ -940,8 +944,10 @@ func nextmatch(f *File, r string, p int, sign int) {
 			if len(sels) == 2 {
 				sel = sels[1]
 			} else { // wrap around
-				p++ 
-				if p > f.b.Nc() { p = 0 }
+				p++
+				if p > f.b.Nc() {
+					p = 0
+				}
 				sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 1)
 				if len(sels) == 0 {
 					editerror("address")
@@ -954,7 +960,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 		sel = are.rxbexecute(f.curtext, p, NRange)
 		if len(sel) == 0 {
 			editerror("no match for regexp")
-			sel = RangeSet{Range{0,0}}
+			sel = RangeSet{Range{0, 0}}
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
@@ -969,325 +975,338 @@ func nextmatch(f *File, r string, p int, sign int) {
 	}
 }
 
-
 func cmdaddress(ap *Addr, a Address, sign int) Address {
-	f := a.f;
+	f := a.f
 	var a1, a2 Address
 	var qbydir int
 	for {
-		switch(ap.typ){
-		case 'l': a = lineaddr(ap.num, a, sign)
-		case '#': a = charaddr(ap.num, a, sign)
+		switch ap.typ {
+		case 'l':
+			a = lineaddr(ap.num, a, sign)
+		case '#':
+			a = charaddr(ap.num, a, sign)
 		case '.':
-			a = mkaddr(f);
+			a = mkaddr(f)
 
 		case '$':
 			a.r.q0 = f.b.Nc()
 			a.r.q1 = a.r.q0
 
 		case '\'':
-editerror("can't handle '");
-//			a.r = f.mark;
+			editerror("can't handle '")
+			//			a.r = f.mark;
 
 		case '?':
-			sign = -sign;
-			if sign == 0  {
-				sign = -1;
+			sign = -sign
+			if sign == 0 {
+				sign = -1
 			}
 			fallthrough
 		case '/':
 			//sign>=0? a.r.q1 : a.r.q0
-			if sign >= 0 { qbydir = a.r.q1 } else { qbydir = a.r.q0 }
-			nextmatch(f, ap.re, qbydir, sign);
-			a.r = sel[0];
+			if sign >= 0 {
+				qbydir = a.r.q1
+			} else {
+				qbydir = a.r.q0
+			}
+			nextmatch(f, ap.re, qbydir, sign)
+			a.r = sel[0]
 
 		case '"':
-			f = matchfile(ap.re);
-			a = mkaddr(f);
+			f = matchfile(ap.re)
+			a = mkaddr(f)
 
 		case '*':
 			a.r.q0 = 0
 			a.r.q1 = f.b.Nc()
 
-		case ',': fallthrough
+		case ',':
+			fallthrough
 		case ';':
 			if ap.left != nil {
-				a1 = cmdaddress(ap.left, a, 0);
+				a1 = cmdaddress(ap.left, a, 0)
 			} else {
 				a1.f = a.f
 				a1.r.q0 = 0
 				a1.r.q1 = 0
 			}
 			if ap.typ == ';' {
-				f = a1.f;
-				a = a1;
-				f.curtext.q0 = a1.r.q0;
-				f.curtext.q1 = a1.r.q1;
+				f = a1.f
+				a = a1
+				f.curtext.q0 = a1.r.q0
+				f.curtext.q1 = a1.r.q1
 			}
 			if ap.next != nil {
-				a2 = cmdaddress(ap.next, a, 0);
+				a2 = cmdaddress(ap.next, a, 0)
 			} else {
 				a2.f = a.f
-				 a2.r.q0 = 0
+				a2.r.q0 = 0
 				a2.r.q1 = f.b.Nc()
 			}
-			if a1.f != a2.f  {
-				editerror("addresses in different files");
+			if a1.f != a2.f {
+				editerror("addresses in different files")
 			}
 			a.f = a1.f
 			a.r.q0 = a1.r.q0
-			a.r.q1 = a2.r.q1;
-			if a.r.q1 < a.r.q0  {
-				editerror("addresses out of order");
+			a.r.q1 = a2.r.q1
+			if a.r.q1 < a.r.q0 {
+				editerror("addresses out of order")
 			}
-			return a;
+			return a
 
-		case '+': fallthrough
+		case '+':
+			fallthrough
 		case '-':
-			sign = 1;
-			if ap.typ == '-'  {
-				sign = -1;
+			sign = 1
+			if ap.typ == '-' {
+				sign = -1
 			}
-			if ap.next==nil || ap.next.typ=='+' || ap.next.typ=='-'  {
-				a = lineaddr(1, a, sign);
+			if ap.next == nil || ap.next.typ == '+' || ap.next.typ == '-' {
+				a = lineaddr(1, a, sign)
 			}
-			break;
+			break
 		default:
-			acmeerror("cmdaddress", nil);
-			return a;
+			acmeerror("cmdaddress", nil)
+			return a
 		}
 		ap = ap.next
-		if ap == nil { break }
+		if ap == nil {
+			break
+		}
 	}
-	return a;
+	return a
 }
 
-type Tofile struct{
+type Tofile struct {
 	f *File
 	r string
-};
+}
 
-func alltofile (w * Window, tp *Tofile) () {
-	if tp.f != nil  {
-		return;
+func alltofile(w *Window, tp *Tofile) {
+	if tp.f != nil {
+		return
 	}
-	if w.isscratch || w.isdir  {
-		return;
+	if w.isscratch || w.isdir {
+		return
 	}
-	t := &w.body;
+	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t  {
-		return;
+	if t.file.curtext != t {
+		return
 	}
-//	if w.nopen[QWevent] > 0   {
-//		return;
+	//	if w.nopen[QWevent] > 0   {
+	//		return;
 	if tp.r == t.file.name {
-		tp.f = t.file;
+		tp.f = t.file
 	}
 }
 
 func tofile(r string) *File {
 	var t Tofile
 
-	t.r  = strings.TrimLeft(r, " \t\n");
-	t.f = nil;
-	row.AllWindows(func(w *Window){alltofile(w,&t)});
-	if t.f == nil  {
-		editerror("no such file\"%v\"", t.r);
+	t.r = strings.TrimLeft(r, " \t\n")
+	t.f = nil
+	row.AllWindows(func(w *Window) { alltofile(w, &t) })
+	if t.f == nil {
+		editerror("no such file\"%v\"", t.r)
 	}
-	return t.f;
+	return t.f
 }
 
-func allmatchfile (w * Window, tp *Tofile) () {
-	if w.isscratch || w.isdir  {
-		return;
+func allmatchfile(w *Window, tp *Tofile) {
+	if w.isscratch || w.isdir {
+		return
 	}
-	t := &w.body;
+	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t  {
-		return;
+	if t.file.curtext != t {
+		return
 	}
-//	if w.nopen[QWevent] > 0   {
-//		return;
-	if filematch(w.body.file, tp.r){
-		if tp.f != nil  {
-			editerror("too many files match \"%v\"", tp.r);
+	//	if w.nopen[QWevent] > 0   {
+	//		return;
+	if filematch(w.body.file, tp.r) {
+		if tp.f != nil {
+			editerror("too many files match \"%v\"", tp.r)
 		}
-		tp.f = w.body.file;
+		tp.f = w.body.file
 	}
 }
 
 func matchfile(r string) *File {
 	var tf Tofile
 
-	tf.f = nil;
-	tf.r = r;
-	row.AllWindows(func(w *Window){ allmatchfile(w, &tf) });
+	tf.f = nil
+	tf.r = r
+	row.AllWindows(func(w *Window) { allmatchfile(w, &tf) })
 
-	if tf.f == nil  {
-		editerror("no file matches \"%v\"", r);
+	if tf.f == nil {
+		editerror("no file matches \"%v\"", r)
 	}
-	return tf.f;
+	return tf.f
 }
 
-func filematch (f * File, r string) (bool) {
+func filematch(f *File, r string) bool {
 	// compile expr first so if we get an error, we haven't allocated anything  {
 	are, err := rxcompile(r)
-	if  err != nil  {
-		editerror("bad regexp in file match");
+	if err != nil {
+		editerror("bad regexp in file match")
 	}
-	w := f.curtext.w;
+	w := f.curtext.w
 	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod;
+	dirty := !w.isdir && !w.isscratch && f.mod
 	dmark := ' '
-	if dirty { dmark = '\'' }
+	if dirty {
+		dmark = '\''
+	}
 	fmark := ' '
-	if curtext!=nil && curtext.file==f {fmark = '.'}
-	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.name);
-	
-	s := are.rxexecute(nil, []rune(buf), 0, len([]rune(buf)), 1);
-	return len(s) > 0;
+	if curtext != nil && curtext.file == f {
+		fmark = '.'
+	}
+	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.name)
+
+	s := are.rxexecute(nil, []rune(buf), 0, len([]rune(buf)), 1)
+	return len(s) > 0
 }
 
-func charaddr (l  int, addr  Address, sign  int) (Address) {
-	if sign == 0  {
+func charaddr(l int, addr Address, sign int) Address {
+	if sign == 0 {
 		addr.r.q0 = l
 		addr.r.q1 = l
-	} else if sign < 0  {
-		addr.r.q0 -= l;
+	} else if sign < 0 {
+		addr.r.q0 -= l
 		addr.r.q1 = addr.r.q0
-	} else if sign > 0  {
-		addr.r.q1 += l;
-		addr.r.q0 = addr.r.q1 
+	} else if sign > 0 {
+		addr.r.q1 += l
+		addr.r.q0 = addr.r.q1
 	}
-	if addr.r.q0<0 || addr.r.q1>addr.f.b.Nc()  {
-		editerror("address out of range");
+	if addr.r.q0 < 0 || addr.r.q1 > addr.f.b.Nc() {
+		editerror("address out of range")
 	}
-	return addr;
+	return addr
 }
 
-func lineaddr (l int, addr  Address, sign  int) (Address) {
+func lineaddr(l int, addr Address, sign int) Address {
 	var a Address
 	f := addr.f
-	a.f = f;
+	a.f = f
 	n := 0
 	p := 0
 	if sign >= 0 {
 		if l == 0 {
-			if sign==0 || addr.r.q1==0 {
+			if sign == 0 || addr.r.q1 == 0 {
 				a.r.q0 = 0
-				a.r.q1 = 0;
-				return a;
+				a.r.q1 = 0
+				return a
 			}
-			a.r.q0 = addr.r.q1;
-			p = addr.r.q1-1;
-		}else{
-			if sign==0 || addr.r.q1==0 {
-				p = 0;
-				n = 1;
-			}else{
-				p = addr.r.q1-1;
-				if f.curtext.ReadC(p)=='\n' {
+			a.r.q0 = addr.r.q1
+			p = addr.r.q1 - 1
+		} else {
+			if sign == 0 || addr.r.q1 == 0 {
+				p = 0
+				n = 1
+			} else {
+				p = addr.r.q1 - 1
+				if f.curtext.ReadC(p) == '\n' {
 					n = 1
 				}
 				p++
 			}
-			for (n < l){
-				if p >= f.b.Nc()  {
-					editerror("address out of range");
+			for n < l {
+				if p >= f.b.Nc() {
+					editerror("address out of range")
 				}
-				if f.curtext.ReadC(p) == '\n'  {
-					n++;
+				if f.curtext.ReadC(p) == '\n' {
+					n++
 				}
 				p++
 			}
-			a.r.q0 = p;
+			a.r.q0 = p
 		}
-		for (p < f.b.Nc() && f.curtext.ReadC(p)!='\n') {
+		for p < f.b.Nc() && f.curtext.ReadC(p) != '\n' {
 			p++
 		}
-		a.r.q1 = p;
-	}else{
-		p = addr.r.q0;
-		if l == 0  {
-			a.r.q1 = addr.r.q0;
-		}else{
-			for n = 0; n<l;  {	// always runs once
+		a.r.q1 = p
+	} else {
+		p = addr.r.q0
+		if l == 0 {
+			a.r.q1 = addr.r.q0
+		} else {
+			for n = 0; n < l; { // always runs once
 				if p == 0 {
 					n++
-					if n != l  {
-						editerror("address out of range");
+					if n != l {
+						editerror("address out of range")
 					}
-				}else{
-					c := f.curtext.ReadC(p-1);
+				} else {
+					c := f.curtext.ReadC(p - 1)
 					n++
-					if c != '\n' || n != l  {
-						p--;
+					if c != '\n' || n != l {
+						p--
 					}
 				}
 			}
-			a.r.q1 = p;
-			if p > 0  {
-				p--;
+			a.r.q1 = p
+			if p > 0 {
+				p--
 			}
 		}
-		for (p > 0 && f.curtext.ReadC(p-1)!='\n') {	// lines start after a newline
-			p--;
+		for p > 0 && f.curtext.ReadC(p-1) != '\n' { // lines start after a newline
+			p--
 		}
-		a.r.q0 = p;
+		a.r.q0 = p
 	}
-	return a;
+	return a
 }
 
 type Filecheck struct {
 	f *File
 	r string
-};
+}
 
-func allfilecheck (w *Window, fp *Filecheck) () {
-	f := w.body.file;
-	if w.body.file == fp.f  {
-		return;
+func allfilecheck(w *Window, fp *Filecheck) {
+	f := w.body.file
+	if w.body.file == fp.f {
+		return
 	}
 	if fp.r == f.name {
-		warning(nil, "warning: duplicate file name \"%s\"\n", fp.r);
+		warning(nil, "warning: duplicate file name \"%s\"\n", fp.r)
 	}
 }
 
 func cmdname(f *File, str string, set bool) string {
 	var fc Filecheck
-	r := "";
-	s := "";
+	r := ""
+	s := ""
 	if str == "" {
 		// no name; use existing
 		if f.name == "" {
-			return "";
+			return ""
 		}
 		return f.name
 	}
-	s = strings.TrimLeft(str, " \t");
+	s = strings.TrimLeft(str, " \t")
 	if s == "" {
-		goto Return;
+		goto Return
 	}
 
 	if s[0] == '/' {
 		r = s
-	}else{
-		r = f.curtext.DirName(s);
+	} else {
+		r = f.curtext.DirName(s)
 	}
-	fc.f = f;
-	fc.r = r;
-	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) } );
-	if f.name == ""  {
-		set = true;
+	fc.f = f
+	fc.r = r
+	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) })
+	if f.name == "" {
+		set = true
 	}
 
-    Return:
+Return:
 	if set && !(r == f.name) {
-		f.Mark();
-		f.mod = true;
-		f.curtext.w.dirty = true;
-		f.curtext.w.SetName(r);
+		f.Mark()
+		f.mod = true
+		f.curtext.w.dirty = true
+		f.curtext.w.SetName(r)
 	}
-	return r;
+	return r
 }

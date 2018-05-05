@@ -777,8 +777,10 @@ func xfideventwrite(x *Xfid, w *Window) {
 	   		%c%c%d %d %d %d %s\n
 	*/
 	lines := strings.Split(string(x.fcall.Data), "\n")
-	for _, events := range lines  {
-		if events == "" { continue }
+	for _, events := range lines {
+		if events == "" {
+			continue
+		}
 		w.owner = int(events[0])
 		c := events[1]
 		words := strings.Split(wsre.ReplaceAllString(events[2:], " "), " ")
@@ -812,11 +814,13 @@ func xfideventwrite(x *Xfid, w *Window) {
 
 		row.lk.Lock() // just like mousethread
 		switch c {
-		case 'x': fallthrough
+		case 'x':
+			fallthrough
 		case 'X':
 			execute(t, q0, q1, true, nil)
 			break
-		case 'l': fallthrough
+		case 'l':
+			fallthrough
 		case 'L':
 			look3(t, q0, q1, true)
 			break
@@ -838,8 +842,8 @@ func xfideventwrite(x *Xfid, w *Window) {
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	var (
-		fc plan9.Fcall
-		w  *Window
+		fc           plan9.Fcall
+		w            *Window
 		q            int
 		off, boff    uint64
 		m, n, nr, nb int

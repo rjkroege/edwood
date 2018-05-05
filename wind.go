@@ -332,11 +332,11 @@ func (w *Window) Lock(owner int) {
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
 	w.owner = 0
-	// Special handling for clones, run backwards to 
+	// Special handling for clones, run backwards to
 	// avoid tripping over Window.CLose indirectly editing f.text and
 	// freeing f on the last iteration of the loop.
 	f := w.body.file
-	for i:=len(f.text)-1; i >=0; i-- {
+	for i := len(f.text) - 1; i >= 0; i-- {
 		w = f.text[i].w
 		w.lk.Unlock()
 		w.Close()

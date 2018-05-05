@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-"runtime/debug"
+	"runtime/debug"
 )
 
 type Addr struct {
@@ -31,14 +31,14 @@ type Cmd struct {
 }
 
 type Cmdtab struct {
-	cmdc    rune                  /* command character */
-	text    byte                  /* takes a textual argument? */
-	regexp  byte                  /* takes a regular expression? */
-	addr    byte                  /* takes an address (m or t)? */
-	defcmd  rune                  /* default command; 0==>none */
-	defaddr Defaddr               /* default address */
-	count   int                   /* takes a count e.g. s2/// */
-	token   []rune                /* takes text terminated by one of these */
+	cmdc    rune                   /* command character */
+	text    byte                   /* takes a textual argument? */
+	regexp  byte                   /* takes a regular expression? */
+	addr    byte                   /* takes an address (m or t)? */
+	defcmd  rune                   /* default command; 0==>none */
+	defaddr Defaddr                /* default address */
+	count   int                    /* takes a count e.g. s2/// */
+	token   []rune                 /* takes text terminated by one of these */
 	fn      func(*Text, *Cmd) bool /* function to call with parse tree */
 }
 
@@ -88,15 +88,15 @@ var cmdtab = []Cmdtab{
 	{'s', 0, 1, 0, 0, aDot, 1, nil, s_cmd},
 	{'t', 0, 0, 1, 0, aDot, 0, nil, m_cmd},
 	{'u', 0, 0, 0, 0, aNo, 2, nil, u_cmd},
-	{'v', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to g_cmd in init() to avoid initialization loop
+	{'v', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to g_cmd in init() to avoid initialization loop
 	{'w', 0, 0, 0, 0, aAll, 0, wordx, w_cmd},
-	{'x', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to x_cmd in init() to avoid initialization loop
-	{'y', 0, 1, 0, 'p', aDot, 0, nil, nil},// Assingned to x_cmd in init() to avoid initialization loop
+	{'x', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to x_cmd in init() to avoid initialization loop
+	{'y', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to x_cmd in init() to avoid initialization loop
 	{'=', 0, 0, 0, 0, aDot, 0, linex, eq_cmd},
 	{'B', 0, 0, 0, 0, aNo, 0, linex, B_cmd},
 	{'D', 0, 0, 0, 0, aNo, 0, linex, D_cmd},
-	{'X', 0, 1, 0, 'f', aNo, 0, nil, nil},// Assingned to X_cmd in init() to avoid initialization loop
-	{'Y', 0, 1, 0, 'f', aNo, 0, nil, nil},// Assingned to X_cmd in init() to avoid initialization loop
+	{'X', 0, 1, 0, 'f', aNo, 0, nil, nil}, // Assingned to X_cmd in init() to avoid initialization loop
+	{'Y', 0, 1, 0, 'f', aNo, 0, nil, nil}, // Assingned to X_cmd in init() to avoid initialization loop
 	{'<', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'|', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'>', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
@@ -177,12 +177,12 @@ func allupdate(w *Window) {
 		}
 		f.Mark()
 		f.elog.Apply(f.text[0])
-		if(f.editclean){
-			f.mod = false;
+		if f.editclean {
+			f.mod = false
 			for _, t := range f.text {
 				t.w.dirty = false
 			}
-		} 
+		}
 
 		t.w.owner = owner
 	}
@@ -206,7 +206,7 @@ func editcmd(ct *Text, r []rune) {
 		return
 	}
 
-	if len(r) > 2 * RBUFSIZE {
+	if len(r) > 2*RBUFSIZE {
 		warning(nil, "string too long\n")
 		return
 	}
@@ -322,7 +322,7 @@ func atnl() {
 	cmdskipbl()
 	c = getch()
 	if c != '\n' {
-debug.PrintStack()
+		debug.PrintStack()
 		editerror("newline expected (saw %c)", c)
 	}
 }
@@ -363,22 +363,22 @@ func collecttoken(end []rune) string {
 	s := ""
 	var c rune
 
-fmt.Println("cmdstartp=", cmdstartp[cmdp:])
+	fmt.Println("cmdstartp=", cmdstartp[cmdp:])
 	for {
 		c = nextc()
-		if !(c == ' ' || c == '\t'){
+		if !(c == ' ' || c == '\t') {
 			break
 		}
 		s += string(getch()) /* blanks significant for getname() */
 	}
 	for {
 		c = getch()
-		if !(c > 0 && utfrune(end, c) == 0){
+		if !(c > 0 && utfrune(end, c) == 0) {
 			break
 		}
 		s += string(c)
 	}
-fmt.Println("Collecttoken=", s)
+	fmt.Println("Collecttoken=", s)
 	if c != '\n' {
 		atnl()
 	}
@@ -493,7 +493,7 @@ func parsecmd(nest int) *Cmd {
 		}
 		if ct.addr != 0 {
 			cmd.mtaddr = simpleaddr()
-		 	if cmd.mtaddr == nil {
+			if cmd.mtaddr == nil {
 				editerror("bad address")
 			}
 		}

@@ -70,7 +70,7 @@ func fbufalloc() []rune {
 // TODO(flux): This is another design constraint of Buffer - we want to efficiently
 // present contiguous segments of bytes, possibly by merging/flattening our tree
 // when a view is requested. This should be a rare operation...
-func (b *Buffer)  View(q0, q1 int) []byte {
+func (b *Buffer) View(q0, q1 int) []byte {
 	if q1 > len(*b) {
 		q1 = len(*b)
 	}

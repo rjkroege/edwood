@@ -41,7 +41,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	c.tag.col = c
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
-	
+
 	tagfile := NewFile("")
 	c.tag.file = tagfile.AddText(&c.tag)
 	c.tag.Init(r1, tagfont, tagcolors, c.display)
@@ -325,7 +325,7 @@ func (c *Column) Grow(w *Window, but int) {
 	if but < 0 { // make sure window fills its own space properly
 		r := w.r
 		if windex == c.nw()-1 || !c.safe { // Last window in column
-			r.Max.Y = cr.Max.Y		// Clamp to column bottom.
+			r.Max.Y = cr.Max.Y // Clamp to column bottom.
 		} else {
 			// Fill space down to the next window.
 			r.Max.Y = c.w[windex+1].r.Min.Y - c.display.ScaleSize(Border)
@@ -474,13 +474,13 @@ func (c *Column) DragWin(w *Window, but int) {
 		nc     *Column
 	)
 	clearmouse()
-	c.display.SetCursor(&boxcursor);
+	c.display.SetCursor(&boxcursor)
 	b = mouse.Buttons
 	op = mouse.Point
 	for mouse.Buttons == b {
 		mousectl.Read()
 	}
-	c.display.SetCursor(nil);
+	c.display.SetCursor(nil)
 	if mouse.Buttons != 0 {
 		for mouse.Buttons != 0 {
 			mousectl.Read()

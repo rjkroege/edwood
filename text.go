@@ -503,7 +503,7 @@ func (t *Text) Fill() {
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
 	// characters possible?
-	if t.fr.IsLastLineFull()  || t.nofill {
+	if t.fr.IsLastLineFull() || t.nofill {
 		return
 	}
 	if t.ncache > 0 {
@@ -603,7 +603,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 }
 
-func (t *Text) View(q0, q1 int) []byte { return t.file.b.View(q0,q1) }
+func (t *Text) View(q0, q1 int) []byte                   { return t.file.b.View(q0, q1) }
 func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
 func (t *Text) nc() int                                  { return t.file.b.Nc() }
 func (t *Text) Q0() int                                  { return t.q0 }
@@ -1289,7 +1289,9 @@ func (t *Text) SetSelect(q0, q1 int) {
 		ticked = false
 		p1 = 0
 	}
-	if t.fr == nil { return }
+	if t.fr == nil {
+		return
+	}
 	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
 		ticked = false
 		p0 = (t.fr.GetFrameFillStatus().Nchars)
@@ -1304,11 +1306,10 @@ func (t *Text) SetSelect(q0, q1 int) {
 	t.fr.DrawSel(t.fr.Ptofchar(p0), p0, p1, ticked)
 }
 
-
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
 func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse ,  func(*frame.Frame, int) {}, t.display.White, high)
+	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(*frame.Frame, int) {}, t.display.White, high)
 
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
@@ -1428,8 +1429,8 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 }
 
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-Untested()
-	if q + 2 > t.file.b.Nc() {
+	Untested()
+	if q+2 > t.file.b.Nc() {
 		return 0, 0
 	}
 	if t.ReadC(q) != '<' {
@@ -1457,8 +1458,8 @@ Untested()
 	return q, 1
 }
 
-func (t *Text) ishtmlend(q int) ( q1 int, stat int) {
-Untested()
+func (t *Text) ishtmlend(q int) (q1 int, stat int) {
+	Untested()
 	if q < 2 {
 		return 0, 0
 	}
@@ -1494,41 +1495,41 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 
 	// after opening tag?  scan forward for closing tag
 	_, stat := t.ishtmlend(inq0)
-	if(stat == 1) {
-		depth = 1;
-		for (q < t.file.b.Nc()) {
+	if stat == 1 {
+		depth = 1
+		for q < t.file.b.Nc() {
 			nq, n := t.ishtmlstart(q)
-			if (n != 0) {
-				depth += n;
-				if(depth == 0) {
-					return q0, q, true;
+			if n != 0 {
+				depth += n
+				if depth == 0 {
+					return q0, q, true
 				}
-				q = nq;
-				continue;
+				q = nq
+				continue
 			}
-			q++;
+			q++
 		}
 	}
 
 	// before closing tag?  scan backward for opening tag
 	_, stat = t.ishtmlstart(q)
-	if (stat == -1) {
-		depth = -1;
-		for(q > 0) {
-			nq, n := t.ishtmlend(q);
-			if(n != 0) {
-				depth += n;
-				if(depth == 0) {
-					return q, q1, true;
+	if stat == -1 {
+		depth = -1
+		for q > 0 {
+			nq, n := t.ishtmlend(q)
+			if n != 0 {
+				depth += n
+				if depth == 0 {
+					return q, q1, true
 				}
-				q = nq;
-				continue;
+				q = nq
+				continue
 			}
-			q--;
+			q--
 		}
 	}
-	
-	return 0,0,false;
+
+	return 0, 0, false
 }
 
 func (t *Text) BackNL(p, n int) int {

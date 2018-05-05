@@ -125,7 +125,7 @@ var (
 	dodollarsigns     bool
 	mtpt              string
 
-	cplumb chan *plumb.Message
+	cplumb     chan *plumb.Message
 	cwait      chan *os.ProcessState
 	ccommand   chan *Command
 	ckill      chan string
@@ -168,11 +168,11 @@ type DirTab struct {
 }
 
 type MntDir struct {
-	id    int64
-	ref   int
-	dir   string
-	next  *MntDir
-	incl  []string
+	id   int64
+	ref  int
+	dir  string
+	next *MntDir
+	incl []string
 }
 
 const MaxFid = math.MaxUint32

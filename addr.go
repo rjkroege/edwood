@@ -183,7 +183,11 @@ func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int)
 			q = lim.q1
 		}
 		sels := pattern.rxexecute(t, nil, r.q1, q, 1)
-		if len(sels) > 0 { sel = sels[0] } else { sel = nil }
+		if len(sels) > 0 {
+			sel = sels[0]
+		} else {
+			sel = nil
+		}
 	}
 	if len(sel) == 0 && showerr {
 		warning(nil, "no match for regexp\n")

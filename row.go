@@ -139,13 +139,13 @@ func (row *Row) DragCol(c *Column, _ int) {
 		d       *Column
 	)
 	clearmouse()
-	row.display.SetCursor(&boxcursor); 
+	row.display.SetCursor(&boxcursor)
 	b = mouse.Buttons
 	op = mouse.Point
 	for mouse.Buttons == b {
 		mousectl.Read()
 	}
-	row.display.SetCursor(nil);
+	row.display.SetCursor(nil)
 	if mouse.Buttons != 0 {
 		for mouse.Buttons != 0 {
 			mousectl.Read()
@@ -183,10 +183,10 @@ Found:
 	}
 	d = row.col[i-1]
 	if p.X < d.r.Min.X+row.display.ScaleSize(80+Scrollwid) {
-		p.X = d.r.Min.X + row.display.ScaleSize(80 + Scrollwid)
+		p.X = d.r.Min.X + row.display.ScaleSize(80+Scrollwid)
 	}
 	if p.X > c.r.Max.X-row.display.ScaleSize(80-Scrollwid) {
-		p.X = c.r.Max.X - row.display.ScaleSize(80 - Scrollwid)
+		p.X = c.r.Max.X - row.display.ScaleSize(80-Scrollwid)
 	}
 	r = d.r
 	r.Max.X = c.r.Max.X

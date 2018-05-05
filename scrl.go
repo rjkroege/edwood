@@ -84,7 +84,7 @@ func (t *Text) ScrDraw() {
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.
-		b.Draw(r1,textcolors[frame.ColBord], nil, image.ZP)
+		b.Draw(r1, textcolors[frame.ColBord], nil, image.ZP)
 		b.Draw(r2, textcolors[frame.ColBack], nil, image.ZP)
 		r2.Min.X = r2.Max.X - 1
 		b.Draw(r2, textcolors[frame.ColBord], nil, image.ZP)

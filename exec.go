@@ -32,11 +32,11 @@ var exectab = []Exectab{
 	{"Delcol", delcol, false, true /*unused*/, true /*unused*/},
 	{"Delete", del, false, true, true /*unused*/},
 	{"Dump", dump, false, true, true /*unused*/},
-	{ "Edit", edit,	false, true /*unused*/,		true /*unused*/		},
+	{"Edit", edit, false, true /*unused*/, true /*unused*/},
 	{"Exit", xexit, false, true /*unused*/, true /*unused*/},
 	{"Font", fontx, false, true /*unused*/, true /*unused*/},
 	{"Get", get, false, true, true /*unused*/},
-	{ "ID", id, false,	true /*unused*/, true /*unused*/		},
+	{"ID", id, false, true /*unused*/, true /*unused*/},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
@@ -47,7 +47,7 @@ var exectab = []Exectab{
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
 	{"Put", put, false, true /*unused*/, true /*unused*/},
-	{ "Putall",		putall,	false,	true /*unused*/,		true /*unused*/		},
+	{"Putall", putall, false, true /*unused*/, true /*unused*/},
 	{"Redo", undo, false, false, true /*unused*/},
 	{"Send", sendx, true, true /*unused*/, true /*unused*/},
 	{"Snarf", cut, false, true, false},
@@ -232,17 +232,17 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	run(t.w, string(b), dir, true, aa, a, false)
 }
 
-func edit(et * Text, _ * Text, argt * Text, _, _  bool, arg string) {
+func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 
-	if(et == nil) {
-		return;
+	if et == nil {
+		return
 	}
-	r, _ := getarg(argt, false, true);
-	seq++;
-	if(r != ""){
-		editcmd(et, []rune(r));
-	}else {
-		editcmd(et, []rune(arg));
+	r, _ := getarg(argt, false, true)
+	seq++
+	if r != "" {
+		editcmd(et, []rune(r))
+	} else {
+		editcmd(et, []rune(arg))
 	}
 }
 
@@ -487,7 +487,7 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 
 func id(et, _, _ *Text, _, _ bool, _ string) {
 	if et != nil && et.w != nil {
-		warning(nil, "/mnt/acme/%d/\n", et.w.id);
+		warning(nil, "/mnt/acme/%d/\n", et.w.id)
 	}
 }
 
@@ -604,29 +604,28 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 	xfidlog(w, "put")
 }
 
-func putall(et , _, _ *Text, _, _ bool, arg string) {
+func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if(w.isscratch || w.isdir || w.body.file.name=="") {
+			if w.isscratch || w.isdir || w.body.file.name == "" {
 				continue
 			}
-			if(w.nopen[QWevent] > 0) {
+			if w.nopen[QWevent] > 0 {
 				continue
 			}
 			a := string(w.body.file.name)
-			e := access(a);
-			if(w.body.file.mod || w.body.ncache > 0) {
+			e := access(a)
+			if w.body.file.mod || w.body.ncache > 0 {
 				if !e {
-					warning(nil, "no auto-Put of %s: %r\n", a);
+					warning(nil, "no auto-Put of %s: %r\n", a)
 				} else {
-					w.Commit(&w.body);
-					put(&w.body, nil, nil, false, false, "");
+					w.Commit(&w.body)
+					put(&w.body, nil, nil, false, false, "")
 				}
 			}
 		}
 	}
 }
-
 
 func sortx(et, _, _ *Text, _, _ bool, _ string) {
 	if et.col != nil {
@@ -1018,7 +1017,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			c.md = nil
 			return
 		}
-		fs, err  := conn.Attach(nil, getuser(), fmt.Sprintf("%d", c.md.id))
+		fs, err := conn.Attach(nil, getuser(), fmt.Sprintf("%d", c.md.id))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "child: can't attach to acme: %v\n", err)
 			fsysdelid(c.md)
