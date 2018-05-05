@@ -83,7 +83,7 @@ func (f *Frame) Rect() image.Rectangle {
 type Frame struct {
 	// TODO(rjk): Remove public access if possible.
 	Font       Fontmetrics
-	Display    *draw.Display           // on which the frame is displayed
+	display    *draw.Display           // on which the frame is displayed
 	background *draw.Image             // on which the frame appears
 	cols       [NumColours]*draw.Image // background and text colours
 	rect       image.Rectangle         // in which the text appears
@@ -146,7 +146,7 @@ func OptColors(cols [NumColours]*draw.Image) option {
 // for example, an obscured window.
 func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...option) {
 	f.Font = &frfont{ft}
-	f.Display = b.Display
+	f.display = b.Display
 	f.maxtab = 8 * ft.StringWidth("0")
 	f.nchars = 0
 	f.nlines = 0
@@ -169,12 +169,12 @@ func (f *Frame) Init(r image.Rectangle, ft *draw.Font, b *draw.Image, opts ...op
 func (f *Frame) InitTick() {
 
 	var err error
-	if f.cols[ColBack] == nil || f.Display == nil {
+	if f.cols[ColBack] == nil || f.display == nil {
 		return
 	}
 
-	f.tickscale = f.Display.ScaleSize(1)
-	b := f.Display.ScreenImage
+	f.tickscale = f.display.ScaleSize(1)
+	b := f.display.ScreenImage
 	ft := f.Font
 
 	if f.tickimage != nil {
@@ -183,12 +183,12 @@ func (f *Frame) InitTick() {
 
 	height := ft.DefaultHeight()
 
-	f.tickimage, err = f.Display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return
 	}
 
-	f.tickback, err = f.Display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
+	f.tickback, err = f.display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
 	if err != nil {
 		f.tickimage.Free()
 		f.tickimage = nil
@@ -196,12 +196,12 @@ func (f *Frame) InitTick() {
 	}
 	f.tickback.Draw(f.tickback.R, f.cols[ColBack], nil, image.ZP)
 
-	f.tickimage.Draw(f.tickimage.R, f.Display.Transparent, nil, image.Pt(0, 0))
+	f.tickimage.Draw(f.tickimage.R, f.display.Transparent, nil, image.Pt(0, 0))
 	// vertical line
-	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.display.Opaque, nil, image.Pt(0, 0))
 	// box on each end
-	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.Display.Opaque, nil, image.Pt(0, 0))
-	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.Display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.display.Opaque, nil, image.Pt(0, 0))
 }
 
 // SetRects initializes the geometry of the frame.

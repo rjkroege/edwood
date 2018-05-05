@@ -18,7 +18,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 
 	frame := &Frame{
 		rect:       f.rect,
-		Display:    f.Display,
+		display:    f.display,
 		background: f.background,
 		Font:       f.Font,
 		maxtab:     f.maxtab,

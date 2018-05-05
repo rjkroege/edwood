@@ -80,7 +80,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	// If we should just show the tick, do that and return.
 	if p0 == p1 {
 		f.Tick(pt, highlighted)
-		f.Display.Flush() // To show the tick.
+		f.display.Flush() // To show the tick.
 		f.sp0 = p0
 		f.sp1 = p1
 		return
@@ -220,7 +220,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 
 	if ticked {
 		f.tickback.Draw(f.tickback.R, f.background, nil, pt)
-		f.background.Draw(r, f.Display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
+		f.background.Draw(r, f.display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
 		f.background.Draw(r, f.tickback, nil, image.ZP)
@@ -234,7 +234,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 // Commentary: because this code ignores selections, it is conceivably
 // undesirable to use it in the public API.
 func (f *Frame) Tick(pt image.Point, ticked bool) {
-	if f.tickscale != f.Display.ScaleSize(1) {
+	if f.tickscale != f.display.ScaleSize(1) {
 		if f.ticked {
 			f.tick(pt, false)
 		}

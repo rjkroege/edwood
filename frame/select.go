@@ -145,7 +145,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 			// TODO(rjk): Document why we need this call and what it's for.
 			getmorelines(f, 0)
 		}
-		if err := f.Display.Flush(); err != nil {
+		if err := f.display.Flush(); err != nil {
 			panic(err)
 		}
 		if omb != mb {
