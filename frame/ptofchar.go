@@ -18,7 +18,7 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 					p--
 					r, w = utf8.DecodeRune(b.Ptr[s:])
 					pt.X += f.Font.BytesWidth(b.Ptr[s : s+w])
-					if r == utf8.RuneError || pt.X > f.Rect.Max.X {
+					if r == utf8.RuneError || pt.X > f.rect.Max.X {
 						panic("frptofchar")
 					}
 				}
@@ -33,21 +33,21 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 }
 
 func (f *Frame) Ptofchar(p int) image.Point {
-	return f.ptofcharptb(p, f.Rect.Min, 0)
+	return f.ptofcharptb(p, f.rect.Min, 0)
 }
 
 func (f *Frame) ptofcharnb(p int, nb int) image.Point {
 	pt := image.Point{}
-	pt = f.ptofcharptb(p, f.Rect.Min, 0)
+	pt = f.ptofcharptb(p, f.rect.Min, 0)
 	return pt
 }
 
 func (f *Frame) grid(p image.Point) image.Point {
-	p.Y -= f.Rect.Min.Y
+	p.Y -= f.rect.Min.Y
 	p.Y -= p.Y % f.Font.DefaultHeight()
-	p.Y += f.Rect.Min.Y
-	if p.X > f.Rect.Max.X {
-		p.X = f.Rect.Max.X
+	p.Y += f.rect.Min.Y
+	if p.X > f.rect.Max.X {
+		p.X = f.rect.Max.X
 	}
 	return p
 }
@@ -58,7 +58,7 @@ func (f *Frame) Charofpt(pt image.Point) int {
 	var r rune
 
 	pt = f.grid(pt)
-	qt := f.Rect.Min
+	qt := f.rect.Min
 
 	for bn = 0; bn < len(f.box) && qt.Y < pt.Y; bn++ {
 		b := f.box[bn]

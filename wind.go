@@ -222,7 +222,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 		if n < 0 {
 			return 1
 		}
-		p := w.tag.fr.Ptofchar(n).Sub(w.tag.fr.Rect.Min)
+		p := w.tag.fr.Ptofchar(n).Sub(w.tag.fr.Rect().Min)
 		return 1 + p.Y/w.tag.fr.Font.DefaultHeight()
 	}
 
@@ -265,7 +265,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	y := r1.Max.Y
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.tag.Resize(r1, true, false /* noredraw */)
-		y = w.tag.fr.Rect.Max.Y
+		y = w.tag.fr.Rect().Max.Y
 		w.DrawButton()
 		w.tagsafe = true
 
@@ -653,7 +653,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 		w.body.Nc(), isdir, dirty)
 	if fonts {
 		// fsys exposes the actual physical font name.
-		return fmt.Sprintf("%s%11d %s %11d ", buf, w.body.fr.Rect.Dx(),
+		return fmt.Sprintf("%s%11d %s %11d ", buf, w.body.fr.Rect().Dx(),
 			fontget(w.body.font, w.display).Name, w.body.fr.GetMaxtab())
 	}
 	return buf

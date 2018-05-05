@@ -135,11 +135,11 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			qt := pt
 			pt = f.cklinewrap(pt, b)
 			if pt.Y > qt.Y {
-				if qt.X > f.Rect.Max.X {
-					qt.X = f.Rect.Max.X
+				if qt.X > f.rect.Max.X {
+					qt.X = f.rect.Max.X
 				}
 				//f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), text, back,qt)
-				f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
+				f.Background.Draw(image.Rect(qt.X, qt.Y, f.rect.Max.X, pt.Y), back, nil, qt)
 			}
 		}
 		ptr := b.Ptr
@@ -162,8 +162,8 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			w = f.Font.BytesWidth(ptr[0:runeindex(ptr, nr)])
 		}
 		x = pt.X + w
-		if x > f.Rect.Max.X {
-			x = f.Rect.Max.X
+		if x > f.rect.Max.X {
+			x = f.rect.Max.X
 		}
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
 		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
@@ -178,7 +178,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		qt := pt
 		pt = f.cklinewrap(pt, f.box[nb])
 		if pt.Y > qt.Y {
-			f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), f.cols[ColHigh], back, qt)
+			f.drawBox(image.Rect(qt.X, qt.Y, f.rect.Max.X, pt.Y), f.cols[ColHigh], back, qt)
 			// f.Background.Draw(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), back, nil, qt)
 		}
 	}
@@ -207,15 +207,15 @@ func (f *Frame) Redraw(enclosing image.Rectangle) {
 
 func (f *Frame) tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
-	if f.ticked == ticked || f.tickimage == nil || !pt.In(f.Rect) {
+	if f.ticked == ticked || f.tickimage == nil || !pt.In(f.rect) {
 		return
 	}
 
 	pt.X -= f.tickscale
 	r := image.Rect(pt.X, pt.Y, pt.X+frtickw*f.tickscale, pt.Y+f.Font.DefaultHeight())
 
-	if r.Max.X > f.Rect.Max.X {
-		r.Max.X = f.Rect.Max.X
+	if r.Max.X > f.rect.Max.X {
+		r.Max.X = f.rect.Max.X
 	}
 
 	if ticked {
@@ -253,7 +253,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 			panic("-- Frame._draw has invalid box mode --")
 		}
 		pt = f.cklinewrap0(pt, b)
-		if pt.Y == f.Rect.Max.Y {
+		if pt.Y == f.rect.Max.Y {
 			f.nchars -= f.strlen(nb)
 			f.delbox(nb, len(f.box)-1)
 			break
@@ -271,7 +271,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 			pt.X += b.Wid
 		} else {
 			if b.Bc == '\n' {
-				pt.X = f.Rect.Min.X
+				pt.X = f.rect.Min.X
 				pt.Y += f.Font.DefaultHeight()
 			} else {
 				pt.X += f.newwid(pt, b)

@@ -74,10 +74,10 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	var ymax int
 
 	r := c.r
-	r.Min.Y = c.tag.fr.Rect.Max.Y + c.display.ScaleSize(Border)
+	r.Min.Y = c.tag.fr.Rect().Max.Y + c.display.ScaleSize(Border)
 	if y < r.Min.Y && c.nw() > 0 { // Steal half the last window
 		v = c.w[c.nw()-1]
-		y = v.body.fr.Rect.Min.Y + v.body.fr.Rect.Dx()/2
+		y = v.body.fr.Rect().Min.Y + v.body.fr.Rect().Dx()/2
 	}
 	// Which window will we land on?
 	var windex int
@@ -138,7 +138,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r1 := r
 		y = min(y, ymax-(v.tag.fr.Font.DefaultHeight()*v.taglines+v.body.fr.Font.DefaultHeight()+c.display.ScaleSize(Border)+1))
 		ffs = v.body.fr.GetFrameFillStatus()
-		r1.Max.Y = min(y, v.body.fr.Rect.Min.Y+ffs.Nlines*v.body.fr.Font.DefaultHeight())
+		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.Font.DefaultHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
 		if c.display != nil {
@@ -287,7 +287,7 @@ func (c *Column) Sort() {
 	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.name < c.w[j].body.file.name })
 
 	r := c.r
-	r.Min.Y = c.tag.fr.Rect.Max.Y
+	r.Min.Y = c.tag.fr.Rect().Max.Y
 	c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 	y := r.Min.Y
 	for i := 0; i < len(c.w); i++ {
@@ -539,9 +539,9 @@ Found:
 	}
 	r = v.r
 	r.Max.Y = p.Y
-	if r.Max.Y > v.body.fr.Rect.Min.Y {
-		r.Max.Y -= (r.Max.Y - v.body.fr.Rect.Min.Y) % v.body.fr.Font.DefaultHeight()
-		if v.body.fr.Rect.Min.Y == v.body.fr.Rect.Max.Y {
+	if r.Max.Y > v.body.fr.Rect().Min.Y {
+		r.Max.Y -= (r.Max.Y - v.body.fr.Rect().Min.Y) % v.body.fr.Font.DefaultHeight()
+		if v.body.fr.Rect().Min.Y == v.body.fr.Rect().Max.Y {
 			r.Max.Y++
 		}
 	}
@@ -572,7 +572,7 @@ func (c *Column) Which(p image.Point) *Text {
 				return &w.tag
 			}
 			// exclude partial line at bottom
-			if p.X >= w.body.scrollr.Max.X && p.Y >= w.body.fr.Rect.Max.Y {
+			if p.X >= w.body.scrollr.Max.X && p.Y >= w.body.fr.Rect().Max.Y {
 				return nil
 			}
 			return &w.body

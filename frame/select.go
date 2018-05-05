@@ -80,8 +80,8 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 		mb := me.Buttons
 
 		scrled := false
-		if mp.Y < f.Rect.Min.Y {
-			getmorelines(f, -(f.Rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
+		if mp.Y < f.rect.Min.Y {
+			getmorelines(f, -(f.rect.Min.Y-mp.Y)/f.Font.DefaultHeight()-1)
 			// As a result of scrolling, we will have called Insert. Insert will
 			// remove the selection. But not put it back. But it will correct
 			// P1 and P0 to reflect the insertion.
@@ -89,8 +89,8 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 			p0 = f.sp1
 			p1 = f.sp0
 			scrled = true
-		} else if mp.Y > f.Rect.Max.Y {
-			getmorelines(f, (mp.Y-f.Rect.Max.Y)/f.Font.DefaultHeight()+1)
+		} else if mp.Y > f.rect.Max.Y {
+			getmorelines(f, (mp.Y-f.rect.Max.Y)/f.Font.DefaultHeight()+1)
 			p0 = f.sp1
 			p1 = f.sp0
 			scrled = true
@@ -166,19 +166,19 @@ func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	if f.Background == nil {
 		panic("Frame.SelectPaint B == nil")
 	}
-	if p0.Y == f.Rect.Max.Y {
+	if p0.Y == f.rect.Max.Y {
 		return
 	}
 	if n == 0 {
 		f.Background.Draw(Rpt(p0, q1), col, nil, image.ZP)
 	} else {
-		if p0.X >= f.Rect.Max.X {
-			p0.X = f.Rect.Max.X - 1
+		if p0.X >= f.rect.Max.X {
+			p0.X = f.rect.Max.X - 1
 		}
-		f.Background.Draw(image.Rect(p0.X, p0.Y, f.Rect.Max.X, q0.Y), col, nil, image.ZP)
+		f.Background.Draw(image.Rect(p0.X, p0.Y, f.rect.Max.X, q0.Y), col, nil, image.ZP)
 		if n > 1 {
-			f.Background.Draw(image.Rect(f.Rect.Min.X, q0.Y, f.Rect.Max.X, p1.Y), col, nil, image.ZP)
+			f.Background.Draw(image.Rect(f.rect.Min.X, q0.Y, f.rect.Max.X, p1.Y), col, nil, image.ZP)
 		}
-		f.Background.Draw(image.Rect(f.Rect.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.ZP)
+		f.Background.Draw(image.Rect(f.rect.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.ZP)
 	}
 }

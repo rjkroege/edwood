@@ -52,7 +52,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 	var d *Column
 
 	// Work out the geometry of the column.
-	r.Min.Y = row.tag.fr.Rect.Max.Y + row.display.ScaleSize(Border)
+	r.Min.Y = row.tag.fr.Rect().Max.Y + row.display.ScaleSize(Border)
 	if x < r.Min.X && len(row.col) > 0 { // Take 40% of last column unless specified
 		d = row.col[len(row.col)-1]
 		x = d.r.Min.X + 3*d.r.Dx()/5

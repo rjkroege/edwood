@@ -19,7 +19,7 @@ func (b *frbox) String() string {
 // to not fit and true if more than 0 runes fit.
 // If b has no width, use minwidth instead of width.
 func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
-	left := f.Rect.Max.X - pt.X
+	left := f.rect.Max.X - pt.X
 	if b.Nrune < 0 {
 		if int(b.Minwid) <= left {
 			return 1, true
@@ -50,18 +50,18 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if b.Nrune < 0 {
-		if int(b.Minwid) > f.Rect.Max.X-p.X {
-			ret.X = f.Rect.Min.X
+		if int(b.Minwid) > f.rect.Max.X-p.X {
+			ret.X = f.rect.Min.X
 			ret.Y = p.Y + f.Font.DefaultHeight()
 		}
 	} else {
-		if b.Wid > f.Rect.Max.X-p.X {
-			ret.X = f.Rect.Min.X
+		if b.Wid > f.rect.Max.X-p.X {
+			ret.X = f.rect.Min.X
 			ret.Y = p.Y + f.Font.DefaultHeight()
 		}
 	}
-	if ret.Y > f.Rect.Max.Y {
-		ret.Y = f.Rect.Max.Y
+	if ret.Y > f.rect.Max.Y {
+		ret.Y = f.rect.Max.Y
 	}
 	return ret
 }
@@ -69,10 +69,10 @@ func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if _, ok := f.canfit(p, b); !ok {
-		ret.X = f.Rect.Min.X
+		ret.X = f.rect.Min.X
 		ret.Y = p.Y + f.Font.DefaultHeight()
-		if ret.Y > f.Rect.Max.Y {
-			ret.Y = f.Rect.Max.Y
+		if ret.Y > f.rect.Max.Y {
+			ret.Y = f.rect.Max.Y
 		}
 	}
 	return ret
@@ -80,10 +80,10 @@ func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 
 func (f *Frame) advance(p image.Point, b *frbox) image.Point {
 	if b.Nrune < 0 && b.Bc == '\n' {
-		p.X = f.Rect.Min.X
+		p.X = f.rect.Min.X
 		p.Y += f.Font.DefaultHeight()
-		if p.Y > f.Rect.Max.Y {
-			p.Y = f.Rect.Max.Y
+		if p.Y > f.rect.Max.Y {
+			p.Y = f.rect.Max.Y
 		}
 	} else {
 		p.X += b.Wid
@@ -97,17 +97,17 @@ func (f *Frame) newwid(pt image.Point, b *frbox) int {
 }
 
 func (f *Frame) newwid0(pt image.Point, b *frbox) int {
-	c := f.Rect.Max.X
+	c := f.rect.Max.X
 	x := pt.X
 	if b.Nrune >= 0 || b.Bc != '\t' {
 		return b.Wid
 	}
 	if x+int(b.Minwid) > c {
-		pt.X = f.Rect.Min.X
+		pt.X = f.rect.Min.X
 		x = pt.X
 	}
 	x += f.maxtab
-	x -= (x - f.Rect.Min.X) % f.maxtab
+	x -= (x - f.rect.Min.X) % f.maxtab
 	if x-pt.X < int(b.Minwid) || x > c {
 		x = pt.X + int(b.Minwid)
 	}
@@ -119,7 +119,7 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 func (f *Frame) clean(pt image.Point, n0, n1 int) {
 	//log.Println("clean", pt, n0, n1, f.Rect.Max.X)
 	//	f.Logboxes("--- clean: starting ---")
-	c := f.Rect.Max.X
+	c := f.rect.Max.X
 	nb := 0
 	for nb = n0; nb < n1-1; nb++ {
 		b := f.box[nb]
@@ -140,7 +140,7 @@ func (f *Frame) clean(pt image.Point, n0, n1 int) {
 		pt = f.advance(pt, b)
 	}
 	f.lastlinefull = false
-	if pt.Y >= f.Rect.Max.Y {
+	if pt.Y >= f.rect.Max.Y {
 		f.lastlinefull = true
 	}
 	//	f.Logboxes("--- clean: end")

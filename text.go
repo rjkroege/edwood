@@ -217,7 +217,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	if colw == 0 {
 		ncol = 1
 	} else {
-		ncol = max(1, t.fr.Rect.Dx()/colw)
+		ncol = max(1, t.fr.Rect().Dx()/colw)
 	}
 	nrow = (len(names) + ncol - 1) / ncol
 
@@ -710,7 +710,7 @@ func (t *Text) Type(r rune) {
 	}
 
 	case_Down := func() {
-		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+n*t.fr.Font.DefaultHeight()))
+		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.Font.DefaultHeight()))
 		t.SetOrigin(q0, true)
 		return
 	}
@@ -1065,7 +1065,7 @@ func (t *Text) FrameScroll(dl int) {
 		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
 			return
 		}
-		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect.Min.X, t.fr.Rect.Min.Y+dl*t.fr.Font.Impl().Height)))
+		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+dl*t.fr.Font.Impl().Height)))
 	}
 	// Insert text into the frame.
 	t.setorigin(q0, true, true)

@@ -79,14 +79,14 @@ func (f *Frame) Delete(p0, p1 int) int {
 
 			r.Min.X = r.Max.X
 			r.Max.X += int(w0 - b.Wid)
-			if r.Max.X > f.Rect.Max.X {
-				r.Max.X = f.Rect.Max.X
+			if r.Max.X > f.rect.Max.X {
+				r.Max.X = f.rect.Max.X
 			}
 			f.Background.Draw(r, f.cols[ColBack], nil, r.Min)
 		} else {
 			r.Max.X += f.newwid(pt0, b)
-			if r.Max.X > f.Rect.Max.X {
-				r.Max.X = f.Rect.Max.X
+			if r.Max.X > f.rect.Max.X {
+				r.Max.X = f.rect.Max.X
 			}
 			col := f.cols[ColBack]
 			if f.sp0 <= cn1 && cn1 < f.sp1 {
@@ -109,7 +109,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	if pt1.Y != pt0.Y {
 		// What is going on here?
 		pt2 := f.ptofcharptb(32767, pt1, n1)
-		if pt2.Y > f.Rect.Max.Y {
+		if pt2.Y > f.rect.Max.Y {
 			panic("Frame.ptofchar in Frame.delete")
 		}
 
@@ -119,12 +119,12 @@ func (f *Frame) Delete(p0, p1 int) int {
 			q1 := pt1.Y + height
 			q2 := pt2.Y + height
 
-			if q2 > f.Rect.Max.Y {
-				q2 = f.Rect.Max.Y
+			if q2 > f.rect.Max.Y {
+				q2 = f.rect.Max.Y
 			}
 
-			f.Background.Draw(image.Rect(pt0.X, pt0.Y, pt0.X+(f.Rect.Max.X-pt1.X), q0), f.Background, nil, pt1)
-			f.Background.Draw(image.Rect(f.Rect.Min.X, q0, f.Rect.Max.X, q0+(q2-q1)), f.Background, nil, image.Pt(f.Rect.Min.X, q1))
+			f.Background.Draw(image.Rect(pt0.X, pt0.Y, pt0.X+(f.rect.Max.X-pt1.X), q0), f.Background, nil, pt1)
+			f.Background.Draw(image.Rect(f.rect.Min.X, q0, f.rect.Max.X, q0+(q2-q1)), f.Background, nil, image.Pt(f.rect.Min.X, q1))
 			f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.cols[ColBack])
 		} else {
 			f.SelectPaint(pt0, pt2, f.cols[ColBack])
@@ -132,7 +132,7 @@ func (f *Frame) Delete(p0, p1 int) int {
 	}
 	// We crash here.
 	f.closebox(n0, n1-1)
-	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-int(f.box[nn0-1].Wid) >= int(f.Rect.Min.X) {
+	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-int(f.box[nn0-1].Wid) >= int(f.rect.Min.X) {
 		nn0--
 		ppt0.X -= int(f.box[nn0].Wid)
 	}
@@ -161,8 +161,8 @@ func (f *Frame) Delete(p0, p1 int) int {
 	}
 	pt0 = f.Ptofchar(f.nchars)
 	n := f.nlines
-	f.nlines = (pt0.Y - f.Rect.Min.Y) / f.Font.DefaultHeight()
-	if pt0.X > f.Rect.Min.X {
+	f.nlines = (pt0.Y - f.rect.Min.Y) / f.Font.DefaultHeight()
+	if pt0.X > f.rect.Min.X {
 		f.nlines++
 	}
 	return n - f.nlines

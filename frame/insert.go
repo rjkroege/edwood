@@ -17,7 +17,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	var c rune
 
 	frame := &Frame{
-		Rect:       f.Rect,
+		rect:       f.rect,
 		Display:    f.Display,
 		Background: f.Background,
 		Font:       f.Font,
@@ -102,7 +102,7 @@ func (f *Frame) chop(pt image.Point, p, bn int) {
 	//  better version
 	for i, bx := range f.box[bn:] {
 		pt = f.cklinewrap(pt, bx)
-		if pt.Y >= f.Rect.Max.Y {
+		if pt.Y >= f.rect.Max.Y {
 			f.nchars = p
 			f.nlines = f.maxlines
 			f.box = f.box[0 : bn+i]
@@ -184,11 +184,11 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	 * If pt1 goes off the rectangle, we can toss everything from there on
 	 */
 	npts := 0
-	for ; pt1.X != pt0.X && pt1.Y != f.Rect.Max.Y && n0 < len(f.box); npts++ {
+	for ; pt1.X != pt0.X && pt1.Y != f.rect.Max.Y && n0 < len(f.box); npts++ {
 		b := f.box[n0]
 		pt0 = f.cklinewrap(pt0, b)
 		pt1 = f.cklinewrap0(pt1, b)
-		if pt1.Y > f.Rect.Max.Y {
+		if pt1.Y > f.rect.Max.Y {
 			f.Logboxes("-- pt1 violated invariant at box --")
 			panic(fmt.Sprint("frame.Insert pt1 too far", " pt1=", pt1, " box=", b))
 		}
@@ -196,7 +196,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		if b.Nrune > 0 {
 			n, fits := f.canfit(pt1, b)
 			if !fits {
-				f.Logboxes("-- frame.canfit false  box[%d]=%v %v, %v--", n0, b.String(), pt1, f.Rect)
+				f.Logboxes("-- frame.canfit false  box[%d]=%v %v, %v--", n0, b.String(), pt1, f.rect)
 				panic("frame.canfit false")
 			}
 			if n != b.Nrune {
@@ -206,7 +206,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		}
 
 		pts = append(pts, points{pt0, pt1})
-		if pt1.Y == f.Rect.Max.Y {
+		if pt1.Y == f.rect.Max.Y {
 			break
 		}
 		pt0 = f.advance(pt0, b)
@@ -215,22 +215,22 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		n0++
 	}
 
-	if pt1.Y > f.Rect.Max.Y {
+	if pt1.Y > f.rect.Max.Y {
 		nframe.validateboxmodel("frame.Insert pt1 too far, nframe validation, %v", pt1)
 		panic("frame.Insert pt1 too far")
 	}
-	if pt1.Y == f.Rect.Max.Y && n0 < len(f.box) {
+	if pt1.Y == f.rect.Max.Y && n0 < len(f.box) {
 		f.nchars -= f.strlen(n0)
 		f.delbox(n0, len(f.box)-1)
 	}
 	if n0 == len(f.box) {
 		div := f.Font.DefaultHeight()
-		f.nlines = (pt1.Y - f.Rect.Min.Y) / div
-		if pt1.X > f.Rect.Min.X {
+		f.nlines = (pt1.Y - f.rect.Min.Y) / div
+		if pt1.X > f.rect.Min.X {
 			f.nlines++
 		}
 	} else if pt1.Y != pt0.Y {
-		y := f.Rect.Max.Y
+		y := f.rect.Max.Y
 		q0 := pt0.Y + f.Font.DefaultHeight()
 		q1 := pt1.Y + f.Font.DefaultHeight()
 		f.nlines += (q1 - q0) / f.Font.DefaultHeight()
@@ -241,16 +241,16 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 		if pt1.Y < y {
 			// log.Println("suspect case in frame", "pt1",  pt1, "pt0", pt0, "f.Rect", f.Rect, "q1", q1,  "y", y)
 			// log.Println(" f.Font.DefaultHeight()",  f.Font.DefaultHeight())
-			rect = f.Rect
+			rect = f.rect
 			rect.Min.Y = q1
 			rect.Max.Y = y
 			// TODO(rjk): This bitblit may be harmful. Investigate further.
 			if q1 < y {
 				// log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
-				f.Background.Draw(rect, f.Background, nil, image.Pt(f.Rect.Min.X, q0))
+				f.Background.Draw(rect, f.Background, nil, image.Pt(f.rect.Min.X, q0))
 			}
 			rect.Min = pt1
-			rect.Max.X = pt1.X + (f.Rect.Max.X - pt0.X)
+			rect.Max.X = pt1.X + (f.rect.Max.X - pt0.X)
 			rect.Max.Y = q1
 			// log.Println("second blit op on ", rect, "from", pt0)
 			f.Background.Draw(rect, f.Background, nil, pt0)
@@ -263,7 +263,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	 * The draw()s above moved everything down after the point they lined up.
 	 */
 	y := 0
-	if pt1.Y == f.Rect.Max.Y {
+	if pt1.Y == f.rect.Max.Y {
 		y = pt1.Y
 	}
 	npts--
@@ -284,7 +284,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			if npts == 0 && pt.Y > pt0.Y {
 				rect.Min = opt0
 				rect.Max = opt0
-				rect.Max.X = f.Rect.Max.X
+				rect.Max.X = f.rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
@@ -297,7 +297,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				rect.Min = pt
 				rect.Max = pt
 				rect.Min.X += b.Wid
-				rect.Max.X = f.Rect.Max.X
+				rect.Max.X = f.rect.Max.X
 				rect.Max.Y += f.Font.DefaultHeight()
 
 				if f.sp0 <= cn0 && cn0 < f.sp1 {
@@ -314,8 +314,8 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			rect.Max = pt
 			rect.Max.X += b.Wid
 			rect.Max.Y += f.Font.DefaultHeight()
-			if rect.Max.X >= f.Rect.Max.X {
-				rect.Max.X = f.Rect.Max.X
+			if rect.Max.X >= f.rect.Max.X {
+				rect.Max.X = f.rect.Max.X
 			}
 			cn0--
 			if f.sp0 <= cn0 && cn0 < f.sp1 {
@@ -327,7 +327,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			}
 			f.Background.Draw(rect, col, nil, rect.Min)
 			y = 0
-			if pt.X == f.Rect.Min.X {
+			if pt.X == f.rect.Min.X {
 				y = pt.Y
 			}
 		}
@@ -351,7 +351,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 
 	// f.Logboxes("after adding")
 
-	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.Rect.Min.X {
+	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.rect.Min.X {
 		nn0--
 		ppt0.X -= f.box[nn0].Wid
 	}

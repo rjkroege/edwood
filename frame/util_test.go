@@ -50,7 +50,7 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box doesn't fit",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123456789")},
 			},
 			func(f *Frame) (int, bool) {
@@ -67,7 +67,7 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box, fits",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123")},
 			},
 			func(f *Frame) (int, bool) {
@@ -84,7 +84,7 @@ func TestCanfit(t *testing.T) {
 			"newline box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{newlinebox},
 			},
 			func(f *Frame) (int, bool) {
@@ -101,7 +101,7 @@ func TestCanfit(t *testing.T) {
 			"tab box",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{tabbox},
 			},
 			func(f *Frame) (int, bool) {
@@ -118,7 +118,7 @@ func TestCanfit(t *testing.T) {
 			"multi-glyph box, doesn't fit",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("本a")},
 			},
 			func(f *Frame) (int, bool) {
@@ -146,7 +146,7 @@ func TestClean(t *testing.T) {
 			"empty frame",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{},
 			},
 			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
@@ -157,7 +157,7 @@ func TestClean(t *testing.T) {
 			"one frame, 0,1",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
 			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
@@ -168,7 +168,7 @@ func TestClean(t *testing.T) {
 			"one frame, 1,1",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
 			func(f *Frame) { f.clean(image.Pt(10, 15), 1, 1) },
@@ -179,7 +179,7 @@ func TestClean(t *testing.T) {
 			"two frame, 0,2",
 			&Frame{
 				Font: Fakemetrics(fixedwidth),
-				Rect: image.Rect(10, 15, 10+57, 15+57),
+				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{hellobox, worldbox},
 			},
 			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 2) },
