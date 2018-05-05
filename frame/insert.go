@@ -19,7 +19,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	frame := &Frame{
 		rect:       f.rect,
 		Display:    f.Display,
-		Background: f.Background,
+		background: f.background,
 		Font:       f.Font,
 		maxtab:     f.maxtab,
 		nchars:     0,
@@ -137,7 +137,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
 	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
 
-	if p0 > f.nchars || len(r) == 0 || f.Background == nil {
+	if p0 > f.nchars || len(r) == 0 || f.background == nil {
 		return f.lastlinefull
 	}
 
@@ -247,13 +247,13 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			// TODO(rjk): This bitblit may be harmful. Investigate further.
 			if q1 < y {
 				// log.Println("first blit op on ", rect, "from", image.Pt(f.Rect.Min.X, q0))
-				f.Background.Draw(rect, f.Background, nil, image.Pt(f.rect.Min.X, q0))
+				f.background.Draw(rect, f.background, nil, image.Pt(f.rect.Min.X, q0))
 			}
 			rect.Min = pt1
 			rect.Max.X = pt1.X + (f.rect.Max.X - pt0.X)
 			rect.Max.Y = q1
 			// log.Println("second blit op on ", rect, "from", pt0)
-			f.Background.Draw(rect, f.Background, nil, pt0)
+			f.background.Draw(rect, f.background, nil, pt0)
 		}
 	}
 
@@ -279,7 +279,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 			rect.Max.X += b.Wid
 			rect.Max.Y += f.Font.DefaultHeight()
 
-			f.Background.Draw(rect, f.Background, nil, pts[npts].pt0)
+			f.background.Draw(rect, f.background, nil, pts[npts].pt0)
 			/* clear bit hanging off right */
 			if npts == 0 && pt.Y > pt0.Y {
 				rect.Min = opt0
@@ -292,7 +292,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				} else {
 					col = f.cols[ColBack]
 				}
-				f.Background.Draw(rect, col, nil, rect.Min)
+				f.background.Draw(rect, col, nil, rect.Min)
 			} else if pt.Y < y {
 				rect.Min = pt
 				rect.Max = pt
@@ -305,7 +305,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				} else {
 					col = f.cols[ColBack]
 				}
-				f.Background.Draw(rect, col, nil, rect.Min)
+				f.background.Draw(rect, col, nil, rect.Min)
 			}
 			y = pt.Y
 			cn0 -= b.Nrune
@@ -325,7 +325,7 @@ func (f *Frame) Insert(r []rune, p0 int) bool {
 				col = f.cols[ColBack]
 				tcol = f.cols[ColText]
 			}
-			f.Background.Draw(rect, col, nil, rect.Min)
+			f.background.Draw(rect, col, nil, rect.Min)
 			y = 0
 			if pt.X == f.rect.Min.X {
 				y = pt.Y

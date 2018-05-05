@@ -13,7 +13,7 @@ func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
+			f.background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -22,9 +22,9 @@ func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 // drawBox is a helpful debugging utility that wraps each box with a
 // rectangle to show its extent.
 func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point) {
-	f.Background.Draw(r, col, nil, qt)
+	f.background.Draw(r, col, nil, qt)
 	r = r.Inset(1)
-	f.Background.Draw(r, back, nil, qt)
+	f.background.Draw(r, back, nil, qt)
 }
 
 // DrawSel repaints a section of the frame, delimited by character
@@ -139,7 +139,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 					qt.X = f.rect.Max.X
 				}
 				//f.drawBox(image.Rect(qt.X, qt.Y, f.Rect.Max.X, pt.Y), text, back,qt)
-				f.Background.Draw(image.Rect(qt.X, qt.Y, f.rect.Max.X, pt.Y), back, nil, qt)
+				f.background.Draw(image.Rect(qt.X, qt.Y, f.rect.Max.X, pt.Y), back, nil, qt)
 			}
 		}
 		ptr := b.Ptr
@@ -166,9 +166,9 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 			x = f.rect.Max.X
 		}
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
-		f.Background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
+		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), back, nil, pt)
 		if b.Nrune >= 0 {
-			f.Background.Bytes(pt, text, image.ZP, f.Font.Impl(), ptr[0:runeindex(ptr, nr)])
+			f.background.Bytes(pt, text, image.ZP, f.Font.Impl(), ptr[0:runeindex(ptr, nr)])
 		}
 		pt.X += w
 		p += nr
@@ -202,7 +202,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 // entire box model.
 func (f *Frame) Redraw(enclosing image.Rectangle) {
 	// log.Printf("Redraw %v %v", f.Rect, enclosing)
-	f.Background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
+	f.background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
 }
 
 func (f *Frame) tick(pt image.Point, ticked bool) {
@@ -219,11 +219,11 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 	}
 
 	if ticked {
-		f.tickback.Draw(f.tickback.R, f.Background, nil, pt)
-		f.Background.Draw(r, f.Display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
+		f.tickback.Draw(f.tickback.R, f.background, nil, pt)
+		f.background.Draw(r, f.Display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
-		f.Background.Draw(r, f.tickback, nil, image.ZP)
+		f.background.Draw(r, f.tickback, nil, image.ZP)
 	}
 	f.ticked = ticked
 }

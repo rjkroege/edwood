@@ -76,7 +76,7 @@ func (f *Frame) IsLastLineFull() bool {
 	return f.lastlinefull
 }
 
- func (f *Frame) Rect() image.Rectangle {
+func (f *Frame) Rect() image.Rectangle {
 	return f.rect
 }
 
@@ -84,7 +84,7 @@ type Frame struct {
 	// TODO(rjk): Remove public access if possible.
 	Font       Fontmetrics
 	Display    *draw.Display           // on which the frame is displayed
-	Background *draw.Image             // on which the frame appears
+	background *draw.Image             // on which the frame appears
 	cols       [NumColours]*draw.Image // background and text colours
 	rect       image.Rectangle         // in which the text appears
 
@@ -207,7 +207,7 @@ func (f *Frame) InitTick() {
 // SetRects initializes the geometry of the frame.
 func (f *Frame) SetRects(r image.Rectangle, b *draw.Image) {
 	height := f.Font.DefaultHeight()
-	f.Background = b
+	f.background = b
 	f.rect = r
 	f.rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
 	f.maxlines = (r.Max.Y - r.Min.Y) / height

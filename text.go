@@ -164,7 +164,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	t.lastsr = image.ZR
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
-	t.Redraw(r, t.fr.Font.Impl(), t.fr.Background, odx, noredraw)
+	t.Redraw(r, t.fr.Font.Impl(), row.display.ScreenImage, odx, noredraw)
 	return t.all.Max.Y
 }
 
