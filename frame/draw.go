@@ -6,7 +6,7 @@ import (
 	"9fans.net/go/draw"
 )
 
-func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
+func (f *frameimpl) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 	// log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for _, b := range f.box {
 		pt = f.cklinewrap(pt, b)
@@ -21,7 +21,7 @@ func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 
 // drawBox is a helpful debugging utility that wraps each box with a
 // rectangle to show its extent.
-func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point) {
+func (f *frameimpl) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point) {
 	f.background.Draw(r, col, nil, qt)
 	r = r.Inset(1)
 	f.background.Draw(r, back, nil, qt)
@@ -45,7 +45,7 @@ func (f *Frame) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point
 //
 // DrawSel does the minimum work needed to clear a highlight and (in particular)
 // multiple calls to DrawSel with highlighted false will be cheap.
-func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
+func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	//  log.Println("Frame DrawSel Start", p0, p1, highlighted, f.P0, f.P1, f.Ticked)
 	//  defer log.Println("Frame DrawSel End",  f.P0, f.P1, f.Ticked)
 	if p0 > p1 {
@@ -108,7 +108,7 @@ func (f *Frame) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 //
 // TODO(rjk): Figure out if this is a true or false statement.
 // Function does not mutate f.p0, f.p1 (well... actually, it does.)
-func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
+func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
 	// log.Println("Frame Drawsel0 Start", p0, p1,  f.P0, f.P1)
 	// defer log.Println("Frame Drawsel0 End", f.P0, f.P1 )
 	p := 0
@@ -200,12 +200,12 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 // was not invoked from Edwood code. Consequently, I am repurposing the name.
 // Future changes will have this function able to clear the Frame and draw the
 // entire box model.
-func (f *Frame) Redraw(enclosing image.Rectangle) {
+func (f *frameimpl) Redraw(enclosing image.Rectangle) {
 	// log.Printf("Redraw %v %v", f.Rect, enclosing)
 	f.background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
 }
 
-func (f *Frame) tick(pt image.Point, ticked bool) {
+func (f *frameimpl) tick(pt image.Point, ticked bool) {
 	//	log.Println("_tick")
 	if f.ticked == ticked || f.tickimage == nil || !pt.In(f.rect) {
 		return
@@ -233,7 +233,7 @@ func (f *Frame) tick(pt image.Point, ticked bool) {
 //
 // Commentary: because this code ignores selections, it is conceivably
 // undesirable to use it in the public API.
-func (f *Frame) Tick(pt image.Point, ticked bool) {
+func (f *frameimpl) Tick(pt image.Point, ticked bool) {
 	if f.tickscale != f.display.ScaleSize(1) {
 		if f.ticked {
 			f.tick(pt, false)
@@ -244,7 +244,7 @@ func (f *Frame) Tick(pt image.Point, ticked bool) {
 	f.tick(pt, ticked)
 }
 
-func (f *Frame) _draw(pt image.Point) image.Point {
+func (f *frameimpl) _draw(pt image.Point) image.Point {
 	// f.LogBoxes("_draw -- start")
 	for nb := 0; nb < len(f.box); nb++ {
 		b := f.box[nb]
@@ -282,7 +282,7 @@ func (f *Frame) _draw(pt image.Point) image.Point {
 	return pt
 }
 
-func (f *Frame) strlen(nb int) int {
+func (f *frameimpl) strlen(nb int) int {
 	n := 0
 	for _, b := range f.box[nb:] {
 		n += nrune(b)

@@ -83,7 +83,7 @@ func comparecore(t *testing.T, prefix string, testvector []BoxTester) {
 // expectedboxesequal tests that the expected box slice afterboxes equals the
 // computed box found in frame. prefix and name describe the test and i is the
 // box index.
-func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *Frame, afterboxes []*frbox) {
+func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *frameimpl, afterboxes []*frbox) {
 	if got, want := frame.box[i], afterboxes[i]; !reflect.DeepEqual(got, want) {
 		switch {
 		case got == nil && want != nil:
@@ -103,7 +103,7 @@ func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *Frame, 
 }
 
 // testcore checks if the frame's box model matches the provided afterboxes, nbox, Use this to implement Verify methods.
-func testcore(t *testing.T, prefix, name string, frame *Frame, nbox int, afterboxes []*frbox) {
+func testcore(t *testing.T, prefix, name string, frame *frameimpl, nbox int, afterboxes []*frbox) {
 	if got, want := len(frame.box), nbox; got != want {
 		t.Errorf("%s-%s: len(frame.box) got %d but want %d\n", prefix, name, got, want)
 	}

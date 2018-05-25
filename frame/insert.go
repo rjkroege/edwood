@@ -13,10 +13,10 @@ var (
 	TMPSIZE = 256
 )
 
-func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
+func (f *frameimpl) bxscan(r []rune, ppt *image.Point) (image.Point, *frameimpl) {
 	var c rune
 
-	frame := &Frame{
+	frame := &frameimpl{
 		rect:              f.rect,
 		display:           f.display,
 		background:        f.background,
@@ -94,7 +94,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	return frame._draw(*ppt), frame
 }
 
-func (f *Frame) chop(pt image.Point, p, bn int) {
+func (f *frameimpl) chop(pt image.Point, p, bn int) {
 	if bn >= len(f.box) {
 		f.Logboxes(" -- chop, invalid bn=%d --\n", bn)
 		panic("chop bn too large")
@@ -131,7 +131,7 @@ var nalloc = 0
 // backspaces are printed; to erase a character, use Delete.
 //
 // Insert will remove the selection or tick  if present but update selection offsets.
-func (f *Frame) Insert(r []rune, p0 int) bool {
+func (f *frameimpl) Insert(r []rune, p0 int) bool {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")

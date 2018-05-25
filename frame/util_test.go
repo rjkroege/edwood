@@ -12,8 +12,8 @@ type BoxModelTestResult struct {
 
 type BoxModelTest struct {
 	name       string
-	frame      *Frame
-	stim       func(*Frame) (int, bool)
+	frame      *frameimpl
+	stim       func(*frameimpl) (int, bool)
 	nbox       int
 	afterboxes []*frbox
 	result     int
@@ -48,12 +48,12 @@ func TestCanfit(t *testing.T) {
 	comparecore(t, "TestCanfit", []BoxTester{
 		BoxModelTest{
 			"multi-glyph box doesn't fit",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123456789")},
 			},
-			func(f *Frame) (int, bool) {
+			func(f *frameimpl) (int, bool) {
 				a, b := f.canfit(image.Pt(10+14, 15), f.box[0])
 				return a, b
 			},
@@ -65,12 +65,12 @@ func TestCanfit(t *testing.T) {
 		},
 		BoxModelTest{
 			"multi-glyph box, fits",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123")},
 			},
-			func(f *Frame) (int, bool) {
+			func(f *frameimpl) (int, bool) {
 				a, b := f.canfit(image.Pt(10+14, 15), f.box[0])
 				return a, b
 			},
@@ -82,12 +82,12 @@ func TestCanfit(t *testing.T) {
 		},
 		BoxModelTest{
 			"newline box",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{newlinebox},
 			},
-			func(f *Frame) (int, bool) {
+			func(f *frameimpl) (int, bool) {
 				a, b := f.canfit(image.Pt(10+57, 15), f.box[0])
 				return a, b
 			},
@@ -99,12 +99,12 @@ func TestCanfit(t *testing.T) {
 		},
 		BoxModelTest{
 			"tab box",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{tabbox},
 			},
-			func(f *Frame) (int, bool) {
+			func(f *frameimpl) (int, bool) {
 				a, b := f.canfit(image.Pt(10+48, 15), f.box[0])
 				return a, b
 			},
@@ -116,12 +116,12 @@ func TestCanfit(t *testing.T) {
 		},
 		BoxModelTest{
 			"multi-glyph box, doesn't fit",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("本a")},
 			},
-			func(f *Frame) (int, bool) {
+			func(f *frameimpl) (int, bool) {
 				a, b := f.canfit(image.Pt(10+57-11, 15), f.box[0])
 				return a, b
 			},
@@ -144,45 +144,45 @@ func TestClean(t *testing.T) {
 	comparecore(t, "TestClean", []BoxTester{
 		SimpleBoxModelTest{
 			"empty frame",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{},
 			},
-			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
+			func(f *frameimpl) { f.clean(image.Pt(10, 15), 0, 1) },
 			0,
 			[]*frbox{},
 		},
 		SimpleBoxModelTest{
 			"one frame, 0,1",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
-			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 1) },
+			func(f *frameimpl) { f.clean(image.Pt(10, 15), 0, 1) },
 			1,
 			[]*frbox{worldbox},
 		},
 		SimpleBoxModelTest{
 			"one frame, 1,1",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
-			func(f *Frame) { f.clean(image.Pt(10, 15), 1, 1) },
+			func(f *frameimpl) { f.clean(image.Pt(10, 15), 1, 1) },
 			1,
 			[]*frbox{worldbox},
 		},
 		SimpleBoxModelTest{
 			"two frame, 0,2",
-			&Frame{
+			&frameimpl{
 				font: Fakemetrics(fixedwidth),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{hellobox, worldbox},
 			},
-			func(f *Frame) { f.clean(image.Pt(10, 15), 0, 2) },
+			func(f *frameimpl) { f.clean(image.Pt(10, 15), 0, 2) },
 			1,
 			[]*frbox{makeBox("hiwo")},
 		},

@@ -7,7 +7,7 @@ import (
 
 type CharofptTestCase struct {
 	name     string
-	frame    *Frame
+	frame    *frameimpl
 	stim     image.Point
 	expected int
 }
@@ -17,7 +17,7 @@ func TestCharofpt(t *testing.T) {
 	for _, tv := range []CharofptTestCase{
 		{
 			"empty",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
@@ -27,7 +27,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"one box",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -40,7 +40,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"two boxes, target first pixel of first char",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -54,7 +54,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"two boxes, last pixel in first char",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -68,7 +68,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"two boxes, bottom edge of second char",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -82,7 +82,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"two boxes, top edge of second box",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -96,7 +96,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"two boxes, top edge of second box",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -110,7 +110,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"three boxes, top edge of second box",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{
@@ -125,7 +125,7 @@ func TestCharofpt(t *testing.T) {
 		},
 		{
 			"three boxes, top edge of second box",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				box: []*frbox{

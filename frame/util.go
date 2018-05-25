@@ -18,7 +18,7 @@ func (b *frbox) String() string {
 // If b has width, returns the index of the first rune known
 // to not fit and true if more than 0 runes fit.
 // If b has no width, use minwidth instead of width.
-func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
+func (f *frameimpl) canfit(pt image.Point, b *frbox) (int, bool) {
 	left := f.rect.Max.X - pt.X
 	if b.Nrune < 0 {
 		if int(b.Minwid) <= left {
@@ -47,7 +47,7 @@ func (f *Frame) canfit(pt image.Point, b *frbox) (int, bool) {
 
 // cklinewrap returns a new for where the given the box b should be
 // placed. NB: this code is not going to do the right thing with a newline box.
-func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
+func (f *frameimpl) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if b.Nrune < 0 {
 		if int(b.Minwid) > f.rect.Max.X-p.X {
@@ -66,7 +66,7 @@ func (f *Frame) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 	return ret
 }
 
-func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
+func (f *frameimpl) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
 	if _, ok := f.canfit(p, b); !ok {
 		ret.X = f.rect.Min.X
@@ -78,7 +78,7 @@ func (f *Frame) cklinewrap0(p image.Point, b *frbox) (ret image.Point) {
 	return ret
 }
 
-func (f *Frame) advance(p image.Point, b *frbox) image.Point {
+func (f *frameimpl) advance(p image.Point, b *frbox) image.Point {
 	if b.Nrune < 0 && b.Bc == '\n' {
 		p.X = f.rect.Min.X
 		p.Y += f.defaultfontheight
@@ -91,12 +91,12 @@ func (f *Frame) advance(p image.Point, b *frbox) image.Point {
 	return p
 }
 
-func (f *Frame) newwid(pt image.Point, b *frbox) int {
+func (f *frameimpl) newwid(pt image.Point, b *frbox) int {
 	b.Wid = f.newwid0(pt, b)
 	return b.Wid
 }
 
-func (f *Frame) newwid0(pt image.Point, b *frbox) int {
+func (f *frameimpl) newwid0(pt image.Point, b *frbox) int {
 	c := f.rect.Max.X
 	x := pt.X
 	if b.Nrune >= 0 || b.Bc != '\t' {
@@ -116,7 +116,7 @@ func (f *Frame) newwid0(pt image.Point, b *frbox) int {
 
 // TODO(rjk): Possibly does not work correctly.
 // clean merges boxes where possible over boxes [n0, n1)
-func (f *Frame) clean(pt image.Point, n0, n1 int) {
+func (f *frameimpl) clean(pt image.Point, n0, n1 int) {
 	//log.Println("clean", pt, n0, n1, f.Rect.Max.X)
 	//	f.Logboxes("--- clean: starting ---")
 	c := f.rect.Max.X
@@ -163,7 +163,7 @@ func Rpt(min, max image.Point) image.Rectangle {
 }
 
 // Logboxes shows the box model to the log for debugging convenience.
-func (f *Frame) Logboxes(message string, args ...interface{}) {
+func (f *frameimpl) Logboxes(message string, args ...interface{}) {
 	log.Printf(message, args...)
 	for i, b := range f.box {
 		if b != nil {

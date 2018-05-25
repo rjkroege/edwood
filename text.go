@@ -51,7 +51,7 @@ const (
 type Text struct {
 	display *draw.Display
 	file    *File
-	fr      *frame.Frame
+	fr      frame.Frame
 	font    string
 
 	org     int // Origin of the frame within the buffer
@@ -1050,11 +1050,11 @@ func (t *Text) Commit(tofile bool) {
 }
 
 // TODO(rjk): Conceivably, this can be removed.
-func getP0(fr *frame.Frame) int {
+func getP0(fr frame.Frame) int {
 	p0, _ := fr.GetSelectionExtent()
 	return p0
 }
-func getP1(fr *frame.Frame) int {
+func getP1(fr frame.Frame) int {
 	_, p1 := fr.GetSelectionExtent()
 	return p1
 }
@@ -1089,7 +1089,7 @@ var (
 /*
  * called from frame library
  */
-func framescroll(f *frame.Frame, dl int) {
+func framescroll(f frame.Frame, dl int) {
 	if f != selecttext.fr {
 		panic("frameselect not right frame")
 	}
@@ -1316,7 +1316,7 @@ func (t *Text) SetSelect(q0, q1 int) {
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
 func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(*frame.Frame, int) {}, t.display.White, high)
+	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.Frame, int) {}, t.display.White, high)
 
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {

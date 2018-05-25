@@ -10,13 +10,13 @@ import (
 type InsertTestResult struct {
 	ppt      image.Point
 	resultpt image.Point
-	frame    *Frame
+	frame    *frameimpl
 }
 
 type InsertTest struct {
 	name       string
-	frame      *Frame
-	stim       func(*Frame) (image.Point, image.Point, *Frame)
+	frame      *frameimpl
+	stim       func(*frameimpl) (image.Point, image.Point, *frameimpl)
 	nbox       int
 	afterboxes []*frbox
 	ppt        image.Point
@@ -58,12 +58,12 @@ func TestBxscan(t *testing.T) {
 	comparecore(t, "TestBxscan", []BoxTester{
 		InsertTest{
 			"1 rune insertion into empty",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point, *Frame) {
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(10, 15)
 				pt2, f := f.bxscan(mkRu("本"), &pt1)
 				return pt1, pt2, f
@@ -75,12 +75,12 @@ func TestBxscan(t *testing.T) {
 		},
 		InsertTest{
 			"1 rune insertion fits at end of line",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point, *Frame) {
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(56, 15)
 				pt2, f := f.bxscan(mkRu("本"), &pt1)
 				return pt1, pt2, f
@@ -92,12 +92,12 @@ func TestBxscan(t *testing.T) {
 		},
 		InsertTest{
 			"1 rune insertion wraps at end of line",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point, *Frame) {
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(58, 15)
 				pt2, f := f.bxscan(mkRu("本"), &pt1)
 				return pt1, pt2, f
@@ -109,12 +109,12 @@ func TestBxscan(t *testing.T) {
 		},
 		InsertTest{
 			"splittable 2 rune insertion at end of line",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point, *Frame) {
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(56, 15)
 				pt2, f := f.bxscan(mkRu("本a"), &pt1)
 				return pt1, pt2, f
@@ -126,12 +126,12 @@ func TestBxscan(t *testing.T) {
 		},
 		InsertTest{
 			"splittable multi-rune rune insertion at start of line",
-			&Frame{
+			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
-			func(f *Frame) (image.Point, image.Point, *Frame) {
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(10, 15)
 				pt2, f := f.bxscan(mkRu(bigstring), &pt1)
 				return pt1, pt2, f

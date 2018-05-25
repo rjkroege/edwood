@@ -5,7 +5,7 @@ import (
 	"unicode/utf8"
 )
 
-func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
+func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 	var w int
 	var r rune
 
@@ -32,17 +32,17 @@ func (f *Frame) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 	return pt
 }
 
-func (f *Frame) Ptofchar(p int) image.Point {
+func (f *frameimpl) Ptofchar(p int) image.Point {
 	return f.ptofcharptb(p, f.rect.Min, 0)
 }
 
-func (f *Frame) ptofcharnb(p int, nb int) image.Point {
+func (f *frameimpl) ptofcharnb(p int, nb int) image.Point {
 	pt := image.Point{}
 	pt = f.ptofcharptb(p, f.rect.Min, 0)
 	return pt
 }
 
-func (f *Frame) grid(p image.Point) image.Point {
+func (f *frameimpl) grid(p image.Point) image.Point {
 	p.Y -= f.rect.Min.Y
 	p.Y -= p.Y % f.defaultfontheight
 	p.Y += f.rect.Min.Y
@@ -52,7 +52,7 @@ func (f *Frame) grid(p image.Point) image.Point {
 	return p
 }
 
-func (f *Frame) Charofpt(pt image.Point) int {
+func (f *frameimpl) Charofpt(pt image.Point) int {
 	var w, bn int
 	var p int
 	var r rune

@@ -9,13 +9,13 @@ import (
 // by the Frame. p0 and p1 must be values that could be returned by Charofpt.
 // TODO(rjk): It is conceivable that we don't need this. It seems like an egregious
 // abstraction violation that it exists.
-func (f *Frame) SetSelectionExtent(p0, p1 int) {
+func (f *frameimpl) SetSelectionExtent(p0, p1 int) {
 	f.sp0, f.sp1 = p0, p1
 }
 
 // GetSelectionExtent returns the rune offsets of the selection maintained by
 // the Frame.
-func (f *Frame) GetSelectionExtent() (int, int) {
+func (f *frameimpl) GetSelectionExtent() (int, int) {
 	return f.sp0, f.sp1
 }
 
@@ -31,7 +31,7 @@ func region(a, b int) int {
 
 // SelectOpt makes a selection in the same fashion as Select but does it in a
 // temporary way with the specified text colours fg, bg.
-func (f *Frame) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(*Frame, int), fg, bg *draw.Image) (int, int) {
+func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int), fg, bg *draw.Image) (int, int) {
 	oback := f.cols[ColHigh]
 	otext := f.cols[ColHText]
 	osp0 := f.sp0
@@ -56,7 +56,7 @@ func (f *Frame) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines
 // so long as a button is down in downevent. Selection stops when the
 // staring point buttondown is altered. getmorelines is a callback provided
 // by the caller to provide n additional lines on demand to the specified frame.
-func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(*Frame, int)) (int, int) {
+func (f *frameimpl) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int)) (int, int) {
 	// log.Println("--- Select Start ---")
 	// defer log.Println("--- Select End ---")
 
@@ -155,7 +155,7 @@ func (f *Frame) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines fu
 	return f.sp0, f.sp1
 }
 
-func (f *Frame) SelectPaint(p0, p1 image.Point, col *draw.Image) {
+func (f *frameimpl) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	q0 := p0
 	q1 := p1
 

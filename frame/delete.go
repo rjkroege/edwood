@@ -9,7 +9,7 @@ import (
 //
 // Delete will clear a selection or tick if present but not put it back.
 // TODO(rjk): This code will redraw too much.
-func (f *Frame) Delete(p0, p1 int) int {
+func (f *frameimpl) Delete(p0, p1 int) int {
 	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	var r image.Rectangle

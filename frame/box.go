@@ -8,7 +8,7 @@ import (
 )
 
 // addbox adds  n boxes after bn and shifts the rest up: * box[bn+n]==box[bn]
-func (f *Frame) addbox(bn, n int) {
+func (f *frameimpl) addbox(bn, n int) {
 	if bn > len(f.box) {
 		panic(fmt.Sprint("Frame.addbox", " bn=", bn, " len(f.box)", len(f.box)))
 	}
@@ -16,7 +16,7 @@ func (f *Frame) addbox(bn, n int) {
 	copy(f.box[bn+n:], f.box[bn:])
 }
 
-func (f *Frame) closebox(n0, n1 int) {
+func (f *frameimpl) closebox(n0, n1 int) {
 	if n0 >= len(f.box) || n1 >= len(f.box) || n1 < n0 {
 		panic(fmt.Sprint("Frame.closebox bounds bad", " n0=", n0, " n1=", n1, " len(box)", len(f.box)))
 	}
@@ -26,7 +26,7 @@ func (f *Frame) closebox(n0, n1 int) {
 	f.box = f.box[0 : len(f.box)-(n1-n0)]
 }
 
-func (f *Frame) delbox(n0, n1 int) {
+func (f *frameimpl) delbox(n0, n1 int) {
 	// TODO(rjk): One of delbox and closebox don't belong.
 	f.closebox(n0, n1)
 }
@@ -44,7 +44,7 @@ func (b *frbox) clone() *frbox {
 }
 
 // dupbox duplicates box i. box i must exist.
-func (f *Frame) dupbox(i int) {
+func (f *frameimpl) dupbox(i int) {
 	if i >= len(f.box) {
 		f.Logboxes("-- dupbox sadness -- ")
 		panic(fmt.Sprint("dupbox i is out of bounds", " i=", i))
@@ -77,7 +77,7 @@ func runeindex(p []byte, n int) int {
 // truncatebox drops the  last n characters from box b without allocation.
 // TODO(rjk): make a method on a frbox
 // TODO(rjk): measure height.
-func (f *Frame) truncatebox(b *frbox, n int) {
+func (f *frameimpl) truncatebox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < int(n) {
 		f.Logboxes("-- truncatebox panic -- ")
 		panic(fmt.Sprint("Frame.truncatebox", " Nrune=", b.Nrune, " n=", n))
@@ -89,7 +89,7 @@ func (f *Frame) truncatebox(b *frbox, n int) {
 
 // chopbox removes the first n chars from box b without allocation.
 // TODO(rjk): measure height
-func (f *Frame) chopbox(b *frbox, n int) {
+func (f *frameimpl) chopbox(b *frbox, n int) {
 	if b.Nrune < 0 || b.Nrune < n {
 		f.Logboxes("-- panic in chopbox --")
 		panic(fmt.Sprint("chopbox", " b.Nrune=", b.Nrune, " n=", n))
@@ -103,7 +103,7 @@ func (f *Frame) chopbox(b *frbox, n int) {
 // splitbox duplicates box [bn] and divides it at rune n into prefix and suffix boxes.
 // It is an error to try to split a non-existent box?
 // TODO(rjk): Figure out if you want this to be so.
-func (f *Frame) splitbox(bn, n int) {
+func (f *frameimpl) splitbox(bn, n int) {
 	if bn > len(f.box) {
 		panic(fmt.Sprint("splitbox", "bn=", bn, "n=", n))
 	}
@@ -113,7 +113,7 @@ func (f *Frame) splitbox(bn, n int) {
 }
 
 // mergebox combines boxes bn and bn+1
-func (f *Frame) mergebox(bn int) {
+func (f *frameimpl) mergebox(bn int) {
 	b1n := len(f.box[bn].Ptr)
 	b2n := len(f.box[bn+1].Ptr)
 
@@ -129,7 +129,7 @@ func (f *Frame) mergebox(bn int) {
 
 // findbox finds the box containing q and puts q on a box boundary starting from
 // rune p in box bn. NB: p must be the first rune in box[bn].
-func (f *Frame) findbox(bn, p, q int) int {
+func (f *frameimpl) findbox(bn, p, q int) int {
 	for _, b := range f.box[bn:] {
 		if p+nrune(b) > q {
 			break
@@ -148,7 +148,7 @@ func (f *Frame) findbox(bn, p, q int) int {
 var validate = flag.Bool("validateboxes", false, "Check that box model is valid")
 
 // validateboxmodel returns true if f's box model is valid.
-func (f *Frame) validateboxmodel(format string, args ...interface{}) {
+func (f *frameimpl) validateboxmodel(format string, args ...interface{}) {
 	if !*validate {
 		return
 	}

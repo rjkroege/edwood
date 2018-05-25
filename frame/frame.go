@@ -33,7 +33,7 @@ type Fontmetrics interface {
 	DefaultHeight() int
 	Impl() *draw.Font
 	StringWidth(string) int
-	RunesWidth(r []rune) int
+	RunesWidth( []rune) int
 }
 
 type frfont struct {
@@ -48,13 +48,35 @@ func (ff *frfont) Impl() *draw.Font {
 	return ff.Font
 }
 
+// Frame is the public interface to a frame of text.
+type Frame interface {
+	Maxtab(m int)
+	GetMaxtab() int
+	GetFrameFillStatus() FrameFillStatus
+	IsLastLineFull() bool
+	Rect() image.Rectangle
+	Init( image.Rectangle,  ...option)
+	Clear( bool)
+	DefaultFontHeight() int
+	Charofpt(pt image.Point) int
+	Ptofchar( int) image.Point
+	Insert( []rune,  int) bool
+	Redraw(enclosing image.Rectangle)
+	GetSelectionExtent() (int, int)
+	Select( *draw.Mousectl,  *draw.Mouse,  func(Frame, int)) (int, int)
+	SelectOpt( *draw.Mousectl,  *draw.Mouse,  func(Frame, int), *draw.Image,  *draw.Image) (int, int)
+	Delete(int,  int) int 
+	DrawSel( image.Point, int,  int,  bool) 
+}
+
+
 // Maxtab sets the maximum size of a tab in pixels.
-func (f *Frame) Maxtab(m int) {
+func (f *frameimpl) Maxtab(m int) {
 	f.maxtab = m
 }
 
 // GetMaxtab returns the current maximum size of a tab in pixels.
-func (f *Frame) GetMaxtab() int { return f.maxtab }
+func (f *frameimpl) GetMaxtab() int { return f.maxtab }
 
 // FrameFillStatus is a snapshot of the capacity of the Frame.
 type FrameFillStatus struct {
@@ -64,7 +86,7 @@ type FrameFillStatus struct {
 }
 
 // GetFrameFillStatus returns a snapshot of the capacity of the frame.
-func (f *Frame) GetFrameFillStatus() FrameFillStatus {
+func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 	return FrameFillStatus{
 		Nchars:   f.nchars,
 		Nlines:   f.nlines,
@@ -72,15 +94,15 @@ func (f *Frame) GetFrameFillStatus() FrameFillStatus {
 	}
 }
 
-func (f *Frame) IsLastLineFull() bool {
+func (f *frameimpl) IsLastLineFull() bool {
 	return f.lastlinefull
 }
 
-func (f *Frame) Rect() image.Rectangle {
+func (f *frameimpl) Rect() image.Rectangle {
 	return f.rect
 }
 
-type Frame struct {
+type frameimpl struct {
 	font       Fontmetrics
 	display    *draw.Display           // on which the frame is displayed
 	background *draw.Image             // on which the frame appears
@@ -114,8 +136,8 @@ type Frame struct {
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) *Frame {
-	f := new(Frame)
+func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) Frame {
+	f := new(frameimpl)
 	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8))
 	return f
 }
@@ -135,11 +157,11 @@ type optioncontext struct {
 // Returns true if the option requires resetting the tick.
 // TODO(rjk): It is possible to generalize this as needed with a more
 // complex state object. One might imagine a set of updater functions?
-type option func(*Frame, *optioncontext)
+type option func(*frameimpl, *optioncontext)
 
 // Option sets the options specified and returns true if
 // we need to init the tick.
-func (f *Frame) Option(opts ...option) *optioncontext {
+func (f *frameimpl) Option(opts ...option) *optioncontext {
 	ctx := &optioncontext{
 		updatetick:  false,
 		maxtabchars: -1,
@@ -153,7 +175,7 @@ func (f *Frame) Option(opts ...option) *optioncontext {
 
 // OptColors sets the default colours.
 func OptColors(cols [NumColours]*draw.Image) option {
-	return func(f *Frame, ctx *optioncontext) {
+	return func(f *frameimpl, ctx *optioncontext) {
 		f.cols = cols
 		// TODO(rjk): I think so. Make sure that this is required.
 		ctx.updatetick = true
@@ -162,7 +184,7 @@ func OptColors(cols [NumColours]*draw.Image) option {
 
 // OptBackground sets the background screen image.
 func OptBackground(b *draw.Image) option {
-	return func(f *Frame, ctx *optioncontext) {
+	return func(f *frameimpl, ctx *optioncontext) {
 		f.background = b
 		// TODO(rjk): This is safe but is it necessary? I think so.
 		ctx.updatetick = true
@@ -171,7 +193,7 @@ func OptBackground(b *draw.Image) option {
 
 // OptFont sets the default font.
 func OptFont(ft *draw.Font) option {
-	return func(f *Frame, ctx *optioncontext) {
+	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = &frfont{ft}
 		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
 	}
@@ -179,7 +201,7 @@ func OptFont(ft *draw.Font) option {
 
 // OptFontMetrics sets the default font metrics object.
 func OptFontMetrics(ft Fontmetrics) option {
-	return func(f *Frame, ctx *optioncontext) {
+	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = ft
 		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
 	}
@@ -187,7 +209,7 @@ func OptFontMetrics(ft Fontmetrics) option {
 
 // OptMaxTab sets the default tabwidth in `0` characters.
 func OptMaxTab(maxtabchars int) option {
-	return func(f *Frame, ctx *optioncontext) {
+	return func(f *frameimpl, ctx *optioncontext) {
 		ctx.maxtabchars = maxtabchars
 	}
 }
@@ -200,7 +222,7 @@ func (ctx *optioncontext) computemaxtab(maxtab, ftw int) int {
 	return ctx.maxtabchars * ftw
 }
 
-func (f *Frame) DefaultFontHeight() int {
+func (f *frameimpl) DefaultFontHeight() int {
 	return f.defaultfontheight
 }
 
@@ -219,7 +241,7 @@ func (f *Frame) DefaultFontHeight() int {
 //
 // TODO(rjk): This may do unnecessary work for some option settings.
 // At some point, consider the code carefully.
-func (f *Frame) Init(r image.Rectangle, opts ...option) {
+func (f *frameimpl) Init(r image.Rectangle, opts ...option) {
 	f.nchars = 0
 	f.nlines = 0
 	f.sp0 = 0
@@ -242,7 +264,8 @@ func (f *Frame) Init(r image.Rectangle, opts ...option) {
 }
 
 // InitTick sets up the TickImage (e.g. cursor)
-func (f *Frame) InitTick() {
+// TODO(rjk): doesn't appear to need to be exposed publically.
+func (f *frameimpl) InitTick() {
 
 	var err error
 	if f.cols[ColBack] == nil || f.display == nil {
@@ -281,7 +304,7 @@ func (f *Frame) InitTick() {
 }
 
 // setrects initializes the geometry of the frame.
-func (f *Frame) setrects(r image.Rectangle) {
+func (f *frameimpl) setrects(r image.Rectangle) {
 	height := f.defaultfontheight
 	f.rect = r
 	f.rect.Max.Y -= (r.Max.Y - r.Min.Y) % height
@@ -302,7 +325,7 @@ func (f *Frame) setrects(r image.Rectangle) {
 // /location and then call SetRects to establish the new geometry. (It is
 // /unnecessary to call InitTick unless the font size has changed.) No
 // /redrawing is necessary.
-func (f *Frame) Clear(freeall bool) {
+func (f *frameimpl) Clear(freeall bool) {
 	f.box = make([]*frbox, 0, 25)
 	if freeall {
 		f.tickimage.Free()
