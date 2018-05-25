@@ -17,14 +17,14 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 	var c rune
 
 	frame := &Frame{
-		rect:       f.rect,
-		display:    f.display,
-		background: f.background,
-		Font:       f.Font,
+		rect:              f.rect,
+		display:           f.display,
+		background:        f.background,
+		font:              f.font,
 		defaultfontheight: f.defaultfontheight,
-		maxtab:     f.maxtab,
-		nchars:     0,
-		box:        []*frbox{},
+		maxtab:            f.maxtab,
+		nchars:            0,
+		box:               []*frbox{},
 	}
 
 	copy(frame.cols[:], f.cols[:])
@@ -40,7 +40,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 			frame.box = append(frame.box, &frbox{
 				Bc:     c,
 				Wid:    10000,
-				Minwid: byte(frame.Font.StringWidth(" ")),
+				Minwid: byte(frame.font.StringWidth(" ")),
 				Nrune:  -1,
 			})
 
@@ -72,7 +72,7 @@ func (f *Frame) bxscan(r []rune, ppt *image.Point) (image.Point, *Frame) {
 				if s+rw >= TMPSIZE {
 					break
 				}
-				w += frame.Font.RunesWidth(r[offs : offs+1])
+				w += frame.font.RunesWidth(r[offs : offs+1])
 
 				offs++
 				s += rw

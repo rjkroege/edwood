@@ -84,7 +84,7 @@ func (f *Frame) truncatebox(b *frbox, n int) {
 	}
 	b.Nrune -= n
 	b.Ptr = b.Ptr[0:runeindex(b.Ptr, b.Nrune)]
-	b.Wid = f.Font.BytesWidth(b.Ptr)
+	b.Wid = f.font.BytesWidth(b.Ptr)
 }
 
 // chopbox removes the first n chars from box b without allocation.
@@ -97,7 +97,7 @@ func (f *Frame) chopbox(b *frbox, n int) {
 	i := runeindex(b.Ptr, n)
 	b.Ptr = b.Ptr[i:]
 	b.Nrune -= n
-	b.Wid = f.Font.BytesWidth(b.Ptr)
+	b.Wid = f.font.BytesWidth(b.Ptr)
 }
 
 // splitbox duplicates box [bn] and divides it at rune n into prefix and suffix boxes.
@@ -196,7 +196,7 @@ func (f *Frame) validateboxmodel(format string, args ...interface{}) {
 		// The width is right.
 		if b.Nrune >= 0 {
 			s := string(b.Ptr)
-			if b.Wid != f.Font.StringWidth(s) {
+			if b.Wid != f.font.StringWidth(s) {
 				log.Printf(format, args...)
 				f.Logboxes("-- box with contents has invalid width --")
 				panic("-- box with contents has invalid width --")

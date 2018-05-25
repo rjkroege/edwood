@@ -13,7 +13,7 @@ func (f *Frame) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.Font.Impl(), b.Ptr)
+			f.background.Bytes(pt, text, image.ZP, f.font.Impl(), b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -159,7 +159,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		if b.Nrune < 0 || nr == b.Nrune {
 			w = b.Wid
 		} else {
-			w = f.Font.BytesWidth(ptr[0:runeindex(ptr, nr)])
+			w = f.font.BytesWidth(ptr[0:runeindex(ptr, nr)])
 		}
 		x = pt.X + w
 		if x > f.rect.Max.X {
@@ -168,7 +168,7 @@ func (f *Frame) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *dra
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
 		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.defaultfontheight), back, nil, pt)
 		if b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.Font.Impl(), ptr[0:runeindex(ptr, nr)])
+			f.background.Bytes(pt, text, image.ZP, f.font.Impl(), ptr[0:runeindex(ptr, nr)])
 		}
 		pt.X += w
 		p += nr

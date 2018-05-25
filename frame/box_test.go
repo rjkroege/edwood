@@ -52,7 +52,7 @@ func TestRunIndex(t *testing.T) {
 
 func TestTruncatebox(t *testing.T) {
 	frame := &Frame{
-		Font: Fakemetrics(fixedwidth),
+		font: Fakemetrics(fixedwidth),
 	}
 
 	testvector := []struct {
@@ -83,7 +83,7 @@ func TestTruncatebox(t *testing.T) {
 
 func TestChopbox(t *testing.T) {
 	frame := &Frame{
-		Font: Fakemetrics(fixedwidth),
+		font: Fakemetrics(fixedwidth),
 	}
 
 	testvector := []struct {
@@ -238,7 +238,7 @@ func TestSplitbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"one element frame",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
@@ -248,7 +248,7 @@ func TestSplitbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"two element frame 1",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{worldbox, makeBox("hiworld")},
 			},
 			func(f *Frame) { f.splitbox(1, 2) },
@@ -258,7 +258,7 @@ func TestSplitbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"one element 0, 0",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 0) },
@@ -268,7 +268,7 @@ func TestSplitbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"one element 0, 2",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
@@ -278,7 +278,7 @@ func TestSplitbox(t *testing.T) {
 		SimpleBoxModelTest{
 			"one element 0, 2",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi")},
 			},
 			func(f *Frame) { f.splitbox(0, 2) },
@@ -310,7 +310,7 @@ func TestMergebox(t *testing.T) {
 		SimpleBoxModelTest{
 			"two -> 1",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{hibox, worldbox},
 			},
 			func(f *Frame) { f.mergebox(0) },
@@ -320,7 +320,7 @@ func TestMergebox(t *testing.T) {
 		SimpleBoxModelTest{
 			"two null -> 1",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{hibox, zerobox},
 			},
 			func(f *Frame) { f.mergebox(0) },
@@ -330,7 +330,7 @@ func TestMergebox(t *testing.T) {
 		SimpleBoxModelTest{
 			"three -> 2",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), worldbox, hibox},
 			},
 			func(f *Frame) { f.mergebox(0) },
@@ -340,7 +340,7 @@ func TestMergebox(t *testing.T) {
 		SimpleBoxModelTest{
 			"three -> 1",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), makeBox("world"), makeBox("hi")},
 			},
 			func(f *Frame) {
@@ -383,7 +383,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find in 1",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 2) },
@@ -394,7 +394,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find at beginning",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hiworld")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 0) },
@@ -405,7 +405,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find at edge",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 2) },
@@ -416,7 +416,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find continuing",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(1, 0, 2) },
@@ -427,7 +427,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find in empty",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 0) },
@@ -438,7 +438,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find at end",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(0, 0, 7) },
@@ -449,7 +449,7 @@ func TestFindbox(t *testing.T) {
 		FindBoxModelTest{
 			"find very near end",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font: Fakemetrics(fixedwidth),
 				box:  []*frbox{makeBox("hi"), makeBox("world")},
 			},
 			func(f *Frame) int { return f.findbox(1, 2, 6) },

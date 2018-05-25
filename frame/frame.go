@@ -81,8 +81,7 @@ func (f *Frame) Rect() image.Rectangle {
 }
 
 type Frame struct {
-	// TODO(rjk): Remove public access if possible.
-	Font       Fontmetrics
+	font       Fontmetrics
 	display    *draw.Display           // on which the frame is displayed
 	background *draw.Image             // on which the frame appears
 	cols       [NumColours]*draw.Image // background and text colours
@@ -123,11 +122,11 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 
 // optioncontext is context passed into each option function
 // that aggregates knowledge about additional updates needed
-// to do to the Frame object that should only be one once per 
+// to do to the Frame object that should only be one once per
 // call to Init.
 type optioncontext struct {
-	updatetick bool // True if the tick needs to initialized
-	maxtabchars int // Number of '0' characters that should be the width of a tab.
+	updatetick  bool // True if the tick needs to initialized
+	maxtabchars int  // Number of '0' characters that should be the width of a tab.
 }
 
 // TODO(rjk): Relocate the documentation somehow. And maybe the code.
@@ -142,7 +141,7 @@ type option func(*Frame, *optioncontext)
 // we need to init the tick.
 func (f *Frame) Option(opts ...option) *optioncontext {
 	ctx := &optioncontext{
-		updatetick: false,
+		updatetick:  false,
 		maxtabchars: -1,
 	}
 
@@ -154,7 +153,7 @@ func (f *Frame) Option(opts ...option) *optioncontext {
 
 // OptColors sets the default colours.
 func OptColors(cols [NumColours]*draw.Image) option {
-	return func(f *Frame, ctx *optioncontext)  {
+	return func(f *Frame, ctx *optioncontext) {
 		f.cols = cols
 		// TODO(rjk): I think so. Make sure that this is required.
 		ctx.updatetick = true
@@ -163,32 +162,32 @@ func OptColors(cols [NumColours]*draw.Image) option {
 
 // OptBackground sets the background screen image.
 func OptBackground(b *draw.Image) option {
-	return func(f *Frame, ctx *optioncontext)  {
+	return func(f *Frame, ctx *optioncontext) {
 		f.background = b
-		// TODO(rjk): This is safe but is it necessary? I think so. 
+		// TODO(rjk): This is safe but is it necessary? I think so.
 		ctx.updatetick = true
 	}
 }
 
 // OptFont sets the default font.
 func OptFont(ft *draw.Font) option {
-	return func(f *Frame, ctx *optioncontext)  {
-		f.Font = &frfont{ft}
-		ctx.updatetick = f.defaultfontheight != f.Font.DefaultHeight()
+	return func(f *Frame, ctx *optioncontext) {
+		f.font = &frfont{ft}
+		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
 	}
 }
 
 // OptFontMetrics sets the default font metrics object.
 func OptFontMetrics(ft Fontmetrics) option {
-	return func(f *Frame, ctx *optioncontext)  {
-		f.Font = ft
-		ctx.updatetick = f.defaultfontheight != f.Font.DefaultHeight()
+	return func(f *Frame, ctx *optioncontext) {
+		f.font = ft
+		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
 	}
 }
 
 // OptMaxTab sets the default tabwidth in `0` characters.
-func OptMaxTab( maxtabchars int) option {
-	return func(f *Frame, ctx *optioncontext)  {
+func OptMaxTab(maxtabchars int) option {
+	return func(f *Frame, ctx *optioncontext) {
 		ctx.maxtabchars = maxtabchars
 	}
 }
@@ -197,10 +196,9 @@ func OptMaxTab( maxtabchars int) option {
 func (ctx *optioncontext) computemaxtab(maxtab, ftw int) int {
 	if ctx.maxtabchars < 0 {
 		return maxtab
-	} 
+	}
 	return ctx.maxtabchars * ftw
 }
-
 
 func (f *Frame) DefaultFontHeight() int {
 	return f.defaultfontheight
@@ -211,7 +209,7 @@ func (f *Frame) DefaultFontHeight() int {
 // destination image for drawing unless these are overriden with
 // one or more instances of the OptColors, OptBackground
 // OptFont or OptFontMetrics option settings.
-// 
+//
 // The background (OptBackground setter) may be null to allow
 // calling the other routines to maintain the model in, for example,
 // an obscured window.
@@ -233,9 +231,9 @@ func (f *Frame) Init(r image.Rectangle, opts ...option) {
 	// will re-use the existing values if new ones are not provided.
 	ctx := f.Option(opts...)
 
-	f.defaultfontheight = f.Font.DefaultHeight()
+	f.defaultfontheight = f.font.DefaultHeight()
 	f.display = f.background.Display
-	f.maxtab = ctx.computemaxtab(f.maxtab, f.Font.StringWidth("0"))
+	f.maxtab = ctx.computemaxtab(f.maxtab, f.font.StringWidth("0"))
 	f.setrects(r)
 
 	if ctx.updatetick || (f.tickimage == nil && f.cols[ColBack] != nil) {
@@ -253,7 +251,7 @@ func (f *Frame) InitTick() {
 
 	f.tickscale = f.display.ScaleSize(1)
 	b := f.display.ScreenImage
-	ft := f.Font
+	ft := f.font
 
 	if f.tickimage != nil {
 		f.tickimage.Free()

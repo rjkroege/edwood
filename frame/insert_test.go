@@ -59,9 +59,9 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion into empty",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
-				rect: image.Rect(10, 15, 10+57, 15+57),
+				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(10, 15)
@@ -76,9 +76,9 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion fits at end of line",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
-				rect: image.Rect(10, 15, 10+57, 15+57),
+				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(56, 15)
@@ -93,9 +93,9 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion wraps at end of line",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
-				rect: image.Rect(10, 15, 10+57, 15+57),
+				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(58, 15)
@@ -110,9 +110,9 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"splittable 2 rune insertion at end of line",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
-				rect: image.Rect(10, 15, 10+57, 15+57),
+				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(56, 15)
@@ -127,9 +127,9 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"splittable multi-rune rune insertion at start of line",
 			&Frame{
-				Font: Fakemetrics(fixedwidth),
+				font:              Fakemetrics(fixedwidth),
 				defaultfontheight: 13,
-				rect: image.Rect(10, 15, 10+57, 15+57),
+				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *Frame) (image.Point, image.Point, *Frame) {
 				pt1 := image.Pt(10, 15)

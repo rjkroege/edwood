@@ -76,6 +76,12 @@ type Text struct {
 	needundo    bool
 }
 
+// getfont is a convenience accessor that gets the draw.Font from the font
+// used in this text.
+func (t *Text) getfont() *draw.Font {
+	return fontget(t.font, t.display)
+}
+
 func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
 	if t == nil {
 		t = new(Text)
@@ -191,7 +197,6 @@ func (t *Text) Close() {
 }
 
 func (t *Text) Columnate(names []string, widths []int) {
-
 	var colw, mint, maxt, ncol, nrow int
 	q1 := (0)
 	Lnl := []rune("\n")
@@ -200,7 +205,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	if len(t.file.text) > 1 {
 		return
 	}
-	mint = t.fr.Font.StringWidth("0")
+	mint = t.getfont().StringWidth("0")
 	/* go for narrower tabs if set more than 3 wide */
 	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
@@ -308,8 +313,9 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		}
 		sort.Strings(dirNames)
 		widths := make([]int, len(dirNames))
+		dft := t.getfont()
 		for i, s := range dirNames {
-			widths[i] = t.fr.Font.StringWidth(s)
+			widths[i] = dft.StringWidth(s)
 		}
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
