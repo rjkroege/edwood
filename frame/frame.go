@@ -17,36 +17,7 @@ const (
 	frtickw = 3
 )
 
-// TODO(rjk): no need for this to have public fields
-type frbox struct {
-	Wid    int    // In pixels. Fixed large size for layout box.
-	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
-	Ptr    []byte // UTF-8 string in this box.
-	Bc     rune   // The kind of special layout box: '\n' or '\t'
-	Minwid byte
-}
 
-// Fontmetrics lets tests mock the calls into draw for measuring the
-// width of UTF8 slices.
-type Fontmetrics interface {
-	BytesWidth([]byte) int
-	DefaultHeight() int
-	Impl() *draw.Font
-	StringWidth(string) int
-	RunesWidth( []rune) int
-}
-
-type frfont struct {
-	*draw.Font
-}
-
-func (ff *frfont) DefaultHeight() int {
-	return ff.Font.Height
-}
-
-func (ff *frfont) Impl() *draw.Font {
-	return ff.Font
-}
 
 // Frame is the public interface to a frame of text. Unlike the C implementation,
 // new Frame instances should be created with NewFrame.
@@ -201,6 +172,15 @@ func (f *frameimpl) IsLastLineFull() bool {
 
 func (f *frameimpl) Rect() image.Rectangle {
 	return f.rect
+}
+
+// TODO(rjk): no need for this to have public fields
+type frbox struct {
+	Wid    int    // In pixels. Fixed large size for layout box.
+	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
+	Ptr    []byte // UTF-8 string in this box.
+	Bc     rune   // The kind of special layout box: '\n' or '\t'
+	Minwid byte
 }
 
 type frameimpl struct {
