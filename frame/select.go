@@ -13,8 +13,6 @@ func (f *frameimpl) SetSelectionExtent(p0, p1 int) {
 	f.sp0, f.sp1 = p0, p1
 }
 
-// GetSelectionExtent returns the rune offsets of the selection maintained by
-// the Frame.
 func (f *frameimpl) GetSelectionExtent() (int, int) {
 	return f.sp0, f.sp1
 }
@@ -29,8 +27,6 @@ func region(a, b int) int {
 	return 1
 }
 
-// SelectOpt makes a selection in the same fashion as Select but does it in a
-// temporary way with the specified text colours fg, bg.
 func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int), fg, bg *draw.Image) (int, int) {
 	oback := f.cols[ColHigh]
 	otext := f.cols[ColHText]
@@ -52,10 +48,6 @@ func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorel
 
 }
 
-// Select takes ownership of the mouse channel to update the selection
-// so long as a button is down in downevent. Selection stops when the
-// staring point buttondown is altered. getmorelines is a callback provided
-// by the caller to provide n additional lines on demand to the specified frame.
 func (f *frameimpl) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int)) (int, int) {
 	// log.Println("--- Select Start ---")
 	// defer log.Println("--- Select End ---")

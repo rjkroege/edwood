@@ -4,10 +4,6 @@ import (
 	"image"
 )
 
-// Delete deletes from the Frame the text between p0 and p1; p1 points at
-// the first rune beyond the deletion.
-//
-// Delete will clear a selection or tick if present but not put it back.
 // TODO(rjk): This code will redraw too much.
 func (f *frameimpl) Delete(p0, p1 int) int {
 	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
