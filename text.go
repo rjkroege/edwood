@@ -1059,7 +1059,7 @@ func getP1(fr frame.Frame) int {
 	return p1
 }
 
-func (t *Text) FrameScroll(dl int) {
+func (t *Text) FrameScroll(fr frame.Frame, dl int) {
 	var q0 int
 	if dl == 0 {
 		// TODO(rjk): Make this mechanism better? It seems unfortunate.
@@ -1069,13 +1069,13 @@ func (t *Text) FrameScroll(dl int) {
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
 	} else {
-		if t.org+(t.fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
+		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
 			return
 		}
-		q0 = t.org + (t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+dl*t.fr.DefaultFontHeight())))
+		q0 = t.org + (fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl* fr.DefaultFontHeight())))
 	}
 	// Insert text into the frame.
-	t.setorigin(q0, true, true)
+	t.setorigin(fr, q0, true, true)
 }
 
 var (
@@ -1129,7 +1129,7 @@ func (t *Text) Select() {
 		selectq = q0
 	}
 	if mouse.Buttons == b {
-		sP0, sP1 := t.fr.Select(mousectl, mouse, func(f frame.Frame, dl int) { t.FrameScroll(dl) })
+		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.Frame, dl int) { t.FrameScroll(fr, dl) })
 
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.Nc() {
@@ -1555,10 +1555,10 @@ func (t *Text) BackNL(p, n int) int {
 }
 
 func (t *Text) SetOrigin(org int, exact bool) {
-	t.setorigin(org, exact, false)
+	t.setorigin(t.fr, org, exact, false)
 }
 
-func (t *Text) setorigin(org int, exact bool, calledfromscroll bool) {
+func (t *Text) setorigin(fr frame.Frame, org int, exact bool, calledfromscroll bool) {
 	// log.Printf("Text.SetOrigin start: t.org = %v, org = %v, exact = %v\n", t.org, org, exact)
 	// defer log.Println("Text.SetOrigin end")
 	// log.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
@@ -1582,16 +1582,16 @@ func (t *Text) setorigin(org int, exact bool, calledfromscroll bool) {
 		}
 	}
 	a = org - t.org
-	if a >= 0 && a < t.fr.GetFrameFillStatus().Nchars {
-		t.fr.Delete(0, a)
+	if a >= 0 && a < fr.GetFrameFillStatus().Nchars {
+		fr.Delete(0, a)
 	} else {
-		if a < 0 && -a < t.fr.GetFrameFillStatus().Nchars {
+		if a < 0 && -a <fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = make([]rune, n)
 			t.file.b.Read(org, r)
-			t.fr.Insert(r, 0)
+			fr.Insert(r, 0)
 		} else {
-			t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
+			fr.Delete(0, fr.GetFrameFillStatus().Nchars)
 		}
 	}
 	t.org = org
