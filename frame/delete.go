@@ -4,8 +4,12 @@ import (
 	"image"
 )
 
-// TODO(rjk): This code will redraw too much.
 func (f *frameimpl) Delete(p0, p1 int) int {
+	return f.deleteimpl(p0, p1)
+}
+
+// TODO(rjk): This code will redraw too much.
+func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	var r image.Rectangle

@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	DELTA   = 25
 	TMPSIZE = 256
 )
 
@@ -124,14 +123,11 @@ type points struct {
 
 var nalloc = 0
 
-// Insert inserts r into Frame f starting at index p0.
-// If a NUL (0) character is inserted, chaos will ensue. Tabs
-// and newlines are handled by the library, but all other characters,
-// including control characters, are just displayed. For example,
-// backspaces are printed; to erase a character, use Delete.
-//
-// Insert will remove the selection or tick  if present but update selection offsets.
 func (f *frameimpl) Insert(r []rune, p0 int) bool {
+	return f.insertimpl(r, p0)	
+}
+
+func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")

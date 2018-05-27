@@ -53,6 +53,10 @@ func (f *frameimpl) grid(p image.Point) image.Point {
 }
 
 func (f *frameimpl) Charofpt(pt image.Point) int {
+	return 	f.charofptimpl( pt )
+}
+
+func (f *frameimpl) charofptimpl(pt image.Point) int {
 	var w, bn int
 	var p int
 	var r rune
