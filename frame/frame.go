@@ -108,6 +108,8 @@ type Frame interface {
 	// so long as a button is down in downevent. Selection stops when the
 	// staring point buttondown is altered. getmorelines is a callback provided
 	// by the caller to provide n additional lines on demand to the specified frame.
+	// The implementation of the callback must use the Frame instance provided
+	// in place of the one that Select is invoked on.
 	//
 	// Select returns the selection range in the Frame.
 	Select( *draw.Mousectl,  *draw.Mouse,  func(Frame, int)) (int, int)

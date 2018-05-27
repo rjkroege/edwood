@@ -515,7 +515,7 @@ func (t *Text) Fill() {
 	}
 	if t.ncache > 0 {
 		t.TypeCommit()
-	}
+	} 
 	for {
 		n := t.file.b.Nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
@@ -1086,16 +1086,6 @@ var (
 	selectq    int
 )
 
-/*
- * called from frame library
- */
-func framescroll(f frame.Frame, dl int) {
-	if f != selecttext.fr {
-		panic("frameselect not right frame")
-	}
-	selecttext.FrameScroll(dl)
-}
-
 func (t *Text) Select() {
 	// log.Println("Text.Select Begin")
 	// defer log.Println("Text.Select End")
@@ -1139,7 +1129,7 @@ func (t *Text) Select() {
 		selectq = q0
 	}
 	if mouse.Buttons == b {
-		sP0, sP1 := t.fr.Select(mousectl, mouse, framescroll)
+		sP0, sP1 := t.fr.Select(mousectl, mouse, func(f frame.Frame, dl int) { t.FrameScroll(dl) })
 
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.Nc() {
