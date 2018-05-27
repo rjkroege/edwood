@@ -124,6 +124,8 @@ type points struct {
 var nalloc = 0
 
 func (f *frameimpl) Insert(r []rune, p0 int) bool {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.insertimpl(r, p0)	
 }
 

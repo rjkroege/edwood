@@ -28,6 +28,8 @@ func (f *frameimpl) drawBox(r image.Rectangle, col, back *draw.Image, qt image.P
 }
 
 func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	//  log.Println("Frame DrawSel Start", p0, p1, highlighted, f.P0, f.P1, f.Ticked)
 	//  defer log.Println("Frame DrawSel End",  f.P0, f.P1, f.Ticked)
 	if p0 > p1 {
@@ -183,6 +185,8 @@ func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text 
 // Future changes will have this function able to clear the Frame and draw the
 // entire box model.
 func (f *frameimpl) Redraw(enclosing image.Rectangle) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	// log.Printf("Redraw %v %v", f.Rect, enclosing)
 	f.background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
 }

@@ -6,6 +6,8 @@ import (
 )
 
 func (f *frameimpl) GetSelectionExtent() (int, int) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.sp0, f.sp1
 }
 
@@ -20,6 +22,8 @@ func region(a, b int) int {
 }
 
 func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int), fg, bg *draw.Image) (int, int) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	oback := f.cols[ColHigh]
 	otext := f.cols[ColHText]
 	osp0 := f.sp0
@@ -36,11 +40,17 @@ func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorel
 		f.DrawSel(f.Ptofchar(osp0), osp0, osp1, true)
 	}()
 
-	return f.Select(mc, downevent, getmorelines)
+	return f.selectimpl(mc, downevent, getmorelines)
 
 }
 
 func (f *frameimpl) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int)) (int, int) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+	return f.selectimpl(mc, downevent, getmorelines)
+}
+
+func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int)) (int, int) {
 	// log.Println("--- Select Start ---")
 	// defer log.Println("--- Select End ---")
 

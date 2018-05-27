@@ -33,6 +33,8 @@ func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 }
 
 func (f *frameimpl) Ptofchar(p int) image.Point {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.ptofcharptb(p, f.rect.Min, 0)
 }
 
@@ -53,6 +55,8 @@ func (f *frameimpl) grid(p image.Point) image.Point {
 }
 
 func (f *frameimpl) Charofpt(pt image.Point) int {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return 	f.charofptimpl( pt )
 }
 

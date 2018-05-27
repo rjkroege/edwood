@@ -5,6 +5,8 @@ import (
 )
 
 func (f *frameimpl) Delete(p0, p1 int) int {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.deleteimpl(p0, p1)
 }
 

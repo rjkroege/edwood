@@ -1,6 +1,8 @@
 package frame
 
 import (
+	"sync"
+
 	"9fans.net/go/draw"
 	"image"
 )
@@ -148,6 +150,9 @@ type Frame interface {
 
 // TODO(rjk): Consider calling this SetMaxtab?
 func (f *frameimpl) Maxtab(m int) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+
 	f.maxtab = m
 }
 
@@ -161,6 +166,8 @@ type FrameFillStatus struct {
 }
 
 func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return FrameFillStatus{
 		Nchars:   f.nchars,
 		Nlines:   f.nlines,
@@ -169,10 +176,14 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 }
 
 func (f *frameimpl) IsLastLineFull() bool {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.lastlinefull
 }
 
 func (f *frameimpl) Rect() image.Rectangle {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.rect
 }
 
@@ -186,6 +197,8 @@ type frbox struct {
 }
 
 type frameimpl struct {
+	lk sync.Mutex
+
 	font       Fontmetrics
 	display    *draw.Display           // on which the frame is displayed
 	background *draw.Image             // on which the frame appears
@@ -226,12 +239,16 @@ func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]
 }
 
 func (f *frameimpl) DefaultFontHeight() int {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	return f.defaultfontheight
 }
 
 // TODO(rjk): This may do unnecessary work for some option settings.
 // At some point, consider the code carefully.
 func (f *frameimpl) Init(r image.Rectangle, opts ...option) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	f.nchars = 0
 	f.nlines = 0
 	f.sp0 = 0
@@ -263,6 +280,8 @@ func (f *frameimpl) setrects(r image.Rectangle) {
 }
 
 func (f *frameimpl) Clear(freeall bool) {
+	f.lk.Lock()
+	defer f.lk.Unlock()
 	f.box = make([]*frbox, 0, 25)
 	if freeall {
 		f.tickimage.Free()
