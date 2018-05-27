@@ -19,7 +19,7 @@ func region(a, b int) int {
 	return 1
 }
 
-func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int), fg, bg *draw.Image) (int, int) {
+func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int), fg, bg *draw.Image) (int, int) {
 	oback := f.cols[ColHigh]
 	otext := f.cols[ColHText]
 	osp0 := f.sp0
@@ -40,7 +40,7 @@ func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorel
 
 }
 
-func (f *frameimpl) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(Frame, int)) (int, int) {
+func (f *frameimpl) Select(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int)) (int, int) {
 	// log.Println("--- Select Start ---")
 	// defer log.Println("--- Select End ---")
 

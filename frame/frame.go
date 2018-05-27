@@ -112,11 +112,11 @@ type Frame interface {
 	// in place of the one that Select is invoked on.
 	//
 	// Select returns the selection range in the Frame.
-	Select( *draw.Mousectl,  *draw.Mouse,  func(Frame, int)) (int, int)
+	Select( *draw.Mousectl,  *draw.Mouse,  func(SelectScrollUpdater, int)) (int, int)
 
 	// SelectOpt makes a selection in the same fashion as Select but does it in a
 	// temporary way with the specified text colours fg, bg.
-	SelectOpt( *draw.Mousectl,  *draw.Mouse,  func(Frame, int), *draw.Image,  *draw.Image) (int, int)
+	SelectOpt( *draw.Mousectl,  *draw.Mouse,  func(SelectScrollUpdater, int), *draw.Image,  *draw.Image) (int, int)
 
 	// Delete deletes from the Frame the text between p0 and p1; p1 points at
 	// the first rune beyond the deletion.

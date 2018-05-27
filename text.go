@@ -506,7 +506,7 @@ func (t *Text) inSelection(q0 int) bool {
 
 
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
-func (t *Text) fill(fr frame.Frame) {
+func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	// log.Println("Text.Fill Start", t.whatstring())
 	// defer log.Println("Text.Fill End")
 
@@ -1061,7 +1061,7 @@ func getP1(fr frame.Frame) int {
 	return p1
 }
 
-func (t *Text) FrameScroll(fr frame.Frame, dl int) {
+func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	var q0 int
 	if dl == 0 {
 		// TODO(rjk): Make this mechanism better? It seems unfortunate.
@@ -1131,7 +1131,7 @@ func (t *Text) Select() {
 		selectq = q0
 	}
 	if mouse.Buttons == b {
-		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.Frame, dl int) { t.FrameScroll(fr, dl) })
+		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		/* horrible botch: while asleep, may have lost selection altogether */
 		if selectq > t.file.b.Nc() {
@@ -1308,7 +1308,7 @@ func (t *Text) SetSelect(q0, q1 int) {
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
 func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.Frame, int) {}, t.display.White, high)
+	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White, high)
 
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
@@ -1560,7 +1560,7 @@ func (t *Text) SetOrigin(org int, exact bool) {
 	t.setorigin(t.fr, org, exact, false)
 }
 
-func (t *Text) setorigin(fr frame.Frame, org int, exact bool, calledfromscroll bool) {
+func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, calledfromscroll bool) {
 	// log.Printf("Text.SetOrigin start: t.org = %v, org = %v, exact = %v\n", t.org, org, exact)
 	// defer log.Println("Text.SetOrigin end")
 	// log.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)

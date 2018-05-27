@@ -4,6 +4,8 @@ import (
 	"image"
 )
 
+// SelectScrollUpdater is a struct subset of frame.Frame that contains only those
+// methods needed to implement a frame.Select callback.
 type  SelectScrollUpdater interface {
 	GetFrameFillStatus() FrameFillStatus
 	Charofpt(pt image.Point) int
@@ -11,6 +13,7 @@ type  SelectScrollUpdater interface {
 	Delete(int,  int) int 
 	Insert( []rune,  int) bool
 	IsLastLineFull() bool
+	Rect() image.Rectangle
 }
 
 type selectscrollupdaterimpl  frameimpl
@@ -51,3 +54,7 @@ func (up *selectscrollupdaterimpl) IsLastLineFull() bool {
 }
 
 
+func (up *selectscrollupdaterimpl) Rect() image.Rectangle {
+	f := (*frameimpl)(up)
+	return f.rect
+}
