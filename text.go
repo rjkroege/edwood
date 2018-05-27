@@ -145,7 +145,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 			t.Show(0, 0, false)
 		}
 	} else {
-		t.Fill()
+		t.fill(t.fr)
 		t.SetSelect(t.q0, t.q1)
 	}
 }
@@ -503,21 +503,23 @@ func (t *Text) inSelection(q0 int) bool {
 	return t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1
 }
 
+
+
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
-func (t *Text) Fill() {
+func (t *Text) fill(fr frame.Frame) {
 	// log.Println("Text.Fill Start", t.whatstring())
 	// defer log.Println("Text.Fill End")
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
 	// characters possible?
-	if t.fr.IsLastLineFull() || t.nofill {
+	if fr.IsLastLineFull() || t.nofill {
 		return
 	}
 	if t.ncache > 0 {
 		t.TypeCommit()
 	} 
 	for {
-		n := t.file.b.Nc() - (t.org + t.fr.GetFrameFillStatus().Nchars)
+		n := t.file.b.Nc() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
 			break
 		}
@@ -525,12 +527,12 @@ func (t *Text) Fill() {
 			n = 2000
 		}
 		rp := make([]rune, n)
-		t.file.b.Read(t.org+t.fr.GetFrameFillStatus().Nchars, rp)
+		t.file.b.Read(t.org+fr.GetFrameFillStatus().Nchars, rp)
 		//
 		// it's expensive to frinsert more than we need, so
 		// count newlines.
 		//
-		nl := t.fr.GetFrameFillStatus().Maxlines - t.fr.GetFrameFillStatus().Nlines //+1
+		nl := fr.GetFrameFillStatus().Maxlines - fr.GetFrameFillStatus().Nlines //+1
 
 		m := 0
 		var i int
@@ -544,7 +546,7 @@ func (t *Text) Fill() {
 			}
 		}
 
-		if lastlinefull := t.fr.Insert(rp[:i], t.fr.GetFrameFillStatus().Nchars); nl == 0 || lastlinefull {
+		if lastlinefull := fr.Insert(rp[:i], fr.GetFrameFillStatus().Nchars); nl == 0 || lastlinefull {
 			break
 		}
 	}
@@ -599,7 +601,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 			p0 = q0 - t.org
 		}
 		t.fr.Delete((p0), (p1))
-		t.Fill()
+		t.fill(t.fr)
 	}
 	if t.w != nil {
 		c := 'd'
@@ -966,7 +968,7 @@ func (t *Text) Type(r rune) {
 			u.nofill = false
 		}
 		for _, t := range t.file.text {
-			t.Fill()
+			t.fill(t.fr)
 		}
 		t.iq1 = t.q0
 		return
@@ -1595,7 +1597,7 @@ func (t *Text) setorigin(fr frame.Frame, org int, exact bool, calledfromscroll b
 		}
 	}
 	t.org = org
-	t.Fill()
+	t.fill(fr)
 	t.ScrDraw()
 
 	if !calledfromscroll {
