@@ -256,7 +256,7 @@ func plumbshow(m *plumb.Message) {
 	w.body.file.mod = false
 	w.dirty = false
 	w.SetTag()
-	w.body.ScrDraw()
+	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
 	xfidlog(w, "new")
 }

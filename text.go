@@ -456,7 +456,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 					u.w.dirty = true /* always a body */
 					u.Insert(q0, r, false)
 					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw()
+					u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
 				}
 			}
 		}
@@ -572,7 +572,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 					u.w.dirty = true /* always a body */
 					u.Delete(q0, q1, false)
 					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw()
+					u.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 				}
 			}
 		}
@@ -1193,7 +1193,7 @@ func (t *Text) Select() {
 					}
 				}
 			}
-			t.ScrDraw()
+			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			clearmouse()
 		}
 		t.display.Flush()
@@ -1243,7 +1243,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		}
 	}
 	if tsd {
-		t.ScrDraw()
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	} else {
 		if t.w.nopen[QWevent] > 0 {
 			nl = 3 * t.fr.GetFrameFillStatus().Maxlines / 4
@@ -1563,7 +1563,7 @@ func (t *Text) SetOrigin(org int, exact bool) {
 func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, calledfromscroll bool) {
 	// log.Printf("Text.SetOrigin start: t.org = %v, org = %v, exact = %v\n", t.org, org, exact)
 	// defer log.Println("Text.SetOrigin end")
-	// log.Printf("\tt.fr.GetFrameFillStatus().Nchars = %#v\n", t.fr.GetFrameFillStatus().Nchars)
+	// log.Printf("\tfr.GetFrameFillStatus().Nchars = %#v\n", fr.GetFrameFillStatus().Nchars)
 
 	var (
 		i, a int
@@ -1598,7 +1598,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	}
 	t.org = org
 	t.fill(fr)
-	t.ScrDraw()
+	t.ScrDraw(fr.GetFrameFillStatus().Nchars)
 
 	if !calledfromscroll {
 		t.SetSelect(t.q0, t.q1)

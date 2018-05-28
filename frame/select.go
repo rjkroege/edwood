@@ -29,7 +29,7 @@ func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorel
 	osp0 := f.sp0
 	osp1 := f.sp1
 
-	f.DrawSel(f.Ptofchar(osp0), osp0, osp1, false)
+	f.drawselimpl(f.ptofcharptb(osp0, f.rect.Min, 0), osp0, osp1, false)
 
 	f.cols[ColHigh] = bg
 	f.cols[ColHText] = fg
@@ -37,7 +37,7 @@ func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorel
 	defer func() {
 		f.cols[ColHigh] = oback
 		f.cols[ColHText] = otext
-		f.DrawSel(f.Ptofchar(osp0), osp0, osp1, true)
+		f.drawselimpl(f.ptofcharptb(osp0, f.rect.Min, 0), osp0, osp1, true)
 	}()
 
 	return f.selectimpl(mc, downevent, getmorelines)
@@ -61,9 +61,9 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 	// Hypothesis: track if we have had inserts and removals during the selection loop.
 	f.modified = false
 
-	p0 := f.Charofpt(omp)
+	p0 := f.charofptimpl(omp)
 	p1 := p0
-	f.DrawSel(f.Ptofchar(p0), p0, p1, true)
+	f.drawselimpl(f.ptofcharptb(p0, f.rect.Min, 0), p0, p1, true)
 
 	reg := 0
 	pin := 0
@@ -75,7 +75,7 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 
 		scrled := false
 		if mp.Y < f.rect.Min.Y {
-			getmorelines(f, -(f.rect.Min.Y-mp.Y)/f.defaultfontheight-1)
+			getmorelines((*selectscrollupdaterimpl)(f), -(f.rect.Min.Y-mp.Y)/f.defaultfontheight-1)
 			// As a result of scrolling, we will have called Insert. Insert will
 			// remove the selection. But not put it back. But it will correct
 			// P1 and P0 to reflect the insertion.
@@ -84,7 +84,7 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 			p1 = f.sp0
 			scrled = true
 		} else if mp.Y > f.rect.Max.Y {
-			getmorelines(f, (mp.Y-f.rect.Max.Y)/f.defaultfontheight+1)
+			getmorelines((*selectscrollupdaterimpl)(f), (mp.Y-f.rect.Max.Y)/f.defaultfontheight+1)
 			p0 = f.sp1
 			p1 = f.sp0
 			scrled = true
@@ -98,7 +98,7 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 			reg = region(p1, p0)
 		}
 
-		q := f.Charofpt(mp)
+		q := f.charofptimpl(mp)
 
 		// log.Printf("select, before state table p0=%d p1=%d q=%d pin=%d", p0, p1, q, pin)
 		switch {
@@ -133,11 +133,11 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 		}
 		// log.Printf("select, after state table p0=%d p1=%d q=%d pin=%d", p0, p1, q, pin)
 
-		f.DrawSel(f.Ptofchar(p0), p0, p1, true)
+		f.drawselimpl(f.ptofcharptb(p0, f.rect.Min, 0), p0, p1, true)
 
 		if scrled {
 			// TODO(rjk): Document why we need this call and what it's for.
-			getmorelines(f, 0)
+			getmorelines((*selectscrollupdaterimpl)(f), 0)
 		}
 		if err := f.display.Flush(); err != nil {
 			panic(err)

@@ -32,10 +32,10 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 	n1 := f.findbox(n0, p0, p1)
 	pt0 := f.ptofcharnb(p0, n0)
-	pt1 := f.Ptofchar(p1)
+	pt1 := f.ptofcharptb(p1, f.rect.Min, 0)
 
 	// Remove the selection or tick.
-	f.DrawSel(f.Ptofchar(f.sp0), f.sp0, f.sp1, false)
+	f.drawselimpl(f.ptofcharptb(f.sp0, f.rect.Min, 0), f.sp0, f.sp1, false)
 
 	nn0 := n0
 	ppt0 := pt0
@@ -159,9 +159,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 	f.nchars -= int(p1 - p0)
 	if f.sp0 == f.sp1 {
-		f.Tick(f.Ptofchar(f.sp0), true)
+		f.Tick(f.ptofcharptb(f.sp0, f.rect.Min, 0), true)
 	}
-	pt0 = f.Ptofchar(f.nchars)
+	pt0 = f.ptofcharptb(f.nchars, f.rect.Min, 0)
 	n := f.nlines
 	f.nlines = (pt0.Y - f.rect.Min.Y) / f.defaultfontheight
 	if pt0.X > f.rect.Min.X {

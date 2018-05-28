@@ -173,7 +173,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	 */
 
 	// Remove the selection or tick.
-	f.DrawSel(f.Ptofchar(f.sp0), f.sp0, f.sp1, false)
+	f.drawselimpl(f.ptofcharptb(f.sp0, f.rect.Min, 0), f.sp0, f.sp1, false)
 
 	/*
 	 * Find point where old and new x's line up

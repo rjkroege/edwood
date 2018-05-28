@@ -188,7 +188,7 @@ func allupdate(w *Window) {
 	}
 
 	t.SetSelect(t.q0, t.q1)
-	t.ScrDraw()
+	t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	w.SetTag()
 }
 

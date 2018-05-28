@@ -196,8 +196,29 @@ type frbox struct {
 	Minwid byte
 }
 
+// Helpful code for debugging reentrancy.
+// TODO(rjk): Remove when we really don't have bugs.
+// type debugginglock struct {
+// 	reallock sync.Mutex
+// 	havelock bool
+// }
+// 
+// func (m *debugginglock) Lock() {
+// 	if m.havelock {
+// 		panic("attempt to reentrantly enter locked frameimpl")
+// 	}
+// 	m.reallock.Lock()
+// 	m.havelock = true
+// }
+// 
+// func (m *debugginglock) Unlock() {
+// 	m.havelock = false
+// 	m.reallock.Unlock()
+// }
+
 type frameimpl struct {
 	lk sync.Mutex
+	// lk debugginglock
 
 	font       Fontmetrics
 	display    *draw.Display           // on which the frame is displayed

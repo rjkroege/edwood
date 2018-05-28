@@ -151,7 +151,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	if w.display != nil {
 		w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
 	}
-	w.body.ScrDraw()
+	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
@@ -307,7 +307,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		y = w.body.Resize(r1, keepextra, false /* noredraw */)
 		w.r = r
 		w.r.Max.Y = y
-		w.body.ScrDraw()
+		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 		w.body.all.Min.Y = oy
 	}
 	w.maxlines = min(w.body.fr.GetFrameFillStatus().Nlines, max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
@@ -417,7 +417,7 @@ func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
 	if t.what == Body {
 		for _, text := range t.file.text {
-			text.ScrDraw()
+			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
 		}
 	}
 	w.SetTag()

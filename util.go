@@ -293,7 +293,7 @@ func flushwarnings() {
 		}
 		t.Show(q0, t.Nc(), true)
 		t.w.SetTag()
-		t.ScrDraw()
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.owner = owner
 		w.dirty = false
 		w.Unlock()

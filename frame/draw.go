@@ -30,6 +30,10 @@ func (f *frameimpl) drawBox(r image.Rectangle, col, back *draw.Image, qt image.P
 func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	f.lk.Lock()
 	defer f.lk.Unlock()
+	f.drawselimpl(pt, p0, p1, highlighted)
+}
+
+func (f *frameimpl) drawselimpl(pt image.Point, p0, p1 int, highlighted bool) {
 	//  log.Println("Frame DrawSel Start", p0, p1, highlighted, f.P0, f.P1, f.Ticked)
 	//  defer log.Println("Frame DrawSel End",  f.P0, f.P1, f.Ticked)
 	if p0 > p1 {
@@ -37,7 +41,7 @@ func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 	}
 
 	if f.ticked {
-		f.Tick(f.Ptofchar(f.sp0), false)
+		f.Tick(f.ptofcharptb(f.sp0, f.rect.Min, 0), false)
 	}
 
 	if f.sp0 != f.sp1 && f.highlighton {
@@ -45,7 +49,7 @@ func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 		// update correctly.
 		back := f.cols[ColBack]
 		text := f.cols[ColText]
-		f.Drawsel0(f.Ptofchar(f.sp0), f.sp0, f.sp1, back, text)
+		f.Drawsel0(f.ptofcharptb(f.sp0, f.rect.Min, 0), f.sp0, f.sp1, back, text)
 
 		// Avoid multiple draws.
 		f.highlighton = false

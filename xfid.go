@@ -261,7 +261,7 @@ func xfidclose(x *Xfid) {
 			t = &w.body
 			// before: only did this if !w.noscroll, but that didn't seem right in practice
 			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
-			t.ScrDraw()
+			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			break
 		case QWeditout:
 			w.editoutlk.Unlock()
@@ -482,7 +482,7 @@ func xfidwrite(x *Xfid) {
 				if qid != QWwrsel && shouldscroll(t, q0, qid) {
 					t.Show(q0+(nr), q0+(nr), true)
 				}
-				t.ScrDraw()
+				t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			}
 			w.SetTag()
 			if qid == QWwrsel {
@@ -587,7 +587,7 @@ func xfidwrite(x *Xfid) {
 		if shouldscroll(t, q0, qid) {
 			t.Show(q0+(len(r)), q0+(len(r)), false)
 		}
-		t.ScrDraw()
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.SetTag()
 		w.addr.q0 += len(r)
 		w.addr.q1 = w.addr.q0
@@ -751,7 +751,7 @@ forloop:
 		w.SetTag()
 	}
 	if scrdraw {
-		w.body.ScrDraw()
+		w.body.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
 }
 

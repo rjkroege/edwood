@@ -63,7 +63,7 @@ func ScrlResize(display *draw.Display) {
 	}
 }
 
-func (t *Text) ScrDraw() {
+func (t *Text) ScrDraw(nchars int) {
 	var (
 		r, r1, r2 image.Rectangle
 		b         *draw.Image
@@ -80,7 +80,7 @@ func (t *Text) ScrDraw() {
 	r1 = r
 	r1.Min.X = 0
 	r1.Max.X = r.Dx()
-	r2 = scrpos(r1, t.org, t.org+t.fr.GetFrameFillStatus().Nchars, t.file.b.Nc())
+	r2 = scrpos(r1, t.org, t.org+ nchars, t.file.b.Nc())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.
