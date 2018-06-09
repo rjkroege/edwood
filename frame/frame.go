@@ -5,8 +5,6 @@ import (
 
 	"9fans.net/go/draw"
 	"image"
-
-	"log"
 )
 
 // TODO(rjk): Make this into a struct of colours?
@@ -284,19 +282,15 @@ func (f *frameimpl) Init(r image.Rectangle, opts ...option) {
 	// will re-use the existing values if new ones are not provided.
 	ctx := f.Option(opts...)
 
-log.Println("before getting some font metrics")
 	f.defaultfontheight = f.font.DefaultHeight()
 	f.display = f.background.Display
-log.Println("before measuring a string")
 	f.maxtab = ctx.computemaxtab(f.maxtab, f.font.StringWidth("0"))
-log.Println("after measuring a string")
 	f.setrects(r)
 
 	if ctx.updatetick || (f.tickimage == nil && f.cols[ColBack] != nil) {
 		f.InitTick()
 	}
 }
-
 
 // setrects initializes the geometry of the frame.
 func (f *frameimpl) setrects(r image.Rectangle) {

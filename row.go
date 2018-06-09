@@ -11,8 +11,6 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
-
-	"log"
 )
 
 type Row struct {
@@ -32,14 +30,11 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	row.col = []*Column{}
 	row.r = r
 	r1 := r
-	log.Println("before fontget in Row.Init")
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height
-	log.Println("after fontget in Row.Init")
 	t := &row.tag
 	f := new(File)
 	t.file = f.AddText(t)
 	t.Init(r1, tagfont, tagcolors, row.display)
-	log.Println("after t.Init")
 	t.what = Rowtag
 	t.row = row
 	t.w = nil
@@ -48,7 +43,6 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
 	t.Insert(0, []rune("Newcol Kill Putall Dump Exit"), true)
-	log.Println("after t.Insert")
 	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
 	return row
 }
