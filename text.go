@@ -11,6 +11,8 @@ import (
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
+
+	"log"
 )
 
 const (
@@ -83,6 +85,8 @@ func (t *Text) getfont() *draw.Font {
 }
 
 func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
+	log.Println("Text.Init start")
+	defer log.Println("Text.Init end")
 	if t == nil {
 		t = new(Text)
 	}
@@ -96,7 +100,9 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
+	log.Println("Text.Init before NewFrame", rf)
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
+	log.Println("Text.Init after NewFrame")
 	t.Redraw(r,  -1, false /* noredraw */)
 	return t
 }

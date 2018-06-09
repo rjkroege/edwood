@@ -34,8 +34,8 @@ func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
 }
 
 func (f *frameimpl) drawselimpl(pt image.Point, p0, p1 int, highlighted bool) {
-	//  log.Println("Frame DrawSel Start", p0, p1, highlighted, f.P0, f.P1, f.Ticked)
-	//  defer log.Println("Frame DrawSel End",  f.P0, f.P1, f.Ticked)
+	// log.Println("Frame DrawSel Start", p0, p1, highlighted, f.sp0, f.sp1, f.ticked)
+	// defer log.Println("Frame DrawSel End",  f.sp0, f.sp1, f.ticked)
 	if p0 > p1 {
 		panic("Drawsel0: p0 and p1 must be ordered")
 	}

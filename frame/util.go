@@ -7,9 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-func (b *frbox) String() string {
-	return fmt.Sprintf("frbox: «%s» wid=%d nrune=%d b=%#v minwid=%d", string(b.Ptr), b.Wid, b.Nrune, b.Bc, int(b.Minwid))
-}
 
 // canfit measures the b's string contents and determines if it fits
 // in the region of the screen between pt and the right edge of the
@@ -91,6 +88,9 @@ func (f *frameimpl) advance(p image.Point, b *frbox) image.Point {
 	return p
 }
 
+// newwid returns the width of a given box and mutates the
+// appropriately. 
+// TODO(rjk): I'm perturbed. This is horrible.
 func (f *frameimpl) newwid(pt image.Point, b *frbox) int {
 	b.Wid = f.newwid0(pt, b)
 	return b.Wid
@@ -167,16 +167,19 @@ func (f *frameimpl) Logboxes(message string, args ...interface{}) {
 	log.Printf(message, args...)
 	for i, b := range f.box {
 		if b != nil {
-			if b.Nrune == -1 && b.Bc == '\n' {
-				log.Printf("	box[%d] -> newline\n", i)
-			} else if b.Nrune == -1 && b.Bc == '\t' {
-				log.Printf("	box[%d] -> tab width=%d\n", i, b.Minwid)
-			} else {
-				log.Printf("	box[%d] -> %#v width %d\n", i, string(b.Ptr), b.Wid)
-			}
+			log.Printf("	box[%d] -> %v\n", i, b)
 		} else {
 			log.Printf("	box[%d] is WRONGLY nil\n", i)
 		}
 	}
 	log.Printf("end: "+message, args...)
+}
+
+func (b *frbox) String() string {
+			if b.Nrune == -1 && b.Bc == '\n' {
+				return fmt.Sprintf("newline")
+			} else if b.Nrune == -1 && b.Bc == '\t' {
+				return fmt.Sprintf("tab width=%d,%d",  b.Wid, b.Minwid)
+			} 
+			return fmt.Sprintf("%#v width=%d nrune=%d",string(b.Ptr), b.Wid, b.Nrune)
 }
