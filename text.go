@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -94,7 +93,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
 	t.lastsr = nullrect
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
-	t.eq0 = math.MaxInt64
+	t.eq0 = ^0
 	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
