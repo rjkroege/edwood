@@ -3,6 +3,7 @@ package frame
 import (
 	"fmt"
 	"image"
+	"log"
 	"unicode/utf8"
 )
 
@@ -133,6 +134,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	//	f.Logboxes("at very start of insert")
 	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
 	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
+	f.validateinputs(r, "Frame.Insert Start")
 
 	if p0 > f.nchars || len(r) == 0 || f.background == nil {
 		return f.lastlinefull
@@ -351,4 +353,20 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	}
 
 	return f.lastlinefull
+}
+
+// validateinputs ensures that the given rune string is valid for
+// insertion.
+func (f *frameimpl) validateinputs(runes []rune, format string, args ...interface{}) {
+	if !*validate {
+		return
+	}
+
+	for i, r := range runes {
+		if r == 0x00 {	// Nulls in input string are forbidden.
+			log.Printf(format, args...)
+			log.Printf("r[%d] null", i)
+			panic("-- invalid input to Frame.Insert --")
+		}
+	}
 }
