@@ -149,7 +149,8 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 	return f.sp0, f.sp1
 }
 
-// SelectPaint draws selection highlights. 
+// SelectPaint draws the regions that need to be blank in col.
+// TODO(rjk): This function is mis-named and should not be public.
 func (f *frameimpl) SelectPaint(p0, p1 image.Point, col *draw.Image) {
 	q0 := p0
 	q1 := p1
