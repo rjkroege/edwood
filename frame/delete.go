@@ -2,8 +2,6 @@ package frame
 
 import (
 	"image"
-
-	"log"
 )
 
 func (f *frameimpl) Delete(p0, p1 int) int {
@@ -14,7 +12,6 @@ func (f *frameimpl) Delete(p0, p1 int) int {
 
 // TODO(rjk): Add doc comments.
 func (f *frameimpl) deleteimpl(p0, p1 int) int {
-	log.Println("hello from delete")
 	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	var r image.Rectangle
@@ -45,9 +42,6 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 	f.modified = true
 
-	f.Logboxes("before loop pt0 %v pt1 %v n0 %d n1 %d", pt0, pt1, n0, n1)
-
-
 	/*
 	 * Invariants:
 	 *  - pt0 points to beginning, pt1 points to end
@@ -55,8 +49,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	 *  - n1, b are box containing beginning of stuff to be kept after deletion
 	 *  - f->p0 and f->p1 are not adjusted until after all deletion is done
 	 */
+	// f.Logboxes("before loop pt0 %v pt1 %v n0 %d n1 %d", pt0, pt1, n0, n1)
 	for pt1.X != pt0.X && n1 < len(f.box) {
-		f.Logboxes("top of loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1)
+		// f.Logboxes("top of loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1)
 		b := f.box[n1]
 		pt0 = f.cklinewrap0(pt0, b)
 		pt1 = f.cklinewrap(pt1, b)
@@ -72,8 +67,6 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 		r.Max = pt0
 		r.Max.Y += f.defaultfontheight
 
-		log.Printf("inside  loop box=%v rect=%v", b, r)
-
 		if b.Nrune > 0 {
 			w0 := b.Wid
 			if n != b.Nrune {
@@ -81,7 +74,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 				b = f.box[n1]
 			}
 			r.Max.X += int(b.Wid)
-			log.Printf("draw rect: %v to pt1: %v", r, pt1)
+			// log.Printf("draw rect: %v to pt1: %v", r, pt1)
 			f.background.Draw(r, f.background, nil, pt1)
 
 			r.Min.X = r.Max.X
@@ -91,7 +84,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 			}
 			// Erase the portion of text at the end of the line that should be blank
 			// now that we've moved the box ending the line over.
-			log.Printf("draw rect: %v to pt1: %v", r, pt1)
+			// log.Printf("draw rect: %v to pt1: %v", r, pt1)
 			f.background.Draw(r, f.cols[ColBack], nil, r.Min)
 		} else {
 			r.Max.X += f.newwid0(pt0, b)
@@ -112,7 +105,6 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	}
 
 	if pt1.Y != pt0.Y {
-		log.Println("In the up blit?")
 		// Blit up the remainder of the text.
 		// TODO(rjk): Understand this completely
 		pt2 := f.ptofcharptb(32767, pt1, n1)
@@ -132,18 +124,11 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 			f.background.Draw(image.Rect(pt0.X, pt0.Y, pt0.X+(f.rect.Max.X-pt1.X), q0), f.background, nil, pt1)
 			f.background.Draw(image.Rect(f.rect.Min.X, q0, f.rect.Max.X, q0+(q2-q1)), f.background, nil, image.Pt(f.rect.Min.X, q1))
-			// Might not be needed.
-//                       f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.cols[ColBack])
-               } else {
-			// Might not be needed.
-//                      f.SelectPaint(pt0, pt2, f.cols[ColBack])
                }
 	}
 
-	log.Printf("after  loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
-	if n1 == len(f.box) && pt1.Y == pt0.Y {
-		// handle last box
-		log.Println("handling last box")
+	// log.Printf("after  loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
+	if n1 == len(f.box) && pt1.Y == pt0.Y {	// handle last box
 		r := image.Rect(pt0.X, pt0.Y, pt1.X, pt1.Y + f.defaultfontheight)
 		f.background.Draw(r, f.cols[ColBack], nil, pt0)
 	}
@@ -182,8 +167,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	if pt0.X > f.rect.Min.X {
 		f.nlines++
 	}
-
-	f.Logboxes("end of delete")
+	// f.Logboxes("end of delete")
 
 	return n - f.nlines
 }
