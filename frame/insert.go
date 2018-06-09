@@ -143,6 +143,9 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	var rect image.Rectangle
 	var col, tcol *draw.Image
 
+	col = f.cols[ColBack]
+	tcol = f.cols[ColText]
+
 	pts := make([]points, 0, 5)
 
 	n0 := f.findbox(0, 0, p0)
@@ -286,11 +289,11 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 				rect.Max.X = f.rect.Max.X
 				rect.Max.Y += f.defaultfontheight
 
-				if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
-					col = f.cols[ColHigh]
-				} else {
-					col = f.cols[ColBack]
-				}
+	//			if f.sp0 <= cn0 && cn0 < f.sp1 { /* b+1 is inside selection */
+	//				col = f.cols[ColHigh]
+	//			} else {
+	//				col = f.cols[ColBack]
+	//			}
 				f.background.Draw(rect, col, nil, rect.Min)
 			} else if pt.Y < y {
 				rect.Min = pt
@@ -299,11 +302,11 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 				rect.Max.X = f.rect.Max.X
 				rect.Max.Y += f.defaultfontheight
 
-				if f.sp0 <= cn0 && cn0 < f.sp1 {
-					col = f.cols[ColHigh]
-				} else {
-					col = f.cols[ColBack]
-				}
+	//			if f.sp0 <= cn0 && cn0 < f.sp1 {
+	//				col = f.cols[ColHigh]
+	//			} else {
+	//				col = f.cols[ColBack]
+	//			}
 				f.background.Draw(rect, col, nil, rect.Min)
 			}
 			y = pt.Y
@@ -317,13 +320,13 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 				rect.Max.X = f.rect.Max.X
 			}
 			cn0--
-			if f.sp0 <= cn0 && cn0 < f.sp1 {
-				col = f.cols[ColHigh]
-				tcol = f.cols[ColHText]
-			} else {
-				col = f.cols[ColBack]
-				tcol = f.cols[ColText]
-			}
+	//		if f.sp0 <= cn0 && cn0 < f.sp1 {
+	//			col = f.cols[ColHigh]
+	//			tcol = f.cols[ColHText]
+	//		} else {
+	//			col = f.cols[ColBack]
+	//			tcol = f.cols[ColText]
+	//		}
 			f.background.Draw(rect, col, nil, rect.Min)
 			y = 0
 			if pt.X == f.rect.Min.X {
@@ -333,14 +336,14 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 		npts--
 	}
 
-	if f.sp0 < p0 && p0 <= f.sp1 {
-		col = f.cols[ColHigh]
-		tcol = f.cols[ColHText]
-	} else {
-		col = f.cols[ColBack]
-		tcol = f.cols[ColText]
-	}
-
+// 	if f.sp0 < p0 && p0 <= f.sp1 {
+// 		col = f.cols[ColHigh]
+// 		tcol = f.cols[ColHText]
+// 	} else {
+// 		col = f.cols[ColBack]
+// 		tcol = f.cols[ColText]
+// 	}
+// 
 	f.SelectPaint(ppt0, ppt1, col)
 	nframe.drawtext(ppt0, tcol, col)
 
