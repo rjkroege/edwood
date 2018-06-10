@@ -92,7 +92,7 @@ func main() {
 	var display *draw.Display
 	display, err = draw.Init(nil, *varfontflag, "edwood", *winsize)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("can't open display: %v\n", err)
 	}
 	if err := display.Attach(draw.Refnone); err != nil {
 		panic("failed to attach to window")
