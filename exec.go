@@ -210,13 +210,14 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			seq++
 			seltext.w.body.file.Mark()
 		}
-		s := wsre.ReplaceAllString(string(r), " ")
-		s = strings.TrimLeft(s, " ")
-		words := strings.SplitN(s, " ", 2)
-		if len(words) == 1 {
-			words = append(words, "")
+
+		s := strings.TrimLeft(string(r), " \t\n")
+		words := wsre.Split(s,  2)
+		arg := ""
+		if len(words) > 1 {
+			arg = strings.TrimLeft(words[1], " \t\n")
 		}
-		e.fn(t, seltext, argt, e.flag1, e.flag2, words[1])
+		e.fn(t, seltext, argt, e.flag1, e.flag2, arg)
 		return
 	}
 
