@@ -452,13 +452,39 @@ func (r *Row) Dump(file string) {
 	b.Flush()
 }
 
-func (r *Row) LoadFonts(file string) {
-	Unimpl()
+// LoadFonts gets the font names from the load file so we don't load 
+// fonts that we won't use.
+func LoadFonts(file string) []string {
+	// C: rowloadfonts
+	f, err  := os.Open(file)
+	if err != nil {
+		return []string{}
+	}
+	defer f.Close()
+	b := bufio.NewReader(f)
 
+	// Read first line of dump file (the current directory) and discard.
+	if _, err := b.ReadString('\n'); err != nil {
+		return []string{}
+	}
+
+	// Read names of global fonts
+	fontnames := make([]string, 0, 2)
+
+	for i := 0; i < 2; i++ {
+		fn, err := b.ReadString('\n')
+		if err != nil {
+			return []string{}
+		}
+		
+		fontnames = append(fontnames, strings.TrimRight(fn, "\n"))
+	}
+	return fontnames
 }
 
 func (r *Row) Load(file string, initing bool) error {
 	Unimpl()
+	// C: rowload
 	return nil
 }
 
