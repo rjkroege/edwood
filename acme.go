@@ -76,8 +76,9 @@ func main() {
 	}
 
 	if loadfile != "" {
-		// TODO(flux)
-		// rowloadfonts(loadfile) // Overrides fonts selected up to here.
+		fontnames := LoadFonts(loadfile) // Overrides fonts selected up to here.
+		*varfontflag = fontnames[0]
+		*fixedfontflag = fontnames[1]
 	}
 
 	os.Setenv("font", *varfontflag)
@@ -673,6 +674,9 @@ var hangupsignals = []os.Signal{
 	os.Signal(syscall.SIGSTOP),
 }
 
+// TODO(rjk): I'm not sure that this is the right thing to do? It fails to
+// handle the situation that is most interesting: trying to save the state
+// if we would otherwise crash. It's also conceivably racy.
 func shutdown(s os.Signal) {
 	for _, sig := range hangupsignals {
 		if sig == s {

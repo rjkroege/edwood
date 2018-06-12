@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"image"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -456,7 +460,6 @@ func (r *Row) Dump(file string) {
 // LoadFonts gets the font names from the load file so we don't load
 // fonts that we won't use.
 func LoadFonts(file string) []string {
-	// C: rowloadfonts
 	f, err := os.Open(file)
 	if err != nil {
 		return []string{}
@@ -471,21 +474,357 @@ func LoadFonts(file string) []string {
 
 	// Read names of global fonts
 	fontnames := make([]string, 0, 2)
-
 	for i := 0; i < 2; i++ {
-		fn, err := b.ReadString('\n')
+		fn, err := readtrim(b)
 		if err != nil {
 			return []string{}
 		}
-
-		fontnames = append(fontnames, strings.TrimRight(fn, "\n"))
+		fontnames = append(fontnames, fn)
 	}
 	return fontnames
 }
 
-func (r *Row) Load(file string, initing bool) error {
-	Unimpl()
-	// C: rowload
+// readtrim returns a string read from the file or an error.
+func readtrim(rd *bufio.Reader) (string, error) {
+	l, err := rd.ReadString('\n')
+	if err == io.EOF && l == "" {
+		// We've run out of content.
+		return "", nil
+	} else if err != nil {
+		return "", err
+	}
+	l = strings.TrimRight(l, "\n")
+	return l, nil
+}
+
+var splittingregexp *regexp.Regexp
+
+func init() {
+	splittingregexp = regexp.MustCompile("[ \t]+")
+}
+
+// splitline splits the line based on a regexp and returns an array with not more than
+// count elements.
+func splitline(l string, count int) []string {
+	splits := splittingregexp.Split(strings.TrimLeft(l, "\t "), count)
+	// log.Printf("splitting %#v ➜ %#v", l, splits)
+	return splits
+}
+
+// loadhelper breaks out common load file parsing functionality for selected row
+// types.
+func (row *Row) loadhelper(rd *bufio.Reader, subl []string, fontname string, ndumped int64, dumpid int) error {
+	// log.Printf("loadhelper start subl=%#v fontname=%s ndumped=%d dumpid=%d", subl, fontname, ndumped, dumpid)
+	// defer log.Println("loadhelper done")
+	// Column for this window.
+	oi, err := strconv.ParseInt(subl[1], 10, 64)
+	if err != nil || oi < 0 || oi > 10 {
+		return fmt.Errorf("cant't parse column id %s: %v", subl[1], err)
+	}
+	i := int(oi)
+
+	oj, err := strconv.ParseInt(subl[2], 10, 64)
+	if err != nil {
+		return fmt.Errorf("cant't parse j %s: %v", subl[2], err)
+	}
+	j := int(oj)
+
+	oq0, err := strconv.ParseInt(subl[3], 10, 64)
+	if err != nil {
+		return fmt.Errorf("cant't parse q0: %v", subl[3], err)
+	}
+	q0 := int(oq0)
+
+	oq1, err := strconv.ParseInt(subl[4], 10, 64)
+	if err != nil {
+		return fmt.Errorf("cant't parse q1: %v", subl[4], err)
+	}
+	q1 := int(oq1)
+
+	percent, err := strconv.ParseFloat(subl[5], 64)
+	if err != nil {
+		return fmt.Errorf("cant't parse percent: %v", subl[5], err)
+	}
+
+	if i > len(row.col) { // Didn't we already make sure that we have a column?
+		i = len(row.col)
+	}
+	c := row.col[i]
+	y := c.r.Min.Y + int((percent*float64(c.r.Dy()))/100.+0.5)
+	if y < c.r.Min.Y || y >= c.r.Max.Y {
+		y = -1
+	}
+
+	// Consider renaming this? Follow-on line or some such.
+	// Read the follow-on line.
+	nextline, err := readtrim(rd)
+	if err != nil {
+		return err
+	}
+	subl = splitline(nextline, 7)
+
+	var w *Window
+	if dumpid == 0 {
+		w = c.Add(nil, nil, y)
+	} else {
+		w = c.Add(nil, lookfile(subl[5]), y)
+	}
+	if w == nil {
+		// Why is this not an error?
+		return nil
+	}
+	w.dumpid = j
+
+	// My understanding of the Acme code was that subl[5] is the original file name
+	// without spaces.
+	if dumpid == 0 {
+		w.SetName(subl[5])
+	}
+
+	afterbar := strings.SplitN(subl[6], "|", 2)
+	w.ClearTag()
+	w.tag.Insert(len(w.tag.file.b), []rune(afterbar[1]), true)
+
+	if ndumped >= 0 {
+		// Simplest thing is to put it in a file and load that.
+		fd, err := ioutil.TempFile("", "edwoodload")
+		if err != nil {
+			return fmt.Errorf("can't create temp file for reloading contents %v", err)
+		}
+
+		if _, err := io.CopyN(fd, rd, ndumped); err != nil {
+			// TODO(rjk): Generate better diagnostics.
+			return err
+		}
+
+		w.body.Load(0, fd.Name(), true)
+		w.body.file.mod = true
+
+		// This shows an example where an observer would be useful?
+		for n := 0; n < len(w.body.file.text); n++ {
+			w.body.file.text[n].w.dirty = true
+		}
+		w.SetTag()
+	} else if dumpid == 0 && subl[5][0] != '+' && subl[5][0] != '-' {
+		// Implementation of the Get command: open the file.
+		get(&w.body, nil, nil, false, false, "")
+	}
+
+	if fontname != "" {
+		fontx(&w.body, nil, nil, false, false, fontname)
+	}
+
+	if q0 > len(w.body.file.b) || q1 > len(w.body.file.b) || q0 > q1 {
+		q0 = 0
+		q1 = 0
+	}
+	// Update the selection on the Text.
+	w.body.Show(q0, q1, true)
+	ffs := w.body.fr.GetFrameFillStatus()
+	w.maxlines = min(ffs.Nlines, max(w.maxlines, ffs.Nlines))
+
+	// TODO(rjk): Conceivably this should be a zerox xfidlog when reconstituting a zerox?
+	xfidlog(w, "new")
+	return nil
+}
+
+func (row *Row) Load(file string, initing bool) error {
+	err := row.loadimpl(file, initing)
+	if err != nil {
+		// log.Printf("Load experienced a problem: %v\n", err)
+		warning(nil, "Load experienced a problem: %v\n", err)
+	}
+	return err
+}
+
+// TODO(rjk): split this apart into smaller functions and files.
+func (row *Row) loadimpl(file string, initing bool) error {
+	// log.Println("Load start", file, initing)
+	// defer log.Println("Load ended")
+
+	if file == "" {
+		if home == "" {
+			return fmt.Errorf("can't find file for load: $home not defined")
+		}
+		file = filepath.Join(home, "edwood.dump")
+	}
+
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	b := bufio.NewReader(f)
+
+	// Current directory.
+	l, err := readtrim(b)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Chdir(l); err != nil {
+		return err
+	}
+
+	// variable width font
+	l, err = readtrim(b)
+	if err != nil {
+		return err
+	}
+	*varfontflag = l
+
+	// fixed width font
+	l, err = readtrim(b)
+	if err != nil {
+		return err
+	}
+	*fixedfontflag = l
+
+	if initing && len(row.col) == 0 {
+		row.Init(row.display.ScreenImage.R, row.display)
+	}
+
+	// Column widths
+	l, err = readtrim(b)
+	if err != nil {
+		return err
+	}
+	subl := splitline(l, -1)
+
+	if len(subl) > 10 {
+		return fmt.Errorf("Load: bad number of column widths %d in %#v", l)
+	}
+
+	// TODO(rjk): put column width parsing in a separate function.
+	for i, cwidth := range subl {
+		percent, err := strconv.ParseFloat(cwidth, 64)
+		if err != nil {
+			return fmt.Errorf("Load: parsing column width in %#v had error %v", l, err)
+		}
+		if percent < 0 || percent >= 100 {
+			return fmt.Errorf("Load: parsing column width in %#v had invalid width %f", l, percent)
+		}
+
+		x := int(float64(row.r.Min.X) + percent*float64(row.r.Dx())/100.0 + 0.5)
+
+		// TODO(rjk): Sigh. A more explicit MVC would simplify thinking about this code.
+		if i < len(row.col) {
+			if i == 0 {
+				continue
+			}
+			c1 := row.col[i-1]
+			c2 := row.col[i]
+			r1 := c1.r
+			r2 := c2.r
+			if x < Border {
+				x = Border
+			}
+			r1.Max.X = x - Border
+			r2.Max.X = x
+			if r1.Dx() < 50 || r2.Dx() < 50 {
+				continue
+			}
+			row.display.ScreenImage.Draw(image.Rectangle{r1.Min, r2.Max}, row.display.White, nil, image.ZP)
+			c1.Resize(r1)
+			c2.Resize(r2)
+			r2.Min.X = x - Border
+			r2.Max.X = x
+			row.display.ScreenImage.Draw(r2, row.display.Black, nil, image.ZP)
+		}
+		if i >= len(row.col) {
+			row.Add(nil, x)
+		}
+	}
+
+	// Read the window entries. There will be an entry for each Window. A Window may be
+	// 1 or 2 lines except for Window records that correspond to each file. In which case,the
+	// unsaved file contents will also be present.
+	cwblock := true // First segment of file is columns and header.
+	for {
+		l, err = readtrim(b)
+		if err != nil {
+			return err
+		}
+
+		switch {
+		case l == "" && !cwblock:
+			// We've reached the end.
+			return nil
+		case cwblock && l[0] == 'c':
+			subl := splitline(l, 3)
+			bi, err := strconv.ParseInt(subl[1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("Load: parsing column id in %#v had error %v", l, err)
+			}
+
+			// Acme's handling of column headers is perplexing. It is conceivable
+			// that this code does not do the right thing even if it replicates Acme
+			// correctly.
+			row.col[int(bi)].tag.Delete(0, len(row.col[int(bi)].tag.file.b), true)
+			row.col[int(bi)].tag.Insert(0, []rune(subl[2]), true)
+		case cwblock && l[0] == 'w':
+			subl := strings.TrimLeft(l[1:], " \t")
+			row.tag.Delete(0, len(row.tag.file.b), true)
+			row.tag.Insert(0, []rune(subl), true)
+		case l[0] == 'e': // command block
+			cwblock = false
+			if len(l) < 1+5*12+1 {
+				return fmt.Errorf("bad line %#v in dumpfile", l)
+			}
+			// We discard a line
+			l, err = readtrim(b) // ctl line; ignored
+			if err != nil {
+				return err
+			}
+			dirline, err := readtrim(b) // directory
+			if err != nil {
+				return err
+			}
+
+			if dirline == "" {
+				dirline = home
+			}
+			cmdline, err := readtrim(b) // command
+			if err != nil {
+				return err
+			}
+			// log.Println("cmdline", cmdline, "dirline", dirline)
+			run(nil, cmdline, dirline, true, "", "", false)
+		case l[0] == 'f':
+			cwblock = false
+			if len(l) < 1+5*12+1 {
+				return fmt.Errorf("bad line %#v in dumpfile", l)
+			}
+			spl := splitline(l, 7)
+			if err := row.loadhelper(b, spl, spl[6], -1, 0); err != nil {
+				return err
+			}
+		case l[0] == 'F':
+			cwblock = false
+			if len(l) < 1+6*12+1 {
+				return fmt.Errorf("bad line %#v in dumpfile", l)
+			}
+			spl := splitline(l, 8)
+			ndumped, err := strconv.ParseInt(spl[6], 10, 64)
+			if err != nil {
+				return fmt.Errorf("bad count of unsaved text from line %#v in dumpfile", l)
+			}
+			if err := row.loadhelper(b, spl, spl[7], ndumped, 0); err != nil {
+				return err
+			}
+		case l[0] == 'x':
+			cwblock = false
+			if len(l) < 1+5*12+1 {
+				return fmt.Errorf("bad line %#v in dumpfile", l)
+			}
+			spl := splitline(l, 7)
+			if err := row.loadhelper(b, spl, spl[6], -1 /* dumpid */, 1); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("default bad line %#v in dumpfile", l)
+		}
+	}
 	return nil
 }
 
