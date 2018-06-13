@@ -973,7 +973,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	c.name = name
 	// t is the full path, trimmed of left whitespace.
 	pipechar = 0
-	if t[0] == '<' || t[0] == '|' || t[0] == '>' {
+	if len(t) > 0 && (t[0] == '<' || t[0] == '|' || t[0] == '>') {
 		pipechar = int(t[0])
 		t = t[1:]
 	}
