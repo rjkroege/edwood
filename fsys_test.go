@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -12,17 +14,62 @@ import (
 	"9fans.net/go/plan9/client"
 )
 
+func TestMain(m *testing.M) {
+	switch os.Getenv("TEST_MAIN") {
+	case "edwood":
+		main()
+	default:
+		// TODO: Replace Xvfb with a fake devdraw.
+		var x *exec.Cmd
+		switch runtime.GOOS {
+		case "linux", "freebsd", "openbsd", "netbsd", "dragonfly":
+			if os.Getenv("DISPLAY") == "" {
+				disp := fmt.Sprintf(":%d", xvfbServerNumber())
+				x = exec.Command("Xvfb", disp)
+				if err := x.Start(); err != nil {
+					log.Fatalf("failed to execute Xvfb: %v", err)
+				}
+				// Give Xvfb some time to start up
+				time.Sleep(time.Millisecond)
+				os.Setenv("DISPLAY", disp)
+			}
+		}
+		e := m.Run()
+
+		if x != nil {
+			// Kill Xvfb gracefully, so that it cleans up the /tmp/.X*-lock file.
+			x.Process.Signal(os.Interrupt)
+			x.Wait()
+		}
+		os.Exit(e)
+	}
+}
+
+// XvfbServerNumber finds a free server number for Xfvb.
+// Similar logic is used by /usr/bin/xvfb-run:/^find_free_servernum/
+func xvfbServerNumber() int {
+	for n := 99; n < 1000; n++ {
+		if _, err := os.Stat(fmt.Sprintf("/tmp/.X%d-lock", n)); os.IsNotExist(err) {
+			return n
+		}
+	}
+	panic("no free X server number")
+}
+
 func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 	// Fork off an acme and talk with it.
 
-	os.Setenv("NAMESPACE", os.TempDir()+"/ns.fsystest")
-	os.Mkdir(os.TempDir()+"/ns.fsystest", os.ModeDir|os.ModePerm)
-	os.Remove(os.TempDir() + "/ns.fsystest/acme")
+	ns := os.TempDir() + "/ns.fsystest"
+	os.Setenv("NAMESPACE", ns)
+	os.Mkdir(ns, os.ModeDir|os.ModePerm)
+	os.Remove(ns + "/acme")
 
-	acmd := exec.Command("./edwood")
+	acmd := exec.Command(os.Args[0])
+	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
 	acmd.Stdout = os.Stdout
+	acmd.Stderr = os.Stderr
 	if err := acmd.Start(); err != nil {
-		t.Fatalf("failed to execute ./edwood: %v", err)
+		t.Fatalf("failed to execute edwood: %v", err)
 	}
 
 	var fsys *client.Fsys
