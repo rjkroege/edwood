@@ -58,22 +58,24 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 			if err != nil {
 				panic(fmt.Sprintf("ResolveUnixAddr: %v", err))
 			}
-			conn, err = net.DialUnix(s[0], unixaddr, nil)
+			conn, err = net.DialUnix(s[0], nil, unixaddr)
 			if err != nil {
 				panic(fmt.Sprintf("cannot reopen for mount: %v", err))
 			}
 		}
 	}
 	if mtpt != "" {
+		// Try v9fs on Linux, which will mount 9P directly.
 		cmd := exec.Command("mount9p", "-", mtpt)
-		if conn == nil {
-			cmd.Stdout = fd
-		} else {
+		if conn != nil {
 			fd, err = conn.File()
 			if err != nil {
 				panic("Bad mtpt connection")
 			}
 		}
+		cmd.Stdin = fd
+		cmd.Stdout = fd
+		cmd.Stderr = os.Stderr
 		err := cmd.Start()
 		if err != nil {
 			if chattyfuse {
@@ -81,7 +83,9 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 			} else {
 				cmd = exec.Command("9pfuse", "-", mtpt)
 			}
+			cmd.Stdin = fd
 			cmd.Stdout = fd
+			cmd.Stderr = os.Stderr
 			err = cmd.Start()
 			if err != nil {
 				panic(fmt.Sprintf("failed to run 9pfuse: %v", err))
