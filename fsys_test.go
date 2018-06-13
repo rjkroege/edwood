@@ -21,7 +21,9 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 
 	acmd := exec.Command("./edwood")
 	acmd.Stdout = os.Stdout
-	acmd.Start()
+	if err := acmd.Start(); err != nil {
+		t.Fatalf("failed to execute ./edwood: %v", err)
+	}
 
 	var fsys *client.Fsys
 	var err error
@@ -176,6 +178,9 @@ Occasion
 	tfs.Write("/new/body", text)
 
 	op := <-reportchan
+	for strings.Index(op, "focus") != -1 {
+		op = <-reportchan
+	}
 	if strings.Index(op, "new") == -1 {
 		t.Fatalf("Didn't get report of window creation.")
 	}
