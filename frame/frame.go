@@ -163,6 +163,7 @@ type FrameFillStatus struct {
 	Nchars   int
 	Nlines   int
 	Maxlines int
+	MaxPixelHeight int
 }
 
 func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
@@ -172,6 +173,7 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 		Nchars:   f.nchars,
 		Nlines:   f.nlines,
 		Maxlines: f.maxlines,
+		MaxPixelHeight: f.maxlines * f.defaultfontheight,
 	}
 }
 
