@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -56,13 +57,21 @@ func xvfbServerNumber() int {
 	panic("no free X server number")
 }
 
-func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
+type Acme struct {
+	t    *testing.T
+	ns   string
+	cmd  *exec.Cmd
+	fsys *client.Fsys
+}
+
+func startAcme(t *testing.T) *Acme {
 	// Fork off an acme and talk with it.
 
-	ns := os.TempDir() + "/ns.fsystest"
+	ns, err := ioutil.TempDir("", "ns.fsystest")
+	if err != nil {
+		t.Fatalf("failed to create namespace: %v", err)
+	}
 	os.Setenv("NAMESPACE", ns)
-	os.Mkdir(ns, os.ModeDir|os.ModePerm)
-	os.Remove(ns + "/acme")
 
 	acmd := exec.Command(os.Args[0])
 	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
@@ -73,13 +82,12 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 	}
 
 	var fsys *client.Fsys
-	var err error
 	for i := 0; i < 10; i++ {
 		fsys, err = client.MountService("acme")
 		if err != nil {
 			if i > 9 {
 				t.Fatalf("Failed to mount acme: %v", err)
-				return nil, nil
+				return nil
 			} else {
 				time.Sleep(time.Second)
 			}
@@ -87,7 +95,19 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 			break
 		}
 	}
-	return acmd, fsys
+	return &Acme{
+		ns:   ns,
+		cmd:  acmd,
+		fsys: fsys,
+	}
+}
+
+func (a *Acme) Cleanup() {
+	a.cmd.Process.Kill()
+	a.cmd.Wait()
+	if err := os.RemoveAll(a.ns); err != nil {
+		a.t.Errorf("failed to remove temporary namespace %v: %v", a.ns, err)
+	}
 }
 
 // Fsys tests run my running a server and client in-process and communicating
@@ -96,7 +116,9 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 func TestFSys(t *testing.T) {
 	var err error
 
-	acmd, fsys := startAcme(t)
+	a := startAcme(t)
+	defer a.Cleanup()
+	fsys := a.fsys
 
 	/*	fid, err := fsys.Open("/", 0) // Readonly
 		if err != nil {
@@ -199,18 +221,12 @@ func TestFSys(t *testing.T) {
 		}
 	}
 	fid.Close()
-
-	acmd.Process.Kill()
-	acmd.Wait()
 }
 
 func TestFSysAddr(t *testing.T) {
-	acmd, fsys := startAcme(t)
-	defer func() {
-		acmd.Process.Kill()
-		acmd.Wait()
-	}()
-	tfs := tFsys{t, fsys}
+	a := startAcme(t)
+	defer a.Cleanup()
+	tfs := tFsys{t, a.fsys}
 
 	//Add some known text
 	text := `
@@ -239,7 +255,7 @@ Occasion
 
 	// Addr is not persistent once you close it, so you need
 	// to read any desired changes with the same opening.
-	fid, err := fsys.Open(winname+"/addr", plan9.OREAD|plan9.OWRITE)
+	fid, err := a.fsys.Open(winname+"/addr", plan9.OREAD|plan9.OWRITE)
 	if err != nil {
 		t.Fatalf("Failed to open %s/addr", winname)
 	}
