@@ -25,14 +25,15 @@ func TestMain(m *testing.M) {
 		switch runtime.GOOS {
 		case "linux", "freebsd", "openbsd", "netbsd", "dragonfly":
 			if os.Getenv("DISPLAY") == "" {
-				disp := fmt.Sprintf(":%d", xvfbServerNumber())
-				x = exec.Command("Xvfb", disp)
+				dp := fmt.Sprintf(":%d", xvfbServerNumber())
+				x = exec.Command("Xvfb", dp)
 				if err := x.Start(); err != nil {
 					log.Fatalf("failed to execute Xvfb: %v", err)
 				}
-				// Give Xvfb some time to start up
-				time.Sleep(time.Millisecond)
-				os.Setenv("DISPLAY", disp)
+				// Give Xvfb some time to start up.
+				// 3 seconds is default for xvfb-run.
+				time.Sleep(3 * time.Second)
+				os.Setenv("DISPLAY", dp)
 			}
 		}
 		e := m.Run()
