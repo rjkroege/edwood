@@ -34,6 +34,10 @@ type Frame interface {
 	GetFrameFillStatus() FrameFillStatus
 	IsLastLineFull() bool
 	Rect() image.Rectangle
+	
+	// TextOccupiedHeight returns the height of the region in the frame
+	// occupied by its boxes.
+	TextOccupiedHeight() int
 
 	// Init prepares the Frame for the display of text in rectangle r.
 	// Frame f will reuse previously set FontMetrics, colours, tab width and
@@ -175,6 +179,15 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 		Maxlines: f.maxlines,
 		MaxPixelHeight: f.maxlines * f.defaultfontheight,
 	}
+}
+
+func (f *frameimpl) TextOccupiedHeight() int {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+
+	// TODO(rjk): To support multiple different fonts at once in a Frame,
+	// this will have to be extended to be the sum of the height of the boxes.
+	return  f.nlines * f.defaultfontheight
 }
 
 func (f *frameimpl) IsLastLineFull() bool {

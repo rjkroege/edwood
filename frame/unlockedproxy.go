@@ -14,6 +14,7 @@ type  SelectScrollUpdater interface {
 	Insert( []rune,  int) bool
 	IsLastLineFull() bool
 	Rect() image.Rectangle
+	TextOccupiedHeight() int
 }
 
 type selectscrollupdaterimpl  frameimpl
@@ -65,3 +66,10 @@ func (up *selectscrollupdaterimpl) Rect() image.Rectangle {
 	f := (*frameimpl)(up)
 	return f.rect
 }
+
+func (up *selectscrollupdaterimpl) TextOccupiedHeight() int {
+	// log.Println("selectscrollupdaterimpl.TextOccupiedHeight")
+	f := (*frameimpl)(up)
+	return f.nlines * f.defaultfontheight
+}
+
