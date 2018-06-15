@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -12,27 +15,80 @@ import (
 	"9fans.net/go/plan9/client"
 )
 
-func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
+func TestMain(m *testing.M) {
+	switch os.Getenv("TEST_MAIN") {
+	case "edwood":
+		main()
+	default:
+		// TODO: Replace Xvfb with a fake devdraw.
+		var x *exec.Cmd
+		switch runtime.GOOS {
+		case "linux", "freebsd", "openbsd", "netbsd", "dragonfly":
+			if os.Getenv("DISPLAY") == "" {
+				dp := fmt.Sprintf(":%d", xvfbServerNumber())
+				x = exec.Command("Xvfb", dp)
+				if err := x.Start(); err != nil {
+					log.Fatalf("failed to execute Xvfb: %v", err)
+				}
+				// Give Xvfb some time to start up.
+				// 3 seconds is default for xvfb-run.
+				time.Sleep(3 * time.Second)
+				os.Setenv("DISPLAY", dp)
+			}
+		}
+		e := m.Run()
+
+		if x != nil {
+			// Kill Xvfb gracefully, so that it cleans up the /tmp/.X*-lock file.
+			x.Process.Signal(os.Interrupt)
+			x.Wait()
+		}
+		os.Exit(e)
+	}
+}
+
+// XvfbServerNumber finds a free server number for Xfvb.
+// Similar logic is used by /usr/bin/xvfb-run:/^find_free_servernum/
+func xvfbServerNumber() int {
+	for n := 99; n < 1000; n++ {
+		if _, err := os.Stat(fmt.Sprintf("/tmp/.X%d-lock", n)); os.IsNotExist(err) {
+			return n
+		}
+	}
+	panic("no free X server number")
+}
+
+type Acme struct {
+	t    *testing.T
+	ns   string
+	cmd  *exec.Cmd
+	fsys *client.Fsys
+}
+
+func startAcme(t *testing.T) *Acme {
 	// Fork off an acme and talk with it.
 
-	os.Setenv("NAMESPACE", os.TempDir()+"/ns.fsystest")
-	os.Mkdir(os.TempDir()+"/ns.fsystest", os.ModeDir|os.ModePerm)
-	os.Remove(os.TempDir() + "/ns.fsystest/acme")
+	ns, err := ioutil.TempDir("", "ns.fsystest")
+	if err != nil {
+		t.Fatalf("failed to create namespace: %v", err)
+	}
+	os.Setenv("NAMESPACE", ns)
 
-	acmd := exec.Command("./edwood")
+	acmd := exec.Command(os.Args[0])
+	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
 	acmd.Stdout = os.Stdout
+	acmd.Stderr = os.Stderr
 	if err := acmd.Start(); err != nil {
-		t.Fatalf("failed to execute ./edwood: %v", err)
+		t.Fatalf("failed to execute edwood: %v", err)
 	}
 
 	var fsys *client.Fsys
-	var err error
 	for i := 0; i < 10; i++ {
 		fsys, err = client.MountService("acme")
 		if err != nil {
 			if i > 9 {
 				t.Fatalf("Failed to mount acme: %v", err)
-				return nil, nil
+				return nil
 			} else {
 				time.Sleep(time.Second)
 			}
@@ -40,7 +96,19 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 			break
 		}
 	}
-	return acmd, fsys
+	return &Acme{
+		ns:   ns,
+		cmd:  acmd,
+		fsys: fsys,
+	}
+}
+
+func (a *Acme) Cleanup() {
+	a.cmd.Process.Kill()
+	a.cmd.Wait()
+	if err := os.RemoveAll(a.ns); err != nil {
+		a.t.Errorf("failed to remove temporary namespace %v: %v", a.ns, err)
+	}
 }
 
 // Fsys tests run my running a server and client in-process and communicating
@@ -49,7 +117,9 @@ func startAcme(t *testing.T) (*exec.Cmd, *client.Fsys) {
 func TestFSys(t *testing.T) {
 	var err error
 
-	acmd, fsys := startAcme(t)
+	a := startAcme(t)
+	defer a.Cleanup()
+	fsys := a.fsys
 
 	/*	fid, err := fsys.Open("/", 0) // Readonly
 		if err != nil {
@@ -152,18 +222,12 @@ func TestFSys(t *testing.T) {
 		}
 	}
 	fid.Close()
-
-	acmd.Process.Kill()
-	acmd.Wait()
 }
 
 func TestFSysAddr(t *testing.T) {
-	acmd, fsys := startAcme(t)
-	defer func() {
-		acmd.Process.Kill()
-		acmd.Wait()
-	}()
-	tfs := tFsys{t, fsys}
+	a := startAcme(t)
+	defer a.Cleanup()
+	tfs := tFsys{t, a.fsys}
 
 	//Add some known text
 	text := `
@@ -192,7 +256,7 @@ Occasion
 
 	// Addr is not persistent once you close it, so you need
 	// to read any desired changes with the same opening.
-	fid, err := fsys.Open(winname+"/addr", plan9.OREAD|plan9.OWRITE)
+	fid, err := a.fsys.Open(winname+"/addr", plan9.OREAD|plan9.OWRITE)
 	if err != nil {
 		t.Fatalf("Failed to open %s/addr", winname)
 	}
