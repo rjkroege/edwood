@@ -1111,7 +1111,7 @@ func (t *Text) Select() {
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
 	if (clicktext == t && mouse.Msec-uint32(clickmsec) < 500) && (q0 == q1 && selectq == q0) {
-		q0, q1 = t.DoubleClick(q0)
+		q0, q1 = t.DoubleClick(q0, q1)
 		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
 		t.SetSelect(q0, q1)
 		t.display.Flush()
@@ -1151,7 +1151,7 @@ func (t *Text) Select() {
 	}
 	if q0 == q1 {
 		if q0 == t.q0 && clicktext == t && mouse.Msec-uint32(clickmsec) < 500 {
-			q0, q1 = t.DoubleClick(q0)
+			q0, q1 = t.DoubleClick(q0, q1)
 			clicktext = nil
 		} else {
 			clicktext = t
@@ -1338,8 +1338,9 @@ func (t *Text) Select3() (q0, q1 int, r bool) {
 	return q0, q1, buts == 0
 }
 
-func (t *Text) DoubleClick(inq0 int) (q0, q1 int) {
+func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	q0 = inq0
+	q1 = inq1
 	if q0, q1, ok := t.ClickHTMLMatch(inq0); ok {
 		return q0, q1
 	}
