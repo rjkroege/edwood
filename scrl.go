@@ -80,7 +80,7 @@ func (t *Text) ScrDraw(nchars int) {
 	r1 = r
 	r1.Min.X = 0
 	r1.Max.X = r.Dx()
-	r2 = scrpos(r1, t.org, t.org+ nchars, t.file.b.Nc())
+	r2 = scrpos(r1, t.org, t.org+nchars, t.file.b.Nc())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.

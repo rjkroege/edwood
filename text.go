@@ -98,7 +98,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.font = rf
 	t.tabstop = int(maxtab)
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
-	t.Redraw(r,  -1, false /* noredraw */)
+	t.Redraw(r, -1, false /* noredraw */)
 	return t
 }
 
@@ -172,7 +172,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
 	// TODO(rjk): Remove this Font accessor.
-	t.Redraw(r,odx, noredraw)
+	t.Redraw(r, odx, noredraw)
 	return t.all.Max.Y
 }
 
@@ -504,8 +504,6 @@ func (t *Text) inSelection(q0 int) bool {
 	return t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1
 }
 
-
-
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
 func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	// log.Println("Text.Fill Start", t.whatstring())
@@ -518,7 +516,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	}
 	if t.ncache > 0 {
 		t.TypeCommit()
-	} 
+	}
 	for {
 		n := t.file.b.Nc() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
@@ -1075,7 +1073,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
 			return
 		}
-		q0 = t.org + (fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl* fr.DefaultFontHeight())))
+		q0 = t.org + (fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight())))
 	}
 	// Insert text into the frame.
 	t.setorigin(fr, q0, true, true)
@@ -1589,7 +1587,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	if a >= 0 && a < fr.GetFrameFillStatus().Nchars {
 		fr.Delete(0, a)
 	} else {
-		if a < 0 && -a <fr.GetFrameFillStatus().Nchars {
+		if a < 0 && -a < fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = make([]rune, n)
 			t.file.b.Read(org, r)

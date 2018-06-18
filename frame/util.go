@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-
 // canfit measures the b's string contents and determines if it fits
 // in the region of the screen between pt and the right edge of the
 // text-containing region. Returned values have several cases.
@@ -89,7 +88,7 @@ func (f *frameimpl) advance(p image.Point, b *frbox) image.Point {
 }
 
 // newwid returns the width of a given box and mutates the
-// appropriately. 
+// appropriately.
 // TODO(rjk): I'm perturbed. This is horrible.
 func (f *frameimpl) newwid(pt image.Point, b *frbox) int {
 	b.Wid = f.newwid0(pt, b)
@@ -176,10 +175,10 @@ func (f *frameimpl) Logboxes(message string, args ...interface{}) {
 }
 
 func (b *frbox) String() string {
-			if b.Nrune == -1 && b.Bc == '\n' {
-				return fmt.Sprintf("newline")
-			} else if b.Nrune == -1 && b.Bc == '\t' {
-				return fmt.Sprintf("tab width=%d,%d",  b.Wid, b.Minwid)
-			} 
-			return fmt.Sprintf("%#v width=%d nrune=%d",string(b.Ptr), b.Wid, b.Nrune)
+	if b.Nrune == -1 && b.Bc == '\n' {
+		return fmt.Sprintf("newline")
+	} else if b.Nrune == -1 && b.Bc == '\t' {
+		return fmt.Sprintf("tab width=%d,%d", b.Wid, b.Minwid)
+	}
+	return fmt.Sprintf("%#v width=%d nrune=%d", string(b.Ptr), b.Wid, b.Nrune)
 }

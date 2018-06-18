@@ -452,11 +452,11 @@ func (r *Row) Dump(file string) {
 	b.Flush()
 }
 
-// LoadFonts gets the font names from the load file so we don't load 
+// LoadFonts gets the font names from the load file so we don't load
 // fonts that we won't use.
 func LoadFonts(file string) []string {
 	// C: rowloadfonts
-	f, err  := os.Open(file)
+	f, err := os.Open(file)
 	if err != nil {
 		return []string{}
 	}
@@ -476,7 +476,7 @@ func LoadFonts(file string) []string {
 		if err != nil {
 			return []string{}
 		}
-		
+
 		fontnames = append(fontnames, strings.TrimRight(fn, "\n"))
 	}
 	return fontnames

@@ -105,9 +105,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	}
 
 	// log.Printf("after  loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
-       if n1 == len(f.box) && pt0.X != pt1.X {
-               f.SelectPaint(pt0, pt1, f.cols[ColBack])
-       }
+	if n1 == len(f.box) && pt0.X != pt1.X {
+		f.SelectPaint(pt0, pt1, f.cols[ColBack])
+	}
 	if pt1.Y != pt0.Y {
 		// Blit up the remainder of the text.
 		// TODO(rjk): Understand this completely
@@ -128,10 +128,10 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 			f.background.Draw(image.Rect(pt0.X, pt0.Y, pt0.X+(f.rect.Max.X-pt1.X), q0), f.background, nil, pt1)
 			f.background.Draw(image.Rect(f.rect.Min.X, q0, f.rect.Max.X, q0+(q2-q1)), f.background, nil, image.Pt(f.rect.Min.X, q1))
-                       f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.cols[ColBack])
-               } else {
-                       f.SelectPaint(pt0, pt2, f.cols[ColBack])
-               }
+			f.SelectPaint(image.Pt(pt2.X, pt2.Y-(pt1.Y-pt0.Y)), pt2, f.cols[ColBack])
+		} else {
+			f.SelectPaint(pt0, pt2, f.cols[ColBack])
+		}
 	}
 
 	f.closebox(n0, n1-1)
@@ -159,9 +159,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	}
 
 	f.nchars -= int(p1 - p0)
-       if f.sp0 == f.sp1 {
-               f.Tick(f.ptofcharptb(f.sp0, f.rect.Min, 0), true)
-       }
+	if f.sp0 == f.sp1 {
+		f.Tick(f.ptofcharptb(f.sp0, f.rect.Min, 0), true)
+	}
 	pt0 = f.ptofcharptb(f.nchars, f.rect.Min, 0)
 	n := f.nlines
 	f.nlines = (pt0.Y - f.rect.Min.Y) / f.defaultfontheight

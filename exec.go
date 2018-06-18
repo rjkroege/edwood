@@ -212,7 +212,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
-		words := wsre.Split(s,  2)
+		words := wsre.Split(s, 2)
 		arg := ""
 		if len(words) > 1 {
 			arg = strings.TrimLeft(words[1], " \t\n")

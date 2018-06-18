@@ -6,33 +6,33 @@ import (
 
 // SelectScrollUpdater is a struct subset of frame.Frame that contains only those
 // methods needed to implement a frame.Select callback.
-type  SelectScrollUpdater interface {
+type SelectScrollUpdater interface {
 	GetFrameFillStatus() FrameFillStatus
 	Charofpt(pt image.Point) int
 	DefaultFontHeight() int
-	Delete(int,  int) int 
-	Insert( []rune,  int) bool
+	Delete(int, int) int
+	Insert([]rune, int) bool
 	IsLastLineFull() bool
 	Rect() image.Rectangle
 	TextOccupiedHeight() int
 }
 
-type selectscrollupdaterimpl  frameimpl
+type selectscrollupdaterimpl frameimpl
 
 func (up *selectscrollupdaterimpl) GetFrameFillStatus() FrameFillStatus {
 	// log.Println("selectscrollupdaterimpl.GetFrameFillStatus")
 	f := (*frameimpl)(up)
 	return FrameFillStatus{
-			Nchars:   f.nchars,
-			Nlines:   f.nlines,
-			Maxlines: f.maxlines,
-		}
+		Nchars:   f.nchars,
+		Nlines:   f.nlines,
+		Maxlines: f.maxlines,
+	}
 }
 
 func (up *selectscrollupdaterimpl) Charofpt(pt image.Point) int {
 	// log.Println("selectscrollupdaterimpl.Charofpt")
 	f := (*frameimpl)(up)
-	return 	f.charofptimpl(pt)
+	return f.charofptimpl(pt)
 }
 
 func (up *selectscrollupdaterimpl) DefaultFontHeight() int {
@@ -47,7 +47,6 @@ func (up *selectscrollupdaterimpl) Delete(p0, p1 int) int {
 	return f.deleteimpl(p0, p1)
 }
 
-
 func (up *selectscrollupdaterimpl) Insert(r []rune, p0 int) bool {
 	// log.Println("selectscrollupdaterimpl.Insert")
 	f := (*frameimpl)(up)
@@ -60,7 +59,6 @@ func (up *selectscrollupdaterimpl) IsLastLineFull() bool {
 	return f.lastlinefull
 }
 
-
 func (up *selectscrollupdaterimpl) Rect() image.Rectangle {
 	// log.Println("selectscrollupdaterimpl.Rect")
 	f := (*frameimpl)(up)
@@ -72,4 +70,3 @@ func (up *selectscrollupdaterimpl) TextOccupiedHeight() int {
 	f := (*frameimpl)(up)
 	return f.nlines * f.defaultfontheight
 }
-

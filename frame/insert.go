@@ -125,7 +125,7 @@ var nalloc = 0
 func (f *frameimpl) Insert(r []rune, p0 int) bool {
 	f.lk.Lock()
 	defer f.lk.Unlock()
-	return f.insertimpl(r, p0)	
+	return f.insertimpl(r, p0)
 }
 
 func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
@@ -363,7 +363,7 @@ func (f *frameimpl) validateinputs(runes []rune, format string, args ...interfac
 	}
 
 	for i, r := range runes {
-		if r == 0x00 {	// Nulls in input string are forbidden.
+		if r == 0x00 { // Nulls in input string are forbidden.
 			log.Printf(format, args...)
 			log.Printf("r[%d] null", i)
 			panic("-- invalid input to Frame.Insert --")
