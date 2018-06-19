@@ -14,7 +14,7 @@ type Fontmetrics interface {
 	DefaultHeight() int
 	Impl() *draw.Font
 	StringWidth(string) int
-	RunesWidth( []rune) int
+	RunesWidth([]rune) int
 }
 
 type frfont struct {

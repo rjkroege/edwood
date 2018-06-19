@@ -57,7 +57,7 @@ func (f *frameimpl) grid(p image.Point) image.Point {
 func (f *frameimpl) Charofpt(pt image.Point) int {
 	f.lk.Lock()
 	defer f.lk.Unlock()
-	return 	f.charofptimpl( pt )
+	return f.charofptimpl(pt)
 }
 
 func (f *frameimpl) charofptimpl(pt image.Point) int {

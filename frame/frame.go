@@ -19,8 +19,6 @@ const (
 	frtickw = 3
 )
 
-
-
 // Frame is the public interface to a frame of text. Unlike the C implementation,
 // new Frame instances should be created with NewFrame.
 type Frame interface {
@@ -34,7 +32,7 @@ type Frame interface {
 	GetFrameFillStatus() FrameFillStatus
 	IsLastLineFull() bool
 	Rect() image.Rectangle
-	
+
 	// TextOccupiedHeight returns the height of the region in the frame
 	// occupied by its boxes.
 	TextOccupiedHeight() int
@@ -51,7 +49,7 @@ type Frame interface {
 	//
 	// Changing the background or font will force the tick to be
 	// recreated.
-	Init( image.Rectangle,  ...option)
+	Init(image.Rectangle, ...option)
 
 	// Clear frees the internal structures associated with f, permitting
 	// another Init or SetRects on the Frame. It does not clear the
@@ -65,7 +63,7 @@ type Frame interface {
 	// /shape of its containing rectangle is unchanged, it is sufficient to
 	// /use Draw to copy the containing rectangle from the old to the new
 	// /location and then call SetRects to establish the new geometry.
-	Clear( bool)
+	Clear(bool)
 
 	// DefaultFontHeight returns the height of the Frame's default font.
 	// TODO(rjk): Reconsider this for Frames containing many styles.
@@ -79,7 +77,7 @@ type Frame interface {
 	// rune, starting from 0, in the receiver Frame. If the Frame holds
 	// fewer than p runes, Ptofchar returns the location of the upper right
 	// corner of the last character in the Frame
-	Ptofchar( int) image.Point
+	Ptofchar(int) image.Point
 
 	// Insert inserts r into Frame f starting at index p0.
 	// If a NUL (0) character is inserted, chaos will ensue. Tabs
@@ -88,7 +86,7 @@ type Frame interface {
 	// backspaces are printed; to erase a character, use Delete.
 	//
 	// Insert will remove the selection or tick  if present but update selection offsets.
-	Insert( []rune,  int) bool
+	Insert([]rune, int) bool
 
 	// Redraw redraws the background of the Frame where the Frame is inside
 	// enclosing. Frame is responsible for drawing all of the pixels inside
@@ -118,17 +116,17 @@ type Frame interface {
 	// in place of the one that Select is invoked on.
 	//
 	// Select returns the selection range in the Frame.
-	Select( *draw.Mousectl,  *draw.Mouse,  func(SelectScrollUpdater, int)) (int, int)
+	Select(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int)) (int, int)
 
 	// SelectOpt makes a selection in the same fashion as Select but does it in a
 	// temporary way with the specified text colours fg, bg.
-	SelectOpt( *draw.Mousectl,  *draw.Mouse,  func(SelectScrollUpdater, int), *draw.Image,  *draw.Image) (int, int)
+	SelectOpt(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int), *draw.Image, *draw.Image) (int, int)
 
 	// Delete deletes from the Frame the text between p0 and p1; p1 points at
 	// the first rune beyond the deletion.
 	//
 	// Delete will clear a selection or tick if present but not put it back.
-	Delete(int,  int) int 
+	Delete(int, int) int
 
 	// DrawSel repaints a section of the frame, delimited by rune
 	// positions p0 and p1, either with plain background or entirely
@@ -149,7 +147,7 @@ type Frame interface {
 	// DrawSel does the minimum work needed to clear a highlight and (in particular)
 	// multiple calls to DrawSel with highlighted false will be cheap.
 	// TODO(rjk): DrawSel does more drawing work than necessary.
-	DrawSel( image.Point, int,  int,  bool) 
+	DrawSel(image.Point, int, int, bool)
 }
 
 // TODO(rjk): Consider calling this SetMaxtab?
@@ -164,9 +162,9 @@ func (f *frameimpl) GetMaxtab() int { return f.maxtab }
 
 // FrameFillStatus is a snapshot of the capacity of the Frame.
 type FrameFillStatus struct {
-	Nchars   int
-	Nlines   int
-	Maxlines int
+	Nchars         int
+	Nlines         int
+	Maxlines       int
 	MaxPixelHeight int
 }
 
@@ -174,9 +172,9 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	return FrameFillStatus{
-		Nchars:   f.nchars,
-		Nlines:   f.nlines,
-		Maxlines: f.maxlines,
+		Nchars:         f.nchars,
+		Nlines:         f.nlines,
+		Maxlines:       f.maxlines,
 		MaxPixelHeight: f.maxlines * f.defaultfontheight,
 	}
 }
@@ -187,7 +185,7 @@ func (f *frameimpl) TextOccupiedHeight() int {
 
 	// TODO(rjk): To support multiple different fonts at once in a Frame,
 	// this will have to be extended to be the sum of the height of the boxes.
-	return  f.nlines * f.defaultfontheight
+	return f.nlines * f.defaultfontheight
 }
 
 func (f *frameimpl) IsLastLineFull() bool {
@@ -203,7 +201,7 @@ func (f *frameimpl) Rect() image.Rectangle {
 }
 
 // TODO(rjk): no need for this to have public fields.
-// TODO(rjk): Could fold Minwid && Bc into Nrune. 
+// TODO(rjk): Could fold Minwid && Bc into Nrune.
 type frbox struct {
 	Wid    int    // In pixels. Fixed large size for layout box.
 	Nrune  int    // Number of runes in Ptr or -1 for special layout boxes (tab, newline)
@@ -218,7 +216,7 @@ type frbox struct {
 // 	reallock sync.Mutex
 // 	havelock bool
 // }
-// 
+//
 // func (m *debugginglock) Lock() {
 // 	if m.havelock {
 // 		panic("attempt to reentrantly enter locked frameimpl")
@@ -226,7 +224,7 @@ type frbox struct {
 // 	m.reallock.Lock()
 // 	m.havelock = true
 // }
-// 
+//
 // func (m *debugginglock) Unlock() {
 // 	m.havelock = false
 // 	m.reallock.Unlock()
