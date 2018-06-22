@@ -423,10 +423,11 @@ func (r *Row) Dump(file string) {
 			} else {
 				dumped = true
 				t.file.dumpid = w.id
+				// TODO(rjk): Conceivably this is a bit of a layering violation?
 				fmt.Fprintf(b, "F%11d %11d %11d %11d %11.7f %11d %s\n", i, j,
 					w.body.q0, w.body.q1,
 					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
-					w.body.file.b.Nc(), fontname)
+					w.body.file.b.Nbyte(), fontname)
 			}
 			b.WriteString(w.CtlPrint(false))
 			fmt.Fprintf(b, "%s\n", firstbufline(&w.tag.file.b))

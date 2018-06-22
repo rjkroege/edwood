@@ -63,6 +63,16 @@ func (b *Buffer) Nc() int {
 	return len(*b)
 }
 
+// Nbyte returns the number of bytes needed to store the contents
+// of the buffer in UTF-8.
+func (b *Buffer) Nbyte() int {
+	bc := 0
+	for _, r := range *b {
+		bc += utf8.RuneLen(r)
+	}
+	return bc
+}
+
 func fbufalloc() []rune {
 	return make([]rune, BUFSIZE/utf8.UTFMax)
 }
