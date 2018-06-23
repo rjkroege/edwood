@@ -53,7 +53,7 @@ func TestLoadFonts(t *testing.T) {
 	f.Close()
 
 	if resp := LoadFonts(filepath.Join(dir, "short_file")); !reflect.DeepEqual(resp, []string{}) {
-		t.Errorf("TestLoadFonts short_file want %v, got %v", []string{}, resp)
+		t.Errorf("TestLoadFonts short_file want %v, got %#v", []string{}, resp)
 	}
 
 	f, err = os.Create(filepath.Join(dir, "full_file"))

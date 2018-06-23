@@ -476,7 +476,7 @@ func LoadFonts(file string) []string {
 	fontnames := make([]string, 0, 2)
 	for i := 0; i < 2; i++ {
 		fn, err := readtrim(b)
-		if err != nil {
+		if err != nil  || fn == "" {
 			return []string{}
 		}
 		fontnames = append(fontnames, fn)
@@ -531,19 +531,19 @@ func (row *Row) loadhelper(rd *bufio.Reader, subl []string, fontname string, ndu
 
 	oq0, err := strconv.ParseInt(subl[3], 10, 64)
 	if err != nil {
-		return fmt.Errorf("cant't parse q0: %v", subl[3], err)
+		return fmt.Errorf("cant't parse q0 %s because %v", subl[3], err)
 	}
 	q0 := int(oq0)
 
 	oq1, err := strconv.ParseInt(subl[4], 10, 64)
 	if err != nil {
-		return fmt.Errorf("cant't parse q1: %v", subl[4], err)
+		return fmt.Errorf("cant't parse q1 %s because %v", subl[4], err)
 	}
 	q1 := int(oq1)
 
 	percent, err := strconv.ParseFloat(subl[5], 64)
 	if err != nil {
-		return fmt.Errorf("cant't parse percent: %v", subl[5], err)
+		return fmt.Errorf("cant't parse percent %s becasue %v", subl[5], err)
 	}
 
 	if i > len(row.col) { // Didn't we already make sure that we have a column?
@@ -692,7 +692,7 @@ func (row *Row) loadimpl(file string, initing bool) error {
 	subl := splitline(l, -1)
 
 	if len(subl) > 10 {
-		return fmt.Errorf("Load: bad number of column widths %d in %#v", l)
+		return fmt.Errorf("Load: bad number of column widths %d in %#v", len(subl), l)
 	}
 
 	// TODO(rjk): put column width parsing in a separate function.

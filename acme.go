@@ -77,8 +77,10 @@ func main() {
 
 	if loadfile != "" {
 		fontnames := LoadFonts(loadfile) // Overrides fonts selected up to here.
-		*varfontflag = fontnames[0]
-		*fixedfontflag = fontnames[1]
+		if len(fontnames) == 2 {
+			*varfontflag = fontnames[0]
+			*fixedfontflag = fontnames[1]
+		}
 	}
 
 	os.Setenv("font", *varfontflag)
