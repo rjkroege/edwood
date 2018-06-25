@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -65,17 +66,52 @@ type Acme struct {
 	fsys *client.Fsys
 }
 
+
+// augmentPath extends PATH so that plan9 dependencies can be
+// found in the build directory.
+func augmentPath() {
+	// We only have Linux executables.
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	// If the executables are already present, skip.
+	_, errdevdraw := exec.LookPath("devdraw")
+	_, err9pserve := exec.LookPath("9pserve")
+	if errdevdraw == nil && err9pserve == nil {
+		return
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	wd = filepath.Join(wd, "build")
+
+	path := os.Getenv("PATH") + ":" + wd
+	os.Setenv("PATH", path)
+}
+
+// startAcme runs an edwood process and 9p mounts it (at acme) in the
+// namespace so that a test may exercise IPC to the subordinate edwood
+// process.
 func startAcme(t *testing.T) *Acme {
-	// Fork off an acme and talk with it.
+	// If $USER is not set (i.e. running in a Docker container)
+	// MountService will fail. Detect this and give up if this is so.
+	if _, hzuser := os.LookupEnv("USER"); !hzuser {
+		t.Fatalf("Test will fail unless USER is set in environment. Please set.")
+	}
 
 	ns, err := ioutil.TempDir("", "ns.fsystest")
 	if err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
 	}
 	os.Setenv("NAMESPACE", ns)
+	augmentPath()
 
 	acmd := exec.Command(os.Args[0])
 	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
+
 	acmd.Stdout = os.Stdout
 	acmd.Stderr = os.Stderr
 	if err := acmd.Start(); err != nil {
@@ -86,7 +122,7 @@ func startAcme(t *testing.T) *Acme {
 	for i := 0; i < 10; i++ {
 		fsys, err = client.MountService("acme")
 		if err != nil {
-			if i > 9 {
+			if i >= 9 {
 				t.Fatalf("Failed to mount acme: %v", err)
 				return nil
 			} else {
