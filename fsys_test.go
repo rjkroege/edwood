@@ -66,7 +66,6 @@ type Acme struct {
 	fsys *client.Fsys
 }
 
-
 // augmentPath extends PATH so that plan9 dependencies can be
 // found in the build directory.
 func augmentPath() {
