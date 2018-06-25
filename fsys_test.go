@@ -66,9 +66,10 @@ type Acme struct {
 	fsys *client.Fsys
 }
 
+
 // augmentPath extends PATH so that plan9 dependencies can be
 // found in the build directory.
-func augmentPath() {
+func augmentPathEnv() {
 	// We only have Linux executables.
 	if runtime.GOOS != "linux" {
 		return
@@ -85,10 +86,14 @@ func augmentPath() {
 	if err != nil {
 		return
 	}
-	wd = filepath.Join(wd, "build")
 
-	path := os.Getenv("PATH") + ":" + wd
+	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin")
 	os.Setenv("PATH", path)
+
+	// We also need fonts.
+	if _, hzp9 := os.LookupEnv("PLAN9"); !hzp9 {
+		os.Setenv("PLAN9", filepath.Join(wd, "build"))
+	}
 }
 
 // startAcme runs an edwood process and 9p mounts it (at acme) in the
@@ -106,7 +111,7 @@ func startAcme(t *testing.T) *Acme {
 		t.Fatalf("failed to create namespace: %v", err)
 	}
 	os.Setenv("NAMESPACE", ns)
-	augmentPath()
+	augmentPathEnv()
 
 	acmd := exec.Command(os.Args[0])
 	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
