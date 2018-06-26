@@ -476,7 +476,7 @@ func LoadFonts(file string) []string {
 	fontnames := make([]string, 0, 2)
 	for i := 0; i < 2; i++ {
 		fn, err := readtrim(b)
-		if err != nil  || fn == "" {
+		if err != nil || fn == "" {
 			return []string{}
 		}
 		fontnames = append(fontnames, fn)
