@@ -611,10 +611,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 
 func access(name string) bool {
 	_, err := os.Stat(name)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func expand(t *Text, q0 int, q1 int) (Expand, bool) {

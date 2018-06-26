@@ -532,7 +532,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	}
 	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
-		warning(nil, "can't create file %s: %r\n", name)
+		warning(nil, "can't create file %s: %v\n", name, err)
 		return
 	}
 	defer fd.Close()
@@ -557,7 +557,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		//sha1((uchar*)s, m, nil, h);
 		nwritten, err := fd.Write([]byte(s))
 		if err != nil || nwritten != len(s) {
-			warning(nil, "can't write file %s: %r\n", name)
+			warning(nil, "can't write file %s: %v\n", name, err)
 			return
 		}
 	}
@@ -615,10 +615,9 @@ func putall(et, _, _ *Text, _, _ bool, arg string) {
 				continue
 			}
 			a := string(w.body.file.name)
-			e := access(a)
 			if w.body.file.mod || w.body.ncache > 0 {
-				if !e {
-					warning(nil, "no auto-Put of %s: %r\n", a)
+				if _, err := os.Stat(a); err != nil {
+					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {
 					w.Commit(&w.body)
 					put(&w.body, nil, nil, false, false, "")
@@ -959,13 +958,14 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		cmd.Stdin = sfd[0]
 		cmd.Stdout = sfd[1]
 		cmd.Stderr = sfd[2]
-		if err := cmd.Start(); err == nil {
+		err := cmd.Start()
+		if err == nil {
 			if cpid != nil {
 				cpid <- cmd.Process
 			}
 			return // TODO(flux) where do we wait?
 		}
-		warning(nil, "exec %s: %r\n", shell)
+		warning(nil, "exec %s: %v\n", shell, err)
 		Fail()
 	}
 	t = strings.TrimLeft(s, " \t\n")
