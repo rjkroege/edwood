@@ -55,5 +55,5 @@ func (up *selectscrollupdaterimpl) Rect() image.Rectangle {
 func (up *selectscrollupdaterimpl) TextOccupiedHeight(r image.Rectangle) int {
 	// log.Println("selectscrollupdaterimpl.TextOccupiedHeight")
 	f := (*frameimpl)(up)
-	return  f.textoccupiedheightimpl(r)
+	return f.textoccupiedheightimpl(r)
 }

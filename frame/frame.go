@@ -59,8 +59,6 @@ type SelectScrollUpdater interface {
 	TextOccupiedHeight(r image.Rectangle) int
 }
 
-
-
 // Frame is the public interface to a frame of text. Unlike the C implementation,
 // new Frame instances should be created with NewFrame.
 type Frame interface {
@@ -191,7 +189,6 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 	}
 }
 
-
 func (f *frameimpl) TextOccupiedHeight(r image.Rectangle) int {
 	f.lk.Lock()
 	defer f.lk.Unlock()
@@ -206,10 +203,10 @@ func (f *frameimpl) textoccupiedheightimpl(r image.Rectangle) int {
 	// TODO(rjk): To support multiple different fonts at once in a Frame,
 	// this will have to be extended to be the sum of the height of the boxes
 	// less than r.Dy
-	if r.Dy() > f.nlines * f.defaultfontheight {
-		return f.nlines * f.defaultfontheight;
+	if r.Dy() > f.nlines*f.defaultfontheight {
+		return f.nlines * f.defaultfontheight
 	}
-	return (r.Dy() / f.defaultfontheight) * f.defaultfontheight;
+	return (r.Dy() / f.defaultfontheight) * f.defaultfontheight
 }
 
 func (f *frameimpl) IsLastLineFull() bool {
