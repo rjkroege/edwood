@@ -19,23 +19,58 @@ const (
 	frtickw = 3
 )
 
+// SelectScrollUpdater are those frame.Frame methods offered to
+// frame.Select callbacks.
+type SelectScrollUpdater interface {
+	// GetFrameFillStatus returns a snapshot of the capacity of the frame.
+	GetFrameFillStatus() FrameFillStatus
+
+	// Charofpt returns the index of the closest rune whose image's upper
+	// left corner is up and to the left of pt.
+	Charofpt(pt image.Point) int
+
+	// DefaultFontHeight returns the height of the Frame's default font.
+	// TODO(rjk): Reconsider this for Frames containing many styles.
+	DefaultFontHeight() int
+
+	// Delete deletes from the Frame the text between p0 and p1; p1 points at
+	// the first rune beyond the deletion.
+	//
+	// Delete will clear a selection or tick if present but not put it back.
+	Delete(int, int) int
+
+	// Insert inserts r into Frame f starting at index p0.
+	// If a NUL (0) character is inserted, chaos will ensue. Tabs
+	// and newlines are handled by the library, but all other characters,
+	// including control characters, are just displayed. For example,
+	// backspaces are printed; to erase a character, use Delete.
+	//
+	// Insert will remove the selection or tick  if present but update selection offsets.
+	Insert([]rune, int) bool
+
+	IsLastLineFull() bool
+	Rect() image.Rectangle
+
+	// TextOccupiedHeight returns the height of the region in the frame
+	// occupied by boxes (which in the future could be of varying height)
+	// that is closest to the height of rectangle r such that only unclipped
+	// boxes fit in the returned height. If r.Dy() exeeds the total height of
+	// the current boxes, then returns the height of current set of boxes.
+	TextOccupiedHeight(r image.Rectangle) int
+}
+
+
+
 // Frame is the public interface to a frame of text. Unlike the C implementation,
 // new Frame instances should be created with NewFrame.
 type Frame interface {
+	SelectScrollUpdater
+
 	// Maxtab sets the maximum size of a tab in pixels.
 	Maxtab(m int)
 
 	// GetMaxtab returns the current maximum size of a tab in pixels.
 	GetMaxtab() int
-
-	// GetFrameFillStatus returns a snapshot of the capacity of the frame.
-	GetFrameFillStatus() FrameFillStatus
-	IsLastLineFull() bool
-	Rect() image.Rectangle
-
-	// TextOccupiedHeight returns the height of the region in the frame
-	// occupied by its boxes.
-	TextOccupiedHeight() int
 
 	// Init prepares the Frame for the display of text in rectangle r.
 	// Frame f will reuse previously set FontMetrics, colours, tab width and
@@ -65,28 +100,11 @@ type Frame interface {
 	// /location and then call SetRects to establish the new geometry.
 	Clear(bool)
 
-	// DefaultFontHeight returns the height of the Frame's default font.
-	// TODO(rjk): Reconsider this for Frames containing many styles.
-	DefaultFontHeight() int
-
-	// Charofpt returns the index of the closest rune whose image's upper
-	// left corner is up and to the left of pt.
-	Charofpt(pt image.Point) int
-
 	// Ptofchar returns the location of the upper left corner of the p'th
 	// rune, starting from 0, in the receiver Frame. If the Frame holds
 	// fewer than p runes, Ptofchar returns the location of the upper right
 	// corner of the last character in the Frame
 	Ptofchar(int) image.Point
-
-	// Insert inserts r into Frame f starting at index p0.
-	// If a NUL (0) character is inserted, chaos will ensue. Tabs
-	// and newlines are handled by the library, but all other characters,
-	// including control characters, are just displayed. For example,
-	// backspaces are printed; to erase a character, use Delete.
-	//
-	// Insert will remove the selection or tick  if present but update selection offsets.
-	Insert([]rune, int) bool
 
 	// Redraw redraws the background of the Frame where the Frame is inside
 	// enclosing. Frame is responsible for drawing all of the pixels inside
@@ -121,12 +139,6 @@ type Frame interface {
 	// SelectOpt makes a selection in the same fashion as Select but does it in a
 	// temporary way with the specified text colours fg, bg.
 	SelectOpt(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int), *draw.Image, *draw.Image) (int, int)
-
-	// Delete deletes from the Frame the text between p0 and p1; p1 points at
-	// the first rune beyond the deletion.
-	//
-	// Delete will clear a selection or tick if present but not put it back.
-	Delete(int, int) int
 
 	// DrawSel repaints a section of the frame, delimited by rune
 	// positions p0 and p1, either with plain background or entirely
@@ -179,13 +191,25 @@ func (f *frameimpl) GetFrameFillStatus() FrameFillStatus {
 	}
 }
 
-func (f *frameimpl) TextOccupiedHeight() int {
+
+func (f *frameimpl) TextOccupiedHeight(r image.Rectangle) int {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+
+	return f.textoccupiedheightimpl(r)
+}
+
+func (f *frameimpl) textoccupiedheightimpl(r image.Rectangle) int {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 
 	// TODO(rjk): To support multiple different fonts at once in a Frame,
-	// this will have to be extended to be the sum of the height of the boxes.
-	return f.nlines * f.defaultfontheight
+	// this will have to be extended to be the sum of the height of the boxes
+	// less than r.Dy
+	if r.Dy() > f.nlines * f.defaultfontheight {
+		return f.nlines * f.defaultfontheight;
+	}
+	return (r.Dy() / f.defaultfontheight) * f.defaultfontheight;
 }
 
 func (f *frameimpl) IsLastLineFull() bool {
