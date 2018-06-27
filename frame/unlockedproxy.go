@@ -4,19 +4,6 @@ import (
 	"image"
 )
 
-// SelectScrollUpdater is a struct subset of frame.Frame that contains only those
-// methods needed to implement a frame.Select callback.
-type SelectScrollUpdater interface {
-	GetFrameFillStatus() FrameFillStatus
-	Charofpt(pt image.Point) int
-	DefaultFontHeight() int
-	Delete(int, int) int
-	Insert([]rune, int) bool
-	IsLastLineFull() bool
-	Rect() image.Rectangle
-	TextOccupiedHeight() int
-}
-
 type selectscrollupdaterimpl frameimpl
 
 func (up *selectscrollupdaterimpl) GetFrameFillStatus() FrameFillStatus {
@@ -65,8 +52,8 @@ func (up *selectscrollupdaterimpl) Rect() image.Rectangle {
 	return f.rect
 }
 
-func (up *selectscrollupdaterimpl) TextOccupiedHeight() int {
+func (up *selectscrollupdaterimpl) TextOccupiedHeight(r image.Rectangle) int {
 	// log.Println("selectscrollupdaterimpl.TextOccupiedHeight")
 	f := (*frameimpl)(up)
-	return f.nlines * f.defaultfontheight
+	return f.textoccupiedheightimpl(r)
 }
