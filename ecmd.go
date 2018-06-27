@@ -441,7 +441,6 @@ func s_cmd(t *Text, cp *Cmd) bool {
 					j := c - '0'
 					if sel[j].q1-sel[j].q0 > RBUFSIZE {
 						editerror("replacement string too long")
-						return false
 					}
 					t.file.b.Read(sel[j].q0, rbuf[:sel[j].q1-sel[j].q0])
 					for k := 0; k < sel[j].q1-sel[j].q0; k++ {
@@ -455,7 +454,6 @@ func s_cmd(t *Text, cp *Cmd) bool {
 			} else {
 				if sel[0].q1-sel[0].q0 > RBUFSIZE {
 					editerror("right hand side too long in substitution")
-					return false
 				}
 				t.file.b.Read(sel[0].q0, rbuf[:sel[0].q1-sel[0].q0])
 				for k := 0; k < sel[0].q1-sel[0].q0; k++ {
@@ -960,7 +958,6 @@ func nextmatch(f *File, r string, p int, sign int) {
 		sel = are.rxbexecute(f.curtext, p, NRange)
 		if len(sel) == 0 {
 			editerror("no match for regexp")
-			sel = RangeSet{Range{0, 0}}
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--

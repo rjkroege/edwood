@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"runtime/debug"
 )
 
@@ -123,10 +124,9 @@ func init() {
 }
 
 var (
-	cmdstartp      []rune
-	cmdp           int
-	editerrc       chan error
-	endeditthreadc chan struct{}
+	cmdstartp []rune
+	cmdp      int
+	editerrc  chan error
 
 	lastpat string
 	patset  bool
@@ -135,20 +135,13 @@ var (
 )
 
 func editthread() {
-	endeditthreadc = make(chan struct{})
-loop:
 	for {
-		select {
-		case <-endeditthreadc:
+		cmd := parsecmd(0)
+		if cmd == nil {
 			break
-		default:
-			cmd := parsecmd(0)
-			if cmd == nil {
-				break loop
-			}
-			if !cmdexec(curtext, cmd) {
-				break loop
-			}
+		}
+		if !cmdexec(curtext, cmd) {
+			break
 		}
 	}
 	editerrc <- nil
@@ -196,7 +189,7 @@ func editerror(format string, args ...interface{}) {
 	s := fmt.Errorf(format, args...)
 	row.AllWindows(allelogterm) /* truncate the edit logs */
 	editerrc <- s
-	close(endeditthreadc) // exit.
+	runtime.Goexit()
 }
 
 func editcmd(ct *Text, r []rune) {
