@@ -21,7 +21,6 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 	if name == "" && mtpt == "" {
 		fd.Close()
 		panic("nothing to do")
-		return -1
 	}
 
 	if name != "" {

@@ -344,7 +344,7 @@ func (r *Row) Dump(file string) {
 
 	fd, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		warning(nil, "can't open %s: %v\n", err)
+		warning(nil, "can't open %s: %v\n", file, err)
 		return
 	}
 	defer fd.Close()
@@ -825,7 +825,6 @@ func (row *Row) loadimpl(file string, initing bool) error {
 			return fmt.Errorf("default bad line %#v in dumpfile", l)
 		}
 	}
-	return nil
 }
 
 func (r *Row) AllWindows(f func(*Window)) {

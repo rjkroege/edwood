@@ -366,7 +366,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 
 func (t *Text) Backnl(p int, n int) int {
 	/* look for start of this line if n==0 */
-	if n == 0 && p > 0 && t.ReadRune(p-1) != '\n' {
+	if n == 0 && p > 0 && t.GetRune(p-1) != '\n' {
 		n = 1
 	}
 	i := n
@@ -379,7 +379,7 @@ func (t *Text) Backnl(p int, n int) int {
 		/* at 128 chars, call it a line anyway */
 		for j := 128; j > 0 && p > 0; p-- {
 			j--
-			if t.ReadRune(p-1) == '\n' {
+			if t.GetRune(p-1) == '\n' {
 				break
 			}
 		}
@@ -624,7 +624,7 @@ func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
 	return p0, p1
 }
 
-func (t *Text) ReadRune(q int) rune {
+func (t *Text) GetRune(q int) rune {
 	if t.cq0 <= q && q < t.cq0+(t.ncache) {
 		return t.cache[q-t.cq0]
 	} else {
