@@ -271,7 +271,10 @@ func (c *Column) Resize(r image.Rectangle) {
 		if i == c.nw()-1 {
 			r1.Max.Y = r.Max.Y
 		} else {
-			r1.Max.Y = r1.Min.Y + (w.r.Dy()+c.display.ScaleSize(Border))*r.Dy()/c.r.Dy()
+			r1.Max.Y = r1.Min.Y
+			if c.r.Dy() != 0 {
+				r1.Max.Y += (w.r.Dy() + c.display.ScaleSize(Border)) * r.Dy() / c.r.Dy()
+			}
 		}
 		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height)
 		r2 := r1
