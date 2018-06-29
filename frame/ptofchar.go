@@ -18,7 +18,7 @@ func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 					p--
 					r, w = utf8.DecodeRune(b.Ptr[s:])
 					pt.X += f.font.BytesWidth(b.Ptr[s : s+w])
-					if r == utf8.RuneError || pt.X > f.rect.Max.X {
+					if r == 0 || pt.X > f.rect.Max.X {
 						panic("frptofchar")
 					}
 				}
@@ -93,10 +93,10 @@ func (f *frameimpl) charofptimpl(pt image.Point) int {
 				s := 0
 				for ; s < len(b.Ptr); s += w {
 					r, w = utf8.DecodeRune(b.Ptr[s:])
-					if r == utf8.RuneError {
+					if r == 0 {
 						panic("end of string in frcharofpt")
 					}
-					qt.X += f.font.StringWidth(string(b.Ptr[s : s+1]))
+					qt.X += f.font.BytesWidth(b.Ptr[s : s+w])
 					if qt.X > pt.X {
 						break
 					}

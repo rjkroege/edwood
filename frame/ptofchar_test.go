@@ -39,6 +39,19 @@ func TestCharofpt(t *testing.T) {
 			1,
 		},
 		{
+			"one box, target first pixel of an invalid rune",
+			&frameimpl{
+				font:              Fakemetrics(fixedwidth),
+				defaultfontheight: 13,
+				box: []*frbox{
+					makeBox("\xef\xbf\xbd"),
+				},
+				rect: image.Rect(10, 15, 10+57, 15+57),
+			},
+			image.Pt(10, 15),
+			0,
+		},
+		{
 			"two boxes, target first pixel of first char",
 			&frameimpl{
 				font:              Fakemetrics(fixedwidth),
