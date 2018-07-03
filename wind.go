@@ -315,8 +315,8 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 }
 
 func (w *Window) Lock1(owner int) {
-	w.ref.Inc()
 	w.lk.Lock()
+	w.ref.Inc()
 	w.owner = owner
 }
 
@@ -338,8 +338,8 @@ func (w *Window) Unlock() {
 	f := w.body.file
 	for i := len(f.text) - 1; i >= 0; i-- {
 		w = f.text[i].w
-		w.lk.Unlock()
 		w.Close()
+		w.lk.Unlock()
 	}
 }
 
