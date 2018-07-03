@@ -896,6 +896,9 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 	}
 }
 
+// runproc. Something with the running of external processes. Executes
+// asynchronously.
+// TODO(rjk): Must lock win on mutation.
 func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) {
 	var (
 		t, name, filename, dir string
@@ -980,16 +983,13 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	c.iseditcommand = iseditcmd
 	c.text = s
 	if newns {
-		incl = nil
 		if win != nil {
+			// Access possibly mutable Window state inside a lock.
+			win.lk.Lock()
 			filename = string(win.body.file.name)
-			if len(incl) > 0 {
-				incl = make([]string, len(incl)) // Incl is inherited by actions in this window
-				for i, inc := range win.incl {
-					incl[i] = inc
-				}
-			}
 			winid = win.id
+			incl = append([]string{}, win.incl...)
+			win.lk.Unlock()
 		} else {
 			filename = ""
 			winid = 0
@@ -1058,7 +1058,9 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		sfd[2] = os.NewFile(uintptr(nfd), "duped erroutfd")
 	}
 	if win != nil {
+		win.lk.Lock()
 		win.Close()
+		win.lk.Unlock()
 	}
 
 	if argaddr != "" {
