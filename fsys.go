@@ -324,7 +324,9 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 		nf.w = f.w
 		nf.nrpart = 0 // not open, so must be zero
 		if nf.w != nil {
+			nf.w.lk.Lock()
 			nf.w.ref.Inc()
+			nf.w.lk.Unlock()
 		}
 		f = nf // walk f
 	}

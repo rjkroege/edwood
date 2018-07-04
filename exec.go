@@ -117,6 +117,7 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	return string(r), a
 }
 
+// execute must run with an existing lock on t's Window
 func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	var (
 		q0, q1 int

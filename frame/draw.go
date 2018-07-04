@@ -28,6 +28,8 @@ func (f *frameimpl) drawBox(r image.Rectangle, col, back *draw.Image, qt image.P
 }
 
 func (f *frameimpl) DrawSel(pt image.Point, p0, p1 int, highlighted bool) {
+	// log.Printf("Frame.DrawSel start pt=%v p0=%d p1=%d highlighted=%v\n", pt, p0, p1, highlighted)
+	// defer log.Println("Frame.DrawSel end")
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	f.drawselimpl(pt, p0, p1, highlighted)
