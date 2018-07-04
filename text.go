@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
@@ -73,6 +74,8 @@ type Text struct {
 	cache       []rune
 	nofill      bool
 	needundo    bool
+
+	lk sync.Mutex
 }
 
 // getfont is a convenience accessor that gets the draw.Font from the font
@@ -553,7 +556,11 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 
 func (t *Text) Delete(q0, q1 int, tofile bool) {
 	if tofile && t.ncache != 0 {
-		panic("text.delete")
+		// This was a panic. But hey! we don't need to
+		// panic. We can fix the issue instead.
+		// TODO(rjk): This is not-principled. But we'll reivist rational
+		// locking later.
+		t.TypeCommit()
 	}
 	n := q1 - q0
 	if n == 0 {
@@ -1204,6 +1211,8 @@ func (t *Text) Select() {
 }
 
 func (t *Text) Show(q0, q1 int, doselect bool) {
+	t.lk.Lock()
+	defer t.lk.Unlock()
 	var (
 		qe  int
 		nl  int
@@ -1271,8 +1280,8 @@ func (t *Text) ReadC(q int) (r rune) {
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
-	//  log.Println("Text SetSelect Start", q0, q1)
-	// adefer log.Println("Text SetSelect End", q0, q1)
+	// log.Println("Text SetSelect Start", q0, q1)
+	// defer log.Println("Text SetSelect End", q0, q1)
 
 	t.q0 = q0
 	t.q1 = q1

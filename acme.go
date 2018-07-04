@@ -280,6 +280,7 @@ func ismtpt(filename string) bool {
 }
 
 func mousethread(display *draw.Display) {
+	// TODO(rjk): Do we need this?
 	runtime.LockOSThread()
 
 	for {
