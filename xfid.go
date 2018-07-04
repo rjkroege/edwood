@@ -267,8 +267,8 @@ func xfidclose(x *Xfid) {
 			w.editoutlk.Unlock()
 			break
 		}
-		w.Unlock()
 		w.Close()
+		w.Unlock()
 	} else {
 		switch q {
 		case Qeditout:
