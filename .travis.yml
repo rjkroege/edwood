@@ -11,6 +11,4 @@ script:
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d -s .)
   - go test -v -race ./...
-
-# Additional tests to enable when they'll pass.
-# - go tool vet .
+  - go tool vet .
