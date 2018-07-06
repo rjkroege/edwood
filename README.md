@@ -1,4 +1,6 @@
-# edwood
+[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://travis-ci.org/rjkroege/edwood.svg?branch=master)](https://travis-ci.org/rjkroege/edwood)
+
+# Overview
 Go port of Rob Pike's Acme editor. Derived from
 [ProjectSerenity](https://github.com/ProjectSerenity/acme) but now
 increasingly divergent. ProjectSerenity was itself a transliteration
@@ -18,7 +20,7 @@ to install [plan9port](https://9fans.github.io/plan9port/) first.
 Contributions are welcome. Just submit a pull request and we'll review
 the code before merging it in.
 
-# Status
+# Project Status
 Edwood is not yet ready for use but is getting close to being actually useful.
 The *useful* milestone will offer the following:
 
@@ -32,9 +34,8 @@ The *useful* milestone will offer the following:
 * More idiomatic Go.
 * Fix bugs.
 * API modernization
-
-# Build And Test
-[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)
+* Revised text handling data structures
+* See the issues list for more
 
 
 
