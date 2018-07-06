@@ -1,10 +1,10 @@
 package frame
 
 import (
+	"image"
 	"sync"
 
 	"9fans.net/go/draw"
-	"image"
 )
 
 // TODO(rjk): Make this into a struct of colours?

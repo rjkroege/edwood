@@ -6,14 +6,13 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
-
-	"runtime/debug"
 )
 
 var (

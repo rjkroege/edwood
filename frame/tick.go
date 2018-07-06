@@ -1,8 +1,9 @@
 package frame
 
 import (
-	"9fans.net/go/draw"
 	"image"
+
+	"9fans.net/go/draw"
 )
 
 // InitTick sets up the TickImage (e.g. cursor)
