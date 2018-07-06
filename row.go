@@ -543,7 +543,7 @@ func (row *Row) loadhelper(rd *bufio.Reader, subl []string, fontname string, ndu
 
 	percent, err := strconv.ParseFloat(subl[5], 64)
 	if err != nil {
-		return fmt.Errorf("cant't parse percent %s becasue %v", subl[5], err)
+		return fmt.Errorf("cant't parse percent %s because %v", subl[5], err)
 	}
 
 	if i > len(row.col) { // Didn't we already make sure that we have a column?

@@ -72,7 +72,7 @@ type Frame interface {
 
 	// Init prepares the Frame for the display of text in rectangle r.
 	// Frame f will reuse previously set FontMetrics, colours, tab width and
-	// destination image for drawing unless these are overriden with
+	// destination image for drawing unless these are overridden with
 	// one or more instances of the OptColors, OptBackground
 	// OptFont or OptFontMetrics OptMaxTab option settings.
 	//

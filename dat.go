@@ -156,7 +156,7 @@ type Command struct {
 	av            []string
 	iseditcommand bool
 	md            *MntDir
-	next          *Command // TODO(flux).  This really wants to be a cannonical slice instead of a linked list
+	next          *Command // TODO(flux).  This really wants to be a canonical slice instead of a linked list
 }
 
 type DirTab struct {
