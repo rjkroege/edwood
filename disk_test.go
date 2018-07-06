@@ -30,7 +30,7 @@ func TestNewBlock(t *testing.T) {
 		t.Errorf("b should not be at the head of the pre-allocated list.")
 	}
 	if b.next != disk.blist {
-		// This property exists becuase we don't have union types.
+		// This property exists because we don't have union types.
 		// TODO(rjk): Fragile under a more idiomatic implementation.
 		t.Errorf("b.next should point at the pre-allocated list.")
 	}
