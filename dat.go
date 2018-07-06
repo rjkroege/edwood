@@ -5,7 +5,6 @@ import (
 	"image"
 	"math"
 	"os"
-	//	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"

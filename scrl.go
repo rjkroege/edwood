@@ -1,11 +1,11 @@
 package main
 
 import (
-	"9fans.net/go/draw"
 	"fmt"
 	"image"
 	"time"
 
+	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
 )
 

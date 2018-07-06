@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"9fans.net/go/plan9"
-	//"github.com/mortdeus/go9p"
 )
 
 // TODO(flux): Wrap fsys into a tidy object.
