@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/complete"
 	"github.com/rjkroege/edwood/frame"
 )
 
@@ -685,7 +687,53 @@ func (t *Text) FileWidth(q0 int, oneelement bool) int {
 }
 
 func (t *Text) Complete() []rune {
-	Unimpl()
+	if t.q0 < t.Nc() && t.ReadC(t.q0) > ' ' { // must be at end of word
+		return nil
+	}
+	str := make([]rune, t.FileWidth(t.q0, true))
+	q := t.q0 - len(str)
+	for i := range str {
+		str[i] = t.ReadC(q)
+		q++
+	}
+	path := make([]rune, t.FileWidth(t.q0-len(str), false))
+	q = t.q0 - len(str) - len(path)
+	for i := range path {
+		path[i] = t.ReadC(q)
+		q++
+	}
+
+	// is path rooted? if not, we need to make it relative to window path
+	dir := string(path)
+	if !filepath.IsAbs(dir) {
+		dir = t.DirName("")
+		if len(dir) == 0 {
+			dir = Ldot
+		}
+		dir = filepath.Clean(filepath.Join(dir, string(path)))
+	}
+
+	c, err := complete.Complete(dir, string(str))
+	if err != nil {
+		warning(nil, "error attempting completion: %v\n", err)
+		return nil
+	}
+	if c.Advance {
+		return []rune(c.String)
+	}
+	var b bytes.Buffer
+	b.WriteString(dir)
+	if len(dir) > 0 && dir[len(dir)-1] != filepath.Separator {
+		b.WriteRune(filepath.Separator)
+	}
+	b.WriteString(string(str) + "*")
+	if c.NMatch == 0 {
+		b.WriteString(": no matches in:")
+	}
+	warning(nil, "%s\n", b.String())
+	for _, fn := range c.Filename {
+		warning(nil, " %s\n", fn)
+	}
 	return nil
 }
 
