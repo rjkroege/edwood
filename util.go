@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"unicode/utf8"
 )
 
 func min(a, b int) int {
@@ -106,6 +107,31 @@ func utfrune(s []rune, r rune) int {
 		}
 	}
 	return -1
+}
+
+func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
+	// Always guaranteed that n bytes may be interpreted
+	// without worrying about partial runes.  This may mean
+	// reading up to UTFmax-1 more bytes than n; the caller
+	// knows this.  If n is a firm limit, the caller should
+	// set p[n] = 0.
+	for nb < n {
+		var w int
+		var ru rune
+		if p[nb] < utf8.RuneSelf {
+			w = 1
+			ru = rune(p[nb])
+		} else {
+			ru, w = utf8.DecodeRune(p[nb:])
+		}
+		if ru != 0 {
+			r = append(r, ru)
+		} else {
+			nulls = true
+		}
+		nb += w
+	}
+	return
 }
 
 func errorwin1(dir string, incl []string) *Window {
