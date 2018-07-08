@@ -397,35 +397,24 @@ func shouldscroll(t *Text, q0 int, qid uint64) bool {
 
 // This is fiddly code that handles partial runes at the end of a previous write?
 func fullrunewrite(x *Xfid) []rune {
-	var (
-		nb uint32
-		r  []rune
-	)
 	// extend with previous partial rune at the end.
-	cnt := x.fcall.Count
+	cnt := int(x.fcall.Count)
 	if x.f.nrpart > 0 {
 		x.fcall.Data = append(x.f.rpart[0:x.f.nrpart], x.fcall.Data...)
-		cnt += uint32(x.f.nrpart)
+		cnt += x.f.nrpart
+		x.f.nrpart = 0
 	}
-	r = make([]rune, cnt)
-	nb = 0
-	for i := uint32(0); i < cnt; i++ {
+	r, nb, _ := cvttorunes(x.fcall.Data, cnt-utf8.UTFMax)
+	for utf8.FullRune(x.fcall.Data[nb:]) {
 		ru, si := utf8.DecodeRune(x.fcall.Data[nb:])
-		if ru == utf8.RuneError {
-			// Let's hope we're at the end of the buffer.
-			if (len(x.fcall.Data) - int(nb)) > utf8.UTFMax {
-				acmeerror("Bad runes in fullrunewrite", nil)
-			}
-			break
-		} else {
-			r[i] = ru
-			nb += uint32(si)
+		if ru != 0 {
+			r = append(r, ru)
 		}
+		nb += si
 	}
-
 	if nb < cnt {
-		copy(x.f.rpart[:], x.fcall.Data[nb:cnt-nb])
-		x.f.nrpart = int(cnt - nb)
+		copy(x.f.rpart[:], x.fcall.Data[nb:])
+		x.f.nrpart = cnt - nb
 	}
 	return r
 }
