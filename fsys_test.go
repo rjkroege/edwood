@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"9fans.net/go/acme"
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 )
@@ -150,17 +152,17 @@ func (a *Acme) Cleanup() {
 	}
 }
 
-// Fsys tests run my running a server and client in-process and communicating
+// Fsys tests run by running a server and client in-process and communicating
 // externally.
 
 func TestFSys(t *testing.T) {
-	var err error
-
 	a := startAcme(t)
 	defer a.Cleanup()
 	fsys := a.fsys
 
-	/*	fid, err := fsys.Open("/", 0) // Readonly
+	t.Run("Dirread", func(t *testing.T) {
+		t.SkipNow()                   // Only used for debugging?
+		fid, err := fsys.Open("/", 0) // Readonly
 		if err != nil {
 			t.Errorf("Failed to open/: %v", err)
 		}
@@ -170,7 +172,7 @@ func TestFSys(t *testing.T) {
 			t.Errorf("Failed to open/: %v", err)
 		}
 		for _, d := range dirs {
-			fmt.Printf("%v\n", d.String())
+			t.Logf("%v\n", d.String())
 		}
 		fid.Close()
 
@@ -183,84 +185,110 @@ func TestFSys(t *testing.T) {
 			t.Errorf("Failed to open/: %v", err)
 		}
 		for _, d := range dirs {
-			fmt.Printf("%v\n", d.String())
+			t.Logf("%v\n", d.String())
 		}
-	*/
-	fid, err := fsys.Open("/new/body", plan9.OWRITE)
-	if err != nil {
-		t.Errorf("Failed to open/: %v", err)
-	}
-	text := []byte("This is a test\nof the emergency typing system\n")
-	fid.Write(text)
-	fid.Close()
-
-	fid, err = fsys.Open("/2/body", plan9.OREAD)
-	if err != nil {
-		t.Errorf("Failed to open /2/body: %v", err)
-	}
-	buf := make([]byte, len(text))
-	_, err = fid.ReadFull(buf)
-	if err != nil {
-		t.Errorf("Failed to read back body: %v", err)
-	}
-	if string(buf) != string(text) {
-		t.Errorf("Corrupted body readback: %v", buf)
-	}
-	fid.Close()
-
-	fid, err = fsys.Open("/2/addr", plan9.OWRITE)
-	if err != nil {
-		t.Errorf("Failed to open /2/addr: %v", err)
-	}
-	fid.Write([]byte("#5"))
-	fid.Close()
-
-	// test insertion
-	fid, err = fsys.Open("/2/data", plan9.OWRITE)
-	if err != nil {
-		t.Errorf("Failed to open /2/data: %v", err)
-	}
-	fid.Write([]byte("insertion"))
-	fid.Close()
-
-	fid, err = fsys.Open("/2/body", plan9.OREAD)
-	if err != nil {
-		t.Errorf("Failed to open /2/body: %v", err)
-	}
-	text = append(text[0:5], append([]byte("insertion"), text[5:]...)...)
-	buf = make([]byte, len(text))
-	_, err = fid.ReadFull(buf)
-	if err != nil {
-		t.Errorf("Failed to read back body: %v", err)
-	}
-	if string(buf) != string(text) {
-		t.Errorf("Corrupted body readback: %v instead of %v", string(buf), string(text))
-	}
-	fid.Close()
-
-	// Delete the window
-	fid, err = fsys.Open("/2/ctl", plan9.OWRITE)
-	if err != nil {
-		t.Errorf("Failed to open /2/ctl: %v", err)
-	}
-	fid.Write([]byte("delete"))
-	fid.Close()
-
-	// Make sure it's gone from the directory
-	fid, err = fsys.Open("/1", plan9.OREAD)
-	if err != nil {
-		t.Errorf("Failed to walk to /1: %v", err)
-	}
-	dirs, err := fid.Dirread()
-	if err != nil {
-		t.Errorf("Failed to open/: %v", err)
-	}
-	for _, d := range dirs {
-		if d.Name == "2" {
-			t.Errorf("delete didn't remove /2")
+	})
+	t.Run("Basic", func(t *testing.T) {
+		fid, err := fsys.Open("/new/body", plan9.OWRITE)
+		if err != nil {
+			t.Errorf("Failed to open/: %v", err)
 		}
-	}
-	fid.Close()
+		text := []byte("This is a test\nof the emergency typing system\n")
+		fid.Write(text)
+		fid.Close()
+
+		fid, err = fsys.Open("/2/body", plan9.OREAD)
+		if err != nil {
+			t.Errorf("Failed to open /2/body: %v", err)
+		}
+		buf := make([]byte, len(text))
+		_, err = fid.ReadFull(buf)
+		if err != nil {
+			t.Errorf("Failed to read back body: %v", err)
+		}
+		if string(buf) != string(text) {
+			t.Errorf("Corrupted body readback: %v", buf)
+		}
+		fid.Close()
+
+		fid, err = fsys.Open("/2/addr", plan9.OWRITE)
+		if err != nil {
+			t.Errorf("Failed to open /2/addr: %v", err)
+		}
+		fid.Write([]byte("#5"))
+		fid.Close()
+
+		// test insertion
+		fid, err = fsys.Open("/2/data", plan9.OWRITE)
+		if err != nil {
+			t.Errorf("Failed to open /2/data: %v", err)
+		}
+		fid.Write([]byte("insertion"))
+		fid.Close()
+
+		fid, err = fsys.Open("/2/body", plan9.OREAD)
+		if err != nil {
+			t.Errorf("Failed to open /2/body: %v", err)
+		}
+		text = append(text[0:5], append([]byte("insertion"), text[5:]...)...)
+		buf = make([]byte, len(text))
+		_, err = fid.ReadFull(buf)
+		if err != nil {
+			t.Errorf("Failed to read back body: %v", err)
+		}
+		if string(buf) != string(text) {
+			t.Errorf("Corrupted body readback: %v instead of %v", string(buf), string(text))
+		}
+		fid.Close()
+
+		// Delete the window
+		fid, err = fsys.Open("/2/ctl", plan9.OWRITE)
+		if err != nil {
+			t.Errorf("Failed to open /2/ctl: %v", err)
+		}
+		fid.Write([]byte("delete"))
+		fid.Close()
+
+		// Make sure it's gone from the directory
+		fid, err = fsys.Open("/1", plan9.OREAD)
+		if err != nil {
+			t.Errorf("Failed to walk to /1: %v", err)
+		}
+		dirs, err := fid.Dirread()
+		if err != nil {
+			t.Errorf("Failed to open/: %v", err)
+		}
+		for _, d := range dirs {
+			if d.Name == "2" {
+				t.Errorf("delete didn't remove /2")
+			}
+		}
+		fid.Close()
+	})
+	t.Run("BigBody", func(t *testing.T) {
+		// Create a large string with some non-latin characters so that
+		// we exercise buffering and unicode encoding in xfidutfread
+		var b bytes.Buffer
+		for i := 0; i < BUFSIZE; i++ {
+			b.WriteString("Go 世界\n")
+		}
+		text := b.Bytes()
+
+		w, err := acme.New()
+		if err != nil {
+			t.Fatalf("Creating new window failed: %v\n", err)
+		}
+		defer w.Del(true)
+
+		w.Write("body", text)
+		buf, err := w.ReadAll("body")
+		if err != nil {
+			t.Fatalf("Reading body failed: %v\n", err)
+		}
+		if string(buf) != string(text) {
+			t.Errorf("Read %v bytes from body; expected %v\n", len(buf), len(text))
+		}
+	})
 }
 
 func TestFSysAddr(t *testing.T) {
