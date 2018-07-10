@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"image"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -538,7 +540,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	}
 	defer fd.Close()
 
-	//h = sha1(nil, 0, nil, nil);
+	h := sha1.New()
 
 	d, err = fd.Stat()
 	isapp := (err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0)
@@ -555,7 +557,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		}
 		f.b.Read(q, r[:n])
 		s := string(r[:n])
-		//sha1((uchar*)s, m, nil, h);
+		io.WriteString(h, s)
 		nwritten, err := fd.Write([]byte(s))
 		if err != nil || nwritten != len(s) {
 			warning(nil, "can't write file %s: %v\n", name, err)
@@ -568,15 +570,13 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			w.dirty = true
 			f.unread = true
 		} else {
-			d1, err := fd.Stat()
-			if err != nil {
+			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
 			//f.qidpath = d.qid.path;
 			//f.dev = d.dev;
 			f.mtime = d.ModTime()
-			//sha1(nil, 0, f.sha1, h);
-			//h = nil;
+			f.hash.Set(h.Sum(nil))
 			f.mod = false
 			w.dirty = false
 			f.unread = false
