@@ -371,7 +371,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 
 func (t *Text) Backnl(p int, n int) int {
 	/* look for start of this line if n==0 */
-	if n == 0 && p > 0 && t.GetRune(p-1) != '\n' {
+	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	i := n
@@ -384,7 +384,7 @@ func (t *Text) Backnl(p int, n int) int {
 		/* at 128 chars, call it a line anyway */
 		for j := 128; j > 0 && p > 0; p-- {
 			j--
-			if t.GetRune(p-1) == '\n' {
+			if t.ReadC(p-1) == '\n' {
 				break
 			}
 		}
@@ -631,14 +631,6 @@ func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
 	p0 = min(q0, t.file.b.Nc())
 	p1 = min(q1, t.file.b.Nc())
 	return p0, p1
-}
-
-func (t *Text) GetRune(q int) rune {
-	if t.cq0 <= q && q < t.cq0+(t.ncache) {
-		return t.cache[q-t.cq0]
-	} else {
-		return t.file.b.ReadC(q)
-	}
 }
 
 func (t *Text) BsWidth(c rune) int {
@@ -1317,14 +1309,11 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 }
 
-func (t *Text) ReadC(q int) (r rune) {
-	if t.cq0 <= q && q < t.cq0+(t.ncache) {
-		r = t.cache[q-t.cq0]
-	} else {
-		r = t.file.b.ReadC(q)
+func (t *Text) ReadC(q int) rune {
+	if t.cq0 <= q && q < t.cq0+t.ncache {
+		return t.cache[q-t.cq0]
 	}
-	return r
-
+	return t.file.b.ReadC(q)
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
