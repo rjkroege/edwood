@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -358,4 +359,39 @@ func addwarningtext(md *MntDir, r []rune) {
 	case cwarn <- 0:
 	default:
 	}
+}
+
+const quoteChar = '\''
+
+func needsQuote(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == quoteChar || c <= ' ' { // quote, blanks, or control characters
+			return true
+		}
+	}
+	return false
+}
+
+// Quote adds single quotes to s in the style of rc(1) if they are needed.
+// The behaviour should be identical to Plan 9's quote(3).
+func quote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	if !needsQuote(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(10 + len(s)) // Enough room for few quotes
+	b.WriteByte(quoteChar)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == quoteChar {
+			b.WriteByte(quoteChar)
+		}
+		b.WriteByte(c)
+	}
+	b.WriteByte(quoteChar)
+	return b.String()
 }

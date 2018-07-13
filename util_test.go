@@ -32,3 +32,21 @@ func TestCvttorunes(t *testing.T) {
 		}
 	}
 }
+
+func TestQuote(t *testing.T) {
+	var testCases = []struct {
+		s, q string
+	}{
+		{"", "''"},
+		{"Edwood", "Edwood"},
+		{"Plan 9", "'Plan 9'"},
+		{"Don't", "'Don''t'"},
+		{"Don't worry!", "'Don''t worry!'"},
+	}
+	for _, tc := range testCases {
+		q := quote(tc.s)
+		if q != tc.q {
+			t.Errorf("%q quoted is %q; expected %q\n", tc.s, q, tc.q)
+		}
+	}
+}
