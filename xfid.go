@@ -841,8 +841,6 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	w.Commit(t)
 	off = x.fcall.Offset
 	n = 0
-	//r = make([]rune, BUFSIZE/utf8.UTFMax)
-	//b = make([]rune, BUFSIZE/utf8.UTFMax)
 	b1 := make([]byte, BUFSIZE)
 	if qid == w.utflastqid && off >= w.utflastboff && w.utflastq <= q1 {
 		boff = w.utflastboff
@@ -855,9 +853,9 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	w.utflastqid = qid
 	r := make([]rune, BUFSIZE/utf8.UTFMax)
 	for q < q1 && n < int(x.fcall.Count) {
-		// * Updating here avoids partial rune problem: we're always on a
-		// * char boundary. The cost is we will usually do one more read
-		// * than we really need, but that's better than being n^2.
+		// Updating here avoids partial rune problem: we're always on a
+		// char boundary. The cost is we will usually do one more read
+		// than we really need, but that's better than being n^2.
 		w.utflastboff = boff
 		w.utflastq = q
 		nr = q1 - q
@@ -865,7 +863,8 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 			nr = BUFSIZE / utf8.UTFMax
 		}
 		t.file.b.Read(q, r[:nr])
-		b := string(r[:nr]) //nb = snprint(b, BUFSIZE+1, "%.*S", nr, r);
+		b := string(r[:nr])
+		nb = len(b)
 		if boff >= off {
 			m = len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
