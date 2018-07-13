@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"time"
 )
@@ -56,16 +56,27 @@ func HashFile(filename string) (h FileHash, err error) {
 	if err != nil {
 		return h, err
 	}
-	d, err := ioutil.ReadAll(fd)
-	if err != nil {
+	defer fd.Close()
+
+	hh := sha1.New()
+	if _, err := io.Copy(hh, fd); err != nil {
 		return h, err
 	}
-	return sha1.Sum(d), nil
+	h.Set(hh.Sum(nil))
+	return
+}
+
+func (h *FileHash) Set(b []byte) {
+	if len(b) != len(h) {
+		panic("internal error: wrong hash size")
+	}
+	copy(h[:], b)
 }
 
 func (h0 FileHash) Eq(h1 FileHash) bool {
 	return bytes.Compare(h0[:], h1[:]) == 0
 }
+
 func calcFileHash(b []byte) FileHash {
 	return sha1.Sum(b)
 }
