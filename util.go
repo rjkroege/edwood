@@ -109,12 +109,16 @@ func utfrune(s []rune, r rune) int {
 	return -1
 }
 
+// Cvttorunes decodes runes r from p. It's guaranteed that first n
+// bytes of p will be interpreted without worrying about partial runes.
+// This may mean reading up to UTFMax-1 more bytes than n; the caller
+// must ensure p is large enough. Partial runes and invalid encodings
+// are converted to RuneError. Nb (always >= n) is the number of bytes
+// interpreted.
+//
+// If any U+0000 rune is present in r, they are elided and nulls is set
+// to true.
 func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
-	// Always guaranteed that n bytes may be interpreted
-	// without worrying about partial runes.  This may mean
-	// reading up to UTFmax-1 more bytes than n; the caller
-	// knows this.  If n is a firm limit, the caller should
-	// set p[n] = 0.
 	for nb < n {
 		var w int
 		var ru rune
