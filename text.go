@@ -741,15 +741,6 @@ func (t *Text) Type(r rune) {
 	nr = 1
 	rp := []rune{r}
 
-	Tagdown := func() {
-		/* expand tag to show all text */
-		if !t.w.tagexpand {
-			t.w.tagexpand = true
-			t.w.Resize(t.w.r, false, true)
-		}
-		return
-	}
-
 	Tagup := func() {
 		/* shrink tag to single line */
 		if t.w.tagexpand {
@@ -797,18 +788,12 @@ func (t *Text) Type(r rune) {
 		}
 		return
 	case draw.KeyDown:
-		if t.what == Tag {
-			Tagdown()
-			return
-		}
+		t.tagdown()
 		n = t.fr.GetFrameFillStatus().Maxlines / 3
 		case_Down()
 		return
 	case Kscrollonedown:
-		if t.what == Tag {
-			Tagdown()
-			return
-		}
+		t.tagdown()
 		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
 		if n <= 0 {
 			n = 1
