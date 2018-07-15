@@ -743,108 +743,52 @@ func (t *Text) Type(r rune) {
 
 	switch r {
 	case draw.KeyLeft:
-		t.TypeCommit()
-		if t.q0 > 0 {
-			if t.q0 != t.q1 {
-				t.Show(t.q0, t.q0, true)
-			} else {
-				t.Show(t.q0-1, t.q0-1, true)
-			}
-		}
+		t.KeyLeft()
 		return
 	case draw.KeyRight:
-		t.TypeCommit()
-		if t.q1 < t.file.b.Nc() {
-			// This is a departure from the plan9/plan9port acme
-			// Instead of always going right one char from q1, it
-			// collapses multi-character selections first, behaving
-			// like every other selection on modern systems. -flux
-			if t.q0 != t.q1 {
-				t.Show(t.q1, t.q1, true)
-			} else {
-				t.Show(t.q1+1, t.q1+1, true)
-			}
-		}
+		t.KeyRight()
 		return
 	case draw.KeyDown:
-		t.tagdownalways(func() {
-			t.keydownhelper(t.fr.GetFrameFillStatus().Maxlines / 3)
-		})
+		t.KeyDownTagExpanding()
 		return
 	case Kscrollonedown:
-		t.tagdownalways(func() {
-			t.keydownhelper(max(1, mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)))
-		})
+		t.KeyScrollOneDown()
 		return
 	case draw.KeyPageDown:
-		t.keydownhelper(2 * t.fr.GetFrameFillStatus().Maxlines / 3)
+		t.KeyPageDown()
 		return
 	case draw.KeyUp:
-		t.tagupalways(func() {
-			t.keyuphelper( t.fr.GetFrameFillStatus().Maxlines / 3)
-		})
+		t.KeyUpTagExpanding()
 		return
 	case Kscrolloneup:
-		t.tagupalways(func() {
-			t.keyuphelper(mousescrollsize(t.fr.GetFrameFillStatus().Maxlines))
-		})
+		t.KeyScrollOneUp()
 		return
 	case draw.KeyPageUp:
-		t.keyuphelper(2 * t.fr.GetFrameFillStatus().Maxlines / 3)
+		t.KeyPageUp()
 		return
 	case draw.KeyHome:
-		t.TypeCommit()
-		if t.org > t.iq1 {
-			q0 = t.Backnl(t.iq1, 1)
-			t.SetOrigin(q0, true)
-		} else {
-			t.Show(0, 0, false)
-		}
+		t.KeyHome()
 		return
 	case draw.KeyEnd:
-		t.TypeCommit()
-		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.b.Nc() {
-				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.b.Nc()
-			}
-			q0 = t.Backnl(t.iq1, 1)
-			t.SetOrigin(q0, true)
-		} else {
-			t.Show(t.file.b.Nc(), t.file.b.Nc(), false)
-		}
+		t.KeyEnd()
 		return
 	case 0x01: /* ^A: beginning of line */
-		t.TypeCommit()
-		/* go to where ^U would erase, if not already at BOL */
-		nnb = 0
-		if t.q0 > 0 && t.ReadC(t.q0-1) != '\n' {
-			nnb = t.BsWidth(0x15)
-		}
-		t.Show(t.q0-nnb, t.q0-nnb, true)
+		t.KeyLineBeginning()
 		return
 	case 0x05: /* ^E: end of line */
-		t.TypeCommit()
-		q0 = t.q0
-		for q0 < t.file.b.Nc() && t.ReadC(q0) != '\n' {
-			q0++
-		}
-		t.Show(q0, q0, true)
+		t.KeyLineEnding()
 		return
 	case draw.KeyCmd + 'c': /* %C: copy */
-		t.TypeCommit()
-		cut(t, t, nil, true, false, "")
+		t.KeyCmdC()
 		return
 	case draw.KeyCmd + 'z': /* %Z: undo */
-		t.TypeCommit()
-		undo(t, nil, nil, true, false, "")
+		t.KeyCmdZ()
 		return
 	case draw.KeyCmd + 'Z': /* %-shift-Z: redo */
-		t.TypeCommit()
-		undo(t, nil, nil, false, false, "")
+		t.KeyShiftCmdZ()
 		return
-
 	}
+
 	if t.what == Body {
 		seq++
 		t.file.Mark()
