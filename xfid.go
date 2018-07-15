@@ -40,6 +40,8 @@ func clampaddr(w *Window) {
 }
 
 func xfidctl(x *Xfid, d *draw.Display) {
+	// log.Println("xfidctl", x)
+	// defer log.Println("done xfidctl")
 	for {
 		select {
 		case f := <-x.c:
@@ -55,6 +57,8 @@ func xfidctl(x *Xfid, d *draw.Display) {
 }
 
 func xfidflush(x *Xfid) {
+	// log.Println("xfidflush", x)
+	// defer log.Println("done xfidflush")
 	var (
 		fc plan9.Fcall
 		wx *Xfid
@@ -84,6 +88,8 @@ out:
 }
 
 func xfidopen(x *Xfid) {
+	// log.Println("xfidopen", x)
+	// defer log.Println("xfidopen done")
 	var (
 		fc     plan9.Fcall
 		w      *Window
@@ -201,6 +207,8 @@ func xfidopen(x *Xfid) {
 }
 
 func xfidclose(x *Xfid) {
+	// log.Println("xfidclose", x)
+	// defer log.Println("xfidclose done")
 	var (
 		fc plan9.Fcall
 		w  *Window
@@ -259,7 +267,6 @@ func xfidclose(x *Xfid) {
 		case QWwrsel:
 			w.nomark = false
 			t = &w.body
-			// before: only did this if !w.noscroll, but that didn't seem right in practice
 			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			break
@@ -280,6 +287,8 @@ func xfidclose(x *Xfid) {
 }
 
 func xfidread(x *Xfid) {
+	// log.Println("xfidread", x)
+	// defer log.Println("done xfidread")
 	var (
 		fc plan9.Fcall
 		n  int
@@ -420,6 +429,8 @@ func fullrunewrite(x *Xfid) []rune {
 }
 
 func xfidwrite(x *Xfid) {
+	// log.Println("xfidwrite", x)
+	// defer log.Println("done xfidwrite")
 	var (
 		fc               plan9.Fcall
 		c                int
@@ -599,6 +610,8 @@ func xfidwrite(x *Xfid) {
 }
 
 func xfidctlwrite(x *Xfid, w *Window) {
+	// log.Println("xfidctlwrite", x)
+	// defer log.Println("done xfidctlwrite")
 	var (
 		fc              plan9.Fcall
 		err             error
@@ -745,6 +758,8 @@ forloop:
 }
 
 func xfideventwrite(x *Xfid, w *Window) {
+	// log.Println("xfideventwrite", x)
+	// defer log.Println("done xfideventwrite")
 	var (
 		fc     plan9.Fcall
 		err    error
@@ -830,6 +845,8 @@ func xfideventwrite(x *Xfid, w *Window) {
 }
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
+	// log.Println("xfidutfread", x)
+	// defer log.Println("done xfidutfread")
 	var (
 		fc           plan9.Fcall
 		w            *Window
@@ -894,6 +911,8 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 }
 
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
+	// log.Println("xfidruneread", x)
+	// defer log.Println("done xfidruneread")
 	var (
 		fc plan9.Fcall
 		w  *Window
@@ -937,6 +956,8 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 }
 
 func xfideventread(x *Xfid, w *Window) {
+	// log.Println("xfideventread", x)
+	// defer log.Println("done xfideventread")
 	var fc plan9.Fcall
 
 	i := 0
@@ -969,6 +990,8 @@ func xfideventread(x *Xfid, w *Window) {
 }
 
 func xfidindexread(x *Xfid) {
+	// log.Println("xfidindexread", x)
+	// defer log.Println("done xfidindexread")
 	var (
 		fc plan9.Fcall
 	)
