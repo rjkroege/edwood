@@ -743,7 +743,7 @@ func (t *Text) Type(r rune) {
 
 	switch r {
 	case draw.KeyLeft:
-		t.KeyLeft()
+		 t.KeyLeft()
 		return
 	case draw.KeyRight:
 		t.KeyRight()
@@ -787,31 +787,11 @@ func (t *Text) Type(r rune) {
 	case draw.KeyCmd + 'Z': /* %-shift-Z: redo */
 		t.KeyShiftCmdZ()
 		return
-	}
-
-	/* cut/paste must be done after the seq++/filemark */
-	switch r {
 	case draw.KeyCmd + 'x': /* %X: cut */
-		t.bodyfilemark()
-		t.TypeCommit()
-		if t.what == Body {
-			seq++
-			t.file.Mark()
-		}
-		cut(t, t, nil, true, true, "")
-		t.Show(t.q0, t.q0, true)
-		t.iq1 = t.q0
+		t.KeyCmdX()
 		return
 	case draw.KeyCmd + 'v': /* %V: paste */
-		t.bodyfilemark()
-		t.TypeCommit()
-		if t.what == Body {
-			seq++
-			t.file.Mark()
-		}
-		paste(t, t, nil, true, false, "")
-		t.Show(t.q0, t.q1, true)
-		t.iq1 = t.q1
+		t.KeyCmdV()
 		return
 	}
 

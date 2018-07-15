@@ -188,3 +188,31 @@ func (t *Text) bodyfilemark() {
 		t.file.Mark()
 	}
 }
+
+// KeyCmdX handles ⌘X
+func (t *Text) KeyCmdX() {
+		t.bodyfilemark()
+		t.TypeCommit()
+		if t.what == Body {
+			seq++
+			t.file.Mark()
+		}
+		cut(t, t, nil, true, true, "")
+		t.Show(t.q0, t.q0, true)
+		t.iq1 = t.q0
+		return
+}
+
+// KeyCmdV handles ⌘V
+func (t *Text) KeyCmdV() {
+		t.bodyfilemark()
+		t.TypeCommit()
+		if t.what == Body {
+			seq++
+			t.file.Mark()
+		}
+		paste(t, t, nil, true, false, "")
+		t.Show(t.q0, t.q1, true)
+		t.iq1 = t.q1
+		return
+}
