@@ -558,11 +558,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 
 func (t *Text) Delete(q0, q1 int, tofile bool) {
 	if tofile && t.ncache != 0 {
-		// This was a panic. But hey! we don't need to
-		// panic. We can fix the issue instead.
-		// TODO(rjk): This is not-principled. But we'll reivist rational
-		// locking later.
-		t.TypeCommit()
+		panic("text.delete")
 	}
 	n := q1 - q0
 	if n == 0 {

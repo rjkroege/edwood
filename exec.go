@@ -847,11 +847,12 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 	cpid = nil
 }
 
-func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
+// fsopenfd opens a plan9 Fid and makes a Go os.File from it for path on fsys.
+func fsopenfd(fsys *client.Fsys, path string, mode uint8) (*os.File, *client.Fid) {
 	fid, err := fsys.Open(path, mode)
 	if err != nil {
 		warning(nil, "Failed to open %v: %v", path, err)
-		return nil
+		return nil, nil
 	}
 
 	// open a pipe, serve the reads from fid down it
@@ -876,7 +877,7 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 				}
 			}
 		}()
-		return r
+		return r, fid
 	} else {
 		go func() {
 			var buf [BUFSIZE]byte
@@ -893,7 +894,7 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 				}
 			}
 		}()
-		return w
+		return w, fid
 	}
 }
 
@@ -910,15 +911,27 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		//static void *parg[2];
 		rcarg []string
 		shell string
+		fid   *client.Fid
 	)
-	Fail := func() {
-		Untested()
-		// threadexec hasn't happened, so send a zero
+	fids := make([]*client.Fid, 0, 3)
+
+	Closeall := func() {
 		sfd[0].Close()
 		if sfd[2] != sfd[1] {
 			sfd[2].Close()
 		}
 		sfd[1].Close()
+		for i, f := range fids {
+			// Errors could be logged but as the process is probably shutting
+			// down, it's not obvious to me where they would actually go.
+			f.Close()
+			fids[i] = nil
+		}
+	}
+	Fail := func() {
+		Untested()
+		Closeall()
+		// threadexec hasn't happened, so send a zero
 		cpid <- nil
 	}
 	Hard := func() {
@@ -1027,7 +1040,8 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {
 			rdselname := fmt.Sprintf("%d/rdsel", winid)
-			sfd[0] = fsopenfd(fs, rdselname, plan9.OREAD)
+			sfd[0], fid = fsopenfd(fs, rdselname, plan9.OREAD)
+			fids = append(fids, fid)
 		} else {
 			sfd[0], _ = os.OpenFile("/dev/null", os.O_RDONLY, 0777)
 		}
@@ -1042,10 +1056,13 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			} else {
 				buf = fmt.Sprintf("%d/wrsel", winid)
 			}
-			sfd[1] = fsopenfd(fs, buf, plan9.OWRITE)
-			sfd[2] = fsopenfd(fs, "cons", plan9.OWRITE)
+			sfd[1], fid = fsopenfd(fs, buf, plan9.OWRITE)
+			fids = append(fids, fid)
+			sfd[2], fid = fsopenfd(fs, "cons", plan9.OWRITE)
+			fids = append(fids, fid)
 		} else {
-			sfd[1] = fsopenfd(fs, "cons", plan9.OWRITE)
+			sfd[1], fid = fsopenfd(fs, "cons", plan9.OWRITE)
+			fids = append(fids, fid)
 			sfd[2] = sfd[1]
 		}
 		// fsunmount(fs); looks like with plan9.client you just drop it on the floor.
@@ -1108,7 +1125,10 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		} else {
 			cpid <- nil
 		}
-		// Where do we wait TODO(flux)
+		go func() {
+			cmd.Wait()
+			Closeall()
+		}()
 		return
 	}
 
