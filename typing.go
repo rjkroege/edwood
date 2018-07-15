@@ -14,7 +14,6 @@ func (t *Text) tagdownalways(nta func()) {
 			t.w.tagexpand = true
 			t.w.Resize(t.w.r, false, true)
 		}
-
 	} else {
 		nta()
 	}
@@ -180,4 +179,12 @@ func (t *Text) KeyCmdZ() {
 func (t *Text) KeyShiftCmdZ() {
 	t.TypeCommit()
 	undo(t, nil, nil, false, false, "")
+}
+
+// bodyfilemark updates the sequence and sets a file mark.
+func (t *Text) bodyfilemark() {
+	if t.what == Body {
+		seq++
+		t.file.Mark()
+	}
 }

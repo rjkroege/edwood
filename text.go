@@ -789,13 +789,10 @@ func (t *Text) Type(r rune) {
 		return
 	}
 
-	if t.what == Body {
-		seq++
-		t.file.Mark()
-	}
 	/* cut/paste must be done after the seq++/filemark */
 	switch r {
 	case draw.KeyCmd + 'x': /* %X: cut */
+		t.bodyfilemark()
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
@@ -806,6 +803,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q0
 		return
 	case draw.KeyCmd + 'v': /* %V: paste */
+		t.bodyfilemark()
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
@@ -816,6 +814,8 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q1
 		return
 	}
+
+	t.bodyfilemark()
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		if t.ncache != 0 {
