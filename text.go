@@ -741,27 +741,6 @@ func (t *Text) Type(r rune) {
 	nr = 1
 	rp := []rune{r}
 
-	Tagup := func() {
-		/* shrink tag to single line */
-		if t.w.tagexpand {
-			t.w.tagexpand = false
-			t.w.taglines = 1
-			t.w.Resize(t.w.r, false, true)
-		}
-		return
-	}
-
-	case_Down := func() {
-		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.DefaultFontHeight()))
-		t.SetOrigin(q0, true)
-		return
-	}
-	case_Up := func() {
-		q0 = t.Backnl(t.org, n)
-		t.SetOrigin(q0, true)
-		return
-	}
-
 	switch r {
 	case draw.KeyLeft:
 		t.TypeCommit()
@@ -788,41 +767,30 @@ func (t *Text) Type(r rune) {
 		}
 		return
 	case draw.KeyDown:
-		t.tagdown()
-		n = t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Down()
+		t.tagdownalways(func() {
+			t.keydownhelper(t.fr.GetFrameFillStatus().Maxlines / 3)
+		})
 		return
 	case Kscrollonedown:
-		t.tagdown()
-		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
-		if n <= 0 {
-			n = 1
-		}
-		case_Down()
+		t.tagdownalways(func() {
+			t.keydownhelper(max(1, mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)))
+		})
 		return
 	case draw.KeyPageDown:
-		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Down()
+		t.keydownhelper(2 * t.fr.GetFrameFillStatus().Maxlines / 3)
 		return
 	case draw.KeyUp:
-		if t.what == Tag {
-			Tagup()
-			return
-		}
-		n = t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Up()
+		t.tagupalways(func() {
+			t.keyuphelper( t.fr.GetFrameFillStatus().Maxlines / 3)
+		})
 		return
 	case Kscrolloneup:
-		if t.what == Tag {
-			Tagup()
-			return
-		}
-		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
-		case_Up()
+		t.tagupalways(func() {
+			t.keyuphelper(mousescrollsize(t.fr.GetFrameFillStatus().Maxlines))
+		})
 		return
 	case draw.KeyPageUp:
-		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Up()
+		t.keyuphelper(2 * t.fr.GetFrameFillStatus().Maxlines / 3)
 		return
 	case draw.KeyHome:
 		t.TypeCommit()
