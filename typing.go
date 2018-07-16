@@ -191,28 +191,43 @@ func (t *Text) bodyfilemark() {
 
 // KeyCmdX handles ⌘X
 func (t *Text) KeyCmdX() {
-		t.bodyfilemark()
-		t.TypeCommit()
-		if t.what == Body {
-			seq++
-			t.file.Mark()
-		}
-		cut(t, t, nil, true, true, "")
-		t.Show(t.q0, t.q0, true)
-		t.iq1 = t.q0
-		return
+	t.bodyfilemark()
+	t.TypeCommit()
+	if t.what == Body {
+		seq++
+		t.file.Mark()
+	}
+	cut(t, t, nil, true, true, "")
+	t.Show(t.q0, t.q0, true)
+	t.iq1 = t.q0
+	return
 }
 
 // KeyCmdV handles ⌘V
 func (t *Text) KeyCmdV() {
-		t.bodyfilemark()
-		t.TypeCommit()
-		if t.what == Body {
-			seq++
-			t.file.Mark()
+	t.bodyfilemark()
+	t.TypeCommit()
+	if t.what == Body {
+		seq++
+		t.file.Mark()
+	}
+	paste(t, t, nil, true, false, "")
+	t.Show(t.q0, t.q1, true)
+	t.iq1 = t.q1
+	return
+}
+
+// alterselection removes any existing text range and returns if it did.
+func (t *Text) alterselection() bool {
+	t.bodyfilemark()
+	wasrange := t.q0 != t.q1
+	if t.q1 > t.q0 {
+		if t.ncache != 0 {
+			acmeerror("text.type", nil)
 		}
-		paste(t, t, nil, true, false, "")
-		t.Show(t.q0, t.q1, true)
-		t.iq1 = t.q1
-		return
+		cut(t, t, nil, true, true, "")
+		t.eq0 = ^0
+	}
+	t.Show(t.q0, t.q0, true)
+	return wasrange
 }

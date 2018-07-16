@@ -743,7 +743,7 @@ func (t *Text) Type(r rune) {
 
 	switch r {
 	case draw.KeyLeft:
-		 t.KeyLeft()
+		t.KeyLeft()
 		return
 	case draw.KeyRight:
 		t.KeyRight()
@@ -795,20 +795,11 @@ func (t *Text) Type(r rune) {
 		return
 	}
 
-	t.bodyfilemark()
-	wasrange := t.q0 != t.q1
-	if t.q1 > t.q0 {
-		if t.ncache != 0 {
-			acmeerror("text.type", nil)
-		}
-		cut(t, t, nil, true, true, "")
-		t.eq0 = ^0
-	}
-	t.Show(t.q0, t.q0, true)
 	switch r {
 	case 0x06:
 		fallthrough /* ^F: complete */
 	case draw.KeyInsert:
+		t.alterselection()
 		t.TypeCommit()
 		rp = t.Complete()
 		if rp == nil {
@@ -817,6 +808,7 @@ func (t *Text) Type(r rune) {
 		nr = len(rp) // runestrlen(rp);
 		break        /* fall through to normal insertion case */
 	case 0x1B:
+		t.alterselection()
 		if t.eq0 != ^0 {
 			if t.eq0 <= t.q0 {
 				t.SetSelect(t.eq0, t.q0)
@@ -830,6 +822,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q0
 		return
 	case 0x7F: /* Del: erase character right */
+		wasrange := t.alterselection()
 		if t.q1 >= t.Nc()-1 {
 			return // End of file
 		}
@@ -844,6 +837,7 @@ func (t *Text) Type(r rune) {
 	case 0x15:
 		fallthrough /* ^U: erase line */
 	case 0x17: /* ^W: erase word */
+		t.alterselection()
 		if t.q0 == 0 { /* nothing to erase */
 			return
 		}
@@ -892,6 +886,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q0
 		return
 	case '\n':
+		t.alterselection()
 		if t.w.autoindent {
 			/* find beginning of previous line using backspace code */
 			nnb = t.BsWidth(0x15)    /* ^U case */
@@ -909,6 +904,8 @@ func (t *Text) Type(r rune) {
 			}
 			rp = rp[:nr]
 		}
+	default:
+		t.alterselection()
 	}
 	/* otherwise ordinary character; just insert, typically in caches of all texts */
 	for _, u := range t.file.text { // u is *Text
