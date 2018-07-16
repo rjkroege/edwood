@@ -231,3 +231,69 @@ func (t *Text) alterselection() bool {
 	t.Show(t.q0, t.q0, true)
 	return wasrange
 }
+
+// KeyAutoComplete handles automatic expansion via the autocompletion
+// system.
+func (t *Text) KeyAutoComplete() {
+	t.alterselection()
+	t.TypeCommit()
+	rp := t.Complete()
+	if rp == nil {
+		return
+	}
+	//		nr := len(rp) // runestrlen(rp);
+	t.KeyDefault(rp)
+}
+
+// KeyDefault inserts the rune(s) in rp as normal typing. It inserts
+// the runes into the caches of all texts.
+func (t *Text) KeyDefault(rp []rune) {
+	nr := len(rp)
+	for _, u := range t.file.text { // u is *Text
+		if u.eq0 == ^0 {
+			u.eq0 = t.q0
+		}
+		if u.ncache == 0 {
+			u.cq0 = t.q0
+		} else {
+			if t.q0 != u.cq0+u.ncache {
+				acmeerror("text.type cq1", nil)
+			}
+		}
+		/*
+		 * Change the tag before we add to ncache,
+		 * so that if the window body is resized the
+		 * commit will not find anything in ncache.
+		 */
+		if u.what == Body && u.ncache == 0 {
+			u.needundo = true
+			t.w.SetTag()
+			u.needundo = false
+		}
+		u.Insert(t.q0, rp, false)
+		if u != t {
+			u.SetSelect(u.q0, u.q1)
+		}
+		if u.ncache+nr > u.ncachealloc {
+			u.ncachealloc += 10 + nr
+			u.cache = append(u.cache, make([]rune, 10+nr)...) //runerealloc(u.cache, u.ncachealloc);
+		}
+		//runemove(u.cache+u.ncache, rp, nr);
+		copy(u.cache[u.ncache:], rp[:nr])
+		u.ncache += nr
+		if t.what == Tag { // TODO(flux): This is hideous work-around for
+			// what looks like a subtle bug near here.
+			t.w.Commit(t)
+		}
+	}
+	t.SetSelect(t.q0+nr, t.q0+nr)
+
+	// TODO(rjk): Should be part of the newline handler and not here.
+	// Make sure that this block and subsequent assignment can be
+	// re-ordered.
+	if rp[0] == '\n' && t.w != nil {
+		t.w.Commit(t)
+	}
+	t.iq1 = t.q0
+
+}

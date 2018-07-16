@@ -796,18 +796,15 @@ func (t *Text) Type(r rune) {
 	}
 
 	switch r {
-	case 0x06:
-		fallthrough /* ^F: complete */
+	case 0x06: // ^F to autocomplete.
+		t.KeyAutoComplete()
+		return
+		//		break
 	case draw.KeyInsert:
-		t.alterselection()
-		t.TypeCommit()
-		rp = t.Complete()
-		if rp == nil {
-			return
-		}
-		nr = len(rp) // runestrlen(rp);
-		break        /* fall through to normal insertion case */
-	case 0x1B:
+		t.KeyAutoComplete()
+		return
+		//		break        /* fall through to normal insertion case */
+	case 0x1B: // ESC
 		t.alterselection()
 		if t.eq0 != ^0 {
 			if t.eq0 <= t.q0 {
@@ -908,49 +905,7 @@ func (t *Text) Type(r rune) {
 		t.alterselection()
 	}
 	/* otherwise ordinary character; just insert, typically in caches of all texts */
-	for _, u := range t.file.text { // u is *Text
-		if u.eq0 == ^0 {
-			u.eq0 = t.q0
-		}
-		if u.ncache == 0 {
-			u.cq0 = t.q0
-		} else {
-			if t.q0 != u.cq0+u.ncache {
-				acmeerror("text.type cq1", nil)
-			}
-		}
-		/*
-		 * Change the tag before we add to ncache,
-		 * so that if the window body is resized the
-		 * commit will not find anything in ncache.
-		 */
-		if u.what == Body && u.ncache == 0 {
-			u.needundo = true
-			t.w.SetTag()
-			u.needundo = false
-		}
-		u.Insert(t.q0, rp, false)
-		if u != t {
-			u.SetSelect(u.q0, u.q1)
-		}
-		if u.ncache+nr > u.ncachealloc {
-			u.ncachealloc += 10 + nr
-			u.cache = append(u.cache, make([]rune, 10+nr)...) //runerealloc(u.cache, u.ncachealloc);
-		}
-		//runemove(u.cache+u.ncache, rp, nr);
-		copy(u.cache[u.ncache:], rp[:nr])
-		u.ncache += nr
-		if t.what == Tag { // TODO(flux): This is hideous work-around for
-			// what looks like a subtle bug near here.
-			t.w.Commit(t)
-		}
-	}
-	t.SetSelect(t.q0+nr, t.q0+nr)
-	if r == '\n' && t.w != nil {
-		t.w.Commit(t)
-	}
-	t.iq1 = t.q0
-
+	t.KeyDefault(rp)
 }
 
 func (t *Text) Commit(tofile bool) {
