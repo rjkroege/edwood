@@ -168,9 +168,8 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 }
 
 func (w *Window) DrawButton() {
-
 	b := button
-	if !w.isdir && !w.isscratch && w.body.file.mod { // TODO(flux) validate text cache stuff goes away
+	if !w.isdir && !w.isscratch && (w.body.file.mod || w.body.ncache > 0) {
 		b = modbutton
 	}
 	var br image.Rectangle
