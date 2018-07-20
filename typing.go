@@ -241,7 +241,6 @@ func (t *Text) KeyAutoComplete() {
 	if rp == nil {
 		return
 	}
-	//		nr := len(rp) // runestrlen(rp);
 	t.KeyDefault(rp)
 }
 
@@ -295,5 +294,113 @@ func (t *Text) KeyDefault(rp []rune) {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0
+}
 
+// KeyEsc handles ESC
+// TODO(rjk): Clarify the intended purpose of ESC.
+func (t *Text) KeyEsc() {
+		t.alterselection()
+		if t.eq0 != ^0 {
+			if t.eq0 <= t.q0 {
+				t.SetSelect(t.eq0, t.q0)
+			} else {
+				t.SetSelect(t.q0, t.eq0)
+			}
+		}
+		if t.ncache > 0 {
+			t.TypeCommit()
+		}
+		t.iq1 = t.q0
+}
+
+
+func (t *Text) KeyEraseCharacterRight() {
+		// TODO(rjk): Why doesn't this need to loop over the
+		// zeroxes?
+		wasrange := t.alterselection()
+		if t.q1 >= t.Nc()-1 {
+			return // End of file
+		}
+		t.TypeCommit() // Avoid messing with the cache?
+		if !wasrange {
+			t.q1++
+			cut(t, t, nil, false, true, "")
+		}
+}
+
+
+
+func (t *Text) KeyEraseCharactersLeft(r rune) {
+		t.alterselection()
+		if t.q0 == 0 { /* nothing to erase */
+			return
+		}
+		// TODO(rjk): Generalize this more nicely.
+		nnb := t.BsWidth(r)
+		q1 := t.q0
+		q0 := q1 - nnb
+		/* if selection is at beginning of window, avoid deleting invisible text */
+		if q0 < t.org {
+			q0 = t.org
+			nnb = q1 - q0
+		}
+		if nnb <= 0 {
+			return
+		}
+		for _, u := range t.file.text { // u is *Text
+			u.nofill = true
+			nb := nnb
+			n := u.ncache
+			if n > 0 {
+				if q1 != u.cq0+n {
+					acmeerror("text.type backspace", nil)
+				}
+				if n > nb {
+					n = nb
+				}
+				u.ncache -= n
+				u.Delete(q1-n, q1, false)
+				nb -= n
+			}
+			if u.eq0 == q1 || u.eq0 == ^0 {
+				u.eq0 = q0
+			}
+			if nb != 0 && u == t {
+				u.Delete(q0, q0+nb, true)
+			}
+			if u != t {
+				u.SetSelect(u.q0, u.q1)
+			} else {
+				t.SetSelect(q0, q0)
+			}
+			u.nofill = false
+		}
+		for _, t := range t.file.text {
+			t.fill(t.fr)
+		}
+		t.iq1 = t.q0
+}
+
+// HERE. refactor me.
+func (t *Text) KeyNewline() {
+		t.alterselection()
+			rp := make([]rune, nnb+1) //runemalloc(nnb + 1);
+		if t.w.autoindent {
+			/* find beginning of previous line using backspace code */
+			nnb := t.BsWidth(0x15)    /* ^U case */
+			nr := 0
+			// TODO(rjk): Conceivably this is non-ideal?
+			rp[nr] =  '\n'
+			nr++
+			for i := 0; i < nnb; i++ {
+				r := t.ReadC(t.q0 - nnb + i)
+				if r != ' ' && r != '\t' {
+					break
+				}
+				rp[nr] = r
+				nr++
+			}
+			rp = rp[:nr]
+		}
+	t.KeyDefault(rp)
 }

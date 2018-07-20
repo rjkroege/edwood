@@ -793,119 +793,34 @@ func (t *Text) Type(r rune) {
 	case draw.KeyCmd + 'v': /* %V: paste */
 		t.KeyCmdV()
 		return
-	}
-
-	switch r {
 	case 0x06: // ^F to autocomplete.
 		t.KeyAutoComplete()
 		return
-		//		break
 	case draw.KeyInsert:
 		t.KeyAutoComplete()
 		return
-		//		break        /* fall through to normal insertion case */
 	case 0x1B: // ESC
-		t.alterselection()
-		if t.eq0 != ^0 {
-			if t.eq0 <= t.q0 {
-				t.SetSelect(t.eq0, t.q0)
-			} else {
-				t.SetSelect(t.q0, t.eq0)
-			}
-		}
-		if t.ncache > 0 {
-			t.TypeCommit()
-		}
-		t.iq1 = t.q0
+		t.KeyEsc()
 		return
 	case 0x7F: /* Del: erase character right */
-		wasrange := t.alterselection()
-		if t.q1 >= t.Nc()-1 {
-			return // End of file
-		}
-		t.TypeCommit() // Avoid messing with the cache?
-		if !wasrange {
-			t.q1++
-			cut(t, t, nil, false, true, "")
-		}
+		t.KeyEraseCharacterRight()
 		return
-	case 0x08:
-		fallthrough /* ^H: erase character */
-	case 0x15:
-		fallthrough /* ^U: erase line */
-	case 0x17: /* ^W: erase word */
-		t.alterselection()
-		if t.q0 == 0 { /* nothing to erase */
-			return
-		}
-		nnb = t.BsWidth(r)
-		q1 = t.q0
-		q0 = q1 - nnb
-		/* if selection is at beginning of window, avoid deleting invisible text */
-		if q0 < t.org {
-			q0 = t.org
-			nnb = q1 - q0
-		}
-		if nnb <= 0 {
-			return
-		}
-		for _, u := range t.file.text { // u is *Text
-			u.nofill = true
-			nb = nnb
-			n = u.ncache
-			if n > 0 {
-				if q1 != u.cq0+n {
-					acmeerror("text.type backspace", nil)
-				}
-				if n > nb {
-					n = nb
-				}
-				u.ncache -= n
-				u.Delete(q1-n, q1, false)
-				nb -= n
-			}
-			if u.eq0 == q1 || u.eq0 == ^0 {
-				u.eq0 = q0
-			}
-			if nb != 0 && u == t {
-				u.Delete(q0, q0+nb, true)
-			}
-			if u != t {
-				u.SetSelect(u.q0, u.q1)
-			} else {
-				t.SetSelect(q0, q0)
-			}
-			u.nofill = false
-		}
-		for _, t := range t.file.text {
-			t.fill(t.fr)
-		}
-		t.iq1 = t.q0
+	case 0x08: // ^H: erase character 
+		t.KeyEraseCharactersLeft(r)
+		return
+	case 0x15: // ^U: erase line
+		t.KeyEraseCharactersLeft(r)
+		return
+	case 0x17:  // ^W: erase word 
+		t.KeyEraseCharactersLeft(r)
 		return
 	case '\n':
-		t.alterselection()
-		if t.w.autoindent {
-			/* find beginning of previous line using backspace code */
-			nnb = t.BsWidth(0x15)    /* ^U case */
-			rp = make([]rune, nnb+1) //runemalloc(nnb + 1);
-			nr = 0
-			rp[nr] = r
-			nr++
-			for i = 0; i < nnb; i++ {
-				r = t.ReadC(t.q0 - nnb + i)
-				if r != ' ' && r != '\t' {
-					break
-				}
-				rp[nr] = r
-				nr++
-			}
-			rp = rp[:nr]
-		}
+		t.KeyNewline()
+		return
 	default:
 		t.alterselection()
+		t.KeyDefault(rp)
 	}
-	/* otherwise ordinary character; just insert, typically in caches of all texts */
-	t.KeyDefault(rp)
 }
 
 func (t *Text) Commit(tofile bool) {
