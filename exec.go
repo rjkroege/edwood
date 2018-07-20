@@ -41,7 +41,7 @@ var exectab = []Exectab{
 	{"ID", id, false, true /*unused*/, true /*unused*/},
 	//	{ "Incl",		incl,		false,	true /*unused*/,		true /*unused*/		},
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
-	//	{ "Kill",		xkill,		false,	true /*unused*/,		true /*unused*/		},
+	{"Kill", xkill, false, true /*unused*/, true /*unused*/},
 	{"Load", dump, false, false, true /*unused*/},
 	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
 	{"Look", look, false, true /*unused*/, true /*unused*/},
@@ -492,6 +492,15 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 func id(et, _, _ *Text, _, _ bool, _ string) {
 	if et != nil && et.w != nil {
 		warning(nil, "/mnt/acme/%d/\n", et.w.id)
+	}
+}
+
+func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
+	if r, _ := getarg(argt, false, false); len(r) > 0 {
+		xkill(nil, nil, nil, false, false, r)
+	}
+	for _, cmd := range strings.Fields(args) {
+		ckill <- cmd
 	}
 }
 
