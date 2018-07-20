@@ -564,7 +564,7 @@ func xfidwrite(x *Xfid) {
 			respond(x, &fc, Eaddr)
 			break
 		}
-		r := []rune(string(x.fcall.Data[0:x.fcall.Count]))
+		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
 		if w.nomark == false {
 			seq++
 			t.file.Mark()
@@ -630,7 +630,7 @@ func xfidctlwrite(x *Xfid, w *Window) {
 forloop:
 	for lidx = 0; lidx < len(lines); lidx++ {
 		line = lines[lidx]
-		words := strings.Split(line, " ")
+		words := strings.SplitN(line, " ", 2)
 		switch words[0] {
 		case "": // empty line.
 		case "lock": // make window exclusive use
@@ -656,7 +656,15 @@ forloop:
 			t = &w.body
 			t.Show(t.q0, t.q1, true)
 		case "name": // set file name
-			r := []rune(words[1])
+			if len(words) < 2 {
+				err = Ebadctl
+				break forloop
+			}
+			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			if nulls {
+				err = fmt.Errorf("nulls in file name")
+				break forloop
+			}
 			for _, rr := range r {
 				if rr <= ' ' {
 					err = fmt.Errorf("bad character in file name")
@@ -667,21 +675,25 @@ forloop:
 			w.body.file.Mark()
 			w.SetName(string(r))
 		case "dump": // set dump string
-			r := []rune(words[1])
-			for _, rr := range r {
-				if rr <= ' ' {
-					err = fmt.Errorf("bad character in file name")
-					break
-				}
+			if len(words) < 2 {
+				err = Ebadctl
+				break forloop
+			}
+			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			if nulls {
+				err = fmt.Errorf("nulls in dump string")
+				break forloop
 			}
 			w.dumpstr = string(r)
 		case "dumpdir": // set dump directory
-			r := []rune(words[1])
-			for _, rr := range r {
-				if rr <= ' ' {
-					err = fmt.Errorf("bad character in file name")
-					break
-				}
+			if len(words) < 2 {
+				err = Ebadctl
+				break forloop
+			}
+			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			if nulls {
+				err = fmt.Errorf("nulls in dump directory string")
+				break forloop
 			}
 			w.dumpdir = string(r)
 		case "delete": // delete for sure
