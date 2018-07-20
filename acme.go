@@ -731,8 +731,9 @@ func acmeputsnarf() {
 }
 
 func acmegetsnarf() {
-	r := make([]byte, MAXSNARF)
-	n, _, _ := row.display.ReadSnarf(r)
+	b := make([]byte, MAXSNARF)
+	n, _, _ := row.display.ReadSnarf(b)
+	r, _, _ := cvttorunes(b, n)
 	snarfbuf.Reset()
-	snarfbuf.Insert(0, []rune(string(r[:n])))
+	snarfbuf.Insert(0, r)
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"io/ioutil"
 	"os"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -35,12 +34,9 @@ func (b *Buffer) Load(q0 int, fd *os.File) (n int, h FileHash, hasNulls bool, er
 	if err != nil {
 		warning(nil, "read error in Buffer.Load")
 	}
-	s := string(d)
-	s = strings.Replace(s, "\000", "", -1)
-	hasNulls = len(s) != len(d)
-	runes := []rune(s)
+	runes, _, hasNulls := cvttorunes(d, len(d))
 	(*b).Insert(q0, runes)
-	return (len(runes)), calcFileHash(d), hasNulls, err
+	return len(runes), calcFileHash(d), hasNulls, err
 }
 
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {
