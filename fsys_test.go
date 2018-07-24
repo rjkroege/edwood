@@ -289,6 +289,53 @@ func TestFSys(t *testing.T) {
 			t.Errorf("Read %v bytes from body; expected %v\n", len(buf), len(text))
 		}
 	})
+	t.Run("CtlWrite", func(t *testing.T) {
+		w, err := acme.New()
+		if err != nil {
+			t.Fatalf("Creating new window failed: %v\n", err)
+		}
+		defer w.Del(true)
+
+		for _, tc := range []struct {
+			name string
+			ok   bool
+		}{
+			{"/edwood/test1", true},
+			{"/edwood/世界.txt", true},
+			{"/edwood/name with space", false},
+			{"/edwood/\x00\x00test2", false},
+		} {
+			err := w.Name(tc.name)
+			if !tc.ok {
+				if err == nil {
+					t.Errorf("Writing window name %q returned nil error\n", tc.name)
+				}
+				continue
+			}
+			if err != nil {
+				t.Errorf("Failed to write window name %q: %v\n", tc.name, err)
+				continue
+			}
+			b, err := w.ReadAll("tag")
+			if err != nil {
+				t.Errorf("Failed to read tag: %v\n", err)
+				continue
+			}
+			tag := strings.SplitN(string(b), " ", 2)
+			if tc.name != tag[0] {
+				t.Errorf("Window name is %q; expected %q\n", tag[0], tc.name)
+			}
+		}
+
+		dump := "Watch go test"
+		if err := w.Ctl("dump " + dump); err != nil {
+			t.Errorf("Failed to write dump %q: %v\n", dump, err)
+		}
+		dumpdir := "/home/gopher/src/edwood"
+		if err := w.Ctl("dumpdir " + dumpdir); err != nil {
+			t.Errorf("Failed to write dumpdir %q: %v\n", dumpdir, err)
+		}
+	})
 }
 
 func TestFSysAddr(t *testing.T) {
