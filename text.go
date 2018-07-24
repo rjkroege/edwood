@@ -68,14 +68,12 @@ type Text struct {
 	row     *Row
 	col     *Column
 
-	iq1         int
-	eq0         int
-	cq0         int
-	ncache      int
-	ncachealloc int
-	cache       []rune
-	nofill      bool
-	needundo    bool
+	iq1      int
+	eq0      int
+	cq0      int
+	cache    []rune
+	nofill   bool
+	needundo bool
 
 	lk sync.Mutex
 }
@@ -99,7 +97,6 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.lastsr = nullrect
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
-	t.ncache = 0
 	t.font = rf
 	t.tabstop = int(maxtab)
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
@@ -263,7 +260,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 }
 
 func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
-	if t.ncache != 0 || t.file.b.Nc() > 0 || t.w == nil || t != &t.w.body {
+	if len(t.cache) != 0 || t.file.b.Nc() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 	if t.w.isdir && t.file.name == "" {
@@ -444,7 +441,7 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 }
 
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
-	if tofile && t.ncache != 0 {
+	if tofile && len(t.cache) != 0 {
 		panic("text.insert")
 	}
 	if len(r) == 0 {
@@ -519,7 +516,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	if fr.IsLastLineFull() || t.nofill {
 		return
 	}
-	if t.ncache > 0 {
+	if len(t.cache) > 0 {
 		t.TypeCommit()
 	}
 	for {
@@ -557,7 +554,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 }
 
 func (t *Text) Delete(q0, q1 int, tofile bool) {
-	if tofile && t.ncache != 0 {
+	if tofile && len(t.cache) != 0 {
 		panic("text.delete")
 	}
 	n := q1 - q0
@@ -921,7 +918,7 @@ func (t *Text) Type(r rune) {
 	}
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
-		if t.ncache != 0 {
+		if len(t.cache) != 0 {
 			acmeerror("text.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
@@ -947,7 +944,7 @@ func (t *Text) Type(r rune) {
 				t.SetSelect(t.q0, t.eq0)
 			}
 		}
-		if t.ncache > 0 {
+		if len(t.cache) > 0 {
 			t.TypeCommit()
 		}
 		t.iq1 = t.q0
@@ -984,7 +981,7 @@ func (t *Text) Type(r rune) {
 		for _, u := range t.file.text { // u is *Text
 			u.nofill = true
 			nb = nnb
-			n = u.ncache
+			n = len(u.cache)
 			if n > 0 {
 				if q1 != u.cq0+n {
 					acmeerror("text.type backspace", nil)
@@ -992,7 +989,7 @@ func (t *Text) Type(r rune) {
 				if n > nb {
 					n = nb
 				}
-				u.ncache -= n
+				u.cache = u.cache[:len(u.cache)-n]
 				u.Delete(q1-n, q1, false)
 				nb -= n
 			}
@@ -1038,10 +1035,10 @@ func (t *Text) Type(r rune) {
 		if u.eq0 == ^0 {
 			u.eq0 = t.q0
 		}
-		if u.ncache == 0 {
+		if len(u.cache) == 0 {
 			u.cq0 = t.q0
 		} else {
-			if t.q0 != u.cq0+u.ncache {
+			if t.q0 != u.cq0+len(u.cache) {
 				acmeerror("text.type cq1", nil)
 			}
 		}
@@ -1050,7 +1047,7 @@ func (t *Text) Type(r rune) {
 		 * so that if the window body is resized the
 		 * commit will not find anything in ncache.
 		 */
-		if u.what == Body && u.ncache == 0 {
+		if u.what == Body && len(u.cache) == 0 {
 			u.needundo = true
 			t.w.SetTag()
 			u.needundo = false
@@ -1059,13 +1056,7 @@ func (t *Text) Type(r rune) {
 		if u != t {
 			u.SetSelect(u.q0, u.q1)
 		}
-		if u.ncache+nr > u.ncachealloc {
-			u.ncachealloc += 10 + nr
-			u.cache = append(u.cache, make([]rune, 10+nr)...) //runerealloc(u.cache, u.ncachealloc);
-		}
-		//runemove(u.cache+u.ncache, rp, nr);
-		copy(u.cache[u.ncache:], rp[:nr])
-		u.ncache += nr
+		u.cache = append(u.cache, rp[:nr]...)
 		if t.what == Tag { // TODO(flux): This is hideous work-around for
 			// what looks like a subtle bug near here.
 			t.w.Commit(t)
@@ -1080,17 +1071,17 @@ func (t *Text) Type(r rune) {
 }
 
 func (t *Text) Commit(tofile bool) {
-	if t.ncache == 0 {
+	if len(t.cache) == 0 {
 		return
 	}
 	if tofile {
-		t.file.Insert(t.cq0, t.cache[:t.ncache])
+		t.file.Insert(t.cq0, t.cache)
 	}
 	if t.what == Body {
 		t.w.dirty = true
 		t.w.utflastqid = -1
 	}
-	t.ncache = 0
+	t.cache = t.cache[:0]
 }
 
 // TODO(rjk): Conceivably, this can be removed.
@@ -1270,7 +1261,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false /* do we call textscrdraw? */
-	nc = t.file.b.Nc() + t.ncache
+	nc = t.file.b.Nc() + len(t.cache)
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
@@ -1306,7 +1297,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 }
 
 func (t *Text) ReadC(q int) rune {
-	if t.cq0 <= q && q < t.cq0+t.ncache {
+	if t.cq0 <= q && q < t.cq0+len(t.cache) {
 		return t.cache[q-t.cq0]
 	}
 	return t.file.b.ReadC(q)
