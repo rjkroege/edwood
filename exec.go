@@ -616,7 +616,7 @@ func putall(et, _, _ *Text, _, _ bool, arg string) {
 				continue
 			}
 			a := string(w.body.file.name)
-			if w.body.file.mod || w.body.ncache > 0 {
+			if w.body.file.mod || len(w.body.cache) > 0 {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {
