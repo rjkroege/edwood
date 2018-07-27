@@ -109,7 +109,7 @@ func main() {
 
 	iconinit(display)
 
-	// cwait = make(chan Waitmsg)
+	cwait = make(chan *os.ProcessState)
 	ccommand = make(chan *Command)
 	ckill = make(chan string)
 	cxfidalloc = make(chan *Xfid)
@@ -172,6 +172,7 @@ func main() {
 	acmeerrorinit()
 	go mousethread(display)
 	go keyboardthread(display)
+	go waitthread()
 	go newwindowthread()
 	go xfidallocthread(display)
 
@@ -524,7 +525,7 @@ func waitthread() {
 			warning(nil, "%s", err)
 			row.display.Flush()
 			row.lk.Unlock()
-			break
+
 		case cmd := <-ckill:
 			found := false
 			for c = command; c != nil; c = c.next {
@@ -539,7 +540,7 @@ func waitthread() {
 			if !found {
 				warning(nil, "Kill: no process %v\n", cmd)
 			}
-			break
+
 		case w := <-cwait:
 			pid := w.Pid()
 			for c = command; c != nil; c = c.next {
@@ -572,8 +573,8 @@ func waitthread() {
 					t.Delete(t.q0, t.q1, true)
 					t.SetSelect(0, 0)
 				}
-				if w.String() != "" {
-					warning(c.md, "%s: exit %s\n", c.name, w.String())
+				if !w.Success() {
+					warning(c.md, "%s: %s\n", c.name, w.String())
 				}
 				row.display.Flush()
 			}
@@ -608,7 +609,6 @@ func waitthread() {
 			row.display.Flush()
 			row.lk.Unlock()
 		}
-
 	}
 }
 
@@ -696,6 +696,8 @@ func shutdown(s os.Signal) {
 
 func acmeerrorinit() {
 	var pfd [2]int
+	// TODO(fhs): Syscall package is not portable.
+	// Perhaps use io.Pipe since exec.Cmd takes io.Reader/io.Writer.
 	err := syscall.Pipe(pfd[:])
 
 	if err != nil {
@@ -704,8 +706,8 @@ func acmeerrorinit() {
 
 	syscall.CloseOnExec(pfd[0])
 	syscall.CloseOnExec(pfd[1])
-	erroutfd = pfd[0]
-	errorfd := pfd[1]
+	errorfd := pfd[0]
+	erroutfd = pfd[1]
 	if errorfd < 0 {
 		acmeerror("can't re-open acmeerror file", nil)
 	}
@@ -714,7 +716,7 @@ func acmeerrorinit() {
 		errorf := os.NewFile(uintptr(errorfd), "Global Error File/Pipe")
 		for {
 			n, _ := errorf.Read(buf[:])
-			if n < 0 {
+			if n == 0 {
 				return
 			}
 			cerr <- fmt.Errorf(string(buf[:n]))

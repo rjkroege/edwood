@@ -848,14 +848,20 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 }
 
 // fsopenfd opens a plan9 Fid and makes a Go os.File from it for path on fsys.
-func fsopenfd(fsys *client.Fsys, path string, mode uint8) (*os.File, *client.Fid) {
+// Caller must close the returned file. This function will close the
+// other end of the pipe and the plan9 Fid.
+func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
 	fid, err := fsys.Open(path, mode)
 	if err != nil {
 		warning(nil, "Failed to open %v: %v", path, err)
-		return nil, nil
+		return nil
 	}
 
 	// open a pipe, serve the reads from fid down it
+	//
+	// TODO(fhs): Pipes are not necessary since exec.Cmd takes io.Reader/io.Writer.
+	// Also, there is a race between writes to fid here and writes from waitthread
+	// (e.g. exit status may be printed before all of stderr is printed).
 	r, w, err := os.Pipe()
 	if err != nil {
 		acmeerror("fsopenfd: Could not make pipe", nil)
@@ -877,7 +883,7 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) (*os.File, *client.Fid
 				}
 			}
 		}()
-		return r, fid
+		return r
 	} else {
 		go func() {
 			var buf [BUFSIZE]byte
@@ -894,7 +900,7 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) (*os.File, *client.Fid
 				}
 			}
 		}()
-		return w, fid
+		return w
 	}
 }
 
@@ -911,9 +917,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		//static void *parg[2];
 		rcarg []string
 		shell string
-		fid   *client.Fid
 	)
-	fids := make([]*client.Fid, 0, 3)
 
 	Closeall := func() {
 		sfd[0].Close()
@@ -921,12 +925,6 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			sfd[2].Close()
 		}
 		sfd[1].Close()
-		for i, f := range fids {
-			// Errors could be logged but as the process is probably shutting
-			// down, it's not obvious to me where they would actually go.
-			f.Close()
-			fids[i] = nil
-		}
 	}
 	Fail := func() {
 		Untested()
@@ -979,15 +977,26 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		if err == nil {
 			if cpid != nil {
 				cpid <- cmd.Process
+			} else {
+				cpid <- nil
 			}
-			return // TODO(flux) where do we wait?
+			go func() {
+				cmd.Wait()
+				Closeall()
+				cwait <- cmd.ProcessState
+			}()
+			return
 		}
 		warning(nil, "exec %s: %v\n", shell, err)
 		Fail()
 	}
 	t = strings.TrimLeft(s, " \t\n")
-	name = filepath.Base(string(t)) + " "
-	c.name = name
+	name = t
+	if i := strings.IndexAny(name, " \t\n"); i >= 0 {
+		name = name[:i]
+	}
+	c.name = filepath.Base(name) + " "
+
 	// t is the full path, trimmed of left whitespace.
 	pipechar = 0
 	if len(t) > 0 && (t[0] == '<' || t[0] == '|' || t[0] == '>') {
@@ -1040,8 +1049,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {
 			rdselname := fmt.Sprintf("%d/rdsel", winid)
-			sfd[0], fid = fsopenfd(fs, rdselname, plan9.OREAD)
-			fids = append(fids, fid)
+			sfd[0] = fsopenfd(fs, rdselname, plan9.OREAD)
 		} else {
 			sfd[0], _ = os.OpenFile("/dev/null", os.O_RDONLY, 0777)
 		}
@@ -1056,13 +1064,10 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			} else {
 				buf = fmt.Sprintf("%d/wrsel", winid)
 			}
-			sfd[1], fid = fsopenfd(fs, buf, plan9.OWRITE)
-			fids = append(fids, fid)
-			sfd[2], fid = fsopenfd(fs, "cons", plan9.OWRITE)
-			fids = append(fids, fid)
+			sfd[1] = fsopenfd(fs, buf, plan9.OWRITE)
+			sfd[2] = fsopenfd(fs, "cons", plan9.OWRITE)
 		} else {
-			sfd[1], fid = fsopenfd(fs, "cons", plan9.OWRITE)
-			fids = append(fids, fid)
+			sfd[1] = fsopenfd(fs, "cons", plan9.OWRITE)
 			sfd[2] = sfd[1]
 		}
 		// fsunmount(fs); looks like with plan9.client you just drop it on the floor.
@@ -1128,13 +1133,13 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		go func() {
 			cmd.Wait()
 			Closeall()
+			cwait <- cmd.ProcessState
 		}()
 		return
 	}
 
 	Fail()
 	return
-
 }
 
 const (
