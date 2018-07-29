@@ -118,7 +118,6 @@ var (
 	textcolors        [frame.NumColours]*draw.Image
 	wdir              string
 	editing           int = Inactive
-	erroutfd          int
 	messagesize       int
 	globalautoindent  bool
 	dodollarsigns     bool
