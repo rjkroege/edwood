@@ -215,7 +215,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	if !w.tagexpand {
 		/* use just as many lines as needed to show the Del */
-		n := int(w.delRunePos())
+		n := w.delRunePos()
 		if n < 0 {
 			return 1
 		}
@@ -229,7 +229,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 	}
 
 	/* if tag ends with \n, include empty line at end for typing */
-	n := int(w.tag.fr.GetFrameFillStatus().Nlines)
+	n := w.tag.fr.GetFrameFillStatus().Nlines
 	if w.tag.file.b.Nc() > 0 {
 		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
 		if c == '\n' {

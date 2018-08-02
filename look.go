@@ -227,7 +227,7 @@ func plumblook(m *plumb.Message) {
 	e.jump = true
 	e.a0 = 0
 	e.a1 = 0
-	addr := string(findattr(m.Attr, "addr"))
+	addr := findattr(m.Attr, "addr")
 	if addr != "" {
 		e.ar = []rune(addr)
 		e.a1 = len(e.ar)
@@ -456,7 +456,7 @@ func dirname(t *Text, r []rune) []rune {
 	for m := (0); m < nt; m++ {
 		c = b[m]
 		if c == '/' {
-			slash = int(m)
+			slash = m
 		}
 		if c == ' ' || c == '\t' {
 			break
@@ -789,7 +789,7 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 			return
 		}
 	}
-	s := wsre.ReplaceAllString(string(arg), " ")
+	s := wsre.ReplaceAllString(arg, " ")
 	filenames := strings.Split(s, " ")
 	if len(filenames) == 1 && filenames[0] == "" && et.col != nil {
 		w := et.col.Add(nil, nil, -1)
@@ -804,7 +804,7 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 		fmt.Printf("rs = %#v\n", rs)
 		e := Expand{}
 		e.name = rs
-		e.bname = string(rs)
+		e.bname = rs
 		e.jump = true
 		fmt.Printf("e = %#v\n", e)
 		openfile(et, &e)

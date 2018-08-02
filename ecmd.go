@@ -33,8 +33,8 @@ func resetxec() {
 }
 
 func mkaddr(f *File) (a Address) {
-	a.r.q0 = int(f.curtext.q0)
-	a.r.q1 = int(f.curtext.q1)
+	a.r.q0 = f.curtext.q0
+	a.r.q1 = f.curtext.q1
 	a.f = f
 	return a
 }
@@ -48,7 +48,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 	}
 
 	if w == nil && (cp.addr == nil || cp.addr.typ != '"' &&
-		Buffer([]rune("bBnqUXY!")).Index([]rune{rune(cp.cmdc)}) == -1 && // Commands that don't need a window
+		Buffer([]rune("bBnqUXY!")).Index([]rune{cp.cmdc}) == -1 && // Commands that don't need a window
 		!(cp.cmdc == 'D' && len(cp.text) > 0)) {
 		editerror("no current window")
 	}
@@ -93,7 +93,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > int(t.file.b.Nc()) {
+			if dot.r.q1 > t.file.b.Nc() {
 				editerror("dot extends past end of buffer during { command")
 			}
 			t.q0 = dot.r.q0
@@ -111,7 +111,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	f := (*File)(w.body.file)
+	f := w.body.file
 	switch editing {
 	case Inactive:
 		return fmt.Errorf("permission denied")
@@ -539,7 +539,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 			t.file.elog.Delete(t.q0, t.q1)
 		}
 	}
-	s = append([]rune{rune(cmd)}, r...)
+	s = append([]rune{cmd}, r...)
 
 	dir = ""
 	if t != nil {
@@ -707,12 +707,12 @@ func nl_cmd(t *Text, cp *Cmd) bool {
 	f := t.file
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a := Address(mkaddr(f))
+		a := mkaddr(f)
 		addr = lineaddr(0, a, -1)
 		a = lineaddr(0, a, 1)
 		addr.r.q1 = a.r.q1
 		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
-			a := Address(mkaddr(f))
+			a := mkaddr(f)
 			addr = lineaddr(1, a, 1)
 		}
 	}

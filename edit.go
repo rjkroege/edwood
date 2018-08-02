@@ -220,7 +220,7 @@ func editcmd(ct *Text, r []rune) {
 		lastpat = ""
 	}
 	go editthread()
-	err := error(<-editerrc)
+	err := <-editerrc
 	editing = Inactive
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
@@ -259,7 +259,7 @@ func getnum(signok int) int {
 		sign = -1
 		getch()
 	}
-	c := rune(nextc())
+	c := nextc()
 	if c < '0' || '9' < c { /* no number defaults to 1 */
 		return sign
 	}
@@ -306,7 +306,7 @@ func okdelim(c rune) {
 
 func atnl() {
 	cmdskipbl()
-	c := rune(getch())
+	c := getch()
 	if c != '\n' {
 		debug.PrintStack()
 		editerror("newline expected (saw %c)", c)
@@ -428,7 +428,7 @@ func parsecmd(nest int) *Cmd {
 	if cmdskipbl() == -1 {
 		return nil
 	}
-	c := rune(getch())
+	c := getch()
 	if c == -1 {
 		return nil
 	}
@@ -437,25 +437,25 @@ func parsecmd(nest int) *Cmd {
 		getch() /* the 'd' */
 		cmd.cmdc = 'c' | 0x100
 	}
-	i := int(cmdlookup(cmd.cmdc))
+	i := cmdlookup(cmd.cmdc)
 	if i >= 0 {
 		if cmd.cmdc == '\n' {
 			goto Return /* let nl_cmd work it all out */
 		}
-		ct := (*Cmdtab)(&cmdtab[i])
+		ct := &cmdtab[i]
 		if ct.defaddr == aNo && cmd.addr != nil {
 			editerror("command takes no address")
 		}
 		if ct.count != 0 {
-			cmd.num = int(getnum(ct.count))
+			cmd.num = getnum(ct.count)
 		}
 		if ct.regexp != 0 {
 			/* x without pattern . .*\n, indicated by cmd.re==0 */
 			/* X without pattern is all files */
-			c := rune(nextc())
+			c := nextc()
 			if ct.cmdc != 'x' && ct.cmdc != 'X' || (c != ' ' && c != '\t' && c != '\n') {
 				cmdskipbl()
-				c := rune(getch())
+				c := getch()
 				if c == '\n' || c < 0 {
 					editerror("no address")
 				}
@@ -605,7 +605,7 @@ func simpleaddr() *Addr {
 		fallthrough
 	case '"':
 		addr.typ = getch()
-		addr.re = getregexp(rune(addr.typ))
+		addr.re = getregexp(addr.typ)
 	case '.':
 		fallthrough
 	case '$':
@@ -671,7 +671,7 @@ func compoundaddr() *Addr {
 	}
 	getch()
 	addr.next = compoundaddr()
-	next := (*Addr)(addr.next)
+	next := addr.next
 	if next != nil && (next.typ == ',' || next.typ == ';') && next.left == nil {
 		editerror("bad address syntax")
 	}

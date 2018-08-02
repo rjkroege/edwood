@@ -257,7 +257,7 @@ func WIN(q plan9.Qid) int {
 }
 
 func FILE(q plan9.Qid) uint64 {
-	return uint64(q.Path & 0xff)
+	return q.Path & 0xff
 }
 
 func QID(id int, q uint64) uint64 {

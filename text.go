@@ -345,7 +345,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.org += n
 	} else {
 		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.
-			t.fr.Insert(t.file.b[q0:q0+n], int(q0-t.org))
+			t.fr.Insert(t.file.b[q0:q0+n], q0-t.org)
 		}
 	}
 	// For each clone, redraw
@@ -477,7 +477,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 		t.org += n
 	} else {
 		if t.fr != nil && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
-			t.fr.Insert(r[:n], int(q0-t.org))
+			t.fr.Insert(r[:n], q0-t.org)
 		}
 	}
 	if t.w != nil {
@@ -1140,7 +1140,7 @@ func (t *Text) Select() {
 	selectq = t.org + (t.fr.Charofpt(mouse.Point))
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
-	if (clicktext == t && mouse.Msec-uint32(clickmsec) < 500) && (q0 == q1 && selectq == q0) {
+	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0, q1)
 		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
 		t.SetSelect(q0, q1)
@@ -1180,7 +1180,7 @@ func (t *Text) Select() {
 		}
 	}
 	if q0 == q1 {
-		if q0 == t.q0 && clicktext == t && mouse.Msec-uint32(clickmsec) < 500 {
+		if q0 == t.q0 && clicktext == t && mouse.Msec-clickmsec < 500 {
 			q0, q1 = t.DoubleClick(q0, q1)
 			clicktext = nil
 		} else {
@@ -1567,7 +1567,7 @@ func (t *Text) BackNL(p, n int) int {
 	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
 		n = 1
 	}
-	i := int(n)
+	i := n
 	for i > 0 && p > 0 {
 		i--
 		p-- /* it's at a newline now; back over it */

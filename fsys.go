@@ -153,8 +153,8 @@ func fsysproc() {
 func fsysaddid(dir string, incl []string) *MntDir {
 	mnt.lk.Lock()
 	mnt.id++
-	id := int(mnt.id)
-	m := (*MntDir)(&MntDir{})
+	id := mnt.id
+	m := &MntDir{}
 	m.id = int64(id)
 	m.dir = dir
 	m.ref = 1 // one for Command, one will be incremented in attach
@@ -257,7 +257,7 @@ func fsysattach(x *Xfid, f *Fid) *Xfid {
 	}
 	f.busy = true
 	f.open = false
-	f.qid.Path = uint64(Qdir)
+	f.qid.Path = Qdir
 	f.qid.Type = plan9.QTDIR
 	f.qid.Vers = 0
 	f.dir = dirtab[0] // '.'
@@ -347,7 +347,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 
 			if wname == ".." {
 				typ = plan9.QTDIR
-				path = uint64(Qdir)
+				path = Qdir
 				id = 0
 				if w != nil {
 					w.Close()
@@ -355,7 +355,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				}
 				q.Type = typ
 				q.Vers = 0
-				q.Path = uint64(QID(id, path))
+				q.Path = QID(id, path)
 				t.Wqid = append(t.Wqid, q)
 				continue
 			}
@@ -379,7 +379,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				break
 			}
 			w.ref.Inc() // we'll drop reference at end if there's an error
-			path = uint64(Qdir)
+			path = Qdir
 			typ = plan9.QTDIR
 			row.lk.Unlock()
 			dir = dirtabw[0] // '.'
@@ -389,7 +389,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 			}
 			q.Type = typ
 			q.Vers = 0
-			q.Path = uint64(QID(id, path))
+			q.Path = QID(id, path)
 			t.Wqid = append(t.Wqid, q)
 			continue
 
@@ -402,7 +402,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				w = <-cnewwindow  // receive new window
 				w.ref.Inc()
 				typ = plan9.QTDIR
-				path = uint64(QID(w.id, Qdir))
+				path = QID(w.id, Qdir)
 				id = w.id
 				dir = dirtabw[0]
 				q.Type = typ

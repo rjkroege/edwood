@@ -338,7 +338,7 @@ func (c *Column) Grow(w *Window, but int) {
 	cr.Min.Y = c.w[0].r.Min.Y
 	if but == 3 { // Switch to full size window
 		if windex != 0 {
-			v := (*Window)(c.w[0])
+			v := c.w[0]
 			c.w[0] = w
 			c.w[windex] = v
 		}

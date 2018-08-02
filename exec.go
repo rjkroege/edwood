@@ -459,7 +459,7 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	r := string(name)
+	r := name
 	for _, u := range t.file.text {
 		u.Reset()
 		u.w.DirFree()
@@ -611,7 +611,7 @@ func putall(et, _, _ *Text, _, _ bool, arg string) {
 			if w.nopen[QWevent] > 0 {
 				continue
 			}
-			a := string(w.body.file.name)
+			a := w.body.file.name
 			if w.body.file.mod || len(w.body.cache) > 0 {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
@@ -731,15 +731,15 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	r, _ := getarg(argt, false, true)
 	tab := int64(0)
 	if r != "" {
-		p := string(r)
+		p := r
 		if '0' <= p[0] && p[0] <= '9' {
 			tab, _ = strconv.ParseInt(p, 10, 16)
 		}
 	} else {
-		arg = wsre.ReplaceAllString(string(arg), " ")
+		arg = wsre.ReplaceAllString(arg, " ")
 		args := strings.Split(arg, " ")
 		arg = args[0]
-		p := string(arg)
+		p := arg
 		if '0' <= p[0] && p[0] <= '9' {
 			tab, _ = strconv.ParseInt(p, 10, 16)
 		}
@@ -763,7 +763,7 @@ func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 	// Parse parameter.  It might be in arg, or argt, or both
 	r, _ := getarg(argt, false, true)
 	r = r + " " + arg
-	r = wsre.ReplaceAllString(string(r), " ")
+	r = wsre.ReplaceAllString(r, " ")
 	words := strings.Split(arg, " ")
 
 	for _, wrd := range words {
@@ -955,7 +955,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		}
 		dir = ""
 		if rdir != "" {
-			dir = string(rdir)
+			dir = rdir
 		}
 		shell = acmeshell
 		if shell == "" {
@@ -1003,7 +1003,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
 			win.lk.Lock()
-			filename = string(win.body.file.name)
+			filename = win.body.file.name
 			winid = win.id
 			incl = append([]string{}, win.incl...)
 			win.lk.Unlock()
@@ -1101,7 +1101,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		}
 	}
 
-	t = wsre.ReplaceAllString(string(t), " ")
+	t = wsre.ReplaceAllString(t, " ")
 	t = strings.TrimLeft(t, " ")
 	c.av = strings.Split(t, " ")
 	if arg != "" {
@@ -1110,7 +1110,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 
 	dir = ""
 	if rdir != "" {
-		dir = string(rdir)
+		dir = rdir
 	}
 	cmd := exec.Command(c.av[0], c.av[1:]...)
 	cmd.Dir = dir
@@ -1193,7 +1193,7 @@ func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 		name = arg
 	} else {
 		r, _ := getarg(argt, false, true)
-		name = string(r)
+		name = r
 	}
 
 	if isdump {
