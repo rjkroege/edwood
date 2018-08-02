@@ -71,7 +71,6 @@ func (c *Column) AddFile(f *File) *Window {
 func (c *Column) Add(w, clone *Window, y int) *Window {
 	// Figure out new window placement
 	var v *Window
-	var ymax int
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y + c.display.ScaleSize(Border)
@@ -112,6 +111,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		 */
 
 		// new window stops where next window begins
+		var ymax int
 		if windex < c.nw() {
 			ymax = c.w[windex].r.Min.Y - c.display.ScaleSize(Border)
 		} else {
@@ -311,7 +311,6 @@ func (c *Column) Sort() {
 
 func (c *Column) Grow(w *Window, but int) {
 	//var nl, ny *int
-	var v *Window
 
 	var windex int
 
@@ -339,7 +338,7 @@ func (c *Column) Grow(w *Window, but int) {
 	cr.Min.Y = c.w[0].r.Min.Y
 	if but == 3 { // Switch to full size window
 		if windex != 0 {
-			v = c.w[0]
+			v := (*Window)(c.w[0])
 			c.w[0] = w
 			c.w[windex] = v
 		}
@@ -401,6 +400,7 @@ func (c *Column) Grow(w *Window, but int) {
 Pack:
 	// pack everyone above
 	y1 := cr.Min.Y
+	var v *Window
 	for j := 0; j < windex; j++ {
 		v = c.w[j]
 		r := v.r
@@ -468,7 +468,6 @@ Pack:
 }
 
 func (c *Column) DragWin(w *Window, but int) {
-
 	var (
 		r      image.Rectangle
 		i, b   int

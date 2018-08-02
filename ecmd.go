@@ -111,9 +111,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	var f *File
-
-	f = w.body.file
+	f := (*File)(w.body.file)
 	switch editing {
 	case Inactive:
 		return fmt.Errorf("permission denied")
@@ -507,7 +505,6 @@ func w_cmd(t *Text, cp *Cmd) bool {
 }
 
 func x_cmd(t *Text, cp *Cmd) bool {
-
 	if cp.re != "" {
 		looper(t.file, cp, cp.cmdc == 'x')
 	} else {
@@ -592,7 +589,6 @@ func pipe_cmd(t *Text, cp *Cmd) bool {
 }
 
 func nlcount(t *Text, q0, q1 int) (nl, pnr int) {
-
 	buf := make([]rune, RBUFSIZE)
 	i := 0
 	nl = 0
@@ -709,15 +705,14 @@ func eq_cmd(t *Text, cp *Cmd) bool {
 
 func nl_cmd(t *Text, cp *Cmd) bool {
 	f := t.file
-	var a Address
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a = mkaddr(f)
+		a := Address(mkaddr(f))
 		addr = lineaddr(0, a, -1)
 		a = lineaddr(0, a, 1)
 		addr.r.q1 = a.r.q1
 		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
-			a = mkaddr(f)
+			a := Address(mkaddr(f))
 			addr = lineaddr(1, a, 1)
 		}
 	}

@@ -193,8 +193,6 @@ func editerror(format string, args ...interface{}) {
 }
 
 func editcmd(ct *Text, r []rune) {
-	var err error
-
 	if len(r) == 0 {
 		return
 	}
@@ -222,7 +220,7 @@ func editcmd(ct *Text, r []rune) {
 		lastpat = ""
 	}
 	go editthread()
-	err = <-editerrc
+	err := error(<-editerrc)
 	editing = Inactive
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
@@ -255,17 +253,13 @@ func ungetch() {
 }
 
 func getnum(signok int) int {
-	var n int
-	var sign int
-	var c rune
-
-	n = 0
-	sign = 1
+	n := int(0)
+	sign := int(1)
 	if signok > 1 && nextc() == '-' {
 		sign = -1
 		getch()
 	}
-	c = nextc()
+	c := rune(nextc())
 	if c < '0' || '9' < c { /* no number defaults to 1 */
 		return sign
 	}
@@ -311,9 +305,8 @@ func okdelim(c rune) {
 }
 
 func atnl() {
-	var c rune
 	cmdskipbl()
-	c = getch()
+	c := rune(getch())
 	if c != '\n' {
 		debug.PrintStack()
 		editerror("newline expected (saw %c)", c)
@@ -428,9 +421,6 @@ func cmdlookup(c rune) int {
 }
 
 func parsecmd(nest int) *Cmd {
-	var i int
-	var c rune
-	var ct *Cmdtab
 	var cp, ncp *Cmd
 	var cmd Cmd
 
@@ -438,7 +428,7 @@ func parsecmd(nest int) *Cmd {
 	if cmdskipbl() == -1 {
 		return nil
 	}
-	c = getch()
+	c := rune(getch())
 	if c == -1 {
 		return nil
 	}
@@ -447,12 +437,12 @@ func parsecmd(nest int) *Cmd {
 		getch() /* the 'd' */
 		cmd.cmdc = 'c' | 0x100
 	}
-	i = cmdlookup(cmd.cmdc)
+	i := int(cmdlookup(cmd.cmdc))
 	if i >= 0 {
 		if cmd.cmdc == '\n' {
 			goto Return /* let nl_cmd work it all out */
 		}
-		ct = &cmdtab[i]
+		ct := (*Cmdtab)(&cmdtab[i])
 		if ct.defaddr == aNo && cmd.addr != nil {
 			editerror("command takes no address")
 		}
@@ -462,10 +452,10 @@ func parsecmd(nest int) *Cmd {
 		if ct.regexp != 0 {
 			/* x without pattern . .*\n, indicated by cmd.re==0 */
 			/* X without pattern is all files */
-			c = nextc()
+			c := rune(nextc())
 			if ct.cmdc != 'x' && ct.cmdc != 'X' || (c != ' ' && c != '\t' && c != '\n') {
 				cmdskipbl()
-				c = getch()
+				c := rune(getch())
 				if c == '\n' || c < 0 {
 					editerror("no address")
 				}
@@ -545,12 +535,10 @@ Return:
 }
 
 func getregexp(delim rune) string {
-	var buf string
-	var i int
 	var c rune
 
-	buf = ""
-	for i = 0; ; i++ {
+	buf := string("")
+	for i := int(0); ; i++ {
 		c = getch()
 		if c == '\\' {
 			if nextc() == delim {
@@ -675,7 +663,6 @@ func simpleaddr() *Addr {
 
 func compoundaddr() *Addr {
 	var addr Addr
-	var next *Addr
 
 	addr.left = simpleaddr()
 	addr.typ = cmdskipbl()
@@ -684,7 +671,7 @@ func compoundaddr() *Addr {
 	}
 	getch()
 	addr.next = compoundaddr()
-	next = addr.next
+	next := (*Addr)(addr.next)
 	if next != nil && (next.typ == ',' || next.typ == ';') && next.left == nil {
 		editerror("bad address syntax")
 	}

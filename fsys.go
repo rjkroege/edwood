@@ -151,13 +151,10 @@ func fsysproc() {
 }
 
 func fsysaddid(dir string, incl []string) *MntDir {
-	var m *MntDir
-	var id int
-
 	mnt.lk.Lock()
 	mnt.id++
-	id = mnt.id
-	m = &MntDir{}
+	id := int(mnt.id)
+	m := (*MntDir)(&MntDir{})
 	m.id = int64(id)
 	m.dir = dir
 	m.ref = 1 // one for Command, one will be incremented in attach
@@ -254,8 +251,8 @@ func fsysflush(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysattach(x *Xfid, f *Fid) *Xfid {
-	var t plan9.Fcall
 	if x.fcall.Uname != username {
+		var t plan9.Fcall
 		return respond(x, &t, Eperm)
 	}
 	f.busy = true
@@ -266,11 +263,12 @@ func fsysattach(x *Xfid, f *Fid) *Xfid {
 	f.dir = dirtab[0] // '.'
 	f.nrpart = 0
 	f.w = nil
+	var t plan9.Fcall
 	t.Qid = f.qid
 	f.mntdir = nil
 	var id int64
-	var err error
 	if x.fcall.Aname != "" {
+		var err error
 		id, err = strconv.ParseInt(x.fcall.Aname, 10, 32)
 		if err != nil {
 			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
@@ -469,7 +467,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysopen(x *Xfid, f *Fid) *Xfid {
-	var t plan9.Fcall
 	var m uint
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^(uint8(plan9.OTRUNC | plan9.OCEXEC))
@@ -494,6 +491,7 @@ func fsysopen(x *Xfid, f *Fid) *Xfid {
 	return nil
 
 Deny:
+	var t plan9.Fcall
 	return respond(x, &t, Eperm)
 }
 
@@ -591,7 +589,6 @@ func fsyswrite(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysclunk(x *Xfid, f *Fid) *Xfid {
-
 	fsysdelid(f.mntdir)
 	x.c <- xfidclose
 	return nil
@@ -613,7 +610,6 @@ func fsysstat(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsyswstat(x *Xfid, f *Fid) *Xfid {
-
 	var t plan9.Fcall
 
 	return respond(x, &t, Eperm)
@@ -630,7 +626,6 @@ func newfid(fid uint32) *Fid {
 }
 
 func getclock() int64 {
-
 	return time.Now().Unix()
 }
 

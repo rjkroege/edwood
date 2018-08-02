@@ -140,8 +140,6 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 		return f.lastlinefull
 	}
 
-	var rect image.Rectangle
-
 	col := f.cols[ColBack]
 	tcol := f.cols[ColText]
 
@@ -224,6 +222,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 		f.nchars -= f.strlen(n0)
 		f.delbox(n0, len(f.box)-1)
 	}
+	var rect image.Rectangle
 	if n0 == len(f.box) {
 		div := f.defaultfontheight
 		f.nlines = (pt1.Y - f.rect.Min.Y) / div

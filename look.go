@@ -211,7 +211,6 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 
 func plumblook(m *plumb.Message) {
 	var e Expand
-	var addr string
 
 	if len(m.Data) >= BUFSIZE {
 		warning(nil, "insanely long file name (%d bytes) in plumb message (%.32s...)\n", len(m.Data), m.Data)
@@ -228,7 +227,7 @@ func plumblook(m *plumb.Message) {
 	e.jump = true
 	e.a0 = 0
 	e.a1 = 0
-	addr = findattr(m.Attr, "addr")
+	addr := string(findattr(m.Attr, "addr"))
 	if addr != "" {
 		e.ar = []rune(addr)
 		e.a1 = len(e.ar)
@@ -478,10 +477,9 @@ Rescue:
 }
 
 func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
-	var colon int
 	amax := q1
 	if q1 == q0 {
-		colon = -1
+		colon := int(-1)
 		for q1 < t.file.b.Nc() {
 			c := t.ReadC(q1)
 			if isfilec(c) {
@@ -784,7 +782,6 @@ func openfile(t *Text, e *Expand) *Window {
 }
 
 func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
-
 	a, _ := getarg(argt, false, true)
 	if a != "" {
 		newx(et, t, nil, flag1, flag2, a)

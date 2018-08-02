@@ -14,7 +14,6 @@ func (f *frameimpl) Delete(p0, p1 int) int {
 func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
 	defer f.validateboxmodel("Frame.Delete Start p0=%d p1=%d", p0, p1)
-	var r image.Rectangle
 
 	if p1 > f.nchars {
 		p1 = f.nchars - 1
@@ -50,6 +49,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	 *  - f->p0 and f->p1 are not adjusted until after all deletion is done
 	 */
 	// f.Logboxes("before loop pt0 %v pt1 %v n0 %d n1 %d", pt0, pt1, n0, n1)
+	var r image.Rectangle
 	for pt1.X != pt0.X && n1 < len(f.box) {
 		// f.Logboxes("top of loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1)
 		b := f.box[n1]

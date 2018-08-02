@@ -237,7 +237,6 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 }
 
 func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
-
 	if et == nil {
 		return
 	}
@@ -335,7 +334,6 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 }
 
 func newcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
-
 	c := et.row.Add(nil, -1)
 	if c != nil {
 		w := c.Add(nil, nil, -1)
@@ -439,7 +437,6 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 }
 
 func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
-
 	if flag1 {
 		if et == nil || et.w == nil {
 			return
@@ -508,7 +505,6 @@ func checkhash(name string, f *File, d os.FileInfo) {
 		f.qidpath = d.Name()
 		f.mtime = d.ModTime()
 	}
-
 }
 
 // TODO(flux): dev and qidpath?
@@ -644,7 +640,6 @@ func seqof(w *Window, isundo bool) int {
 }
 
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
-
 	if et == nil || et.w == nil {
 		return
 	}
@@ -729,7 +724,6 @@ func look(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
 }
 
 func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
-
 	if et == nil || et.w == nil {
 		return
 	}
@@ -1172,12 +1166,11 @@ func indentval(s string) int {
 }
 
 func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
-	var autoindent int
 	w := (*Window)(nil)
 	if et != nil && et.w != nil {
 		w = et.w
 	}
-	autoindent = IError
+	autoindent := int(IError)
 	r, _ := getarg(argt, false, true)
 	if len(r) > 0 {
 		autoindent = indentval(r)
