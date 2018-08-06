@@ -151,13 +151,10 @@ func fsysproc() {
 }
 
 func fsysaddid(dir string, incl []string) *MntDir {
-	var m *MntDir
-	var id int
-
 	mnt.lk.Lock()
 	mnt.id++
-	id = mnt.id
-	m = &MntDir{}
+	id := mnt.id
+	m := &MntDir{}
 	m.id = int64(id)
 	m.dir = dir
 	m.ref = 1 // one for Command, one will be incremented in attach
@@ -254,23 +251,24 @@ func fsysflush(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysattach(x *Xfid, f *Fid) *Xfid {
-	var t plan9.Fcall
 	if x.fcall.Uname != username {
+		var t plan9.Fcall
 		return respond(x, &t, Eperm)
 	}
 	f.busy = true
 	f.open = false
-	f.qid.Path = uint64(Qdir)
+	f.qid.Path = Qdir
 	f.qid.Type = plan9.QTDIR
 	f.qid.Vers = 0
 	f.dir = dirtab[0] // '.'
 	f.nrpart = 0
 	f.w = nil
+	var t plan9.Fcall
 	t.Qid = f.qid
 	f.mntdir = nil
 	var id int64
-	var err error
 	if x.fcall.Aname != "" {
+		var err error
 		id, err = strconv.ParseInt(x.fcall.Aname, 10, 32)
 		if err != nil {
 			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
@@ -349,7 +347,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 
 			if wname == ".." {
 				typ = plan9.QTDIR
-				path = uint64(Qdir)
+				path = Qdir
 				id = 0
 				if w != nil {
 					w.Close()
@@ -357,7 +355,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				}
 				q.Type = typ
 				q.Vers = 0
-				q.Path = uint64(QID(id, path))
+				q.Path = QID(id, path)
 				t.Wqid = append(t.Wqid, q)
 				continue
 			}
@@ -381,7 +379,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				break
 			}
 			w.ref.Inc() // we'll drop reference at end if there's an error
-			path = uint64(Qdir)
+			path = Qdir
 			typ = plan9.QTDIR
 			row.lk.Unlock()
 			dir = dirtabw[0] // '.'
@@ -391,7 +389,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 			}
 			q.Type = typ
 			q.Vers = 0
-			q.Path = uint64(QID(id, path))
+			q.Path = QID(id, path)
 			t.Wqid = append(t.Wqid, q)
 			continue
 
@@ -404,7 +402,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				w = <-cnewwindow  // receive new window
 				w.ref.Inc()
 				typ = plan9.QTDIR
-				path = uint64(QID(w.id, Qdir))
+				path = QID(w.id, Qdir)
 				id = w.id
 				dir = dirtabw[0]
 				q.Type = typ
@@ -469,7 +467,6 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysopen(x *Xfid, f *Fid) *Xfid {
-	var t plan9.Fcall
 	var m uint
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^(uint8(plan9.OTRUNC | plan9.OCEXEC))
@@ -494,6 +491,7 @@ func fsysopen(x *Xfid, f *Fid) *Xfid {
 	return nil
 
 Deny:
+	var t plan9.Fcall
 	return respond(x, &t, Eperm)
 }
 
@@ -591,7 +589,6 @@ func fsyswrite(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsysclunk(x *Xfid, f *Fid) *Xfid {
-
 	fsysdelid(f.mntdir)
 	x.c <- xfidclose
 	return nil
@@ -613,7 +610,6 @@ func fsysstat(x *Xfid, f *Fid) *Xfid {
 }
 
 func fsyswstat(x *Xfid, f *Fid) *Xfid {
-
 	var t plan9.Fcall
 
 	return respond(x, &t, Eperm)
@@ -630,7 +626,6 @@ func newfid(fid uint32) *Fid {
 }
 
 func getclock() int64 {
-
 	return time.Now().Unix()
 }
 

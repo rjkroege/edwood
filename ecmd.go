@@ -34,8 +34,8 @@ func resetxec() {
 }
 
 func mkaddr(f *File) (a Address) {
-	a.r.q0 = int(f.curtext.q0)
-	a.r.q1 = int(f.curtext.q1)
+	a.r.q0 = f.curtext.q0
+	a.r.q1 = f.curtext.q1
 	a.f = f
 	return a
 }
@@ -48,9 +48,9 @@ func cmdexec(t *Text, cp *Cmd) bool {
 		w = t.w
 	}
 
-	if w == nil && (cp.addr == nil || cp.addr.typ != '"') &&
-		utfrune([]rune("bBnqUXY!"), cp.cmdc) == -1 && // Commands that don't need a window
-		!(cp.cmdc == 'D' && len(cp.text) > 0) {
+	if w == nil && (cp.addr == nil || cp.addr.typ != '"' &&
+		Buffer([]rune("bBnqUXY!")).Index([]rune{cp.cmdc}) == -1 && // Commands that don't need a window
+		!(cp.cmdc == 'D' && len(cp.text) > 0)) {
 		editerror("no current window")
 	}
 	i := cmdlookup(cp.cmdc) // will be -1 for '{'
@@ -94,7 +94,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > int(t.file.b.Nc()) {
+			if dot.r.q1 > t.file.b.Nc() {
 				editerror("dot extends past end of buffer during { command")
 			}
 			t.q0 = dot.r.q0
@@ -112,9 +112,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	var f *File
-
-	f = w.body.file
+	f := w.body.file
 	switch editing {
 	case Inactive:
 		return fmt.Errorf("permission denied")
@@ -478,7 +476,6 @@ func w_cmd(t *Text, cp *Cmd) bool {
 }
 
 func x_cmd(t *Text, cp *Cmd) bool {
-
 	if cp.re != "" {
 		looper(t.file, cp, cp.cmdc == 'x')
 	} else {
@@ -513,7 +510,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 			t.file.elog.Delete(t.q0, t.q1)
 		}
 	}
-	s = append([]rune{rune(cmd)}, r...)
+	s = append([]rune{cmd}, r...)
 
 	dir = ""
 	if t != nil {
@@ -563,7 +560,6 @@ func pipe_cmd(t *Text, cp *Cmd) bool {
 }
 
 func nlcount(t *Text, q0, q1 int) (nl, pnr int) {
-
 	buf := make([]rune, RBUFSIZE)
 	i := 0
 	nl = 0
@@ -680,15 +676,14 @@ func eq_cmd(t *Text, cp *Cmd) bool {
 
 func nl_cmd(t *Text, cp *Cmd) bool {
 	f := t.file
-	var a Address
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a = mkaddr(f)
+		a := mkaddr(f)
 		addr = lineaddr(0, a, -1)
 		a = lineaddr(0, a, 1)
 		addr.r.q1 = a.r.q1
 		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
-			a = mkaddr(f)
+			a := mkaddr(f)
 			addr = lineaddr(1, a, 1)
 		}
 	}

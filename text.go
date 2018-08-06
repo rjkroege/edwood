@@ -283,7 +283,6 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, fmt.Errorf("can't fstat %s: %v\n", filename, err)
 	}
 
-	var count int
 	q1 := (0)
 	hasNulls := false
 	if d.IsDir() {
@@ -327,6 +326,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	} else {
 		t.w.isdir = false
 		t.w.filemenu = true
+		var count int
 		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)
 		if err != nil {
 			warning(nil, "Error reading file %s: %v", filename, err)
@@ -345,7 +345,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.org += n
 	} else {
 		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.
-			t.fr.Insert(t.file.b[q0:q0+n], int(q0-t.org))
+			t.fr.Insert(t.file.b[q0:q0+n], q0-t.org)
 		}
 	}
 	// For each clone, redraw
@@ -363,7 +363,6 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		warning(nil, "%s: NUL bytes elided\n", filename)
 	}
 	return q1 - q0, nil
-
 }
 
 func (t *Text) Backnl(p int, n int) int {
@@ -478,7 +477,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 		t.org += n
 	} else {
 		if t.fr != nil && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
-			t.fr.Insert(r[:n], int(q0-t.org))
+			t.fr.Insert(r[:n], q0-t.org)
 		}
 	}
 	if t.w != nil {
@@ -1067,7 +1066,6 @@ func (t *Text) Type(r rune) {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0
-
 }
 
 func (t *Text) Commit(tofile bool) {
@@ -1095,12 +1093,12 @@ func getP1(fr frame.Frame) int {
 }
 
 func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
-	var q0 int
 	if dl == 0 {
 		// TODO(rjk): Make this mechanism better? It seems unfortunate.
 		ScrSleep(100)
 		return
 	}
+	var q0 int
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
 	} else {
@@ -1142,7 +1140,7 @@ func (t *Text) Select() {
 	selectq = t.org + (t.fr.Charofpt(mouse.Point))
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
-	if (clicktext == t && mouse.Msec-uint32(clickmsec) < 500) && (q0 == q1 && selectq == q0) {
+	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0, q1)
 		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
 		t.SetSelect(q0, q1)
@@ -1182,7 +1180,7 @@ func (t *Text) Select() {
 		}
 	}
 	if q0 == q1 {
-		if q0 == t.q0 && clicktext == t && mouse.Msec-uint32(clickmsec) < 500 {
+		if q0 == t.q0 && clicktext == t && mouse.Msec-clickmsec < 500 {
 			q0, q1 = t.DoubleClick(q0, q1)
 			clicktext = nil
 		} else {
@@ -1565,13 +1563,11 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 }
 
 func (t *Text) BackNL(p, n int) int {
-	var i int
-
 	/* look for start of this line if n==0 */
 	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
 		n = 1
 	}
-	i = n
+	i := n
 	for i > 0 && p > 0 {
 		i--
 		p-- /* it's at a newline now; back over it */
@@ -1666,5 +1662,4 @@ func (t *Text) DirName(name string) string {
 	}
 	spl = filepath.Clean(spl + string(filepath.Separator) + name)
 	return spl
-
 }

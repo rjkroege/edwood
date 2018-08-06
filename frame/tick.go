@@ -9,8 +9,6 @@ import (
 // InitTick sets up the TickImage (e.g. cursor)
 // TODO(rjk): doesn't appear to need to be exposed publically.
 func (f *frameimpl) InitTick() {
-
-	var err error
 	if f.cols[ColBack] == nil || f.display == nil {
 		return
 	}
@@ -25,6 +23,7 @@ func (f *frameimpl) InitTick() {
 
 	height := ft.DefaultHeight()
 
+	var err error
 	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
 	if err != nil {
 		return

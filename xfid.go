@@ -31,11 +31,11 @@ func clampaddr(w *Window) {
 	if w.addr.q1 < 0 {
 		w.addr.q1 = 0
 	}
-	if w.addr.q0 > int(w.body.Nc()) {
-		w.addr.q0 = int(w.body.Nc())
+	if w.addr.q0 > w.body.Nc() {
+		w.addr.q0 = w.body.Nc()
 	}
-	if w.addr.q1 > int(w.body.Nc()) {
-		w.addr.q1 = int(w.body.Nc())
+	if w.addr.q1 > w.body.Nc() {
+		w.addr.q1 = w.body.Nc()
 	}
 }
 
@@ -169,7 +169,7 @@ func xfidopen(x *Xfid) {
 			seq++
 			t.file.Mark()
 			cut(t, t, nil, false, true, "")
-			w.wrselrange = Range{int(t.q1), int(t.q1)}
+			w.wrselrange = Range{t.q1, t.q1}
 			w.nomark = true
 		case QWeditout:
 			if editing == Inactive {
@@ -184,7 +184,7 @@ func xfidopen(x *Xfid) {
 			//		respond(x, &fc, Einuse);
 			//		return;
 			//	}
-			w.wrselrange = Range{int(t.q1), int(t.q1)}
+			w.wrselrange = Range{t.q1, t.q1}
 			break
 		}
 		w.Unlock()
@@ -358,7 +358,7 @@ func xfidread(x *Xfid) {
 
 	case QWdata:
 		// BUG: what should happen if q1 > q0?
-		if w.addr.q0 > int(w.body.Nc()) {
+		if w.addr.q0 > w.body.Nc() {
 			respond(x, &fc, Eaddr)
 			break
 		}
@@ -367,7 +367,7 @@ func xfidread(x *Xfid) {
 
 	case QWxdata:
 		// BUG: what should happen if q1 > q0?
-		if w.addr.q0 > int(w.body.Nc()) {
+		if w.addr.q0 > w.body.Nc() {
 			respond(x, &fc, Eaddr)
 			break
 		}
@@ -560,7 +560,7 @@ func xfidwrite(x *Xfid) {
 		a = w.addr
 		t = &w.body
 		w.Commit(t)
-		if a.q0 > int(t.Nc()) || a.q1 > int(t.Nc()) {
+		if a.q0 > t.Nc() || a.q1 > t.Nc() {
 			respond(x, &fc, Eaddr)
 			break
 		}
