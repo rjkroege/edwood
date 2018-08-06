@@ -63,7 +63,6 @@ func (f *frameimpl) Charofpt(pt image.Point) int {
 func (f *frameimpl) charofptimpl(pt image.Point) int {
 	var w, bn int
 	var p int
-	var r rune
 
 	pt = f.grid(pt)
 	qt := f.rect.Min
@@ -78,6 +77,7 @@ func (f *frameimpl) charofptimpl(pt image.Point) int {
 		p += nrune(b)
 	}
 
+	var r rune
 	for _, b := range f.box[bn:] {
 		if qt.X > pt.X {
 			break

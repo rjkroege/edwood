@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -33,8 +34,8 @@ func resetxec() {
 }
 
 func mkaddr(f *File) (a Address) {
-	a.r.q0 = int(f.curtext.q0)
-	a.r.q1 = int(f.curtext.q1)
+	a.r.q0 = f.curtext.q0
+	a.r.q1 = f.curtext.q1
 	a.f = f
 	return a
 }
@@ -48,7 +49,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 	}
 
 	if w == nil && (cp.addr == nil || cp.addr.typ != '"' &&
-		Buffer([]rune("bBnqUXY!")).Index([]rune{rune(cp.cmdc)}) == -1 && // Commands that don't need a window
+		Buffer([]rune("bBnqUXY!")).Index([]rune{cp.cmdc}) == -1 && // Commands that don't need a window
 		!(cp.cmdc == 'D' && len(cp.text) > 0)) {
 		editerror("no current window")
 	}
@@ -93,7 +94,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > int(t.file.b.Nc()) {
+			if dot.r.q1 > t.file.b.Nc() {
 				editerror("dot extends past end of buffer during { command")
 			}
 			t.q0 = dot.r.q0
@@ -111,9 +112,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	var f *File
-
-	f = w.body.file
+	f := w.body.file
 	switch editing {
 	case Inactive:
 		return fmt.Errorf("permission denied")
@@ -195,64 +194,34 @@ func d_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-/*
-func D1 (Text *t) () {
-	if t.w.body.file.ntext>1 || winclean(t.w, false)  {
-		colclose(t.col, t.w, true);
-}
-*/
-func D_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *list, *r, *s, *n;
-	int nr, nn;
-	Window *w;
-	Runestr dir, rs;
-	char buf[128];
-
-	list = filelist(t, cp.u.text.r, cp.u.text.n);
-	if list == nil {
-		D1(t);
-		return true;
+func D1(t *Text) {
+	if len(t.w.body.file.text) > 1 || t.w.Clean(false) {
+		t.col.Close(t.w, true)
 	}
-	dir = dirname(t, nil, 0);
-	r = list;
-	nr = runestrlen(r);
-	r = skipbl(r, nr, &nr);
-	do{
-		s = findbl(r, nr, &nr);
-		*s = '\0';
-		// first time through, could be empty string, meaning delete file empty name
-		nn = runestrlen(r);
-		if r[0]=='/' || nn==0 || dir.nr==0 {
-			rs.r = runestrdup(r);
-			rs.nr = nn;
-		}else{
-			n = runemalloc(dir.nr+1+nn);
-			runemove(n, dir.r, dir.nr);
-			n[dir.nr] = '/';
-			runemove(n+dir.nr+1, r, nn);
-			rs = cleanrname(runestr(n, dir.nr+1+nn));
-		}
-		w = lookfile(rs.r, rs.nr);
-		if w == nil {
-			snprint(buf, sizeof buf, "no such file %.*S", rs.nr, rs.r);
-			free(rs.r);
-			editerror(buf);
-		}
-		free(rs.r);
-		D1(&w.body);
-		if nr > 0  {
-			r = skipbl(s+1, nr-1, &nr);
-	}while(nr > 0);
-	clearcollection();
-	free(dir.r);
-	return true;
 }
 
+func D_cmd(t *Text, cp *Cmd) bool {
+	list := filelist(t, cp.text)
+	if list == "" {
+		D1(t)
+		return true
+	}
+	dir := dirname(t, nil)
+	for _, s := range strings.Fields(list) {
+		if !filepath.IsAbs(s) {
+			s = filepath.Join(string(dir), s)
+		}
+		w := lookfile(s)
+		if w == nil {
+			editerror(fmt.Sprintf("no such file %q", s))
+		}
+		D1(&w.body)
+	}
+	clearcollection()
+	return true
+}
+
+/*
 static int
 readloader(void *v, uint q0, Rune *r, int nr)
 {
@@ -507,7 +476,6 @@ func w_cmd(t *Text, cp *Cmd) bool {
 }
 
 func x_cmd(t *Text, cp *Cmd) bool {
-
 	if cp.re != "" {
 		looper(t.file, cp, cp.cmdc == 'x')
 	} else {
@@ -542,7 +510,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 			t.file.elog.Delete(t.q0, t.q1)
 		}
 	}
-	s = append([]rune{rune(cmd)}, r...)
+	s = append([]rune{cmd}, r...)
 
 	dir = ""
 	if t != nil {
@@ -592,7 +560,6 @@ func pipe_cmd(t *Text, cp *Cmd) bool {
 }
 
 func nlcount(t *Text, q0, q1 int) (nl, pnr int) {
-
 	buf := make([]rune, RBUFSIZE)
 	i := 0
 	nl = 0
@@ -709,15 +676,14 @@ func eq_cmd(t *Text, cp *Cmd) bool {
 
 func nl_cmd(t *Text, cp *Cmd) bool {
 	f := t.file
-	var a Address
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a = mkaddr(f)
+		a := mkaddr(f)
 		addr = lineaddr(0, a, -1)
 		a = lineaddr(0, a, 1)
 		addr.r.q1 = a.r.q1
 		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
-			a = mkaddr(f)
+			a := mkaddr(f)
 			addr = lineaddr(1, a, 1)
 		}
 	}

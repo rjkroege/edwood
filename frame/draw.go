@@ -104,13 +104,13 @@ func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text 
 	p := 0
 	trim := false
 	x := 0
-	var w int
 
 	if p0 > p1 {
 		panic("Drawsel0: p0 and p1 must be ordered")
 	}
 
 	nb := 0
+	var w int
 	for ; nb < len(f.box) && p < p1; nb++ {
 		b := f.box[nb]
 		nr := nrune(b)

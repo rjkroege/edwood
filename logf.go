@@ -135,7 +135,7 @@ func xfidlog(w *Window, op string) {
 		}
 	}
 	f := w.body.file
-	name := string(f.name)
+	name := f.name
 	eventlog.ev = append(eventlog.ev, fmt.Sprintf("%d %s %s\n", w.id, op, name))
 	if eventlog.r.L == nil {
 		eventlog.r.L = &eventlog.lk

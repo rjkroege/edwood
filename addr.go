@@ -26,7 +26,7 @@ func isregexc(r rune) bool {
 	if r == 0 {
 		return false
 	}
-	if isalnum(rune(r)) {
+	if isalnum(r) {
 		return true
 	}
 	if utfrune([]rune("^+-.*?#,;[]()$"), r) != -1 {

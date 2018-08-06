@@ -108,10 +108,8 @@ func (w *Window) initHeadless(clone *Window) *Window {
 }
 
 func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
-
 	//	var r1, br image.Rectangle
 	//	var f *File
-	var rf string
 	//	var rp []rune
 	//	var nc int
 
@@ -139,6 +137,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 		r1.Max.Y = r1.Min.Y
 	}
 
+	var rf string
 	if clone != nil {
 		rf = clone.body.font
 	} else {
@@ -207,7 +206,6 @@ func (w *Window) moveToDel() {
 }
 
 func (w *Window) TagLines(r image.Rectangle) int {
-	var n int
 	if !w.tagexpand && !w.showdel {
 		return 1
 	}
@@ -217,7 +215,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	if !w.tagexpand {
 		/* use just as many lines as needed to show the Del */
-		n = w.delRunePos()
+		n := w.delRunePos()
 		if n < 0 {
 			return 1
 		}
@@ -231,7 +229,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 	}
 
 	/* if tag ends with \n, include empty line at end for typing */
-	n = w.tag.fr.GetFrameFillStatus().Nlines
+	n := w.tag.fr.GetFrameFillStatus().Nlines
 	if w.tag.file.b.Nc() > 0 {
 		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
 		if c == '\n' {
@@ -594,11 +592,9 @@ func isDir(r string) (bool, error) {
 	}
 
 	return false, nil
-
 }
 
 func (w *Window) AddIncl(r string) {
-
 	// Tries to open absolute paths, and if fails, tries
 	// to use dirname instead.
 	d, err := isDir(r)
@@ -616,7 +612,6 @@ func (w *Window) AddIncl(r string) {
 	}
 	w.incl = append(w.incl, r)
 	return
-
 }
 
 func (w *Window) Clean(conservative bool) bool {
