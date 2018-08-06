@@ -353,20 +353,21 @@ func getrhs(delim rune, cmd rune) (s string) {
 }
 
 func collecttoken(end []rune) string {
+	// TODO(fhs): use strings.Builder to build s
 	s := ""
 	var c rune
 
 	fmt.Println("cmdstartp=", cmdstartp[cmdp:])
 	for {
 		c = nextc()
-		if !(c == ' ' || c == '\t') {
+		if c != ' ' && c != '\t' {
 			break
 		}
 		s += string(getch()) /* blanks significant for getname() */
 	}
 	for {
 		c = getch()
-		if !(c > 0 && utfrune(end, c) == 0) {
+		if c <= 0 || utfrune(end, c) != -1 {
 			break
 		}
 		s += string(c)

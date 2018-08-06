@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -47,9 +48,9 @@ func cmdexec(t *Text, cp *Cmd) bool {
 		w = t.w
 	}
 
-	if w == nil && (cp.addr == nil || cp.addr.typ != '"' &&
-		Buffer([]rune("bBnqUXY!")).Index([]rune{rune(cp.cmdc)}) == -1 && // Commands that don't need a window
-		!(cp.cmdc == 'D' && len(cp.text) > 0)) {
+	if w == nil && (cp.addr == nil || cp.addr.typ != '"') &&
+		utfrune([]rune("bBnqUXY!"), cp.cmdc) == -1 && // Commands that don't need a window
+		!(cp.cmdc == 'D' && len(cp.text) > 0) {
 		editerror("no current window")
 	}
 	i := cmdlookup(cp.cmdc) // will be -1 for '{'
@@ -195,64 +196,34 @@ func d_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-/*
-func D1 (Text *t) () {
-	if t.w.body.file.ntext>1 || winclean(t.w, false)  {
-		colclose(t.col, t.w, true);
-}
-*/
-func D_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *list, *r, *s, *n;
-	int nr, nn;
-	Window *w;
-	Runestr dir, rs;
-	char buf[128];
-
-	list = filelist(t, cp.u.text.r, cp.u.text.n);
-	if list == nil {
-		D1(t);
-		return true;
+func D1(t *Text) {
+	if len(t.w.body.file.text) > 1 || t.w.Clean(false) {
+		t.col.Close(t.w, true)
 	}
-	dir = dirname(t, nil, 0);
-	r = list;
-	nr = runestrlen(r);
-	r = skipbl(r, nr, &nr);
-	do{
-		s = findbl(r, nr, &nr);
-		*s = '\0';
-		// first time through, could be empty string, meaning delete file empty name
-		nn = runestrlen(r);
-		if r[0]=='/' || nn==0 || dir.nr==0 {
-			rs.r = runestrdup(r);
-			rs.nr = nn;
-		}else{
-			n = runemalloc(dir.nr+1+nn);
-			runemove(n, dir.r, dir.nr);
-			n[dir.nr] = '/';
-			runemove(n+dir.nr+1, r, nn);
-			rs = cleanrname(runestr(n, dir.nr+1+nn));
-		}
-		w = lookfile(rs.r, rs.nr);
-		if w == nil {
-			snprint(buf, sizeof buf, "no such file %.*S", rs.nr, rs.r);
-			free(rs.r);
-			editerror(buf);
-		}
-		free(rs.r);
-		D1(&w.body);
-		if nr > 0  {
-			r = skipbl(s+1, nr-1, &nr);
-	}while(nr > 0);
-	clearcollection();
-	free(dir.r);
-	return true;
 }
 
+func D_cmd(t *Text, cp *Cmd) bool {
+	list := filelist(t, cp.text)
+	if list == "" {
+		D1(t)
+		return true
+	}
+	dir := dirname(t, nil)
+	for _, s := range strings.Fields(list) {
+		if !filepath.IsAbs(s) {
+			s = filepath.Join(string(dir), s)
+		}
+		w := lookfile(s)
+		if w == nil {
+			editerror(fmt.Sprintf("no such file %q", s))
+		}
+		D1(&w.body)
+	}
+	clearcollection()
+	return true
+}
+
+/*
 static int
 readloader(void *v, uint q0, Rune *r, int nr)
 {
