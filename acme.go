@@ -529,8 +529,7 @@ func waitthread() {
 		case cmd := <-ckill:
 			found := false
 			for c = command; c != nil; c = c.next {
-				/* -1 for blank */
-				if c.name == cmd {
+				if c.name == cmd+" " {
 					if err := c.proc.Kill(); err != nil {
 						warning(nil, "kill %v: %v\n", cmd, err)
 					}
