@@ -431,13 +431,15 @@ func includename(t *Text, r string) string {
 	return runestr(r, n);
 }
 */
+
+// Dirname returns the directory name of the path in the tag file of t.
+// If the filename r is not nil, it'll be appended to the result.
 func dirname(t *Text, r []rune) []rune {
 	var (
 		b     []rune
 		c     rune
 		nt    int
 		slash int
-		tmp   []rune
 	)
 
 	b = nil
@@ -454,10 +456,10 @@ func dirname(t *Text, r []rune) []rune {
 	b = make([]rune, nt)
 	t.w.tag.file.b.Read(0, b)
 	slash = -1
-	for m := (0); m < nt; m++ {
+	for m := 0; m < nt; m++ {
 		c = b[m]
 		if c == '/' {
-			slash = int(m)
+			slash = m
 		}
 		if c == ' ' || c == '\t' {
 			break
@@ -466,13 +468,12 @@ func dirname(t *Text, r []rune) []rune {
 	if slash < 0 {
 		goto Rescue
 	}
-	b = append(b[:len(b)+slash+1], r...)
+	b = append(b[:slash+1], r...)
 	return cleanrname(b)
 
 Rescue:
-	tmp = r
 	if len(r) > 0 {
-		return cleanrname(tmp)
+		return cleanrname(r)
 	}
 	return r
 }
