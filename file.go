@@ -156,7 +156,7 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 
 func (f *File) SetName(name string) {
 	if f.seq > 0 {
-		// f.UnsetName(f, &f.delta) TODO(flux): Undo
+		f.UnsetName(&f.delta)
 	}
 	f.name = name
 	f.unread = true
