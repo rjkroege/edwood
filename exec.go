@@ -850,61 +850,14 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 	cpid = nil
 }
 
-// fsopenfd opens a plan9 Fid and makes a Go os.File from it for path on fsys.
-// Caller must close the returned file. This function will close the
-// other end of the pipe and the plan9 Fid.
-func fsopenfd(fsys *client.Fsys, path string, mode uint8) *os.File {
+// Fsopenfd opens a plan9 Fid.
+func fsopenfd(fsys *client.Fsys, path string, mode uint8) *client.Fid {
 	fid, err := fsys.Open(path, mode)
 	if err != nil {
 		warning(nil, "Failed to open %v: %v", path, err)
 		return nil
 	}
-
-	// open a pipe, serve the reads from fid down it
-	//
-	// TODO(fhs): Pipes are not necessary since exec.Cmd takes io.Reader/io.Writer.
-	// Also, there is a race between writes to fid here and writes from waitthread
-	// (e.g. exit status may be printed before all of stderr is printed).
-	r, w, err := os.Pipe()
-	if err != nil {
-		acmeerror("fsopenfd: Could not make pipe", nil)
-	}
-
-	if mode == plan9.OREAD {
-		go func() {
-			var buf [BUFSIZE]byte
-			var werr error
-			for {
-				n, err := fid.Read(buf[:])
-				if n != 0 {
-					_, werr = w.Write(buf[:n])
-				}
-				if err != nil || werr != nil {
-					fid.Close()
-					w.Close()
-					return
-				}
-			}
-		}()
-		return r
-	} else {
-		go func() {
-			var buf [BUFSIZE]byte
-			var werr error
-			for {
-				n, err := r.Read(buf[:])
-				if n != 0 {
-					_, werr = fid.Write(buf[:n])
-				}
-				if err != nil || werr != nil {
-					r.Close()
-					fid.Close()
-					return
-				}
-			}
-		}()
-		return w
-	}
+	return fid
 }
 
 // runproc. Something with the running of external processes. Executes
@@ -915,19 +868,23 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		t, name, filename, dir string
 		incl                   []string
 		winid                  int
-		sfd                    [3]*os.File
+		sin                    io.ReadCloser
+		sout, serr             io.WriteCloser
 		pipechar               int
-		//static void *parg[2];
-		rcarg []string
-		shell string
+		rcarg                  []string
+		shell                  string
 	)
 
 	Closeall := func() {
-		sfd[0].Close()
-		if sfd[2] != sfd[1] {
-			sfd[2].Close()
+		if sin != nil {
+			sin.Close()
 		}
-		sfd[1].Close()
+		if serr != nil && serr != sout {
+			serr.Close()
+		}
+		if sout != nil {
+			sout.Close()
+		}
 	}
 	Fail := func() {
 		Untested()
@@ -973,9 +930,9 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		rcarg = []string{shell, "-c", t}
 		cmd := exec.Command(rcarg[0], rcarg[1:]...)
 		cmd.Dir = dir
-		cmd.Stdin = sfd[0]
-		cmd.Stdout = sfd[1]
-		cmd.Stderr = sfd[2]
+		cmd.Stdin = sin
+		cmd.Stdout = sout
+		cmd.Stderr = serr
 		err := cmd.Start()
 		if err == nil {
 			if cpid != nil {
@@ -1052,9 +1009,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {
 			rdselname := fmt.Sprintf("%d/rdsel", winid)
-			sfd[0] = fsopenfd(fs, rdselname, plan9.OREAD)
-		} else {
-			sfd[0], _ = os.OpenFile("/dev/null", os.O_RDONLY, 0777)
+			sin = fsopenfd(fs, rdselname, plan9.OREAD)
 		}
 		if (winid > 0 || iseditcmd) && (pipechar == '|' || pipechar == '<') {
 			var buf string
@@ -1067,21 +1022,19 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			} else {
 				buf = fmt.Sprintf("%d/wrsel", winid)
 			}
-			sfd[1] = fsopenfd(fs, buf, plan9.OWRITE)
-			sfd[2] = fsopenfd(fs, "cons", plan9.OWRITE)
+			sout = fsopenfd(fs, buf, plan9.OWRITE)
+			serr = fsopenfd(fs, "cons", plan9.OWRITE)
 		} else {
-			sfd[1] = fsopenfd(fs, "cons", plan9.OWRITE)
-			sfd[2] = sfd[1]
+			sout = fsopenfd(fs, "cons", plan9.OWRITE)
+			serr = sout
 		}
 		// fsunmount(fs); looks like with plan9.client you just drop it on the floor.
 		fs = nil
 	} else {
 		//	rfork(RFFDG|RFNOTEG);
 		fsysclose()
-		sfd[0], _ = os.Open("/dev/null")
-		sfd[1], _ = os.OpenFile("/dev/null", os.O_WRONLY, 0777)
 		nfd, _ := syscall.Dup(erroutfd)
-		sfd[2] = os.NewFile(uintptr(nfd), "duped erroutfd")
+		serr = os.NewFile(uintptr(nfd), "duped erroutfd")
 	}
 	if win != nil {
 		win.lk.Lock()
@@ -1123,9 +1076,9 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 	}
 	cmd := exec.Command(c.av[0], c.av[1:]...)
 	cmd.Dir = dir
-	cmd.Stdin = sfd[0]
-	cmd.Stdout = sfd[1]
-	cmd.Stderr = sfd[2]
+	cmd.Stdin = sin
+	cmd.Stdout = sout
+	cmd.Stderr = serr
 	err := cmd.Start()
 	if err == nil {
 		if cpid != nil {
