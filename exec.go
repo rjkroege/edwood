@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"9fans.net/go/plan9"
@@ -43,7 +42,7 @@ var exectab = []Exectab{
 	{"Indent", indent, false, true /*unused*/, true /*unused*/},
 	{"Kill", xkill, false, true /*unused*/, true /*unused*/},
 	{"Load", dump, false, false, true /*unused*/},
-	//	{ "Local",		local,	false,	true /*unused*/,		true /*unused*/		},
+	{"Local", local, false, true /*unused*/, true /*unused*/},
 	{"Look", look, false, true /*unused*/, true /*unused*/},
 	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
@@ -501,6 +500,15 @@ func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
 	}
 }
 
+func local(et, _, argt *Text, _, _ bool, arg string) {
+	a, aa := getarg(argt, true, true)
+	dir := dirname(et, nil)
+	if len(dir) == 1 && dir[0] == '.' { // sigh
+		dir = dir[:0]
+	}
+	run(nil, arg, string(dir), false, aa, a, false)
+}
+
 func checkhash(name string, f *File, d os.FileInfo) {
 	Untested()
 
@@ -863,16 +871,16 @@ func fsopenfd(fsys *client.Fsys, path string, mode uint8) *client.Fid {
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
-func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) {
+func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) {
 	var (
-		t, name, filename, dir string
-		incl                   []string
-		winid                  int
-		sin                    io.ReadCloser
-		sout, serr             io.WriteCloser
-		pipechar               int
-		rcarg                  []string
-		shell                  string
+		t, name, filename string
+		incl              []string
+		winid             int
+		sin               io.ReadCloser
+		sout, serr        io.WriteCloser
+		pipechar          int
+		rcarg             []string
+		shell             string
 	)
 
 	Closeall := func() {
@@ -918,10 +926,6 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			// why ' in an argument fails to work properly.
 			t = s
 			c.text = s
-		}
-		dir = ""
-		if rdir != "" {
-			dir = rdir
 		}
 		shell = acmeshell
 		if shell == "" {
@@ -988,7 +992,7 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 			os.Setenv("%", filename)
 			os.Setenv("samfile", filename)
 		}
-		c.md = fsysmount(rdir, incl)
+		c.md = fsysmount(dir, incl)
 		if c.md == nil {
 			fmt.Fprintf(os.Stderr, "child: can't allocate mntdir\n")
 			return
@@ -1031,10 +1035,10 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		// fsunmount(fs); looks like with plan9.client you just drop it on the floor.
 		fs = nil
 	} else {
-		//	rfork(RFFDG|RFNOTEG);
-		fsysclose()
-		nfd, _ := syscall.Dup(erroutfd)
-		serr = os.NewFile(uintptr(nfd), "duped erroutfd")
+		// TODO(fhs): If runtime.GOOS is plan9, we need to execute the command in
+		// Edwood's file name space and environment variable group.
+
+		serr = errorWriter{}
 	}
 	if win != nil {
 		win.lk.Lock()
@@ -1070,10 +1074,6 @@ func runproc(win *Window, s string, rdir string, newns bool, argaddr string, arg
 		c.av = append(c.av, arg)
 	}
 
-	dir = ""
-	if rdir != "" {
-		dir = rdir
-	}
 	cmd := exec.Command(c.av[0], c.av[1:]...)
 	cmd.Dir = dir
 	cmd.Stdin = sin

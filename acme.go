@@ -169,7 +169,6 @@ func main() {
 	display.Flush()
 
 	// After row is initialized
-	acmeerrorinit()
 	go mousethread(display)
 	go keyboardthread(display)
 	go waitthread()
@@ -693,34 +692,19 @@ func shutdown(s os.Signal) {
 	return
 }
 
-func acmeerrorinit() {
-	var pfd [2]int
-	// TODO(fhs): Syscall package is not portable.
-	// Perhaps use io.Pipe since exec.Cmd takes io.Reader/io.Writer.
-	err := syscall.Pipe(pfd[:])
+type errorWriter struct{}
 
-	if err != nil {
-		acmeerror("can't create pipe", nil)
+func (w errorWriter) Write(data []byte) (n int, err error) {
+	n = len(data)
+	if n > 0 {
+		cerr <- fmt.Errorf(string(data))
 	}
+	return
+}
 
-	syscall.CloseOnExec(pfd[0])
-	syscall.CloseOnExec(pfd[1])
-	errorfd := pfd[0]
-	erroutfd = pfd[1]
-	if errorfd < 0 {
-		acmeerror("can't re-open acmeerror file", nil)
-	}
-	go func() {
-		var buf [BUFSIZE]byte
-		errorf := os.NewFile(uintptr(errorfd), "Global Error File/Pipe")
-		for {
-			n, _ := errorf.Read(buf[:])
-			if n == 0 {
-				return
-			}
-			cerr <- fmt.Errorf(string(buf[:n]))
-		}
-	}()
+// Close exists only to satisfy io.WriteCloser interface.
+func (w errorWriter) Close() error {
+	return nil
 }
 
 const MAXSNARF = 100 * 1024
