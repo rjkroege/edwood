@@ -33,9 +33,18 @@ func TestMain(m *testing.M) {
 				if err := x.Start(); err != nil {
 					log.Fatalf("failed to execute Xvfb: %v", err)
 				}
-				// Give Xvfb some time to start up.
-				// 3 seconds is default for xvfb-run.
-				time.Sleep(3 * time.Second)
+				// Wait for Xvfb to start up.
+				for i := 0; i < 5*60; i++ {
+					err := exec.Command("xdpyinfo", "-display", dp).Run()
+					if err == nil {
+						break
+					}
+					if _, ok := err.(*exec.ExitError); !ok {
+						log.Fatalf("failed to execute xdpyinfo: %v", err)
+					}
+					log.Printf("%v waiting for Xvfb...\n", i)
+					time.Sleep(time.Second)
+				}
 				os.Setenv("DISPLAY", dp)
 			}
 		}
