@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 					log.Fatalf("failed to execute Xvfb: %v", err)
 				}
 				// Wait for Xvfb to start up.
-				for i := 0; i < 60*60; i++ {
+				for i := 0; i < 5*60; i++ {
 					err := exec.Command("xdpyinfo", "-display", dp).Run()
 					if err == nil {
 						break
