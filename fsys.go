@@ -4,11 +4,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	"9fans.net/go/plan9"
@@ -17,7 +17,7 @@ import (
 // TODO(flux): Wrap fsys into a tidy object.
 
 var (
-	sfd *os.File
+	sfd net.Conn
 )
 
 const (
@@ -98,12 +98,7 @@ var (
 
 func fsysinit() {
 	initfcall()
-	pipe, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
-	if err != nil {
-		acmeerror("Failed to open pipe", nil)
-	}
-	reader := os.NewFile(uintptr(pipe[0]), "pipeend0")
-	writer := os.NewFile(uintptr(pipe[1]), "pipeend1")
+	reader, writer := net.Pipe()
 	if post9pservice(reader, "acme", mtpt) < 0 {
 		acmeerror("can't post service", nil)
 	}
