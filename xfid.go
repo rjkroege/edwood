@@ -8,7 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -136,7 +135,7 @@ func xfidopen(x *Xfid) {
 				return
 			}
 			var err error
-			// TODO(flux): Move the TempFile and CloseOnExec and Remove
+			// TODO(flux): Move the TempFile and Remove
 			// into a tempfile() call
 			w.rdselfd, err = ioutil.TempFile("", "acme")
 			if err != nil {
@@ -144,7 +143,6 @@ func xfidopen(x *Xfid) {
 				respond(x, &fc, fmt.Errorf("can't create temp file"))
 				return
 			}
-			syscall.CloseOnExec(int(w.rdselfd.Fd()))
 			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 			q0 = t.q0
