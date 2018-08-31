@@ -62,6 +62,11 @@ func restoremouse(w *Window) bool {
 	return false
 }
 
+func bytetorune(s []byte) []rune {
+	r, _, _ := cvttorunes(s, len(s))
+	return r
+}
+
 // TODO(flux) The "correct" answer here is return unicode.IsNumber(c) || unicode.IsLetter(c)
 func isalnum(c rune) bool {
 	/*
