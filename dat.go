@@ -201,12 +201,6 @@ type Xfid struct {
 
 type RangeSet []Range
 
-type Dirlist struct {
-	r   []rune
-	nr  int
-	wid int
-}
-
 type Expand struct {
 	q0    int
 	q1    int

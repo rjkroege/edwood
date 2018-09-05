@@ -233,9 +233,9 @@ func (t *Text) Columnate(names []string, widths []int) {
 	q1 = 0
 	for i := 0; i < nrow; i++ {
 		for j := i; j < len(names); j += nrow {
-			dl := names[j]
-			t.file.Insert(q1, []rune(dl))
-			q1 += (len(dl))
+			dl := bytetorune([]byte(names[j]))
+			t.file.Insert(q1, dl)
+			q1 += len(dl)
 			if j+nrow >= len(names) {
 				break
 			}
