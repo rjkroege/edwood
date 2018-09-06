@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
-	"os"
+	"log"
 	"strings"
 	"unicode/utf8"
 )
@@ -35,8 +35,7 @@ func abs(x int) int {
 }
 
 func acmeerror(s string, err error) {
-	fmt.Fprintf(os.Stderr, "acme: %s: %v\n", s, err)
-	// panic(fmt.Sprintf(os.Stderr, "acme: %s: %v\n", s, err))
+	log.Panicf("acme: %s: %v\n", s, err)
 }
 
 var (

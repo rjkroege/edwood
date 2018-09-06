@@ -11,23 +11,16 @@ import (
 
 var chattyfuse bool
 
-func post9pservice(fd *os.File, name string, mtpt string) int {
-	var (
-		err      error
-		ns, addr string
-		conn     *net.UnixConn
-	)
-
+func post9pservice(conn net.Conn, name string, mtpt string) int {
 	if name == "" && mtpt == "" {
-		fd.Close()
+		conn.Close()
 		panic("nothing to do")
 	}
 
 	if name != "" {
-		if strings.Index(name, "!") != -1 {
-			addr = name
-		} else {
-			ns = getns()
+		addr := name
+		if !strings.Contains(name, "!") {
+			ns := getns()
 			if ns == "" {
 				return -1
 			}
@@ -37,19 +30,25 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 			return -1
 		}
 		cmd := exec.Command("9pserve", "-lv", addr)
-		cmd.Stdin = fd
-		cmd.Stdout = fd
+		cmd.Stdin = conn
+		cmd.Stdout = conn
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
 		if err != nil {
-			panic("Failed to start 9pserve")
+			panic(fmt.Sprintf("failed to start 9pserve: %v", err))
 		}
-		fd.Close()
 		// 9pserve will fork into the background.  Wait for that.
-		err = cmd.Wait()
-		if err != nil {
-			panic("Failed to start 9pserve")
+		if state, err := cmd.Process.Wait(); err != nil || !state.Success() {
+			panic(fmt.Sprintf("9pserve wait failed: %v, %v", err, state))
 		}
+		go func() {
+			// Now wait for I/O to finish.
+			err = cmd.Wait()
+			if err != nil {
+				panic(fmt.Sprintf("9pserve wait failed: %v", err))
+			}
+			conn.Close()
+		}()
 		if mtpt != "" {
 			// reopen
 			s := strings.Split(addr, "!")
@@ -64,18 +63,26 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 		}
 	}
 	if mtpt != "" {
+		// 9pfuse uses fd 0 for both reads and writes, so we need to set cmd.Stdin to
+		// a *os.File instead of an io.Reader. os/exec package will set stdin to the
+		// fd in *os.File, which supports both read and writes. It doesn't matter what
+		// we set cmd.Stdout to because it's never used!
+		uconn, ok := conn.(*net.UnixConn)
+		if !ok {
+			// Thankfully, we should never reach here beacause name is always "acme".
+			panic("9pfuse writes to stdin!")
+		}
+		fd, err := uconn.File()
+		if err != nil {
+			panic(fmt.Sprintf("bad mtpt connection: %v", err))
+		}
+
 		// Try v9fs on Linux, which will mount 9P directly.
 		cmd := exec.Command("mount9p", "-", mtpt)
-		if conn != nil {
-			fd, err = conn.File()
-			if err != nil {
-				panic("Bad mtpt connection")
-			}
-		}
 		cmd.Stdin = fd
 		cmd.Stdout = fd
 		cmd.Stderr = os.Stderr
-		err := cmd.Start()
+		err = cmd.Start()
 		if err != nil {
 			if chattyfuse {
 				cmd = exec.Command("9pfuse", "-D", "-", mtpt)
@@ -90,7 +97,13 @@ func post9pservice(fd *os.File, name string, mtpt string) int {
 				panic(fmt.Sprintf("failed to run 9pfuse: %v", err))
 			}
 		}
-		fd.Close()
+		go func() {
+			err = cmd.Wait()
+			if err != nil {
+				panic(fmt.Sprintf("wait failed: %v", err))
+			}
+			fd.Close()
+		}()
 	}
 	return 0
 }
