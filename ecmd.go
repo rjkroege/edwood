@@ -40,7 +40,7 @@ func mkaddr(f *File) (a Address) {
 	return a
 }
 
-var none Address = Address{Range{0, 0}, nil}
+var none = Address{Range{0, 0}, nil}
 
 func cmdexec(t *Text, cp *Cmd) bool {
 	w := (*Window)(nil)

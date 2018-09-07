@@ -19,9 +19,8 @@ func (f *frameimpl) canfit(pt image.Point, b *frbox) (int, bool) {
 	if b.Nrune < 0 {
 		if int(b.Minwid) <= left {
 			return 1, true
-		} else {
-			return 0, false
 		}
+		return 0, false
 	}
 
 	if left >= b.Wid {
@@ -152,9 +151,8 @@ func nbyte(f *frbox) int {
 func nrune(b *frbox) int {
 	if b.Nrune < 0 {
 		return 1
-	} else {
-		return b.Nrune
 	}
+	return b.Nrune
 }
 
 func Rpt(min, max image.Point) image.Rectangle {

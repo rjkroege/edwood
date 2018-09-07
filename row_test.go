@@ -13,11 +13,11 @@ type loadfontstest struct {
 	val   string
 }
 
-const short_file = `/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
+const shortFile = `/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
 /mnt/font/GoRegular/13a/font
 `
 
-const full_file = `/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
+const fullFile = `/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
 /mnt/font/GoRegular/13a/font
 /mnt/font/Iosevka/12a/font
 `
@@ -47,7 +47,7 @@ func TestLoadFonts(t *testing.T) {
 	if err != nil {
 		t.Fatal("TestLoadFonts short_file can't create file:", err)
 	}
-	if _, err := f.WriteString(short_file); err != nil {
+	if _, err := f.WriteString(shortFile); err != nil {
 		t.Fatal("TestLoadFonts short_file can't write file:", err)
 	}
 	f.Close()
@@ -60,7 +60,7 @@ func TestLoadFonts(t *testing.T) {
 	if err != nil {
 		t.Fatal("TestLoadFonts full_file can't create file:", err)
 	}
-	if _, err := f.WriteString(full_file); err != nil {
+	if _, err := f.WriteString(fullFile); err != nil {
 		t.Fatal("TestLoadFonts full_file can't write file:", err)
 	}
 	f.Close()

@@ -139,9 +139,8 @@ func startAcme(t *testing.T) *Acme {
 			if i >= 9 {
 				t.Fatalf("Failed to mount acme: %v", err)
 				return nil
-			} else {
-				time.Sleep(time.Second)
 			}
+			time.Sleep(time.Second)
 		} else {
 			break
 		}

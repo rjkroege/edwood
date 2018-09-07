@@ -58,10 +58,10 @@ func (e *Elog) Term() {
 	(*e).warned = false
 }
 
-func (e *ElogOperation) reset() {
-	e.t = Null
-	e.nd = 0
-	e.r = e.r[0:0]
+func (eo *ElogOperation) reset() {
+	eo.t = Null
+	eo.nd = 0
+	eo.r = eo.r[0:0]
 }
 
 func elogclose(f *File) {}

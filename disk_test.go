@@ -96,24 +96,24 @@ func TestReadWriteBig(t *testing.T) {
 	}
 	bigstring := b.String()
 
-	original_large_blk := disk.NewBlock(uint(4 * 100))
-	new_large_blk := writereadtestcore(t, "big write-read test", bigstring, original_large_blk, disk)
+	originalLargeBlk := disk.NewBlock(uint(4 * 100))
+	newLargeBlk := writereadtestcore(t, "big write-read test", bigstring, originalLargeBlk, disk)
 
-	if original_large_blk != new_large_blk {
-		t.Errorf("without resizing, new_large_blk should equal original_large_blk")
+	if originalLargeBlk != newLargeBlk {
+		t.Errorf("without resizing, newLargeBlk should equal originalLargeBlk")
 	}
 
 	// Resize it with a little string.
-	new_small_blk := writereadtestcore(t, "small size-changing write-read test", "c日本d", new_large_blk, disk)
-	if new_small_blk == original_large_blk {
-		t.Errorf("with resizing, new_small_blk should not equal original_large_blk")
+	newSmallBlk := writereadtestcore(t, "small size-changing write-read test", "c日本d", newLargeBlk, disk)
+	if newSmallBlk == originalLargeBlk {
+		t.Errorf("with resizing, newSmallBlk should not equal originalLargeBlk")
 	}
 
-	if original_large_blk != disk.free[2] {
-		t.Errorf("with resizing, original_large_blk should be in the free-bucket for re-use")
+	if originalLargeBlk != disk.free[2] {
+		t.Errorf("with resizing, originalLargeBlk should be in the free-bucket for re-use")
 	}
-	if original_large_blk.next != nil {
-		t.Errorf("Release failed to make original_large_blk.next point to nothing")
+	if originalLargeBlk.next != nil {
+		t.Errorf("Release failed to make originalLargeBlk.next point to nothing")
 	}
 
 	// Resize with a big string, make sure that we reuse the block
@@ -123,12 +123,12 @@ func TestReadWriteBig(t *testing.T) {
 	}
 	bigstring = b.String()
 
-	different_large_blk := writereadtestcore(t, "small to large size-changing write-read test", bigstring, new_small_blk, disk)
-	if new_small_blk == different_large_blk {
-		t.Errorf("with resizing, from small to large, different_large_blk should not equal new_small_blk")
+	differentLargeBlk := writereadtestcore(t, "small to large size-changing write-read test", bigstring, newSmallBlk, disk)
+	if newSmallBlk == differentLargeBlk {
+		t.Errorf("with resizing, from small to large, differentLargeBlk should not equal newSmallBlk")
 	}
-	if different_large_blk != original_large_blk {
-		t.Errorf("with resizing to a previously-used large block, should have reused original_large_blk")
+	if differentLargeBlk != originalLargeBlk {
+		t.Errorf("with resizing to a previously-used large block, should have reused originalLargeBlk")
 	}
 	if disk.free[2] != nil {
 		t.Errorf("reusing block from bucket should have removed the block")

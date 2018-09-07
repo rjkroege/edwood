@@ -85,9 +85,8 @@ func printarg(argt *Text, q0 int, q1 int) string {
 	}
 	if q0 == q1 {
 		return fmt.Sprintf("%s:#%d", argt.file.name, q0)
-	} else {
-		return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
 	}
+	return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
 }
 
 func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {

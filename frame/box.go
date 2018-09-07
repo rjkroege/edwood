@@ -65,7 +65,7 @@ func runeindex(p []byte, n int) int {
 	offs := 0
 	for i := 0; i < n; i++ {
 		if p[offs] < 0x80 {
-			offs += 1
+			offs++
 		} else {
 			_, size := utf8.DecodeRune(p[offs:])
 			offs += size
@@ -166,7 +166,7 @@ func (f *frameimpl) validateboxmodel(format string, args ...interface{}) {
 	total := 0
 	for _, b := range f.box {
 		if b.Nrune < 0 {
-			total += 1
+			total++
 		} else {
 			total += b.Nrune
 		}

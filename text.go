@@ -269,18 +269,18 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	}
 	if ismtpt(filename) {
 		warning(nil, "will not open self mount point %s\n", filename)
-		return 0, fmt.Errorf("will not open self mount point %s\n", filename)
+		return 0, fmt.Errorf("will not open self mount point %s", filename)
 	}
 	fd, err := os.Open(filename)
 	if err != nil {
 		warning(nil, "can't open %s: %v\n", filename, err)
-		return 0, fmt.Errorf("can't open %s: %v\n", filename, err)
+		return 0, fmt.Errorf("can't open %s: %v", filename, err)
 	}
 	defer fd.Close()
 	d, err := fd.Stat()
 	if err != nil {
 		warning(nil, "can't fstat %s: %v\n", filename, err)
-		return 0, fmt.Errorf("can't fstat %s: %v\n", filename, err)
+		return 0, fmt.Errorf("can't fstat %s: %v", filename, err)
 	}
 
 	q1 := (0)
@@ -289,7 +289,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		/* this is checked in get() but it's possible the file changed underfoot */
 		if len(t.file.text) > 1 {
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
-			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it\n", filename)
+			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
 		}
 		t.w.isdir = true
 		t.w.filemenu = false
@@ -301,7 +301,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		dirNames, err := fd.Readdirnames(0)
 		if err != nil {
 			warning(nil, "failed to Readdirnames: %s\n", filename)
-			return 0, fmt.Errorf("failed to Readdirnames: %s\n", filename)
+			return 0, fmt.Errorf("failed to Readdirnames: %s", filename)
 		}
 		for i, dn := range dirNames {
 			s, err := os.Stat(filepath.Join(fd.Name(), dn))
@@ -430,9 +430,8 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 			t.Insert(q0, tp[:n], tofile)
 			nrp = n
 			return q0, nrp
-		} else {
-			bp++
 		}
+		bp++
 	}
 	t.Insert(q0, r, tofile)
 	nrp = n
@@ -756,12 +755,12 @@ func (t *Text) Type(r rune) {
 		return
 	}
 
-	case_Down := func() {
+	caseDown := func() {
 		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.DefaultFontHeight()))
 		t.SetOrigin(q0, true)
 		return
 	}
-	case_Up := func() {
+	caseUp := func() {
 		q0 = t.Backnl(t.org, n)
 		t.SetOrigin(q0, true)
 		return
@@ -798,7 +797,7 @@ func (t *Text) Type(r rune) {
 			return
 		}
 		n = t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Down()
+		caseDown()
 		return
 	case Kscrollonedown:
 		if t.what == Tag {
@@ -809,11 +808,11 @@ func (t *Text) Type(r rune) {
 		if n <= 0 {
 			n = 1
 		}
-		case_Down()
+		caseDown()
 		return
 	case draw.KeyPageDown:
 		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Down()
+		caseDown()
 		return
 	case draw.KeyUp:
 		if t.what == Tag {
@@ -821,7 +820,7 @@ func (t *Text) Type(r rune) {
 			return
 		}
 		n = t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Up()
+		caseUp()
 		return
 	case Kscrolloneup:
 		if t.what == Tag {
@@ -829,11 +828,11 @@ func (t *Text) Type(r rune) {
 			return
 		}
 		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
-		case_Up()
+		caseUp()
 		return
 	case draw.KeyPageUp:
 		n = 2 * t.fr.GetFrameFillStatus().Maxlines / 3
-		case_Up()
+		caseUp()
 		return
 	case draw.KeyHome:
 		t.TypeCommit()
