@@ -74,8 +74,8 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.tagexpand = true
 	w.body.w = w
 	w.incl = []string{}
-	WinId++
-	w.id = WinId
+	WinID++
+	w.id = WinID
 	w.ref.Inc()
 	if globalincref {
 		w.ref.Inc()
@@ -145,7 +145,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	}
 	w.body.Init(r1, rf, textcolors, w.display)
 	w.body.what = Body
-	r1.Min.Y -= 1
+	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
 		w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)

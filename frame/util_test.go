@@ -28,17 +28,17 @@ func (bx BoxModelTest) Try() interface{} {
 	}
 }
 
-func (tv BoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
+func (bx BoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
 	r := result.(BoxModelTestResult)
 
-	if got, want := r.result, tv.result; got != want {
-		t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, tv.name, got, want)
+	if got, want := r.result, bx.result; got != want {
+		t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, bx.name, got, want)
 	}
-	if got, want := r.boolresult, tv.boolresult; got != want {
-		t.Errorf("%s-%s: running stim bool got %v but want %v\n", prefix, tv.name, got, want)
+	if got, want := r.boolresult, bx.boolresult; got != want {
+		t.Errorf("%s-%s: running stim bool got %v but want %v\n", prefix, bx.name, got, want)
 	}
 
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.afterboxes)
+	testcore(t, prefix, bx.name, bx.frame, bx.nbox, bx.afterboxes)
 }
 
 func TestCanfit(t *testing.T) {

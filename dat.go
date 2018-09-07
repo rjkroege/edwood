@@ -47,7 +47,6 @@ const (
 	NRange = 10 // TODO(flux): No reason for this static limit anymore; should we remove?
 	//	Infinity  = 0x7FFFFFFF
 
-	//	STACK = 65536
 	EVENTSIZE = 256
 	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
 	RBUFSIZE  = BUFSIZE / utf8.UTFMax
@@ -117,7 +116,7 @@ var (
 	tagcolors         [frame.NumColours]*draw.Image
 	textcolors        [frame.NumColours]*draw.Image
 	wdir              string
-	editing           int = Inactive
+	editing           = Inactive
 	messagesize       int
 	globalautoindent  bool
 	dodollarsigns     bool
@@ -140,7 +139,7 @@ var (
 
 	editoutlk *sync.Mutex
 
-	WinId int = 0
+	WinID = 0
 )
 
 type Range struct {

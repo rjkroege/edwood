@@ -43,7 +43,7 @@ func plumbthread() {
 		plumbeditfidbr := bufio.NewReader(plumbeditfid)
 		// Relay messages.
 		for {
-			var m *plumb.Message = &plumb.Message{}
+			var m = &plumb.Message{}
 			err := m.Recv(plumbeditfidbr)
 			if err != nil {
 				break
@@ -585,9 +585,8 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 			_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
 				func(q int) rune { return t.ReadC(q) }, false)
 			return true
-		} else {
-			r = t.DirName(string([]rune(r)[:nname]))
 		}
+		r = t.DirName(string([]rune(r)[:nname]))
 	}
 	e.bname = r
 	// if it's already a window name, it's a file
@@ -622,9 +621,8 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 	e.agetc = func(q int) rune {
 		if q < t.Nc() {
 			return t.ReadC(q)
-		} else {
-			return 0
 		}
+		return 0
 	}
 
 	// if in selection, choose selection

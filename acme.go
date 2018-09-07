@@ -43,7 +43,7 @@ var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
 var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)")
-var ncol int = 2
+var ncol = 2
 
 var mainpid int
 
@@ -202,7 +202,7 @@ func readfile(c *Column, filename string) {
 	xfidlog(w, "new")
 }
 
-var fontCache map[string]*draw.Font = make(map[string]*draw.Font)
+var fontCache = make(map[string]*draw.Font)
 
 func fontget(name string, display *draw.Display) *draw.Font {
 	var font *draw.Font

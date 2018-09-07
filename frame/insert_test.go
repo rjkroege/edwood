@@ -28,18 +28,18 @@ func (bx InsertTest) Try() interface{} {
 	return InsertTestResult{a, b, c}
 }
 
-func (tv InsertTest) Verify(t *testing.T, prefix string, result interface{}) {
+func (bx InsertTest) Verify(t *testing.T, prefix string, result interface{}) {
 	r := result.(InsertTestResult)
 
-	if got, want := r.ppt, tv.ppt; got != want {
-		t.Errorf("%s-%s: running stim ppt got %d but want %d\n", prefix, tv.name, got, want)
+	if got, want := r.ppt, bx.ppt; got != want {
+		t.Errorf("%s-%s: running stim ppt got %d but want %d\n", prefix, bx.name, got, want)
 	}
-	if got, want := r.resultpt, tv.resultpt; got != want {
-		t.Errorf("%s-%s: running stim resultpt got %d but want %d\n", prefix, tv.name, got, want)
+	if got, want := r.resultpt, bx.resultpt; got != want {
+		t.Errorf("%s-%s: running stim resultpt got %d but want %d\n", prefix, bx.name, got, want)
 	}
 	// We use the global frame here to make sure that bxscan works as desired.
 	// I note in passing that encapsulation here could be improved.
-	testcore(t, prefix, tv.name, r.frame, tv.nbox, tv.afterboxes)
+	testcore(t, prefix, bx.name, r.frame, bx.nbox, bx.afterboxes)
 }
 
 func mkRu(s string) []rune {

@@ -17,8 +17,8 @@ func (bx SimpleBoxModelTest) Try() interface{} {
 	return struct{}{}
 }
 
-func (tv SimpleBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.afterboxes)
+func (bx SimpleBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
+	testcore(t, prefix, bx.name, bx.frame, bx.nbox, bx.afterboxes)
 }
 
 func TestRunIndex(t *testing.T) {
@@ -366,11 +366,11 @@ func (bx FindBoxModelTest) Try() interface{} {
 	return bx.stim(bx.frame)
 }
 
-func (tv FindBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
+func (bx FindBoxModelTest) Verify(t *testing.T, prefix string, result interface{}) {
 	r := result.(int)
-	testcore(t, prefix, tv.name, tv.frame, tv.nbox, tv.afterboxes)
-	if got, want := r, tv.foundbox; got != want {
-		t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, tv.name, got, want)
+	testcore(t, prefix, bx.name, bx.frame, bx.nbox, bx.afterboxes)
+	if got, want := r, bx.foundbox; got != want {
+		t.Errorf("%s-%s: running stim got %d but want %d\n", prefix, bx.name, got, want)
 	}
 }
 

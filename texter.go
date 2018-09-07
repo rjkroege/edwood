@@ -17,7 +17,7 @@ type Texter interface {
 	View(q0, q1 int) []byte // Return a "read only" slice
 }
 
-// TestText implements Texter around a buffer
+// TextBuffer implements Texter around a buffer.
 type TextBuffer struct {
 	q0, q1 int
 	buf    []rune

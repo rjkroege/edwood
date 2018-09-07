@@ -25,11 +25,11 @@ const (
 	DEBUG = 0
 )
 
-var fids map[uint32]*Fid = make(map[uint32]*Fid)
+var fids = make(map[uint32]*Fid)
 
 type fsfunc func(*Xfid, *Fid) *Xfid
 
-var fcall []fsfunc = make([]fsfunc, plan9.Tmax)
+var fcall = make([]fsfunc, plan9.Tmax)
 
 func initfcall() {
 	fcall[plan9.Tflush] = fsysflush
@@ -53,7 +53,7 @@ var (
 	Enotdir = errors.New("not a directory")
 )
 
-var dirtab []*DirTab = []*DirTab{
+var dirtab = []*DirTab{
 	{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
 	{"acme", plan9.QTDIR, Qacme, 0500 | plan9.DMDIR},
 	{"cons", plan9.QTFILE, Qcons, 0600},
@@ -67,7 +67,7 @@ var dirtab []*DirTab = []*DirTab{
 	//	{ nil, }
 }
 
-var dirtabw []*DirTab = []*DirTab{
+var dirtabw = []*DirTab{
 	{".", plan9.QTDIR, Qdir, 0500 | plan9.DMDIR},
 	{"addr", plan9.QTFILE, QWaddr, 0600},
 	{"body", plan9.QTAPPEND, QWbody, 0600 | plan9.DMAPPEND},
@@ -92,7 +92,7 @@ type Mnt struct {
 var mnt Mnt
 
 var (
-	username string = "Wile E. Coyote"
+	username = "Wile E. Coyote"
 	closing  int
 )
 
@@ -191,7 +191,7 @@ func fsysdelid(idm *MntDir) {
 		prev = m
 	}
 
-	cerr <- fmt.Errorf("fsysdelid: can't find id %d\n", idm.id)
+	cerr <- fmt.Errorf("fsysdelid: can't find id %d", idm.id)
 }
 
 // Called only in exec.c:/^run(), from a different FD group
