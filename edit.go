@@ -7,11 +7,11 @@ import (
 )
 
 type Addr struct {
-	typ  rune /* # (byte addr), l (line addr), / ? . $ + - , ; */
+	typ  rune // # (byte addr), l (line addr), / ? . $ + - , ;
 	re   string
-	left *Addr /* left side of , and ; */
+	left *Addr // left side of , and ;
 	num  int
-	next *Addr /* or right side of , and ; */
+	next *Addr // or right side of , and ;
 }
 
 type Address struct {
@@ -20,32 +20,32 @@ type Address struct {
 }
 
 type Cmd struct {
-	addr   *Addr  /* address (range of text) */
-	re     string /* regular expression for e.g. 'x' */
-	cmd    *Cmd   /* target of x, g, {, etc. */
-	text   string /* text of a, c, i; rhs of s */
-	mtaddr *Addr  /* address for m, t */
-	next   *Cmd   /* pointer to next element in braces */
+	addr   *Addr  // address (range of text)
+	re     string // regular expression for e.g. 'x'
+	cmd    *Cmd   // target of x, g, {, etc.
+	text   string // text of a, c, i; rhs of s
+	mtaddr *Addr  // address for m, t
+	next   *Cmd   // pointer to next element in braces
 	num    int
-	flag   rune /* whatever */
-	cmdc   rune /* command character; 'x' etc. */
+	flag   rune // whatever
+	cmdc   rune // command character; 'x' etc.
 }
 
 type Cmdtab struct {
-	cmdc    rune                   /* command character */
-	text    byte                   /* takes a textual argument? */
-	regexp  byte                   /* takes a regular expression? */
-	addr    byte                   /* takes an address (m or t)? */
-	defcmd  rune                   /* default command; 0==>none */
-	defaddr Defaddr                /* default address */
-	count   int                    /* takes a count e.g. s2/// */
-	token   []rune                 /* takes text terminated by one of these */
-	fn      func(*Text, *Cmd) bool /* function to call with parse tree */
+	cmdc    rune                   // command character
+	text    byte                   // takes a textual argument?
+	regexp  byte                   // takes a regular expression?
+	addr    byte                   // takes an address (m or t)?
+	defcmd  rune                   // default command; 0==>none
+	defaddr Defaddr                // default address
+	count   int                    // takes a count e.g. s2///
+	token   []rune                 // takes text terminated by one of these
+	fn      func(*Text, *Cmd) bool // function to call with parse tree
 }
 
-const INCR = 25 /* delta when growing list */
+const INCR = 25 // delta when growing list
 
-type List struct { /* code depends on a long being able to hold a pointer */
+type List struct { // code depends on a long being able to hold a pointer
 
 	nalloc int
 	nused  int
@@ -73,7 +73,7 @@ var (
 )
 
 var cmdtab = []Cmdtab{
-	/*	cmdc	text	regexp	addr	defcmd	defaddr	count	token	 fn	*/
+	// cmdc	text	regexp	addr	defcmd	defaddr	count	token	 fn
 	{'\n', 0, 0, 0, 0, aDot, 0, nil, nl_cmd},
 	{'a', 1, 0, 0, 0, aDot, 0, nil, a_cmd},
 	{'b', 0, 0, 0, 0, aNo, 0, linex, b_cmd},
@@ -160,7 +160,7 @@ func alleditinit(w *Window) {
 func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
-	if f.curtext != t { /* do curtext only */
+	if f.curtext != t { // do curtext only
 		return
 	}
 	if !f.elog.Empty() {
@@ -187,7 +187,7 @@ func allupdate(w *Window) {
 
 func editerror(format string, args ...interface{}) {
 	s := fmt.Errorf(format, args...)
-	row.AllWindows(allelogterm) /* truncate the edit logs */
+	row.AllWindows(allelogterm) // truncate the edit logs
 	editerrc <- s
 	runtime.Goexit()
 }
@@ -225,7 +225,7 @@ func editcmd(ct *Text, r []rune) {
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
 	}
-	/* update everyone whose edit log has data */
+	// update everyone whose edit log has data
 	row.AllWindows(allupdate)
 }
 
@@ -260,7 +260,7 @@ func getnum(signok int) int {
 		getch()
 	}
 	c := nextc()
-	if c < '0' || '9' < c { /* no number defaults to 1 */
+	if c < '0' || '9' < c { // no number defaults to 1
 		return sign
 	}
 
@@ -333,7 +333,7 @@ func getrhs(delim rune, cmd rune) (s string) {
 				if c == 'n' {
 					c = '\n'
 				} else {
-					if c != delim && (cmd == 's' || c != '\\') { /* s does its own */
+					if c != delim && (cmd == 's' || c != '\\') { // s does its own
 						s = s + "\\" // TODO(flux): Use a stringbuilder
 					}
 				}
@@ -341,7 +341,7 @@ func getrhs(delim rune, cmd rune) (s string) {
 		}
 		s = s + string(c)
 	}
-	ungetch() /* let client read whether delimiter, '\n' or whatever */
+	ungetch() // let client read whether delimiter, '\n' or whatever
 	return
 }
 
@@ -356,7 +356,7 @@ func collecttoken(end []rune) string {
 		if c != ' ' && c != '\t' {
 			break
 		}
-		s += string(getch()) /* blanks significant for getname() */
+		s += string(getch()) // blanks significant for getname()
 	}
 	for {
 		c = getch()
@@ -434,14 +434,14 @@ func parsecmd(nest int) *Cmd {
 		return nil
 	}
 	cmd.cmdc = c
-	if cmd.cmdc == 'c' && nextc() == 'd' { /* sleazy two-character case */
-		getch() /* the 'd' */
+	if cmd.cmdc == 'c' && nextc() == 'd' { // sleazy two-character case
+		getch() // the 'd'
 		cmd.cmdc = 'c' | 0x100
 	}
 	i := cmdlookup(cmd.cmdc)
 	if i >= 0 {
 		if cmd.cmdc == '\n' {
-			goto Return /* let nl_cmd work it all out */
+			goto Return // let nl_cmd work it all out
 		}
 		ct := &cmdtab[i]
 		if ct.defaddr == aNo && cmd.addr != nil {
@@ -451,8 +451,8 @@ func parsecmd(nest int) *Cmd {
 			cmd.num = getnum(ct.count)
 		}
 		if ct.regexp != 0 {
-			/* x without pattern . .*\n, indicated by cmd.re==0 */
-			/* X without pattern is all files */
+			// x without pattern . .*\n, indicated by cmd.re==0
+			// X without pattern is all files
 			c := nextc()
 			if ct.cmdc != 'x' && ct.cmdc != 'X' || (c != ' ' && c != '\t' && c != '\n') {
 				cmdskipbl()
@@ -644,7 +644,7 @@ func simpleaddr() *Addr {
 			fallthrough
 		case '?':
 			if addr.typ != '+' && addr.typ != '-' {
-				/* insert the missing '+' */
+				// insert the missing '+'
 				nap = newaddr()
 				nap.typ = '+'
 				nap.next = addr.next

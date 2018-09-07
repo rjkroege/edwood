@@ -277,7 +277,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark() /* seq has been incremented by execute */
+				t.file.Mark() // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -287,7 +287,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 			}
 		}
 	}
-	if t == nil { /* no selection */
+	if t == nil { // no selection
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -325,7 +325,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 			t.w.SetTag()
 		}
 	} else {
-		if dosnarf { /* Snarf command */
+		if dosnarf { // Snarf command
 			argtext = t
 		}
 	}
@@ -361,10 +361,10 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 		q, q0, q1, n int
 	)
 
-	/* if tobody, use body of executing window  (Paste or Send command)  */
+	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark() /* seq has been incremented by execute */
+		t.file.Mark() // seq has been incremented by execute
 	}
 	if t == nil {
 		return
@@ -415,8 +415,8 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 		promote = true
 	} else {
 		if isput {
-			/* if are doing a Put, want to synthesize name even for non-existent file */
-			/* best guess is that file name doesn't contain a slash */
+			// if are doing a Put, want to synthesize name even for non-existent file
+			// best guess is that file name doesn't contain a slash
 			promote = true
 			if strings.Index(r, "/") != -1 {
 				t = argt
@@ -428,7 +428,7 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 		if arg == "" {
 			return t.file.name
 		}
-		/* prefix with directory name if necessary */
+		// prefix with directory name if necessary
 		r = filepath.Join(t.DirName(""), arg)
 	}
 	return r
@@ -647,11 +647,11 @@ func sortx(et, _, _ *Text, _, _ bool, _ string) {
 }
 
 func seqof(w *Window, isundo bool) int {
-	/* if it's undo, see who changed with us */
+	// if it's undo, see who changed with us
 	if isundo {
 		return w.body.file.seq
 	}
-	/* if it's redo, see who we'll be sync'ed up with */
+	// if it's redo, see who we'll be sync'ed up with
 	return w.body.file.RedoSeq()
 }
 
@@ -661,7 +661,7 @@ func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	}
 	seq := seqof(et.w, flag1)
 	if seq == 0 {
-		/* nothing to undo */
+		// nothing to undo
 		return
 	}
 	/*
@@ -837,7 +837,7 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
-		/* ugly: fix locks so w.unlock works */
+		// ugly: fix locks so w.unlock works
 		nw.Lock1(t.w.owner)
 		xfidlog(nw, "zerox")
 	}
@@ -846,7 +846,7 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 func runwaittask(c *Command, cpid chan *os.Process) {
 	c.proc = <-cpid
 
-	if c.proc != nil { /* successful exec */
+	if c.proc != nil { // successful exec
 		c.pid = c.proc.Pid
 		ccommand <- c
 	} else {

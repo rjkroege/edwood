@@ -124,7 +124,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	w.tag.Init(r1, tagfont, tagcolors, w.display)
 	w.tag.what = Tag
 
-	/* tag is a copy of the contents, not a tracked image */
+	// tag is a copy of the contents, not a tracked image
 	if clone != nil {
 		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, clone.tag.file.b, true)
@@ -214,7 +214,7 @@ func (w *Window) TagLines(r image.Rectangle) int {
 	w.tagsafe = false
 
 	if !w.tagexpand {
-		/* use just as many lines as needed to show the Del */
+		// use just as many lines as needed to show the Del
 		n := w.delRunePos()
 		if n < 0 {
 			return 1
@@ -223,12 +223,12 @@ func (w *Window) TagLines(r image.Rectangle) int {
 		return 1 + p.Y/w.tag.fr.DefaultFontHeight()
 	}
 
-	/* can't use more than we have */
+	// can't use more than we have
 	if w.tag.fr.GetFrameFillStatus().Nlines >= w.tag.fr.GetFrameFillStatus().Maxlines {
 		return w.tag.fr.GetFrameFillStatus().Maxlines
 	}
 
-	/* if tag ends with \n, include empty line at end for typing */
+	// if tag ends with \n, include empty line at end for typing
 	n := w.tag.fr.GetFrameFillStatus().Nlines
 	if w.tag.file.b.Nc() > 0 {
 		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
@@ -252,7 +252,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	r1 := r
 	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
 
-	/* If needed, recompute number of lines in tag. */
+	// If needed, recompute number of lines in tag.
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
 		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height)
@@ -288,7 +288,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	r1.Min.Y = y
 	if !safe || !w.body.all.Eq(r1) {
 		oy := y
-		if y+1+w.body.fr.DefaultFontHeight() <= r.Max.Y { /* room for one line */
+		if y+1+w.body.fr.DefaultFontHeight() <= r.Max.Y { // room for one line
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
@@ -373,7 +373,7 @@ func (w *Window) Delete() {
 	if x != nil {
 		w.events = w.events[0:0]
 		w.eventx = nil
-		x.c <- nil /* wake him up */
+		x.c <- nil // wake him up
 	}
 }
 
@@ -425,7 +425,7 @@ func (w *Window) Type(t *Text, r rune) {
 }
 
 func (w *Window) ClearTag() {
-	/* w must be committed */
+	// w must be committed
 	n := w.tag.Nc()
 	r := make([]rune, n)
 	w.tag.file.b.Read(0, r)
@@ -475,9 +475,9 @@ func (w *Window) SetTag1() {
 	Ledit := (" Edit")
 	//	Lpipe := (" |")
 
-	/* there are races that get us here with stuff in the tag cache, so we take extra care to sync it */
+	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
 	if len(w.tag.cache) != 0 || w.tag.file.mod {
-		w.Commit(&w.tag) /* check file name; also guarantees we can modify tag contents */
+		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
 	}
 
 	// (flux) The C implemtation does a lot of work to avoid
@@ -517,13 +517,13 @@ func (w *Window) SetTag1() {
 
 	new := Buffer([]rune(sb.String()))
 
-	/* replace tag if the new one is different */
+	// replace tag if the new one is different
 	resize := false
 	if !new.Eq(w.tag.file.b) {
 		resize = true // Might need to resize the tag
 		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, new, true)
-		/* try to preserve user selection */
+		// try to preserve user selection
 		newbarIndex := new.Index([]rune("|")) // New always has "|"
 		q0 := w.tag.q0
 		q1 := w.tag.q1
@@ -556,7 +556,7 @@ func (w *Window) Commit(t *Text) {
 	f := t.file
 	if len(f.text) > 1 {
 		for _, te := range f.text {
-			te.Commit(false) /* no-op for t */
+			te.Commit(false) // no-op for t
 		}
 	}
 	if t.what == Body {
@@ -615,7 +615,7 @@ func (w *Window) AddIncl(r string) {
 }
 
 func (w *Window) Clean(conservative bool) bool {
-	if w.isscratch || w.isdir { /* don't whine if it's a guide file, error window, etc. */
+	if w.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
@@ -625,7 +625,7 @@ func (w *Window) Clean(conservative bool) bool {
 		if len(w.body.file.name) != 0 {
 			warning(nil, "%v modified\n", w.body.file.name)
 		} else {
-			if w.body.Nc() < 100 { /* don't whine if it's too small */
+			if w.body.Nc() < 100 { // don't whine if it's too small
 				return true
 			}
 			warning(nil, "unnamed file modified\n")

@@ -78,7 +78,7 @@ const (
 var (
 	globalincref bool
 	seq          int
-	maxtab       uint /*size of a tab, in units of the '0' character */
+	maxtab       uint // size of a tab, in units of the '0' character
 
 	tagfont     string
 	mouse       *draw.Mouse

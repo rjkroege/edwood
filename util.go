@@ -166,7 +166,7 @@ func errorwin1(dir string, incl []string) *Window {
 	return w
 }
 
-/* make new window, if necessary; return with it locked */
+// make new window, if necessary; return with it locked
 func errorwin(md *MntDir, owner int) *Window {
 	var w *Window
 
@@ -180,7 +180,7 @@ func errorwin(md *MntDir, owner int) *Window {
 		if w.col != nil {
 			break
 		}
-		/* window was deleted too fast */
+		// window was deleted too fast
 		w.Unlock()
 	}
 	return w
@@ -201,7 +201,7 @@ func errorwinforwin(w *Window) *Window {
 
 	t = &w.body
 	dir = t.DirName("")
-	if dir == "." { /* sigh */
+	if dir == "." { // sigh
 		dir = ""
 	}
 	incl = []string{}
@@ -216,7 +216,7 @@ func errorwinforwin(w *Window) *Window {
 		if w.col != nil {
 			break
 		}
-		/* window deleted too fast */
+		// window deleted too fast
 		w.Unlock()
 	}
 	return w
@@ -250,12 +250,12 @@ func makenewwindow(t *Text) *Window {
 		return c.Add(nil, nil, -1)
 	}
 
-	/* find biggest window and biggest blank spot */
+	// find biggest window and biggest blank spot
 	emptyw = c.w[0]
 	bigw = emptyw
 	for i = 1; i < len(c.w); i++ {
 		w = c.w[i]
-		/* use >= to choose one near bottom of screen */
+		// use >= to choose one near bottom of screen
 		if w.body.fr.GetFrameFillStatus().Maxlines >= bigw.body.fr.GetFrameFillStatus().Maxlines {
 			bigw = w
 		}
@@ -265,11 +265,11 @@ func makenewwindow(t *Text) *Window {
 	}
 	emptyb = &emptyw.body
 	el = emptyb.fr.GetFrameFillStatus().Maxlines - emptyb.fr.GetFrameFillStatus().Nlines
-	/* if empty space is big, use it */
+	// if empty space is big, use it
 	if el > 15 || (el > 3 && el > (bigw.body.fr.GetFrameFillStatus().Maxlines-1)/2) {
 		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(tagfont, t.display).Height
 	} else {
-		/* if this window is in column and isn't much smaller, split it */
+		// if this window is in column and isn't much smaller, split it
 		if t.col == c && t.w.r.Dy() > 2*bigw.r.Dy()/3 {
 			bigw = t.w
 		}

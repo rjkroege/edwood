@@ -375,7 +375,7 @@ func MovedMouse(m draw.Mouse) {
 		}
 		return
 	}
-	/* scroll Buttons, wheels, etc. */
+	// scroll Buttons, wheels, etc.
 	if w != nil && (m.Buttons&(8|16)) != 0 {
 		if m.Buttons&8 != 0 {
 			but = Kscrolloneup
@@ -425,7 +425,7 @@ func MovedMouse(m draw.Mouse) {
 			argtext = t
 			seltext = t
 			if t.col != nil {
-				activecol = t.col /* button 1 only */
+				activecol = t.col // button 1 only
 			}
 			if t.w != nil && t == &t.w.body {
 				activewin = t.w
@@ -466,7 +466,7 @@ func keyboardthread(display *draw.Display) {
 			for {
 				typetext = row.Type(r, mouse.Point)
 				t = typetext
-				if t != nil && t.col != nil && !(r == draw.KeyDown || r == draw.KeyLeft || r == draw.KeyRight) { /* scrolling doesn't change activecol */
+				if t != nil && t.col != nil && !(r == draw.KeyDown || r == draw.KeyLeft || r == draw.KeyRight) { // scrolling doesn't change activecol
 					activecol = t.col
 				}
 				if t != nil && t.w != nil {
@@ -556,7 +556,7 @@ func waitthread() {
 			t := &row.tag
 			t.Commit(true)
 			if c == nil {
-				/* helper processes use this exit status */
+				// helper processes use this exit status
 				// TODO(flux): I don't understand what this libthread code is doing
 				Untested()
 				if strings.HasPrefix(w.String(), "libthread") {
@@ -580,7 +580,7 @@ func waitthread() {
 			Freecmd()
 
 		case c = <-ccommand:
-			/* has this command already exited? */
+			// has this command already exited?
 			lastp := (*Pid)(nil)
 			for p := pids; p != nil; p = p.next {
 				if p.pid == c.pid {
@@ -642,7 +642,7 @@ func newwindowthread() {
 	var w *Window
 
 	for {
-		/* only fsysproc is talking to us, so synchronization is trivial */
+		// only fsysproc is talking to us, so synchronization is trivial
 		<-cnewwindow
 		w = makenewwindow(nil)
 		w.SetTag()

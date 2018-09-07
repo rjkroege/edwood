@@ -61,7 +61,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 		d = row.col[len(row.col)-1]
 		x = d.r.Min.X + 3*d.r.Dx()/5
 	}
-	/* look for column we'll land on */
+	// look for column we'll land on
 	var colidx int
 	for colidx, d = range row.col {
 		if x < d.r.Max.X {
@@ -119,7 +119,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	for i := 0; i < len(row.col); i++ {
 		c := row.col[i]
 		r1.Min.X = r1.Max.X
-		/* the test should not be necessary, but guarantee we don't lose a pixel */
+		// the test should not be necessary, but guarantee we don't lose a pixel
 		if i == len(row.col)-1 {
 			r1.Max.X = rect.Max.X
 		} else {
@@ -170,12 +170,12 @@ Found:
 		return
 	}
 	if (i > 0 && p.X < row.col[i-1].r.Min.X) || (i < len(row.col)-1 && p.X > c.r.Max.X) {
-		/* shuffle */
+		// shuffle
 		x = c.r.Min.X
 		row.Close(c, false)
-		if (row.Add(c, p.X) == nil) && /* whoops! */
-			(row.Add(c, x) == nil) && /* WHOOPS! */
-			(row.Add(c, -1) == nil) { /* shit! */
+		if (row.Add(c, p.X) == nil) && // whoops!
+			(row.Add(c, x) == nil) && // WHOOPS!
+			(row.Add(c, -1) == nil) { // shit!
 			row.Close(c, true)
 			return
 		}
@@ -230,11 +230,11 @@ Found:
 		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
 		return
 	}
-	if i == len(row.col) { /* extend last column right */
+	if i == len(row.col) { // extend last column right
 		c = row.col[i-1]
 		r.Min.X = c.r.Min.X
 		r.Max.X = row.r.Max.X
-	} else { /* extend next window left */
+	} else { // extend next window left
 		c = row.col[i]
 		r.Max.X = c.r.Max.X
 	}
@@ -287,7 +287,7 @@ func (row *Row) Type(r rune, p image.Point) *Text {
 		} else {
 			w.Lock('K')
 			w.Type(t, r)
-			/* Expand tag if necessary */
+			// Expand tag if necessary
 			if t.what == Tag {
 				t.w.tagsafe = false
 				if r == '\n' {
@@ -382,14 +382,14 @@ func (r *Row) Dump(file string) {
 			w.Commit(&w.tag)
 			t := &w.body
 
-			/* windows owned by others get special treatment */
+			// windows owned by others get special treatment
 			if w.nopen[QWevent] > 0 {
 				if w.dumpstr == "" {
 					continue
 				}
 			}
 
-			/* zeroxes of external windows are tossed */
+			// zeroxes of external windows are tossed
 			if len(t.file.text) > 1 {
 				for _, t1 := range t.file.text {
 					if w == t1.w {
