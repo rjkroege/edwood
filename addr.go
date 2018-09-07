@@ -19,9 +19,8 @@ func isaddrc(r rune) bool {
 	return false
 }
 
-//* quite hard: could be almost anything but white space, but we are a little conservative,
-//* aiming for regular expressions of alphanumerics and no white space
-
+// quite hard: could be almost anything but white space, but we are a little conservative,
+// aiming for regular expressions of alphanumerics and no white space
 func isregexc(r rune) bool {
 	if r == 0 {
 		return false

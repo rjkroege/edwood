@@ -495,10 +495,8 @@ func keyboardthread(display *draw.Display) {
 
 }
 
-/*
- * There is a race between process exiting and our finding out it was ever created.
- * This structure keeps a list of processes that have exited we haven't heard of.
- */
+// There is a race between process exiting and our finding out it was ever created.
+// This structure keeps a list of processes that have exited we haven't heard of.
 type Pid struct {
 	pid  int
 	msg  string

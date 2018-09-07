@@ -1040,11 +1040,9 @@ func (t *Text) Type(r rune) {
 				acmeerror("text.type cq1", nil)
 			}
 		}
-		/*
-		 * Change the tag before we add to ncache,
-		 * so that if the window body is resized the
-		 * commit will not find anything in ncache.
-		 */
+		// Change the tag before we add to ncache,
+		// so that if the window body is resized the
+		// commit will not find anything in ncache.
 		if u.what == Body && len(u.cache) == 0 {
 			u.needundo = true
 			t.w.SetTag()
@@ -1129,10 +1127,9 @@ func (t *Text) Select() {
 	)
 
 	selecttext = t
-	/*
-	 * To have double-clicking and chording, we double-click
-	 * immediately if it might make sense.
-	 */
+
+	// To have double-clicking and chording, we double-click
+	// immediately if it might make sense.
 	b := mouse.Buttons
 	q0 := t.q0
 	q1 := t.q1

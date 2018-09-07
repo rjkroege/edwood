@@ -13,19 +13,17 @@ const (
 	Wsequence = "warning: changes out of sequence\n"
 )
 
-/*
- * Elog is a log of changes made by editing commands.  Three reasons for this:
- * 1) We want addresses in commands to apply to old file, not file-in-change.
- * 2) It's difficult to track changes correctly as things move, e.g. ,x m$
- * 3) This gives an opportunity to optimize by merging adjacent changes.
- * It's a little bit like the Undo/Redo log in Files, but Point 3) argues for a
- * separate implementation.  To do this well, we use Replace as well as
- * Insert and Delete
- *
- * There is a significant assumption that the log has increasing q0s.
- * The log is then played back backwards to apply the changes to the text.
- * Out-of-order edits are warned about.
- */
+// Elog is a log of changes made by editing commands.  Three reasons for this:
+// 1) We want addresses in commands to apply to old file, not file-in-change.
+// 2) It's difficult to track changes correctly as things move, e.g. ,x m$
+// 3) This gives an opportunity to optimize by merging adjacent changes.
+// It's a little bit like the Undo/Redo log in Files, but Point 3) argues for a
+// separate implementation.  To do this well, we use Replace as well as
+// Insert and Delete
+//
+// There is a significant assumption that the log has increasing q0s.
+// The log is then played back backwards to apply the changes to the text.
+// Out-of-order edits are warned about.
 type Elog struct {
 	log    []ElogOperation
 	warned bool
