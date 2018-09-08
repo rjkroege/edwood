@@ -124,7 +124,7 @@ func (t *Text) whatstring() string {
 func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
 	// defer log.Println("--- Text Redraw end")
-	/* use no wider than 3-space tabs in a directory */
+	// use no wider than 3-space tabs in a directory
 	maxt := int(maxtab)
 	if t.what == Body {
 		if t.w.isdir {
@@ -209,7 +209,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 		return
 	}
 	mint = t.getfont().StringWidth("0")
-	/* go for narrower tabs if set more than 3 wide */
+	// go for narrower tabs if set more than 3 wide
 	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
@@ -286,7 +286,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	q1 := (0)
 	hasNulls := false
 	if d.IsDir() {
-		/* this is checked in get() but it's possible the file changed underfoot */
+		// this is checked in get() but it's possible the file changed underfoot
 		if len(t.file.text) > 1 {
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
 			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
@@ -351,11 +351,11 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	// For each clone, redraw
 	for _, u := range t.file.text {
 		if u != t { // Skip the one we just redrew
-			if u.org > u.file.b.Nc() { /* will be 0 because of reset(), but safety first */
+			if u.org > u.file.b.Nc() { // will be 0 because of reset(), but safety first
 				u.org = 0
 			}
 			u.Resize(u.all, true, false /* noredraw */)
-			u.Backnl(u.org, 0) /* go to beginning of line */
+			u.Backnl(u.org, 0) // go to beginning of line
 		}
 		u.SetSelect(q0, q0)
 	}
@@ -366,18 +366,18 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 }
 
 func (t *Text) Backnl(p int, n int) int {
-	/* look for start of this line if n==0 */
+	// look for start of this line if n==0
 	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	i := n
 	for i > 0 && p > 0 {
 		i--
-		p-- /* it's at a newline now; back over it */
+		p-- // it's at a newline now; back over it
 		if p == 0 {
 			break
 		}
-		/* at 128 chars, call it a line anyway */
+		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
 			j--
 			if t.ReadC(p-1) == '\n' {
@@ -454,7 +454,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 		if len(t.file.text) > 1 {
 			for _, u := range t.file.text {
 				if u != t {
-					u.w.dirty = true /* always a body */
+					u.w.dirty = true // always a body
 					u.Insert(q0, r, false)
 					u.SetSelect(u.q0, u.q1)
 					u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
@@ -568,7 +568,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		if len(t.file.text) > 1 {
 			for _, u := range t.file.text {
 				if u != t {
-					u.w.dirty = true /* always a body */
+					u.w.dirty = true // always a body
 					u.Delete(q0, q1, false)
 					u.SetSelect(u.q0, u.q1)
 					u.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
@@ -625,23 +625,23 @@ func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
 }
 
 func (t *Text) BsWidth(c rune) int {
-	/* there is known to be at least one character to erase */
-	if c == 0x08 { /* ^H: erase character */
+	// there is known to be at least one character to erase
+	if c == 0x08 { // ^H: erase character
 		return 1
 	}
 	q := t.q0
 	skipping := true
 	for q > 0 {
 		r := t.ReadC(q - 1)
-		if r == '\n' { /* eat at most one more character */
-			if q == t.q0 { /* eat the newline */
+		if r == '\n' { // eat at most one more character
+			if q == t.q0 { // eat the newline
 				q--
 			}
 			break
 		}
 		if c == 0x17 {
 			eq := isalnum(r)
-			if eq && skipping { /* found one; stop skipping */
+			if eq && skipping { // found one; stop skipping
 				skipping = false
 			} else {
 				if !eq && !skipping {
@@ -737,7 +737,7 @@ func (t *Text) Type(r rune) {
 	rp := []rune{r}
 
 	Tagdown := func() {
-		/* expand tag to show all text */
+		// expand tag to show all text
 		if !t.w.tagexpand {
 			t.w.tagexpand = true
 			t.w.Resize(t.w.r, false, true)
@@ -746,7 +746,7 @@ func (t *Text) Type(r rune) {
 	}
 
 	Tagup := func() {
-		/* shrink tag to single line */
+		// shrink tag to single line
 		if t.w.tagexpand {
 			t.w.tagexpand = false
 			t.w.taglines = 1
@@ -856,16 +856,16 @@ func (t *Text) Type(r rune) {
 			t.Show(t.file.b.Nc(), t.file.b.Nc(), false)
 		}
 		return
-	case 0x01: /* ^A: beginning of line */
+	case 0x01: // ^A: beginning of line
 		t.TypeCommit()
-		/* go to where ^U would erase, if not already at BOL */
+		// go to where ^U would erase, if not already at BOL
 		nnb = 0
 		if t.q0 > 0 && t.ReadC(t.q0-1) != '\n' {
 			nnb = t.BsWidth(0x15)
 		}
 		t.Show(t.q0-nnb, t.q0-nnb, true)
 		return
-	case 0x05: /* ^E: end of line */
+	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
 		for q0 < t.file.b.Nc() && t.ReadC(q0) != '\n' {
@@ -873,15 +873,15 @@ func (t *Text) Type(r rune) {
 		}
 		t.Show(q0, q0, true)
 		return
-	case draw.KeyCmd + 'c': /* %C: copy */
+	case draw.KeyCmd + 'c': // %C: copy
 		t.TypeCommit()
 		cut(t, t, nil, true, false, "")
 		return
-	case draw.KeyCmd + 'z': /* %Z: undo */
+	case draw.KeyCmd + 'z': // %Z: undo
 		t.TypeCommit()
 		undo(t, nil, nil, true, false, "")
 		return
-	case draw.KeyCmd + 'Z': /* %-shift-Z: redo */
+	case draw.KeyCmd + 'Z': // %-shift-Z: redo
 		t.TypeCommit()
 		undo(t, nil, nil, false, false, "")
 		return
@@ -891,9 +891,9 @@ func (t *Text) Type(r rune) {
 		seq++
 		t.file.Mark()
 	}
-	/* cut/paste must be done after the seq++/filemark */
+	// cut/paste must be done after the seq++/filemark
 	switch r {
-	case draw.KeyCmd + 'x': /* %X: cut */
+	case draw.KeyCmd + 'x': // %X: cut
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
@@ -903,7 +903,7 @@ func (t *Text) Type(r rune) {
 		t.Show(t.q0, t.q0, true)
 		t.iq1 = t.q0
 		return
-	case draw.KeyCmd + 'v': /* %V: paste */
+	case draw.KeyCmd + 'v': // %V: paste
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
@@ -925,7 +925,7 @@ func (t *Text) Type(r rune) {
 	t.Show(t.q0, t.q0, true)
 	switch r {
 	case 0x06:
-		fallthrough /* ^F: complete */
+		fallthrough // ^F: complete
 	case draw.KeyInsert:
 		t.TypeCommit()
 		rp = t.Complete()
@@ -933,7 +933,7 @@ func (t *Text) Type(r rune) {
 			return
 		}
 		nr = len(rp) // runestrlen(rp);
-		break        /* fall through to normal insertion case */
+		break        // fall through to normal insertion case
 	case 0x1B:
 		if t.eq0 != ^0 {
 			if t.eq0 <= t.q0 {
@@ -947,7 +947,7 @@ func (t *Text) Type(r rune) {
 		}
 		t.iq1 = t.q0
 		return
-	case 0x7F: /* Del: erase character right */
+	case 0x7F: // Del: erase character right
 		if t.q1 >= t.Nc()-1 {
 			return // End of file
 		}
@@ -958,17 +958,17 @@ func (t *Text) Type(r rune) {
 		}
 		return
 	case 0x08:
-		fallthrough /* ^H: erase character */
+		fallthrough // ^H: erase character
 	case 0x15:
-		fallthrough /* ^U: erase line */
-	case 0x17: /* ^W: erase word */
-		if t.q0 == 0 { /* nothing to erase */
+		fallthrough // ^U: erase line
+	case 0x17: // ^W: erase word
+		if t.q0 == 0 { // nothing to erase
 			return
 		}
 		nnb = t.BsWidth(r)
 		q1 = t.q0
 		q0 = q1 - nnb
-		/* if selection is at beginning of window, avoid deleting invisible text */
+		// if selection is at beginning of window, avoid deleting invisible text
 		if q0 < t.org {
 			q0 = t.org
 			nnb = q1 - q0
@@ -1011,8 +1011,8 @@ func (t *Text) Type(r rune) {
 		return
 	case '\n':
 		if t.w.autoindent {
-			/* find beginning of previous line using backspace code */
-			nnb = t.BsWidth(0x15)    /* ^U case */
+			// find beginning of previous line using backspace code
+			nnb = t.BsWidth(0x15)    // ^U case
 			rp = make([]rune, nnb+1) //runemalloc(nnb + 1);
 			nr = 0
 			rp[nr] = r
@@ -1028,7 +1028,7 @@ func (t *Text) Type(r rune) {
 			rp = rp[:nr]
 		}
 	}
-	/* otherwise ordinary character; just insert, typically in caches of all texts */
+	// otherwise ordinary character; just insert, typically in caches of all texts
 	for _, u := range t.file.text { // u is *Text
 		if u.eq0 == ^0 {
 			u.eq0 = t.q0
@@ -1146,7 +1146,7 @@ func (t *Text) Select() {
 		t.display.Flush()
 		x := mouse.Point.X
 		y := mouse.Point.Y
-		/* stay here until something interesting happens */
+		// stay here until something interesting happens
 		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
 			mousectl.Read()
@@ -1154,16 +1154,16 @@ func (t *Text) Select() {
 				break
 			}
 		}
-		mouse.Point.X = x /* in case we're calling frselect */
+		mouse.Point.X = x // in case we're calling frselect
 		mouse.Point.Y = y
-		q0 = t.q0 /* may have changed */
+		q0 = t.q0 // may have changed
 		q1 = t.q1
 		selectq = q0
 	}
 	if mouse.Buttons == b {
 		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
-		/* horrible botch: while asleep, may have lost selection altogether */
+		// horrible botch: while asleep, may have lost selection altogether
 		if selectq > t.file.b.Nc() {
 			selectq = t.org + sP0
 		}
@@ -1191,7 +1191,7 @@ func (t *Text) Select() {
 	}
 	t.SetSelect(q0, q1)
 	t.display.Flush()
-	state := None /* what we've done; undo when possible */
+	state := None // what we've done; undo when possible
 	for mouse.Buttons != 0 {
 		mouse.Msec = 0
 		b := mouse.Buttons
@@ -1257,7 +1257,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		t.SetSelect(q0, q1)
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
-	tsd = false /* do we call textscrdraw? */
+	tsd = false // do we call textscrdraw?
 	nc = t.file.b.Nc() + len(t.cache)
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
@@ -1283,7 +1283,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 			nl = t.fr.GetFrameFillStatus().Maxlines / 4
 		}
 		q = t.Backnl(q0, nl)
-		/* avoid going backwards if trying to go forwards - long lines! */
+		// avoid going backwards if trying to go forwards - long lines!
 		if !(q0 > t.org && q < t.org) {
 			t.SetOrigin(q, true)
 		}
@@ -1306,7 +1306,7 @@ func (t *Text) SetSelect(q0, q1 int) {
 
 	t.q0 = q0
 	t.q1 = q1
-	/* compute desired p0,p1 from q0,q1 */
+	// compute desired p0,p1 from q0,q1
 	p0 := q0 - t.org
 	p1 := q1 - t.org
 	ticked := true
@@ -1355,7 +1355,7 @@ func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
 	if (buts & 4) != 0 {
 		return q0, q1, nil, false
 	}
-	if (buts & 1) != 0 { /* pick up argument */
+	if (buts & 1) != 0 { // pick up argument
 		return q0, q1, argtext, true
 	}
 	return q0, q1, nil, true
@@ -1376,7 +1376,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	for i, l := range left {
 		q := inq0
 		r := right[i]
-		/* try matching character to left, looking right */
+		// try matching character to left, looking right
 		if q == 0 {
 			c = '\n'
 		} else {
@@ -1392,7 +1392,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			}
 			return
 		}
-		/* try matching character to right, looking left */
+		// try matching character to right, looking left
 		if q == t.file.b.Nc() {
 			c = '\n'
 		} else {
@@ -1413,12 +1413,12 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			return
 		}
 	}
-	/* try filling out word to right */
+	// try filling out word to right
 	q1 = inq0
 	for q1 < t.file.b.Nc() && isalnum(t.ReadC(q1)) {
 		q1++
 	}
-	/* try filling out word to left */
+	// try filling out word to left
 	for q0 > 0 && isalnum(t.ReadC(q0-1)) {
 		q0--
 	}
@@ -1562,18 +1562,18 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 }
 
 func (t *Text) BackNL(p, n int) int {
-	/* look for start of this line if n==0 */
+	// look for start of this line if n==0
 	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	i := n
 	for i > 0 && p > 0 {
 		i--
-		p-- /* it's at a newline now; back over it */
+		p-- // it's at a newline now; back over it
 		if p == 0 {
 			break
 		}
-		/* at 128 chars, call it a line anyway */
+		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
 			if t.ReadC(p-1) == '\n' {
 				break
@@ -1636,7 +1636,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 func (t *Text) Reset() {
 	t.file.seq = 0
 	t.eq0 = ^0
-	/* do t.delete(0, t.nc, true) without building backup stuff */
+	// do t.delete(0, t.nc, true) without building backup stuff
 	t.SetSelect(t.org, t.org)
 	t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 	t.org = 0

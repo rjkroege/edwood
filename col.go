@@ -185,7 +185,7 @@ func (c *Column) Close(w *Window, dofree bool) {
 		i            int
 		didmouse, up bool
 	)
-	/* w is locked */
+	// w is locked
 	if !c.safe {
 		c.Grow(w, 1)
 	}
@@ -213,11 +213,11 @@ Found:
 		return
 	}
 	up = false
-	if i == len(c.w) { /* extend last window down */
+	if i == len(c.w) { // extend last window down
 		w = c.w[i-1]
 		r.Min.Y = w.r.Min.Y
 		r.Max.Y = c.r.Max.Y
-	} else { /* extend next window up */
+	} else { // extend next window up
 		up = true
 		w = c.w[i]
 		r.Max.Y = w.r.Max.Y

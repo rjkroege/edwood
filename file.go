@@ -119,7 +119,7 @@ func (f *File) Insert(p0 int, s []rune) {
 
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
-	/* undo an insertion by deleting */
+	// undo an insertion by deleting
 	u.t = Delete
 	u.mod = f.mod
 	u.seq = f.seq
@@ -142,7 +142,7 @@ func (f *File) Delete(p0, p1 int) {
 }
 
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
-	/* undo a deletion by inserting */
+	// undo a deletion by inserting
 	var u Undo
 	u.t = Insert
 	u.mod = f.mod
@@ -164,11 +164,11 @@ func (f *File) SetName(name string) {
 
 func (f *File) UnsetName(delta *[]*Undo) {
 	var u Undo
-	/* undo a file name change by restoring old name */
+	// undo a file name change by restoring old name
 	u.t = Filename
 	u.mod = f.mod
 	u.seq = f.seq
-	u.p0 = 0 /* unused */
+	u.p0 = 0 // unused
 	u.n = len(f.name)
 	u.buf = []rune(f.name)
 	(*delta) = append(*delta, &u)
@@ -235,15 +235,15 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 		delta, epsilon *[]*Undo
 	)
 	if isundo {
-		/* undo; reverse delta onto epsilon, seq decreases */
+		// undo; reverse delta onto epsilon, seq decreases
 		delta = &f.delta
 		epsilon = &f.epsilon
 		stop = f.seq
 	} else {
-		/* redo; reverse epsilon onto delta, seq increases */
+		// redo; reverse epsilon onto delta, seq increases
 		delta = &f.epsilon
 		epsilon = &f.delta
-		stop = 0 /* don't know yet */
+		stop = 0 // don't know yet
 	}
 
 	for len(*delta) > 0 {

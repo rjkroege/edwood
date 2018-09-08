@@ -280,7 +280,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 			rect.Max.Y += f.defaultfontheight
 
 			f.background.Draw(rect, f.background, nil, pts[npts].pt0)
-			/* clear bit hanging off right */
+			// clear bit hanging off right
 			if npts == 0 && pt.Y > pt0.Y {
 				rect.Min = opt0
 				rect.Max = opt0
