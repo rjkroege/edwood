@@ -267,12 +267,10 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	var (
 		q0, q1, n, c int
 	)
-	/*
-	 * if not executing a mouse chord (et != t) and snarfing (dosnarf)
-	 * and executed Cut or Snarf in window tag (et.w != nil),
-	 * then use the window body selection or the tag selection
-	 * or do nothing at all.
-	 */
+	// if not executing a mouse chord (et != t) and snarfing (dosnarf)
+	// and executed Cut or Snarf in window tag (et.w != nil),
+	// then use the window body selection or the tag selection
+	// or do nothing at all.
 	if et != t && dosnarf && et.w != nil {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
@@ -664,11 +662,9 @@ func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 		// nothing to undo
 		return
 	}
-	/*
-	 * Undo the executing window first. Its display will update. other windows
-	 * in the same file will not call show() and jump to a different location in the file.
-	 * Simultaneous changes to other files will be chaotic, however.
-	 */
+	// Undo the executing window first. Its display will update. other windows
+	// in the same file will not call show() and jump to a different location in the file.
+	// Simultaneous changes to other files will be chaotic, however.
 	et.w.Undo(flag1)
 	for _, c := range row.col {
 		for _, w := range c.w {
@@ -901,8 +897,8 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 	Hard := func() {
 		Untested()
-		//* ugly: set path = (. $cputype /bin)
-		//* should honor $path if unusual.
+		// ugly: set path = (. $cputype /bin)
+		// should honor $path if unusual.
 		/* TODO(flux): This looksl ike plan9 magic
 		if cputype {
 			n = 0;

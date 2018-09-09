@@ -569,10 +569,10 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 			return false
 		}
 	}
-	//* See if it's a file name in <>, and turn that into an include
-	//* file name if so.  Should probably do it for "" too, but that's not
-	//* restrictive enough syntax and checking for a #include earlier on the
-	//* line would be silly.
+	// See if it's a file name in <>, and turn that into an include
+	// file name if so.  Should probably do it for "" too, but that's not
+	// restrictive enough syntax and checking for a #include earlier on the
+	// line would be silly.
 	// TODO(flux) This is even crazier when working in Go - is this even
 	// a feature we want to support?
 	if q0 > 0 && t.ReadC(q0-1) == '<' && q1 < t.file.b.Nc() && t.ReadC(q1) == '>' {
@@ -707,14 +707,14 @@ func openfile(t *Text, e *Expand) *Window {
 	} else {
 		w = lookfile(e.name)
 		if w == nil && e.name[0] != '/' {
-			//* Unrooted path in new window.
-			// * This can happen if we type a pwd-relative path
-			//* in the topmost tag or the column tags.
-			//* Most of the time plumber takes care of these,
-			// * but plumber might not be running or might not
-			// * be configured to accept plumbed directories.
-			// * Make the name a full path, just like we would if
-			// * opening via the plumber.
+			// Unrooted path in new window.
+			// This can happen if we type a pwd-relative path
+			// in the topmost tag or the column tags.
+			// Most of the time plumber takes care of these,
+			// but plumber might not be running or might not
+			// be configured to accept plumbed directories.
+			// Make the name a full path, just like we would if
+			// opening via the plumber.
 			rp := fmt.Sprintf("%s/%s", wdir, e.name)
 			rs = string(cleanrname([]rune(rp)))
 			e.name = rs

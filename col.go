@@ -91,9 +91,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		if windex < c.nw() {
 			windex++
 		}
-		/*
-		 * if landing window (v) is too small, grow it first.
-		 */
+		//
+		// if landing window (v) is too small, grow it first.
+		//
 		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
 		ffs := v.body.fr.GetFrameFillStatus()
@@ -106,9 +106,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			c.Grow(v, 1)
 		}
 
-		/*
-		 * figure out where to split v to make room for w
-		 */
+		//
+		// figure out where to split v to make room for w
+		//
 
 		// new window stops where next window begins
 		var ymax int
@@ -144,9 +144,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		if c.display != nil {
 			c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
 		}
-		/*
-		 * leave r with w's coordinates
-		 */
+		//
+		// leave r with w's coordinates
+		//
 		r.Min.Y = r1.Max.Y
 	}
 	if w == nil {

@@ -95,27 +95,25 @@ func xfidlogflush(x *Xfid) {
 	}
 }
 
-/*
- * add a log entry for op on w.
- * expected calls:
- *
- * op == "new" for each new window
- *	- caller of coladd or makenewwindow responsible for calling
- *		xfidlog after setting window name
- *	- exception: zerox
- *
- * op == "zerox" for new window created via zerox
- *	- called from zeroxx
- *
- * op == "get" for Get executed on window
- *	- called from get
- *
- * op == "put" for Put executed on window
- *	- called from put
- *
- * op == "del" for deleted window
- *	- called from winclose
- */
+// add a log entry for op on w.
+// expected calls:
+//
+// op == "new" for each new window
+// - caller of coladd or makenewwindow responsible for calling
+// 	xfidlog after setting window name
+// - exception: zerox
+//
+// op == "zerox" for new window created via zerox
+// - called from zeroxx
+//
+// op == "get" for Get executed on window
+// - called from get
+//
+// op == "put" for Put executed on window
+// - called from put
+//
+// op == "del" for deleted window
+// - called from winclose
 func xfidlog(w *Window, op string) {
 	eventlog.lk.Lock()
 	defer eventlog.lk.Unlock()

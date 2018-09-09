@@ -68,11 +68,9 @@ func bytetorune(s []byte) []rune {
 
 // TODO(flux) The "correct" answer here is return unicode.IsNumber(c) || unicode.IsLetter(c)
 func isalnum(c rune) bool {
-	/*
-	 * Hard to get absolutely right.  Use what we know about ASCII
-	 * and assume anything above the Latin control characters is
-	 * potentially an alphanumeric.
-	 */
+	// Hard to get absolutely right.  Use what we know about ASCII
+	// and assume anything above the Latin control characters is
+	// potentially an alphanumeric.
 	if c <= ' ' {
 		return false
 	}
@@ -186,11 +184,9 @@ func errorwin(md *MntDir, owner int) *Window {
 	return w
 }
 
-/*
- * Incoming window should be locked.
- * It will be unlocked and returned window
- * will be locked in its place.
- */
+// Incoming window should be locked.
+// It will be unlocked and returned window
+// will be locked in its place.
 func errorwinforwin(w *Window) *Window {
 	var (
 		owner int
@@ -222,9 +218,7 @@ func errorwinforwin(w *Window) *Window {
 	return w
 }
 
-/*
- * Heuristic city.
- */
+// Heuristic city.
 func makenewwindow(t *Text) *Window {
 	var (
 		c               *Column
@@ -308,14 +302,13 @@ func flushwarnings() {
 			w.owner = 'E'
 		}
 		w.Commit(t)
-		/*
-		 * Most commands don't generate much output. For instance,
-		 * Edit ,>cat goes through /dev/cons and is already in blocks
-		 * because of the i/o system, but a few can.  Edit ,p will
-		 * put the entire result into a single hunk.  So it's worth doing
-		 * this in blocks (and putting the text in a buffer in the first
-		 * place), to avoid a big memory footprint.
-		 */
+
+		// Most commands don't generate much output. For instance,
+		// Edit ,>cat goes through /dev/cons and is already in blocks
+		// because of the i/o system, but a few can.  Edit ,p will
+		// put the entire result into a single hunk.  So it's worth doing
+		// this in blocks (and putting the text in a buffer in the first
+		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)
 		for n = 0; n < warn.buf.Nc(); n += nr {

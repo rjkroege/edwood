@@ -123,12 +123,12 @@ func xfidopen(x *Xfid) {
 			}
 			w.nopen[q]++
 		case QWrdsel:
-			//* Use a temporary file.
-			//* A pipe would be the obvious, but we can't afford the
-			//* broken pipe notification.  Using the code to read QWbody
-			//* is n², which should probably also be fixed.  Even then,
-			//* though, we'd need to squirrel away the data in case it's
-			//* modified during the operation, e.g. by |sort
+			// Use a temporary file.
+			// A pipe would be the obvious, but we can't afford the
+			// broken pipe notification.  Using the code to read QWbody
+			// is n², which should probably also be fixed.  Even then,
+			// though, we'd need to squirrel away the data in case it's
+			// modified during the operation, e.g. by |sort
 			if w.rdselfd != nil {
 				w.Unlock()
 				respond(x, &fc, Einuse)
@@ -778,18 +778,16 @@ func xfideventwrite(x *Xfid, w *Window) {
 		num    int64
 	)
 	err = nil
-	/*
-	   The mes-
-	                  sages have a fixed format: a character indicating the
-	                  origin or cause of the action, a character indicating
-	                  the type of the action, four free-format blank-
-	                  terminated decimal numbers, optional text, and a new-
-	                  line.  The first and second numbers are the character
-	                  addresses of the action, the third is a flag, and the
-	                  final is a count of the characters in the optional
-	                  text, which may itself contain newlines.
-	   		%c%c%d %d %d %d %s\n
-	*/
+
+	// The messages have a fixed format: a character indicating the
+	// origin or cause of the action, a character indicating
+	// the type of the action, four free-format blank-terminated
+	// decimal numbers, optional text, and a newline.
+	// The first and second numbers are the character
+	// addresses of the action, the third is a flag, and the
+	// final is a count of the characters in the optional
+	// text, which may itself contain newlines.
+	// %c%c%d %d %d %d %s\n
 	lines := strings.Split(string(x.fcall.Data), "\n")
 	for _, events := range lines {
 		if events == "" {
