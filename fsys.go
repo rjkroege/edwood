@@ -114,7 +114,7 @@ func fsysproc() {
 	for {
 		fc, err := plan9.ReadFcall(sfd)
 		if err != nil || fc == nil {
-			acmeerror("fsysproc: ", err)
+			acmeerror("fsysproc", err)
 		}
 		if x == nil {
 			cxfidalloc <- nil

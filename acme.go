@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"9fans.net/go/draw"
@@ -175,7 +174,8 @@ func main() {
 	go newwindowthread()
 	go xfidallocthread(display)
 
-	signal.Notify(csignal /*, hangupsignals...*/)
+	signal.Ignore(ignoreSignals...)
+	signal.Notify(csignal, hangupSignals...)
 	for {
 		select {
 		case <-cexit:
@@ -665,29 +665,17 @@ func killprocs() {
 
 var dumping bool
 
-var hangupsignals = []os.Signal{
-	os.Signal(syscall.SIGINT),
-	os.Signal(syscall.SIGHUP),
-	os.Signal(syscall.SIGQUIT),
-	os.Signal(syscall.SIGSTOP),
-}
-
 // TODO(rjk): I'm not sure that this is the right thing to do? It fails to
 // handle the situation that is most interesting: trying to save the state
 // if we would otherwise crash. It's also conceivably racy.
 func shutdown(s os.Signal) {
-	for _, sig := range hangupsignals {
-		if sig == s {
-			if !dumping && os.Getpid() == mainpid {
-				killprocs()
-				dumping = true
-				row.Dump("")
-			} else {
-				os.Exit(0)
-			}
-		}
+	if !dumping && os.Getpid() == mainpid {
+		killprocs()
+		dumping = true
+		row.Dump("")
+	} else {
+		os.Exit(0)
 	}
-	return
 }
 
 type errorWriter struct{}
