@@ -36,7 +36,7 @@ func timefmt( /*Fmt* */ ) int {
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
 var bartflagflag = flag.Bool("b", false, "Bart's Flag")
 var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
-var varfontflag = flag.String("f", "/lib/font/bit/lucsans/euro.8.font", "Variable Width Font")
+var varfontflag = flag.String("f", defaultVarFont, "Variable Width Font")
 var fixedfontflag = flag.String("F", "/lib/font/bit/lucm/unicode.9.font", "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", "", "Mountpoint")
