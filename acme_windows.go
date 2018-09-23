@@ -7,7 +7,10 @@ import (
 	"syscall"
 )
 
-const defaultVarFont = "/lib/font/bit/lucsans/euro.8.font"
+const (
+	defaultVarFont = "/lib/font/bit/lucsans/euro.8.font"
+	defaultMtpt    = ""
+)
 
 var ignoreSignals = []os.Signal{
 	syscall.SIGPIPE,

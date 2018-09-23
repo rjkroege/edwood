@@ -452,3 +452,9 @@ func (tfs tFsys) Write(file, s string) {
 	}
 	fid.Close()
 }
+
+func TestGetuser(t *testing.T) {
+	if getuser() == "" {
+		t.Errorf("Didn't get a username")
+	}
+}
