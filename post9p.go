@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"os/user"
 	"strings"
+
+	"9fans.net/go/plan9/client"
 )
 
 var chattyfuse bool
@@ -20,11 +22,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 	if name != "" {
 		addr := name
 		if !strings.Contains(name, "!") {
-			ns := getns()
-			if ns == "" {
-				return -1
-			}
-			addr = fmt.Sprintf("unix!%s/%s", ns, name)
+			addr = fmt.Sprintf("unix!%s/%s", client.Namespace(), name)
 		}
 		if addr == "" {
 			return -1
@@ -108,55 +106,10 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 	return 0
 }
 
-func getns() string {
-	ns := os.Getenv("NAMESPACE")
-	if ns == "" {
-		var err error
-		ns, err = nsfromdisplay()
-		if err != nil {
-			acmeerror(ns, err)
-		}
-	}
-	if ns == "" {
-		panic("$NAMESPACE not set")
-	}
-	return ns
-}
-
 func getuser() string {
 	user, err := user.Current()
 	if err != nil {
 		return "Wile E. Coyote"
 	}
 	return user.Username
-}
-
-func nsfromdisplay() (ns string, err error) {
-	disp := os.Getenv("DISPLAY")
-	if disp == "" {
-		disp = ":0.0"
-	}
-
-	disp = strings.TrimSuffix(disp, ".0")
-	disp = strings.Replace(disp, "/", "_", -1)
-	ns = fmt.Sprintf("/tmp/ns.%s.%s", getuser(), disp)
-	err = os.Mkdir(ns, 0700)
-	if err == nil {
-		return ns, nil
-	}
-
-	// See if it's already there
-	f, err := os.Open(ns)
-	if err != nil {
-		return "", fmt.Errorf("Can't open namespace %s: %v", ns, err)
-	}
-	defer f.Close()
-	s, err := f.Stat()
-	if err != nil {
-		return "", fmt.Errorf("Can't stat namespace %s: %v", ns, err)
-	}
-	if !s.IsDir() || s.Mode()&0777 != 0700 { // || !isme(d->uid)
-		return "", fmt.Errorf("Bad namespace %s: %v", ns, err)
-	}
-	return ns, nil
 }
