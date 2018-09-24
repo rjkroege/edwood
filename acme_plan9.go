@@ -1,4 +1,4 @@
-// +build windows
+// +build plan9
 
 package main
 
@@ -7,8 +7,10 @@ import (
 	"syscall"
 )
 
+const defaultVarFont = "/lib/font/bit/lucidasans/euro.8.font"
+
 var ignoreSignals = []os.Signal{
-	syscall.SIGPIPE,
+	syscall.Note("sys: write on closed pipe"),
 }
 
 var hangupSignals = []os.Signal{

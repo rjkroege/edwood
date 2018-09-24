@@ -1,4 +1,4 @@
-// +build darwin dragonfly freebsd linux netbsd openbsd solaris
+// +build windows
 
 package main
 
@@ -7,11 +7,10 @@ import (
 	"syscall"
 )
 
+const defaultVarFont = "/lib/font/bit/lucsans/euro.8.font"
+
 var ignoreSignals = []os.Signal{
 	syscall.SIGPIPE,
-	syscall.SIGTTIN,
-	syscall.SIGTTOU,
-	syscall.SIGTSTP,
 }
 
 var hangupSignals = []os.Signal{
