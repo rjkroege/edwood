@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -274,8 +275,8 @@ func ismtpt(filename string) bool {
 	if mtpt == "" {
 		return false
 	}
-
-	return strings.HasPrefix(filename, mtpt) && (mtpt[len(mtpt)-1] == '/' || filename[len(mtpt)] == '/' || len(filename) == len(mtpt))
+	s := path.Clean(filename)
+	return strings.HasPrefix(s, mtpt) && (mtpt[len(mtpt)-1] == '/' || len(s) == len(mtpt) || s[len(mtpt)] == '/')
 }
 
 func mousethread(display *draw.Display) {
