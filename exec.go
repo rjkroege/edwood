@@ -853,16 +853,6 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 	cpid = nil
 }
 
-// Fsopenfd opens a plan9 Fid.
-func fsopenfd(fsys *client.Fsys, path string, mode uint8) *client.Fid {
-	fid, err := fsys.Open(path, mode)
-	if err != nil {
-		warning(nil, "Failed to open %v: %v", path, err)
-		return nil
-	}
-	return fid
-}
-
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
@@ -987,23 +977,11 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			os.Setenv("%", filename)
 			os.Setenv("samfile", filename)
 		}
-		c.md = fsysmount(dir, incl)
-		if c.md == nil {
-			fmt.Fprintf(os.Stderr, "child: can't allocate mntdir\n")
-			return
-		}
-		conn, err := client.DialService("acme")
+		var fs *client.Fsys
+		var err error
+		c.md, fs, err = fsysmount(dir, incl)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "child: can't connect to acme: %v\n", err)
-			fsysdelid(c.md)
-			c.md = nil
-			return
-		}
-		fs, err := conn.Attach(nil, getuser(), fmt.Sprintf("%d", c.md.id))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "child: can't attach to acme: %v\n", err)
-			fsysdelid(c.md)
-			c.md = nil
+			fmt.Fprintf(os.Stderr, "fsysmount: %v", err)
 			return
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {

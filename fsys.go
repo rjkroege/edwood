@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"sort"
 	"strconv"
 	"sync"
@@ -98,7 +99,10 @@ var (
 
 func fsysinit() {
 	initfcall()
-	reader, writer := net.Pipe()
+	reader, writer, err := newPipe()
+	if err != nil {
+		acmeerror("failed to create pipe", err)
+	}
 	if post9pservice(reader, "acme", mtpt) < 0 {
 		acmeerror("can't post service", nil)
 	}
@@ -192,11 +196,6 @@ func fsysdelid(idm *MntDir) {
 	}
 
 	cerr <- fmt.Errorf("fsysdelid: can't find id %d", idm.id)
-}
-
-// Called only in exec.c:/^run(), from a different FD group
-func fsysmount(dir string, incl []string) *MntDir {
-	return fsysaddid(dir, incl)
 }
 
 func fsysclose() {
@@ -641,4 +640,12 @@ func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	b, _ := d.Bytes()
 	copy(buf, b)
 	return len(b)
+}
+
+func getuser() string {
+	user, err := user.Current()
+	if err != nil {
+		return "Wile E. Coyote"
+	}
+	return user.Username
 }
