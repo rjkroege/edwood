@@ -105,7 +105,6 @@ func (row *Row) Add(c *Column, x int) *Column {
 
 func (r *Row) Resize(rect image.Rectangle) {
 	or := row.r
-	deltax := rect.Min.X - or.Min.X
 	row.r = rect
 	r1 := rect
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, r.display).Height
@@ -123,7 +122,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 		if i == len(row.col)-1 {
 			r1.Max.X = rect.Max.X
 		} else {
-			r1.Max.X = (c.r.Max.X-or.Min.X)*rect.Dx()/or.Dx() + deltax
+			r1.Max.X = rect.Min.X + (c.r.Max.X-or.Min.X)*rect.Dx()/or.Dx()
 		}
 		if i > 0 {
 			r2 := r1
