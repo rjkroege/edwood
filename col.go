@@ -22,10 +22,16 @@ type Column struct {
 	safe    bool
 }
 
+// nw returns the number of Window pointers in Column c.
+// TODO(rjk): Consider that this helper is not particularly useful. len is handy.
 func (c *Column) nw() int {
 	return len(c.w)
 }
 
+// Init initializes a new Column object filling image r and drawn to
+// display dis.
+// TODO(rjk): Why does this need to handle the case where c is nil?
+// TODO(rjk): Do we (re)initialize a Column object? It would seem likely.
 func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	if c == nil {
 		c = &Column{}
@@ -42,6 +48,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
 
+	// TODO(rjk) better code: making tag should be split out.
 	tagfile := NewFile("")
 	c.tag.file = tagfile.AddText(&c.tag)
 	c.tag.Init(r1, tagfont, tagcolors, c.display)
@@ -55,12 +62,15 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	c.tag.SetSelect(c.tag.file.b.Nc(), c.tag.file.b.Nc())
 	if c.display != nil {
 		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
+		// perf.
 		c.display.Flush()
 	}
 	c.safe = true
 	return c
 }
 
+// TODO(rjk): Remove the dead code.
 /*
 func (c *Column) AddFile(f *File) *Window {
 	w := NewWindow(f)
@@ -68,6 +78,22 @@ func (c *Column) AddFile(f *File) *Window {
 }
 */
 
+// findWindowContainingY finds the window containing vertical offset y
+// and returns the Window and its index.
+// TODO(rjk): It's almost certain that we repeat this code somewhere else.
+// possibly multiple times.
+// TODO(rjk): Get rid of the index requirement?
+func (c *Column) findWindowContainingY(y int) (int, *Window) {
+	for i, v := range c.w {
+		if y < v.r.Max.Y {
+			return i, v
+		}
+	}
+	return len(c.w), nil
+}
+
+// Add adds a window to the Column.
+// TODO(rjk): what are the args?
 func (c *Column) Add(w, clone *Window, y int) *Window {
 	// Figure out new window placement
 	var v *Window
@@ -79,13 +105,17 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		y = v.body.fr.Rect().Min.Y + v.body.fr.Rect().Dx()/2
 	}
 	// Which window will we land on?
+// 	var windex int
+// 	for windex = 0; windex < len(c.w); windex++ {
+// 		v = c.w[windex]
+// 		if y < v.r.Max.Y {
+// 			break
+// 		}
+// 	}
 	var windex int
-	for windex = 0; windex < len(c.w); windex++ {
-		v = c.w[windex]
-		if y < v.r.Max.Y {
-			break
-		}
-	}
+	windex, v = c.findWindowContainingY(y)
+
+ 	// TODO(rjk): be polite. :-)
 	buggered := false // historical variable name
 	if c.nw() > 0 {
 		if windex < c.nw() {
