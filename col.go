@@ -333,6 +333,7 @@ func (c *Column) Sort() {
 	}
 }
 
+// Grow Window w with a mode determined by mouse button but.
 func (c *Column) Grow(w *Window, but int) {
 	//var nl, ny *int
 
@@ -375,16 +376,20 @@ func (c *Column) Grow(w *Window, but int) {
 		c.safe = false
 		return
 	}
+
+	// Observation: before I can support lines of arbitrary height, I need to change
+	// Frame to paint partial lines of text.
+	// TODO(rjk): Rewrite this logic for computing heights when font heights vary.
 	// store old #lines for each window
 	onl := w.body.fr.GetFrameFillStatus().Maxlines
 	nl := make([]int, c.nw())
-	ny := make([]int, c.nw())
 	tot := 0
 	for j := 0; j < c.nw(); j++ {
 		l := c.w[j].taglines - 1 + c.w[j].body.fr.GetFrameFillStatus().Maxlines // TODO(flux): This taglines subtraction (for scrolling tags) assumes tags take the same number of pixels height as the body lines.  This is clearly false.
 		nl[j] = l
 		tot += l
 	}
+
 	// approximate new #lines for this window
 	if but == 2 { // as big as can be
 		for i := range nl {
@@ -420,11 +425,34 @@ func (c *Column) Grow(w *Window, but int) {
 				dnl -= l
 			}
 		}
+		
+		// This is an egregious hack. It's an experiment for #52
+		// 0 lines is not being handled correctly elsewhere so try to 
+		// find the largest and use it to force the 0s to 1s.
+		// 1. find index with max
+		maxindex := -1
+		maxval := 0
+		for i, nlv := range nl {
+			if nlv > maxval {
+				maxindex = i
+				maxval = nlv
+			}
+		}
+
+		for i, _ := range nl {
+			if nl[i] == 0 {
+				nl[i] ++
+				nl[maxindex] --
+			}
+		}
 	}
 Pack:
+	ny := make([]int, c.nw())
 	// pack everyone above
 	y1 := cr.Min.Y
 	var v *Window
+
+	// Resize windows [0, target window)
 	for j := 0; j < windex; j++ {
 		v = c.w[j]
 		r := v.r
