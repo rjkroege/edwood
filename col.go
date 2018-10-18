@@ -115,13 +115,16 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		if windex < c.nw() {
 			windex++
 		}
-		//
-		// if landing window (v) is too small, grow it first.
-		//
+
+		// if landing window (v) is too small, grow it first (landing window
+		// will be split to accomodate the newly added window.)
+		// minht is the height of the first line of the tag and the border thickness
+		// TODO(rjk): Make minht a method of the tag to simplify variable height fonts.
 		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
-		ffs := v.body.fr.GetFrameFillStatus()
-		for !c.safe || ffs.Maxlines < 3 || v.body.all.Dy() <= minht {
+	//	ffs := v.body.fr.GetFrameFillStatus()
+		// TODO(rjk): Why don't we recompute the ffs? hypothesis: we need to remeasure?
+		for !c.safe ||  v.body.fr.GetFrameFillStatus().Maxlines < 3 || v.body.all.Dy() <= minht {
 			j++
 			if j > 10 {
 				buggered = true // Too many windows in column
@@ -130,10 +133,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			c.Grow(v, 1)
 		}
 
-		//
 		// figure out where to split v to make room for w
-		//
-
 		// new window stops where next window begins
 		var ymax int
 		if windex < c.nw() {
@@ -161,7 +161,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		}
 		r1 := r
 		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
-		ffs = v.body.fr.GetFrameFillStatus()
+		ffs := v.body.fr.GetFrameFillStatus()
 		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
