@@ -104,14 +104,8 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		v = c.w[c.nw()-1]
 		y = v.body.fr.Rect().Min.Y + v.body.fr.Rect().Dx()/2
 	}
+
 	// Which window will we land on?
-// 	var windex int
-// 	for windex = 0; windex < len(c.w); windex++ {
-// 		v = c.w[windex]
-// 		if y < v.r.Max.Y {
-// 			break
-// 		}
-// 	}
 	var windex int
 	windex, v = c.findWindowContainingY(y)
 
