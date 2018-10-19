@@ -22,10 +22,16 @@ type Column struct {
 	safe    bool
 }
 
+// nw returns the number of Window pointers in Column c.
+// TODO(rjk): Consider that this helper is not particularly useful. len is handy.
 func (c *Column) nw() int {
 	return len(c.w)
 }
 
+// Init initializes a new Column object filling image r and drawn to
+// display dis.
+// TODO(rjk): Why does this need to handle the case where c is nil?
+// TODO(rjk): Do we (re)initialize a Column object? It would seem likely.
 func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	if c == nil {
 		c = &Column{}
@@ -42,6 +48,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
 
+	// TODO(rjk) better code: making tag should be split out.
 	tagfile := NewFile("")
 	c.tag.file = tagfile.AddText(&c.tag)
 	c.tag.Init(r1, tagfont, tagcolors, c.display)
@@ -55,12 +62,15 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	c.tag.SetSelect(c.tag.file.b.Nc(), c.tag.file.b.Nc())
 	if c.display != nil {
 		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
+		// perf.
 		c.display.Flush()
 	}
 	c.safe = true
 	return c
 }
 
+// TODO(rjk): Remove the dead code.
 /*
 func (c *Column) AddFile(f *File) *Window {
 	w := NewWindow(f)
@@ -68,6 +78,22 @@ func (c *Column) AddFile(f *File) *Window {
 }
 */
 
+// findWindowContainingY finds the window containing vertical offset y
+// and returns the Window and its index.
+// TODO(rjk): It's almost certain that we repeat this code somewhere else.
+// possibly multiple times.
+// TODO(rjk): Get rid of the index requirement?
+func (c *Column) findWindowContainingY(y int) (int, *Window) {
+	for i, v := range c.w {
+		if y < v.r.Max.Y {
+			return i, v
+		}
+	}
+	return len(c.w), nil
+}
+
+// Add adds a window to the Column.
+// TODO(rjk): what are the args?
 func (c *Column) Add(w, clone *Window, y int) *Window {
 	// Figure out new window placement
 	var v *Window
@@ -78,26 +104,27 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		v = c.w[c.nw()-1]
 		y = v.body.fr.Rect().Min.Y + v.body.fr.Rect().Dx()/2
 	}
+
 	// Which window will we land on?
 	var windex int
-	for windex = 0; windex < len(c.w); windex++ {
-		v = c.w[windex]
-		if y < v.r.Max.Y {
-			break
-		}
-	}
+	windex, v = c.findWindowContainingY(y)
+
+	// TODO(rjk): be polite. :-)
 	buggered := false // historical variable name
 	if c.nw() > 0 {
 		if windex < c.nw() {
 			windex++
 		}
-		//
-		// if landing window (v) is too small, grow it first.
-		//
+
+		// if landing window (v) is too small, grow it first (landing window
+		// will be split to accomodate the newly added window.)
+		// minht is the height of the first line of the tag and the border thickness
+		// TODO(rjk): Make minht a method of the tag to simplify variable height fonts.
 		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
-		ffs := v.body.fr.GetFrameFillStatus()
-		for !c.safe || ffs.Maxlines < 3 || v.body.all.Dy() <= minht {
+		// Code inspection suggests that the frame fill status may have altered
+		// after resizing.
+		for !c.safe || v.body.fr.GetFrameFillStatus().Maxlines < 3 || v.body.all.Dy() <= minht {
 			j++
 			if j > 10 {
 				buggered = true // Too many windows in column
@@ -106,10 +133,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			c.Grow(v, 1)
 		}
 
-		//
 		// figure out where to split v to make room for w
-		//
-
 		// new window stops where next window begins
 		var ymax int
 		if windex < c.nw() {
@@ -137,7 +161,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		}
 		r1 := r
 		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
-		ffs = v.body.fr.GetFrameFillStatus()
+		ffs := v.body.fr.GetFrameFillStatus()
 		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
@@ -309,6 +333,7 @@ func (c *Column) Sort() {
 	}
 }
 
+// Grow Window w with a mode determined by mouse button but.
 func (c *Column) Grow(w *Window, but int) {
 	//var nl, ny *int
 
@@ -351,16 +376,20 @@ func (c *Column) Grow(w *Window, but int) {
 		c.safe = false
 		return
 	}
+
+	// Observation: before I can support lines of arbitrary height, I need to change
+	// Frame to paint partial lines of text.
+	// TODO(rjk): Rewrite this logic for computing heights when font heights vary.
 	// store old #lines for each window
 	onl := w.body.fr.GetFrameFillStatus().Maxlines
 	nl := make([]int, c.nw())
-	ny := make([]int, c.nw())
 	tot := 0
 	for j := 0; j < c.nw(); j++ {
 		l := c.w[j].taglines - 1 + c.w[j].body.fr.GetFrameFillStatus().Maxlines // TODO(flux): This taglines subtraction (for scrolling tags) assumes tags take the same number of pixels height as the body lines.  This is clearly false.
 		nl[j] = l
 		tot += l
 	}
+
 	// approximate new #lines for this window
 	if but == 2 { // as big as can be
 		for i := range nl {
@@ -396,11 +425,34 @@ func (c *Column) Grow(w *Window, but int) {
 				dnl -= l
 			}
 		}
+
+		// This is an egregious hack. It's an experiment for #52
+		// 0 lines is not being handled correctly elsewhere so try to
+		// find the largest and use it to force the 0s to 1s.
+		// 1. find index with max
+		maxindex := -1
+		maxval := 0
+		for i, nlv := range nl {
+			if nlv > maxval {
+				maxindex = i
+				maxval = nlv
+			}
+		}
+
+		for i := range nl {
+			if nl[i] == 0 {
+				nl[i]++
+				nl[maxindex]--
+			}
+		}
 	}
 Pack:
+	ny := make([]int, c.nw())
 	// pack everyone above
 	y1 := cr.Min.Y
 	var v *Window
+
+	// Resize windows [0, target window)
 	for j := 0; j < windex; j++ {
 		v = c.w[j]
 		r := v.r
