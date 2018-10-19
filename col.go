@@ -122,8 +122,8 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		// TODO(rjk): Make minht a method of the tag to simplify variable height fonts.
 		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1
 		j := 0
-	//	ffs := v.body.fr.GetFrameFillStatus()
-		// TODO(rjk): Why don't we recompute the ffs? hypothesis: we need to remeasure?
+		// Code inspection suggests that the frame fill status may have altered
+		// after resizing.
 		for !c.safe ||  v.body.fr.GetFrameFillStatus().Maxlines < 3 || v.body.all.Dy() <= minht {
 			j++
 			if j > 10 {
