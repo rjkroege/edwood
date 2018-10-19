@@ -109,7 +109,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	var windex int
 	windex, v = c.findWindowContainingY(y)
 
- 	// TODO(rjk): be polite. :-)
+	// TODO(rjk): be polite. :-)
 	buggered := false // historical variable name
 	if c.nw() > 0 {
 		if windex < c.nw() {
@@ -124,7 +124,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		j := 0
 		// Code inspection suggests that the frame fill status may have altered
 		// after resizing.
-		for !c.safe ||  v.body.fr.GetFrameFillStatus().Maxlines < 3 || v.body.all.Dy() <= minht {
+		for !c.safe || v.body.fr.GetFrameFillStatus().Maxlines < 3 || v.body.all.Dy() <= minht {
 			j++
 			if j > 10 {
 				buggered = true // Too many windows in column
@@ -425,9 +425,9 @@ func (c *Column) Grow(w *Window, but int) {
 				dnl -= l
 			}
 		}
-		
+
 		// This is an egregious hack. It's an experiment for #52
-		// 0 lines is not being handled correctly elsewhere so try to 
+		// 0 lines is not being handled correctly elsewhere so try to
 		// find the largest and use it to force the 0s to 1s.
 		// 1. find index with max
 		maxindex := -1
@@ -441,8 +441,8 @@ func (c *Column) Grow(w *Window, but int) {
 
 		for i, _ := range nl {
 			if nl[i] == 0 {
-				nl[i] ++
-				nl[maxindex] --
+				nl[i]++
+				nl[maxindex]--
 			}
 		}
 	}
