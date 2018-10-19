@@ -439,7 +439,7 @@ func (c *Column) Grow(w *Window, but int) {
 			}
 		}
 
-		for i, _ := range nl {
+		for i := range nl {
 			if nl[i] == 0 {
 				nl[i]++
 				nl[maxindex]--
