@@ -83,13 +83,13 @@ func (c *Column) AddFile(f *File) *Window {
 // TODO(rjk): It's almost certain that we repeat this code somewhere else.
 // possibly multiple times.
 // TODO(rjk): Get rid of the index requirement?
-func (c *Column) findWindowContainingY(y int) (int, *Window) {
-	for i, v := range c.w {
+func (c *Column) findWindowContainingY(y int) (i int, v *Window) {
+	for i, v = range c.w {
 		if y < v.r.Max.Y {
 			return i, v
 		}
 	}
-	return len(c.w), nil
+	return len(c.w), v
 }
 
 // Add adds a window to the Column.
