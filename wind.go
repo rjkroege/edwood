@@ -205,6 +205,7 @@ func (w *Window) moveToDel() {
 	}
 }
 
+// TagLines computes the number of lines in the tag that can fit in r.
 func (w *Window) TagLines(r image.Rectangle) int {
 	if !w.tagexpand && !w.showdel {
 		return 1
@@ -242,10 +243,20 @@ func (w *Window) TagLines(r image.Rectangle) int {
 	return n
 }
 
+// Resize the specified Window to rectangle r.
+// TODO(rjk): when collapsing the tag, this is called twice. Once would seem
+// sufficient.
+// TODO(rjk): This function does not appear to update the Window's rect correctly
+// in all cases.
 func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
+	// log.Printf("Window.Resize r=%v safe=%v keepextra=%v\n", r, safe, keepextra)
+	// defer log.Println("Window.Resize End\n")
+
+	// TODO(rjk): Do not leak global event state into this function.
 	mouseintag := mouse.Point.In(w.tag.all)
 	mouseinbody := mouse.Point.In(w.body.all)
 
+	// Tagtop is a rectangle corresponding to one line of tag.
 	w.tagtop = r
 	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height
 
@@ -308,6 +319,8 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.body.all.Min.Y = oy
 	}
 	w.maxlines = min(w.body.fr.GetFrameFillStatus().Nlines, max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
+	// TODO(rjk): this value doesn't make sense when we've collapsed
+	// the tag if the rectangle update block is not executed.
 	return w.r.Max.Y
 }
 
