@@ -425,26 +425,6 @@ func (c *Column) Grow(w *Window, but int) {
 				dnl -= l
 			}
 		}
-
-		// This is an egregious hack. It's an experiment for #52
-		// 0 lines is not being handled correctly elsewhere so try to
-		// find the largest and use it to force the 0s to 1s.
-		// 1. find index with max
-		maxindex := -1
-		maxval := 0
-		for i, nlv := range nl {
-			if nlv > maxval {
-				maxindex = i
-				maxval = nlv
-			}
-		}
-
-		for i := range nl {
-			if nl[i] == 0 {
-				nl[i]++
-				nl[maxindex]--
-			}
-		}
 	}
 Pack:
 	ny := make([]int, c.nw())
@@ -461,7 +441,7 @@ Pack:
 		if nl[j] != 0 {
 			r.Max.Y += 1 + nl[j]*v.body.fr.DefaultFontHeight()
 		}
-		r.Min.Y = v.Resize(r, c.safe, false)
+		r.Min.Y = v.Resize(r, false, false)
 		r.Max.Y += c.display.ScaleSize(Border)
 		c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
 		y1 = r.Max.Y
@@ -488,7 +468,7 @@ Pack:
 		r.Max.Y = r.Min.Y + w.tagtop.Dy() + 1 + h + c.display.ScaleSize(Border)
 	}
 	// draw window
-	r.Max.Y = w.Resize(r, c.safe, true)
+	r.Max.Y = w.Resize(r, false, true)
 	if windex < c.nw()-1 {
 		r.Min.Y = r.Max.Y
 		r.Max.Y += c.display.ScaleSize(Border)
@@ -507,7 +487,7 @@ Pack:
 		if nl[j] != 0 {
 			r.Max.Y += 1 + nl[j]*v.body.fr.DefaultFontHeight()
 		}
-		y1 = v.Resize(r, c.safe, j == c.nw()-1)
+		y1 = v.Resize(r, false, j == c.nw()-1)
 		if j < c.nw()-1 { // no border on last window
 			r.Min.Y = y1
 			r.Max.Y += c.display.ScaleSize(Border)
