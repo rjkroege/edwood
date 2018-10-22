@@ -46,7 +46,7 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
-	t.Insert(0, []rune("Newcol Kill Putall Dump Exit"), true)
+	t.Insert(0, []rune("Newcol Kill Putall Dump Exit "), true)
 	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
 	return row
 }
