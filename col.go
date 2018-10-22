@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	Lheader = []rune("New Cut Paste Snarf Sort Zerox Delcol")
+	Lheader = []rune("New Cut Paste Snarf Sort Zerox Delcol ")
 )
 
 type Column struct {
