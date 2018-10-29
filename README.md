@@ -21,21 +21,18 @@ Contributions are welcome. Just submit a pull request and we'll review
 the code before merging it in.
 
 # Project Status
-Edwood is not yet ready for use but is getting close to being actually useful.
-The *useful* milestone will offer the following:
-
-* editing experience effectively identical to Acme
-* support for `win` and other filesystem clients
-* but... buggy
+Edwood has reached the *useful* milestone (v0.1) and should
+serve as drop-in replacement for Plan9 Port Acme. (But probably with
+different bugs.) Please file issues if Acme client apps don't work
+with Acme or if your favourite Acme feature doesn't work.
 
 # Roadmap
 
-* Get to useful.
-* More idiomatic Go.
-* Fix bugs.
-* API modernization
-* Revised text handling data structures
-* See the issues list for more
+* More idiomatic Go and tests.
+* Internal API modernization.
+* Revised text handling data structures.
+* More configurability: styles, keyboard shortcuts, autocomplete.
+* See the issues list for the details.
 
 
 
