@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -221,73 +222,45 @@ func D_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-/*
-static int
-readloader(void *v, uint q0, Rune *r, int nr)
-{
-	if nr > 0  {
-		eloginsert(v, q0, r, nr);
-	return 0;
-}
-*/
 func e_cmd(t *Text, cp *Cmd) bool {
-	Unimpl()
-	return false
-}
-
-/*
-	Rune *name;
-	File *f;
-	int i, isdir, q0, q1, fd, nulls, samename, allreplaced;
-	char *s, tmp[128];
-	Dir *d;
-
-	f := t.file;
-	q0 := addr.r.q0;
-	q1 := addr.r.q1;
+	f := t.file
+	q0 := addr.r.q0
+	q1 := addr.r.q1
 	if cp.cmdc == 'e' {
-		if t.w.Clean(true)==false  {
-			editerror("");	// winclean generated message already
+		if !t.w.Clean(true) {
+			editerror("") // Clean generated message already
 		}
-		q0 = 0;
-		q1 = f.b.Nc();
+		q0 = 0
+		q1 = f.b.Nc()
 	}
-	allreplaced := (q0==0 && q1==f.b.Nc());
-	name = cmdname(f, cp.text, cp.cmdc=='e');
-	if name == nil  {
-		editerror(Enoname);
+	allreplaced := q0 == 0 && q1 == f.b.Nc()
+	name := cmdname(f, cp.text, cp.cmdc == 'e')
+	if name == "" {
+		editerror(Enoname)
 	}
-	i = runestrlen(name);
-	samename = runeeq(name, i, t.file.name, t.file.nname);
-	s = runetobyte(name, i);
-	free(name);
-	fd = open(s, OREAD);
-	if fd < 0 {
-		snprint(tmp, sizeof tmp, "can't open %s: %r", s);
-		free(s);
-		editerror(tmp);
+	samename := name == t.file.name
+	fd, err := os.Open(name)
+	if err != nil {
+		editerror("can't open %v: %v", name, err)
 	}
-	d = dirfstat(fd);
-	isdir = (d!=nil && (d.qid.typ&QTDIR));
-	free(d);
-	if isdir {
-		close(fd);
-		snprint(tmp, sizeof tmp, "%s is a directory", s);
-		free(s);
-		editerror(tmp);
+	defer fd.Close()
+	fi, err := fd.Stat()
+	if err == nil && fi.IsDir() {
+		editerror("%v is a directory", name)
 	}
-	elogdelete(f, q0, q1);
-	nulls = 0;
-	loadfile(fd, q1, &nulls, readloader, f, nil);
-	free(s);
-	close(fd);
-	if nulls  {
-		warning(nil, "%s: NUL bytes elided\n", s);
-	else if allreplaced && samename  {
-		f.editclean = true;
-	return true;
+	f.elog.Delete(q0, q1)
+	_, nulls, err := f.Load(q1, fd, false)
+	if err != nil {
+		warning(nil, "Error reading file %v: %v", name, err)
+		return false
+	}
+	if nulls {
+		warning(nil, "%v: NUL bytes elided\n", name)
+	} else if allreplaced && samename {
+		f.editclean = true
+	}
+	return true
 }
-*/
 
 func f_cmd(t *Text, cp *Cmd) bool {
 	str := ""
