@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 )
 
+// Buffer is a mutable array of runes.
 type Buffer []rune
 
 func NewBuffer() Buffer { return []rune{} }

@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// File is an editable text buffer with undo. Many Text can share one
+// File (to implement Zerox). The File is responsible for updating the
+// Text instances. File is a model in MVC parlance while Text is a 
+// View-Controller.
 type File struct {
 	b       Buffer
 	delta   []*Undo
@@ -24,6 +28,7 @@ type File struct {
 	seq       int
 	mod       bool
 
+	// Observer pattern: many Text instances can share a File.
 	curtext *Text
 	text    []*Text
 	dumpid  int
