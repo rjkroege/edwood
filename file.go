@@ -26,7 +26,7 @@ type File struct {
 	unread    bool
 	editclean bool
 	seq       int
-	putseq int		// seq on last put
+	putseq    int // seq on last put
 	mod       bool
 
 	// Observer pattern: many Text instances can share a File.
