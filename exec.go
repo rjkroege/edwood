@@ -591,8 +591,9 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			w.dirty = false
 			f.unread = false
 		}
+
+		f.SnapshotSeq()
 		for _, u := range f.text {
-			u.w.putseq = f.seq
 			u.w.dirty = w.dirty
 		}
 	}

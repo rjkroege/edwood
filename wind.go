@@ -44,7 +44,6 @@ type Window struct {
 	maxlines    int
 	dirnames    []string
 	widths      []int
-	putseq      int
 	incl        []string
 	reffont     *draw.Font
 	ctrllock    *sync.Mutex
@@ -398,7 +397,7 @@ func (w *Window) Undo(isundo bool) {
 	f := body.file
 	for _, text := range f.text {
 		v := text.w
-		v.dirty = (f.seq != v.putseq)
+		v.dirty = f.SeqDiffer()
 		if v != w {
 			v.body.q0 = (getP0(v.body.fr)) + v.body.org
 			v.body.q1 = (getP1(v.body.fr)) + v.body.org
@@ -508,7 +507,7 @@ func (w *Window) SetTag1() {
 		if len(w.body.file.epsilon) > 0 {
 			sb.WriteString(Lredo)
 		}
-		dirty := w.body.file.name != "" && (len(w.body.cache) != 0 || w.body.file.seq != w.putseq)
+		dirty := w.body.file.name != "" && (len(w.body.cache) != 0 || w.body.file.SeqDiffer())
 		if !w.isdir && dirty {
 			sb.WriteString(Lput)
 		}
