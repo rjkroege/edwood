@@ -26,6 +26,7 @@ type File struct {
 	unread    bool
 	editclean bool
 	seq       int
+	putseq int		// seq on last put
 	mod       bool
 
 	// Observer pattern: many Text instances can share a File.
@@ -54,6 +55,16 @@ func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, er
 		f.hash = h
 	}
 	return n, hasNulls, err
+}
+
+// SnapshotSeq saves the current seq to putseq. Call this on Put actions.
+func (f *File) SnapshotSeq() {
+	f.putseq = f.seq
+}
+
+// SeqDiffer returns true if the current seq differs from a previously snapshot.
+func (f *File) SeqDiffer() bool {
+	return f.seq != f.putseq
 }
 
 func HashFile(filename string) (h FileHash, err error) {
