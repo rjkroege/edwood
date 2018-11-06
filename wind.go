@@ -22,7 +22,6 @@ type Window struct {
 	isdir      bool
 	isscratch  bool
 	filemenu   bool
-	dirty      bool
 	autoindent bool
 	showdel    bool
 
@@ -100,7 +99,6 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.autoindent = globalautoindent
 
 	if clone != nil {
-		w.dirty = clone.dirty
 		w.autoindent = clone.autoindent
 	}
 	return w
@@ -397,7 +395,6 @@ func (w *Window) Undo(isundo bool) {
 	f := body.file
 	for _, text := range f.text {
 		v := text.w
-		v.dirty = f.SeqDiffer()
 		if v != w {
 			v.body.q0 = (getP0(v.body.fr)) + v.body.org
 			v.body.q1 = (getP1(v.body.fr)) + v.body.org
@@ -564,11 +561,11 @@ func (w *Window) SetTag1() {
 }
 
 func (w *Window) Commit(t *Text) {
-	t.Commit(true)
+	t.Commit(true) // will set the file.mod to true
 	f := t.file
 	if len(f.text) > 1 {
 		for _, te := range f.text {
-			te.Commit(false) // no-op for t
+			te.Commit(false)
 		}
 	}
 	if t.what == Body {
@@ -580,8 +577,7 @@ func (w *Window) Commit(t *Text) {
 	if filename != w.body.file.name {
 		seq++
 		w.body.file.Mark()
-		w.body.file.mod = true
-		w.dirty = true
+		w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()
 	}
@@ -626,6 +622,7 @@ func (w *Window) AddIncl(r string) {
 	return
 }
 
+// Clean returns true iff w can be treated as unmodified.
 func (w *Window) Clean(conservative bool) bool {
 	if w.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
 		return true
@@ -633,7 +630,7 @@ func (w *Window) Clean(conservative bool) bool {
 	if !conservative && w.nopen[QWevent] > 0 {
 		return true
 	}
-	if w.dirty {
+	if w.body.file.Dirty() {
 		if len(w.body.file.name) != 0 {
 			warning(nil, "%v modified\n", w.body.file.name)
 		} else {
@@ -642,7 +639,8 @@ func (w *Window) Clean(conservative bool) bool {
 			}
 			warning(nil, "unnamed file modified\n")
 		}
-		w.dirty = false
+		// This toggle permits checking if we can safely destroy the window.
+		w.body.file.TreatAsClean()
 		return false
 	}
 	return true
@@ -656,7 +654,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 		isdir = 1
 	}
 	dirty := 0
-	if w.dirty {
+	if w.body.file.Dirty() {
 		dirty = 1
 	}
 	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.Nc(),
