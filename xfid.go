@@ -641,14 +641,12 @@ forloop:
 			t = &w.body
 			t.eq0 = ^0
 			t.file.Reset()
-			t.file.mod = false
-			w.dirty = false
+			t.file.Unmodded()
 			settag = true
 		case "dirty": // mark window 'dirty'
 			t = &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
-			t.file.mod = true
-			w.dirty = true
+			t.file.Modded()
 			settag = true
 		case "show": // show dot
 			t = &w.body

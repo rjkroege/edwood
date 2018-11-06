@@ -23,11 +23,14 @@ type File struct {
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
 	mtime   time.Time
 	// dev       int
-	unread    bool
-	editclean bool
-	seq       int
-	putseq    int // seq on last put
-	mod       bool
+	unread bool
+
+	// TODO(rjk): Could possibly be removed.
+	editclean    bool
+	seq          int
+	putseq       int // seq on last put
+	mod          bool
+	treatasclean bool // Window Clean tests should succeed if set.
 
 	// Observer pattern: many Text instances can share a File.
 	curtext *Text
@@ -129,7 +132,7 @@ func (f *File) Insert(p0 int, s []rune) {
 	}
 	f.b.Insert(p0, s)
 	if len(s) != 0 {
-		f.mod = true
+		f.Modded()
 	}
 }
 
@@ -153,7 +156,7 @@ func (f *File) Delete(p0, p1 int) {
 	}
 	f.b.Delete(p0, p1)
 	if p1 > p0 {
-		f.mod = true
+		f.Modded()
 	}
 }
 
@@ -284,6 +287,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.seq = u.seq
 			f.Undelete(epsilon, u.p0, u.p0+u.n)
 			f.mod = u.mod
+			f.treatasclean = false
 			f.b.Delete(u.p0, u.p0+u.n)
 			for _, text := range f.text {
 				text.Delete(u.p0, u.p0+u.n, false)
@@ -295,6 +299,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.seq = u.seq
 			f.Uninsert(epsilon, u.p0, u.n)
 			f.mod = u.mod
+			f.treatasclean = false
 			f.b.Insert(u.p0, u.buf)
 			for _, text := range f.text {
 				text.Insert(u.p0, u.buf, false)
@@ -306,6 +311,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.seq = u.seq
 			f.UnsetName(epsilon)
 			f.mod = u.mod
+			f.treatasclean = false
 			if u.n == 0 {
 				f.name = ""
 			} else {
@@ -335,4 +341,25 @@ func (f *File) Close() {
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
+}
+
+// Dirty returns true if the File should be considered modified.
+func (f *File) Dirty() bool {
+	return !f.treatasclean && f.mod
+}
+
+// TreatAsClean notes that the File should be considered as not Dirty
+// until its next modification.
+func (f *File) TreatAsClean() {
+	f.treatasclean = true
+}
+
+func (f *File) Modded() {
+	f.mod = true
+	f.treatasclean = false
+}
+
+func (f *File) Unmodded() {
+	f.mod = false
+	f.treatasclean = false
 }

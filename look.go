@@ -254,8 +254,7 @@ func plumbshow(m *plumb.Message) {
 	w.SetName(name)
 	r, _, _ = cvttorunes(m.Data, len(m.Data))
 	w.body.Insert(0, r, true)
-	w.body.file.mod = false
-	w.dirty = false
+	w.body.file.Unmodded()
 	w.SetTag()
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
@@ -738,8 +737,7 @@ func openfile(t *Text, e *Expand) *Window {
 		if err != nil {
 			t.file.unread = false
 		}
-		t.file.mod = false
-		t.w.dirty = false
+		t.file.Unmodded()
 		t.w.SetTag()
 		t.w.tag.SetSelect(t.w.tag.file.b.Nc(), t.w.tag.file.b.Nc())
 		if ow != nil {

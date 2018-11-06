@@ -448,13 +448,11 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if tofile {
 		t.file.Insert(q0, r)
 		if t.what == Body {
-			t.w.dirty = true
 			t.w.utflastqid = -1
 		}
 		if len(t.file.text) > 1 {
 			for _, u := range t.file.text {
 				if u != t {
-					u.w.dirty = true // always a body
 					u.Insert(q0, r, false)
 					u.SetSelect(u.q0, u.q1)
 					u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
@@ -562,13 +560,11 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	if tofile {
 		t.file.Delete(q0, q1)
 		if t.what == Body {
-			t.w.dirty = true
 			t.w.utflastqid = -1
 		}
 		if len(t.file.text) > 1 {
 			for _, u := range t.file.text {
 				if u != t {
-					u.w.dirty = true // always a body
 					u.Delete(q0, q1, false)
 					u.SetSelect(u.q0, u.q1)
 					u.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
@@ -1073,7 +1069,6 @@ func (t *Text) Commit(tofile bool) {
 		t.file.Insert(t.cq0, t.cache)
 	}
 	if t.what == Body {
-		t.w.dirty = true
 		t.w.utflastqid = -1
 	}
 	t.cache = t.cache[:0]

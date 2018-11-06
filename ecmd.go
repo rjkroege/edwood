@@ -1240,8 +1240,7 @@ func cmdname(f *File, str string, set bool) string {
 Return:
 	if set && !(r == f.name) {
 		f.Mark()
-		f.mod = true
-		f.curtext.w.dirty = true
+		f.Modded()
 		f.curtext.w.SetName(r)
 	}
 	return r

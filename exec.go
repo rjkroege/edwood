@@ -462,16 +462,10 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	}
 	samename := r == t.file.name
 	t.Load(0, name, samename)
-	var dirty bool
 	if samename {
-		t.file.mod = false
-		dirty = false
+		t.file.Unmodded()
 	} else {
-		t.file.mod = true
-		dirty = true
-	}
-	for _, u := range t.file.text {
-		u.w.dirty = dirty
+		t.file.Modded()
 	}
 	w.SetTag()
 	t.file.unread = false
@@ -576,8 +570,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	}
 	if name == f.name {
 		if q0 != 0 || q1 != f.b.Nc() {
-			f.mod = true
-			w.dirty = true
+			f.Modded()
 			f.unread = true
 		} else {
 			if d1, err := fd.Stat(); err == nil {
@@ -587,15 +580,10 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			//f.dev = d.dev;
 			f.mtime = d.ModTime()
 			f.hash.Set(h.Sum(nil))
-			f.mod = false
-			w.dirty = false
+			f.Unmodded()
 			f.unread = false
 		}
-
 		f.SnapshotSeq()
-		for _, u := range f.text {
-			u.w.dirty = w.dirty
-		}
 	}
 
 	w.SetTag()

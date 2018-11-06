@@ -301,7 +301,7 @@ func flushwarnings() {
 		if owner == 0 {
 			w.owner = 'E'
 		}
-		w.Commit(t)
+		w.Commit(t) // marks the backing text as dirty
 
 		// Most commands don't generate much output. For instance,
 		// Edit ,>cat goes through /dev/cons and is already in blocks
@@ -323,7 +323,7 @@ func flushwarnings() {
 		t.w.SetTag()
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.owner = owner
-		w.dirty = false
+		t.file.TreatAsClean()
 		w.Unlock()
 		warn.buf.Close()
 		if warn.md != nil {
