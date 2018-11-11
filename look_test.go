@@ -11,6 +11,7 @@ func TestDirname(t *testing.T) {
 	}{
 		{[]rune("/a/b/c/d.go Del Snarf | Look "), nil, []rune("/a/b/c")},
 		{[]rune("/a/b/c/d.go Del Snarf | Look "), []rune("e.go"), []rune("/a/b/c/e.go")},
+		{[]rune("/a/b/c/d.go Del Snarf | Look "), []rune("/x/e.go"), []rune("/x/e.go")},
 	}
 
 	for _, tc := range testCases {

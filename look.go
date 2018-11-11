@@ -245,8 +245,8 @@ func plumbshow(m *plumb.Message) {
 		nuntitled++
 		name = fmt.Sprintf("Untitled-%d", nuntitled)
 	}
-	if name[0] != '/' && m.Dir != "" {
-		name = fmt.Sprintf("%s/%s", m.Dir, name)
+	if !filepath.IsAbs(name) && m.Dir != "" {
+		name = filepath.Join(m.Dir, name)
 	}
 	name = filepath.Clean(name)
 	r, _, _ := cvttorunes([]byte(name), len(name)) // remove nulls
@@ -440,15 +440,11 @@ func dirname(t *Text, r []rune) []rune {
 		slash int
 	)
 
-	b = nil
 	if t == nil || t.w == nil {
 		goto Rescue
 	}
 	nt = t.w.tag.file.b.Nc()
-	if nt == 0 {
-		goto Rescue
-	}
-	if len(r) >= 1 && r[0] == '/' {
+	if nt == 0 || filepath.IsAbs(string(r)) {
 		goto Rescue
 	}
 	b = make([]rune, nt)
@@ -705,7 +701,7 @@ func openfile(t *Text, e *Expand) *Window {
 		}
 	} else {
 		w = lookfile(e.name)
-		if w == nil && e.name[0] != '/' {
+		if w == nil && !filepath.IsAbs(e.name) {
 			// Unrooted path in new window.
 			// This can happen if we type a pwd-relative path
 			// in the topmost tag or the column tags.
@@ -714,7 +710,7 @@ func openfile(t *Text, e *Expand) *Window {
 			// be configured to accept plumbed directories.
 			// Make the name a full path, just like we would if
 			// opening via the plumber.
-			rp := fmt.Sprintf("%s/%s", wdir, e.name)
+			rp := filepath.Join(wdir, e.name)
 			rs = string(cleanrname([]rune(rp)))
 			e.name = rs
 			w = lookfile(e.name)
