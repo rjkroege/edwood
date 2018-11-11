@@ -103,6 +103,7 @@ func fsysinit() {
 	if err != nil {
 		acmeerror("failed to create pipe", err)
 	}
+	// TODO(fhs): post9pservice should return error instead of int
 	if post9pservice(reader, "acme", mtpt) < 0 {
 		acmeerror("can't post service", nil)
 	}

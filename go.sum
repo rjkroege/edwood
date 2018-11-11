@@ -1,2 +1,6 @@
 9fans.net/go v0.0.0-20180626134441-6000580a6378 h1:8jIVxy2RXNT+qswzqmriGYc/lRQsuhpGMkc2LiCLwLo=
 9fans.net/go v0.0.0-20180626134441-6000580a6378/go.mod h1:diCsxrliIURU9xsYtjCp5AbpQKqdhKmf0ujWDUSkfoY=
+9fans.net/go v0.0.0-20180727211846-5d4fa602e1e8 h1:I5as7fR6RT+wVrs+vOeEtOHJ4z2vnUnIR+cqvAiQ80s=
+9fans.net/go v0.0.0-20180727211846-5d4fa602e1e8/go.mod h1:diCsxrliIURU9xsYtjCp5AbpQKqdhKmf0ujWDUSkfoY=
+github.com/fhs/mux9p v0.1.0 h1:ssvNWjvbfcunib9ujS2TFSdYo9fnnhIljXkzQPJQR1A=
+github.com/fhs/mux9p v0.1.0/go.mod h1:tjbHDrV79hmPQZ5kZ5Lu5ggNPNFe6MGAldApF+ynYy8=
