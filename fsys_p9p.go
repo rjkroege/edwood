@@ -1,4 +1,4 @@
-// +build !plan9
+// +build darwin dragonfly freebsd linux netbsd openbsd solaris
 
 package main
 
