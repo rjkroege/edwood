@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -607,7 +608,7 @@ func (w *Window) AddIncl(r string) {
 	// to use dirname instead.
 	d, err := isDir(r)
 	if d == false {
-		if r[0] == '/' {
+		if filepath.IsAbs(r) {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}

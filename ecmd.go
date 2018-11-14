@@ -1225,7 +1225,7 @@ func cmdname(f *File, str string, set bool) string {
 		goto Return
 	}
 
-	if s[0] == '/' {
+	if filepath.IsAbs(s) {
 		r = s
 	} else {
 		r = f.curtext.DirName(s)
