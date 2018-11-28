@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://travis-ci.org/rjkroege/edwood.svg?branch=master)](https://travis-ci.org/rjkroege/edwood)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://travis-ci.com/rjkroege/edwood.svg?branch=master)](https://travis-ci.com/rjkroege/edwood)
 
 # Overview
 Go port of Rob Pike's Acme editor. Derived from
@@ -25,8 +25,6 @@ Edwood has reached the *useful* milestone (v0.1) and should
 serve as drop-in replacement for Plan9 Port Acme. (But probably with
 different bugs.) Please file issues if Acme client apps don't work
 with Acme or if your favourite Acme feature doesn't work.
-
-*Currently continuous builder is not working... I'm working on it.*
 
 # Roadmap
 
