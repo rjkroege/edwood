@@ -26,6 +26,8 @@ serve as drop-in replacement for Plan9 Port Acme. (But probably with
 different bugs.) Please file issues if Acme client apps don't work
 with Acme or if your favourite Acme feature doesn't work.
 
+*Currently continuous builder is not working... I'm working on it.*
+
 # Roadmap
 
 * More idiomatic Go and tests.
