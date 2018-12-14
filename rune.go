@@ -31,27 +31,6 @@ func runeEq(r, s []rune) bool {
 	return true
 }
 
-func runesplitN(buf []rune, sep []rune, nl int) [][]rune {
-	linestart := 0
-	lines := [][]rune{}
-	for i, r := range buf {
-		for _, se := range sep {
-			if r == se {
-				line := buf[linestart:i]
-				lines = append(lines, line)
-				linestart = i + 1
-			}
-			if len(lines) >= nl {
-				break
-			}
-		}
-	}
-	if linestart != len(buf) {
-		lines = append(lines, buf[linestart:]) // trailing chunk
-	}
-	return lines
-}
-
 func isIn(r []rune, s rune) bool {
 	for _, c := range r {
 		if s == c {

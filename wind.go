@@ -574,7 +574,10 @@ func (w *Window) Commit(t *Text) {
 	}
 	r := make([]rune, w.tag.Nc())
 	w.tag.file.b.Read(0, r)
-	filename := string(runesplitN(r, []rune(" \t"), 1)[0])
+	filename := string(r)
+	if i := strings.IndexAny(filename, " \t"); i >= 0 {
+		filename = filename[:i]
+	}
 	if filename != w.body.file.name {
 		seq++
 		w.body.file.Mark()
