@@ -4,7 +4,7 @@ import "testing"
 
 func TestDelText(t *testing.T) {
 	f := &File{
-		text: []*Text{&Text{}, &Text{}, &Text{}, &Text{}, &Text{}},
+		text: []*Text{{}, {}, {}, {}, {}},
 	}
 	t.Run("Nonexistent", func(t *testing.T) {
 		defer func() {
