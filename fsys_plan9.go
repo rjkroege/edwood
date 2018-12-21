@@ -43,7 +43,7 @@ type pipeAddr struct{}
 func (pipeAddr) Network() string { return "pipe" }
 func (pipeAddr) String() string  { return "pipe" }
 
-func post9pservice(conn net.Conn, name string, mtpt string) int {
+func post9pservice(conn net.Conn, name string, mtpt string) error {
 	cfd := int(conn.(*pipeConn).File.Fd())
 	go func() {
 		// We need to do this within a new goroutine because the file server
@@ -61,7 +61,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 			acmeerror("bind /dev filed", err)
 		}
 	}()
-	return 0
+	return nil
 }
 
 // Called only in exec.c:/^run(), from a different FD group

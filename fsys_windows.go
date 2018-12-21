@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 
 	"9fans.net/go/plan9/client"
@@ -16,24 +15,24 @@ func newPipe() (net.Conn, net.Conn, error) {
 	return c1, c2, nil
 }
 
-func post9pservice(conn net.Conn, name string, mtpt string) int {
+func post9pservice(conn net.Conn, name string, mtpt string) error {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		log.Panicf("Listen failed: %v\n", err)
+		return fmt.Errorf("Listen failed: %v", err)
 	}
 	go func() {
 		defer l.Close()
 		if err := mux9p.Do(l, conn, nil); err != nil {
-			log.Panicf("9P multiplexer failed: %v\n", err)
+			acmeerror("9P multiplexer failed", err)
 		}
 	}()
 	fsysAddr = l.Addr()
 	fmt.Printf("9P fileserver listening on address %v\n", fsysAddr)
 
 	if mtpt != "" {
-		log.Panicf("mounting in Windows is not supported\n")
+		return fmt.Errorf("mounting in Windows is not supported")
 	}
-	return 0
+	return nil
 }
 
 // Called only in exec.c:/^run(), from a different FD group

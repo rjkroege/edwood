@@ -19,10 +19,10 @@ func newPipe() (net.Conn, net.Conn, error) {
 	return c1, c2, nil
 }
 
-func post9pservice(conn net.Conn, name string, mtpt string) int {
+func post9pservice(conn net.Conn, name string, mtpt string) error {
 	if name == "" && mtpt == "" {
 		conn.Close()
-		panic("nothing to do")
+		return fmt.Errorf("nothing to do")
 	}
 
 	if name != "" {
@@ -31,7 +31,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 			addr = fmt.Sprintf("unix!%s/%s", client.Namespace(), name)
 		}
 		if addr == "" {
-			return -1
+			return fmt.Errorf("empty listen address")
 		}
 		cmd := exec.Command("9pserve", "-lv", addr)
 		cmd.Stdin = conn
@@ -39,17 +39,17 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
 		if err != nil {
-			panic(fmt.Sprintf("failed to start 9pserve: %v", err))
+			return fmt.Errorf("failed to start 9pserve: %v", err)
 		}
 		// 9pserve will fork into the background.  Wait for that.
 		if state, err := cmd.Process.Wait(); err != nil || !state.Success() {
-			panic(fmt.Sprintf("9pserve wait failed: %v, %v", err, state))
+			return fmt.Errorf("9pserve wait failed: %v, %v", err, state)
 		}
 		go func() {
 			// Now wait for I/O to finish.
 			err = cmd.Wait()
 			if err != nil {
-				panic(fmt.Sprintf("9pserve wait failed: %v", err))
+				acmeerror("9pserve wait failed", err)
 			}
 			conn.Close()
 		}()
@@ -58,11 +58,11 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 			s := strings.Split(addr, "!")
 			unixaddr, err := net.ResolveUnixAddr(s[0], s[1])
 			if err != nil {
-				panic(fmt.Sprintf("ResolveUnixAddr: %v", err))
+				return fmt.Errorf("ResolveUnixAddr: %v", err)
 			}
 			conn, err = net.DialUnix(s[0], nil, unixaddr)
 			if err != nil {
-				panic(fmt.Sprintf("cannot reopen for mount: %v", err))
+				return fmt.Errorf("cannot reopen for mount: %v", err)
 			}
 		}
 	}
@@ -74,11 +74,11 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 		uconn, ok := conn.(*net.UnixConn)
 		if !ok {
 			// Thankfully, we should never reach here beacause name is always "acme".
-			panic("9pfuse writes to stdin!")
+			return fmt.Errorf("9pfuse writes to stdin")
 		}
 		fd, err := uconn.File()
 		if err != nil {
-			panic(fmt.Sprintf("bad mtpt connection: %v", err))
+			return fmt.Errorf("bad mtpt connection: %v", err)
 		}
 
 		// Try v9fs on Linux, which will mount 9P directly.
@@ -98,18 +98,18 @@ func post9pservice(conn net.Conn, name string, mtpt string) int {
 			cmd.Stderr = os.Stderr
 			err = cmd.Start()
 			if err != nil {
-				panic(fmt.Sprintf("failed to run 9pfuse: %v", err))
+				return fmt.Errorf("failed to run 9pfuse: %v", err)
 			}
 		}
 		go func() {
 			err = cmd.Wait()
 			if err != nil {
-				panic(fmt.Sprintf("wait failed: %v", err))
+				acmeerror("wait failed", err)
 			}
 			fd.Close()
 		}()
 	}
-	return 0
+	return nil
 }
 
 // Called only in exec.c:/^run(), from a different FD group
