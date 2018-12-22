@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 var (
@@ -113,11 +112,11 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	f := w.body.file
 	switch editing {
 	case Inactive:
-		return fmt.Errorf("permission denied")
+		return Eperm
 	case Inserting:
+		f := w.body.file
 		f.elog.Insert(q, r)
 		return nil
 	case Collecting:
@@ -467,7 +466,6 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 		r, s []rune
 		dir  string
 		w    *Window
-		q    *sync.Mutex
 	)
 
 	r = skipbl(cr)
@@ -503,23 +501,22 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	row.lk.Unlock()
 	<-cedit
 	//
-	//	 * The editoutlk exists only so that we can tell when
-	//	 * the editout file has been closed.  It can get closed *after*
-	//	 * the process exits because, since the process cannot be
-	//	 * connected directly to editout (no 9P kernel support),
-	//	 * the process is actually connected to a pipe to another
-	//	 * process (arranged via 9pserve) that reads from the pipe
-	//	 * and then writes the data in the pipe to editout using
-	//	 * 9P transactions.  This process might still have a couple
-	//	 * writes left to copy after the original process has exited.
+	// The editoutlk exists only so that we can tell when
+	// the editout file has been closed.  It can get closed *after*
+	// the process exits because, since the process cannot be
+	// connected directly to editout (no 9P kernel support),
+	// the process is actually connected to a pipe to another
+	// process (arranged via 9pserve) that reads from the pipe
+	// and then writes the data in the pipe to editout using
+	// 9P transactions.  This process might still have a couple
+	// writes left to copy after the original process has exited.
 	//
+	q := editoutlk
 	if w != nil {
 		q = w.editoutlk
-	} else {
-		q = editoutlk
 	}
-	q.Lock() // wait for file to close
-	q.Unlock()
+	q <- true // wait for file to close
+	<-q
 	row.lk.Lock()
 	editing = Inactive
 	if t != nil && t.w != nil {
