@@ -607,7 +607,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	}
 }
 
-func (t *Text) View(q0, q1 int) []byte                   { return t.file.b.View(q0, q1) }
+func (t *Text) View(q0, q1 int) []rune                   { return t.file.b.View(q0, q1) }
 func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
 func (t *Text) nc() int                                  { return t.file.b.Nc() }
 func (t *Text) Q0() int                                  { return t.q0 }
