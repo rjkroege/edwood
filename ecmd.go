@@ -868,7 +868,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 	}
 	sel = RangeSet{Range{0, 0}}
 	if sign >= 0 {
-		sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 2)
+		sels := are.rxexecute(f.curtext, nil, p, -1, 2)
 		if len(sels) == 0 {
 			editerror("no match for regexp")
 		} else {
@@ -882,7 +882,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 				if p > f.b.Nc() {
 					p = 0
 				}
-				sels := are.rxexecute(f.curtext, nil, p, 0x7FFFFFFF, 1)
+				sels := are.rxexecute(f.curtext, nil, p, -1, 1)
 				if len(sels) == 0 {
 					editerror("address")
 				} else {
