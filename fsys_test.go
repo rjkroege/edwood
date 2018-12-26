@@ -344,6 +344,17 @@ func TestFSys(t *testing.T) {
 			t.Errorf("Failed to write dumpdir %q: %v\n", dumpdir, err)
 		}
 	})
+	t.Run("WriteEditout", func(t *testing.T) {
+		fid, err := fsys.Open("/editout", plan9.OWRITE)
+		if err != nil {
+			t.Fatalf("failed to open /editout: %v", err)
+		}
+		defer fid.Close()
+		_, err = fid.Write([]byte("hello\n"))
+		if err == nil || err.Error() != Eperm.Error() {
+			t.Fatalf("write to editout returned %v; expected %v", err, Eperm)
+		}
+	})
 }
 
 func TestFSysAddr(t *testing.T) {

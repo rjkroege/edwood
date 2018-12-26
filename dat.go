@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -137,7 +136,7 @@ var (
 	cedit      chan int
 	cwarn      chan uint
 
-	editoutlk *sync.Mutex
+	editoutlk = make(chan bool, 1)
 
 	WinID = 0
 )

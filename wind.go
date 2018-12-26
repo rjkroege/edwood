@@ -58,7 +58,7 @@ type Window struct {
 	tagexpand   bool
 	taglines    int
 	tagtop      image.Rectangle
-	editoutlk   *sync.Mutex
+	editoutlk   chan bool
 }
 
 func NewWindow() *Window {
@@ -102,6 +102,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	if clone != nil {
 		w.autoindent = clone.autoindent
 	}
+	w.editoutlk = make(chan bool, 1)
 	return w
 }
 

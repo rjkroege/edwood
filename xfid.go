@@ -175,13 +175,13 @@ func xfidopen(x *Xfid) {
 				respond(x, &fc, Eperm)
 				return
 			}
-
-			// TODO(flux): Need a better mechanism for editoutlk
-			//	if !w.editoutlk.CanLock() {
-			//		w.Unlock();
-			//		respond(x, &fc, Einuse);
-			//		return;
-			//	}
+			select {
+			case w.editoutlk <- true:
+			default:
+				w.Unlock()
+				respond(x, &fc, Einuse)
+				return
+			}
 			w.wrselrange = Range{t.q1, t.q1}
 			break
 		}
@@ -191,11 +191,12 @@ func xfidopen(x *Xfid) {
 		case Qlog:
 			xfidlogopen(x)
 		case Qeditout:
-			// TODO(flux) CanLock doesn't exist :-(
-			//	if !editoutlk.CanLock() {
-			//		respond(x, &fc, Einuse);
-			//		return;
-			//	}
+			select {
+			case editoutlk <- true:
+			default:
+				respond(x, &fc, Einuse)
+				return
+			}
 		}
 	}
 	fc.Qid = x.f.qid
@@ -269,7 +270,7 @@ func xfidclose(x *Xfid) {
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			break
 		case QWeditout:
-			w.editoutlk.Unlock()
+			<-w.editoutlk
 			break
 		}
 		w.Close()
@@ -277,7 +278,7 @@ func xfidclose(x *Xfid) {
 	} else {
 		switch q {
 		case Qeditout:
-			editoutlk.Unlock()
+			<-editoutlk
 			break
 		}
 	}
