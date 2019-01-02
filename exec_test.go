@@ -6,6 +6,7 @@ import (
 )
 
 func acmeTestingMain() {
+	acmeshell = os.Getenv("acmeshell")
 	cwait = make(chan *os.ProcessState)
 	cerr = make(chan error)
 	go func() {
