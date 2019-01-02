@@ -38,11 +38,17 @@ func TestRunproc(t *testing.T) {
 
 	for _, tc := range tt {
 		cpid := make(chan *os.Process)
-		go runproc(nil, tc.s, "", false, "", tc.arg, &Command{}, cpid, false)
+		go func() {
+			err := runproc(nil, tc.s, "", false, "", tc.arg, &Command{}, cpid, false)
+			if err != nil {
+				t.Errorf("runproc failed for command %q: %v", tc.s, err)
+				cwait <- nil
+			}
+		}()
 		<-cpid
 		status := <-cwait
-		if !status.Success() {
-			t.Errorf("command %q exited with status %v\n", tc.s, status)
+		if status != nil && !status.Success() {
+			t.Errorf("command %q exited with status %v", tc.s, status)
 		}
 	}
 }

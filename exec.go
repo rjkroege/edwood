@@ -680,7 +680,12 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 
 	c = &Command{}
 	cpid = make(chan *os.Process)
-	go runproc(win, s, rdir, newns, argaddr, xarg, c, cpid, iseditcmd)
+	go func() {
+		err := runproc(win, s, rdir, newns, argaddr, xarg, c, cpid, iseditcmd)
+		if err != nil {
+			warning(nil, "runproc: %v\n", err)
+		}
+	}()
 	// This is to avoid blocking waiting for task launch.
 	// So runproc sends the resulting process down cpid,
 	// and runwait task catches, and records the process in command list (by
@@ -845,7 +850,7 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
-func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) {
+func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) error {
 	var (
 		t, name, filename string
 		incl              []string
@@ -874,7 +879,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		// threadexec hasn't happened, so send a zero
 		cpid <- nil
 	}
-	Hard := func() {
+	Hard := func() error {
 		// ugly: set path = (. $cputype /bin)
 		// should honor $path if unusual.
 		/* TODO(flux): This looksl ike plan9 magic
@@ -911,21 +916,21 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		cmd.Stdout = sout
 		cmd.Stderr = serr
 		err := cmd.Start()
-		if err == nil {
-			if cpid != nil {
-				cpid <- cmd.Process
-			} else {
-				cpid <- nil
-			}
-			go func() {
-				cmd.Wait()
-				Closeall()
-				cwait <- cmd.ProcessState
-			}()
-			return
+		if err != nil {
+			Fail()
+			return fmt.Errorf("exec %s: %v", shell, err)
 		}
-		warning(nil, "exec %s: %v\n", shell, err)
-		Fail()
+		if cpid != nil {
+			cpid <- cmd.Process
+		} else {
+			cpid <- nil
+		}
+		go func() {
+			cmd.Wait()
+			Closeall()
+			cwait <- cmd.ProcessState
+		}()
+		return nil
 	}
 	t = strings.TrimLeft(s, " \t\n")
 	name = t
@@ -969,8 +974,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		var err error
 		c.md, fs, err = fsysmount(dir, incl)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "fsysmount: %v", err)
-			return
+			return fmt.Errorf("fsysmount: %v", err)
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {
 			rdselname := fmt.Sprintf("%d/rdsel", winid)
@@ -1011,20 +1015,17 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		os.Setenv("acmeaddr", argaddr)
 	}
 	if acmeshell != "" {
-		Hard()
-		return
+		return Hard()
 	}
 	for _, r := range t {
 		if r == ' ' || r == '\t' {
 			continue
 		}
 		if r < ' ' {
-			Hard()
-			return
+			return Hard()
 		}
 		if utfrune([]rune("#;&|^$=`'{}()<>[]*?^~`/"), r) != -1 {
-			Hard()
-			return
+			return Hard()
 		}
 	}
 
@@ -1039,22 +1040,21 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	cmd.Stdout = sout
 	cmd.Stderr = serr
 	err := cmd.Start()
-	if err == nil {
-		if cpid != nil {
-			cpid <- cmd.Process
-		} else {
-			cpid <- nil
-		}
-		go func() {
-			cmd.Wait()
-			Closeall()
-			cwait <- cmd.ProcessState
-		}()
-		return
+	if err != nil {
+		Fail()
+		return err
 	}
-
-	Fail()
-	return
+	if cpid != nil {
+		cpid <- cmd.Process
+	} else {
+		cpid <- nil
+	}
+	go func() {
+		cmd.Wait()
+		Closeall()
+		cwait <- cmd.ProcessState
+	}()
+	return nil
 }
 
 const (
