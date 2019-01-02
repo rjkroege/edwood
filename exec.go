@@ -875,7 +875,6 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		cpid <- nil
 	}
 	Hard := func() {
-		Untested()
 		// ugly: set path = (. $cputype /bin)
 		// should honor $path if unusual.
 		/* TODO(flux): This looksl ike plan9 magic
@@ -1029,9 +1028,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 	}
 
-	t = wsre.ReplaceAllString(t, " ")
-	t = strings.TrimLeft(t, " ")
-	c.av = strings.Split(t, " ")
+	c.av = strings.Fields(t)
 	if arg != "" {
 		c.av = append(c.av, arg)
 	}
