@@ -355,6 +355,41 @@ func TestFSys(t *testing.T) {
 			t.Fatalf("write to editout returned %v; expected %v", err, Eperm)
 		}
 	})
+	t.Run("WriteEvent", func(t *testing.T) {
+		w, err := acme.New()
+		if err != nil {
+			t.Fatalf("creating new window failed: %v\n", err)
+		}
+		defer w.Del(true)
+
+		tt := []struct {
+			err error
+			s   string
+		}{
+			{nil, ""},
+			{nil, "\n"},
+			{nil, "ML0 0 \n"},
+			{nil, "Ml0 0 \n"},
+			{nil, "MX0 0 \n"},
+			{nil, "ML0 0 \nMl0 0 \n"},
+			{Ebadevent, "M\n"},
+			{Ebadevent, "ML\n"},
+			{Ebadevent, "ML0 \n"},
+			{Ebadevent, "MLA 0 \n"},
+			{Ebadevent, "ML0 A \n"},
+			{Ebadevent, "M40 0 \n"},
+			{Ebadevent, "ML9 9 \n"},
+			{Ebadevent, "MZ0 0 \n"},
+			{Ebadevent, "MZ0 0 \nML0 0 \n"}, // bad event followed by a good one
+		}
+		for _, tc := range tt {
+			_, err = w.Write("event", []byte(tc.s))
+			if (tc.err == nil && err != nil) ||
+				(tc.err != nil && (err == nil || err.Error() != tc.err.Error())) {
+				t.Errorf("event %q returned %v; expected %v", tc.s, err, tc.err)
+			}
+		}
+	})
 }
 
 func TestFSysAddr(t *testing.T) {

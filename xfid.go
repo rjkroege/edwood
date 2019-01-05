@@ -767,16 +767,7 @@ forloop:
 }
 
 func xfideventwrite(x *Xfid, w *Window) {
-	// log.Println("xfideventwrite", x)
-	// defer log.Println("done xfideventwrite")
-	var (
-		fc     plan9.Fcall
-		err    error
-		t      *Text
-		q0, q1 int
-		num    int64
-	)
-	err = nil
+	var err error
 
 	// The messages have a fixed format: a character indicating the
 	// origin or cause of the action, a character indicating
@@ -788,35 +779,45 @@ func xfideventwrite(x *Xfid, w *Window) {
 	// text, which may itself contain newlines.
 	// %c%c%d %d %d %d %s\n
 	lines := strings.Split(string(x.fcall.Data), "\n")
+forloop:
 	for _, events := range lines {
 		if events == "" {
 			continue
 		}
+		if len(events) < 2 {
+			err = Ebadevent
+			break
+		}
 		w.owner = int(events[0])
 		c := events[1]
-		words := strings.Split(wsre.ReplaceAllString(events[2:], " "), " ")
+		words := strings.Fields(events[2:])
+		if len(words) < 2 {
+			err = Ebadevent
+			break
+		}
+		var num int64
 		num, err = strconv.ParseInt(words[0], 10, 32)
 		if err != nil {
 			err = Ebadevent
 			break
 		}
-		q0 = int(num)
+		q0 := int(num)
 		num, err = strconv.ParseInt(words[1], 10, 32)
 		if err != nil {
 			err = Ebadevent
 			break
 		}
-		q1 = int(num)
+		q1 := int(num)
 
-		if 'a' <= c && c <= 'z' {
+		var t *Text
+		switch {
+		case 'a' <= c && c <= 'z':
 			t = &w.tag
-		} else {
-			if 'A' <= c && c <= 'Z' {
-				t = &w.body
-			} else {
-				err = Ebadevent
-				break
-			}
+		case 'A' <= c && c <= 'Z':
+			t = &w.body
+		default:
+			err = Ebadevent
+			break forloop
 		}
 		if q0 > t.Nc() || q1 > t.Nc() || q0 > q1 {
 			err = Ebadevent
@@ -825,30 +826,25 @@ func xfideventwrite(x *Xfid, w *Window) {
 
 		row.lk.Lock() // just like mousethread
 		switch c {
-		case 'x':
-			fallthrough
-		case 'X':
+		case 'x', 'X':
 			execute(t, q0, q1, true, nil)
-			break
-		case 'l':
-			fallthrough
-		case 'L':
+		case 'l', 'L':
 			look3(t, q0, q1, true)
-			break
 		default:
+			row.lk.Unlock()
 			err = Ebadevent
-			break
+			break forloop
 		}
 		row.lk.Unlock()
 	}
 
+	var fc plan9.Fcall
 	if err != nil {
 		fc.Count = 0
 	} else {
 		fc.Count = uint32(len(x.fcall.Data))
 	}
 	respond(x, &fc, err)
-	return
 }
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
