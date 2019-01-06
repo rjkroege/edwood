@@ -1,14 +1,18 @@
 sudo: false
 language: go
+go_import_path: github.com/rjkroege/edwood
 
 go:
-  - 1.10.3
+  - "1.10.x"
+  - "1.11.x"
 
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
 
 env:
-  - acmeshell=sh
+  global:
+    - acmeshell=sh
+    - GO111MODULE=on
 
 script:
   - go get -t -v ./...
