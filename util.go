@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -276,9 +278,26 @@ func makenewwindow(t *Text) *Window {
 	return w
 }
 
-func mousescrollsize(nl int) int {
-	// Unimpl()
-	return 1
+func mousescrollsize(maxlines int) int {
+	s := os.Getenv("mousescrollsize")
+	if s == "" {
+		return 1
+	}
+	if s[len(s)-1] == '%' {
+		pcnt, err := strconv.ParseFloat(s[:len(s)-1], 32)
+		if err != nil || pcnt <= 0 {
+			return 1
+		}
+		if pcnt > 100 {
+			pcnt = 100
+		}
+		return int(pcnt * float64(maxlines) / 100.0)
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n <= 0 {
+		return 1
+	}
+	return n
 }
 
 type Warning struct {

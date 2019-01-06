@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"reflect"
 	"testing"
 )
@@ -29,6 +30,47 @@ func TestCvttorunes(t *testing.T) {
 		if !reflect.DeepEqual(r, tc.r) || nb != tc.nb || nulls != tc.nulls {
 			t.Errorf("cvttorunes of (%q, %v) returned %q, %v, %v; expected %q, %v, %v\n",
 				tc.p, tc.n, r, nb, nulls, tc.r, tc.nb, tc.nulls)
+		}
+	}
+}
+
+func TestMousescrollsize(t *testing.T) {
+	const key = "mousescrollsize"
+	mss, ok := os.LookupEnv(key)
+	if ok {
+		defer os.Setenv(key, mss)
+	} else {
+		defer os.Unsetenv(key)
+	}
+
+	tt := []struct {
+		s        string
+		maxlines int
+		n        int
+	}{
+		{"", 200, 1},
+		{"0", 200, 1},
+		{"-1", 200, 1},
+		{"-42", 200, 1},
+		{"two", 200, 1},
+		{"1", 200, 1},
+		{"42", 200, 42},
+		{"123", 200, 123},
+		{"%", 200, 1},
+		{"0%", 200, 1},
+		{"-1%", 200, 1},
+		{"-42%", 200, 1},
+		{"five%", 200, 1},
+		{"123%", 200, 200},
+		{"10%", 200, 20},
+		{"100%", 200, 200},
+	}
+	for _, tc := range tt {
+		os.Setenv(key, tc.s)
+		n := mousescrollsize(tc.maxlines)
+		if n != tc.n {
+			t.Errorf("mousescrollsize of %v for %v lines is %v; expected %v",
+				tc.s, tc.maxlines, n, tc.n)
 		}
 	}
 }
