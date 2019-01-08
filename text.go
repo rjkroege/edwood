@@ -13,6 +13,7 @@ import (
 	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/complete"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/drawutil"
 )
 
 const (
@@ -800,7 +801,7 @@ func (t *Text) Type(r rune) {
 			Tagdown()
 			return
 		}
-		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
+		n = drawutil.MouseScrollSize(t.fr.GetFrameFillStatus().Maxlines)
 		if n <= 0 {
 			n = 1
 		}
@@ -823,7 +824,7 @@ func (t *Text) Type(r rune) {
 			Tagup()
 			return
 		}
-		n = mousescrollsize(t.fr.GetFrameFillStatus().Maxlines)
+		n = drawutil.MouseScrollSize(t.fr.GetFrameFillStatus().Maxlines)
 		caseUp()
 		return
 	case draw.KeyPageUp:
