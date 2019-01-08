@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -278,26 +279,48 @@ func makenewwindow(t *Text) *Window {
 	return w
 }
 
+var scrollSizeOnce sync.Once
+var scrollLines int
+var scrollPercent float64
+
 func mousescrollsize(maxlines int) int {
-	s := os.Getenv("mousescrollsize")
-	if s == "" {
-		return 1
-	}
-	if s[len(s)-1] == '%' {
-		pcnt, err := strconv.ParseFloat(s[:len(s)-1], 32)
-		if err != nil || pcnt <= 0 {
-			return 1
+	return _mousescrollsize(&scrollSizeOnce, maxlines)
+}
+
+type doer interface {
+	Do(func())
+}
+
+func _mousescrollsize(once doer, maxlines int) int {
+	once.Do(func() {
+		s := os.Getenv("mousescrollsize")
+		if s == "" {
+			return
 		}
-		if pcnt > 100 {
-			pcnt = 100
+		if s[len(s)-1] == '%' {
+			pcnt, err := strconv.ParseFloat(s[:len(s)-1], 32)
+			if err != nil || pcnt <= 0 {
+				return
+			}
+			if pcnt > 100 {
+				pcnt = 100
+			}
+			scrollPercent = pcnt
+			return
 		}
-		return int(pcnt * float64(maxlines) / 100.0)
+		n, err := strconv.Atoi(s)
+		if err != nil || n <= 0 {
+			return
+		}
+		scrollLines = n
+	})
+	if scrollLines > 0 {
+		return scrollLines
 	}
-	n, err := strconv.Atoi(s)
-	if err != nil || n <= 0 {
-		return 1
+	if scrollPercent > 0 {
+		return int(scrollPercent * float64(maxlines) / 100.0)
 	}
-	return n
+	return 1
 }
 
 type Warning struct {

@@ -67,13 +67,19 @@ func TestMousescrollsize(t *testing.T) {
 	}
 	for _, tc := range tt {
 		os.Setenv(key, tc.s)
-		n := mousescrollsize(tc.maxlines)
+		scrollLines = 0
+		scrollPercent = 0
+		n := _mousescrollsize(always{}, tc.maxlines)
 		if n != tc.n {
 			t.Errorf("mousescrollsize of %v for %v lines is %v; expected %v",
 				tc.s, tc.maxlines, n, tc.n)
 		}
 	}
 }
+
+type always struct{}
+
+func (a always) Do(f func()) { f() }
 
 func TestQuote(t *testing.T) {
 	var testCases = []struct {
