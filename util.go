@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"os"
-	"strconv"
 	"strings"
-	"sync"
 	"unicode/utf8"
 )
 
@@ -277,50 +274,6 @@ func makenewwindow(t *Text) *Window {
 		w.col.Grow(w, 1)
 	}
 	return w
-}
-
-var scrollSizeOnce sync.Once
-var scrollLines int
-var scrollPercent float64
-
-func mousescrollsize(maxlines int) int {
-	return _mousescrollsize(&scrollSizeOnce, maxlines)
-}
-
-type doer interface {
-	Do(func())
-}
-
-func _mousescrollsize(once doer, maxlines int) int {
-	once.Do(func() {
-		s := os.Getenv("mousescrollsize")
-		if s == "" {
-			return
-		}
-		if s[len(s)-1] == '%' {
-			pcnt, err := strconv.ParseFloat(s[:len(s)-1], 32)
-			if err != nil || pcnt <= 0 {
-				return
-			}
-			if pcnt > 100 {
-				pcnt = 100
-			}
-			scrollPercent = pcnt
-			return
-		}
-		n, err := strconv.Atoi(s)
-		if err != nil || n <= 0 {
-			return
-		}
-		scrollLines = n
-	})
-	if scrollLines > 0 {
-		return scrollLines
-	}
-	if scrollPercent > 0 {
-		return int(scrollPercent * float64(maxlines) / 100.0)
-	}
-	return 1
 }
 
 type Warning struct {
