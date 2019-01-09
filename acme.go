@@ -299,7 +299,7 @@ func mousethread(display *draw.Display) {
 		case mousectl.Mouse = <-mousectl.C:
 			MovedMouse(mousectl.Mouse)
 		case <-cwarn:
-			break
+			// Do nothing
 		case pm := <-cplumb:
 			if pm.Type == "text" {
 				act := findattr(pm.Attr, "action")
@@ -441,7 +441,6 @@ func MovedMouse(m draw.Mouse) {
 		}
 		return
 	}
-	return
 }
 
 func keyboardthread(display *draw.Display) {
@@ -630,7 +629,6 @@ func xfidallocthread(d *draw.Display) {
 		case x := <-cxfidfree:
 			x.next = xfree
 			xfree = x
-			break
 		}
 	}
 

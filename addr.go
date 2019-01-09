@@ -96,7 +96,6 @@ func number(showerr bool, t Texter, r Range, line int, dir int, size int) (Range
 		if line > 0 {
 			goto Rescue
 		}
-		break
 	case Fore:
 		if q1 > 0 {
 			for q1 < t.Nc() && t.ReadC(q1-1) != '\n' {
@@ -119,7 +118,6 @@ func number(showerr bool, t Texter, r Range, line int, dir int, size int) (Range
 		if line > 0 {
 			goto Rescue
 		}
-		break
 	case Back:
 		if q0 < t.Nc() {
 			for q0 > 0 && t.ReadC(q0-1) != '\n' {
@@ -246,7 +244,6 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 				r, evalp = number(showerr, t, r, 1, int(prevc), Line) // do previous one
 			}
 			dir = int(c)
-			break
 		case c == '.':
 			fallthrough
 		case c == '$':
@@ -265,7 +262,6 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			} else {
 				dir = None
 			}
-			break
 		case c == '#':
 			if q == q1 {
 				return r, evalp, q - 1
@@ -302,7 +298,6 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			}
 			dir = None
 			size = Line
-			break
 		case c == '?':
 			dir = Back
 			fallthrough
@@ -322,7 +317,6 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 					}
 					c = getc(q)
 					q++
-					break
 				case '/':
 					goto out
 				}
@@ -334,7 +328,6 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			}
 			dir = None
 			size = Line
-			break
 		}
 	}
 	if evalp && dir != None {

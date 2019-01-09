@@ -587,7 +587,6 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	}
 
 	w.SetTag()
-	return
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {

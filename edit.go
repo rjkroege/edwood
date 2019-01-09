@@ -647,7 +647,6 @@ func simpleaddr() *Addr {
 				nap.next = addr.next
 				addr.next = nap
 			}
-			break
 		case '+':
 			fallthrough
 		case '-':

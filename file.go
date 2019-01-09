@@ -318,7 +318,6 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			} else {
 				f.name = string(u.buf)
 			}
-			break
 		}
 		(*delta) = (*delta)[0 : len(*delta)-1]
 	}

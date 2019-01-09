@@ -101,7 +101,6 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			t.q1 = dot.r.q1
 			cmdexec(t, cp)
 		}
-		break
 	default:
 		if i < 0 {
 			editerror("unknown command %c in cmdexec", cp.cmdc)
@@ -627,7 +626,6 @@ func eq_cmd(t *Text, cp *Cmd) bool {
 	switch len(cp.text) {
 	case 0:
 		mode = PosnLine
-		break
 	case 1:
 		if cp.text[0] == '#' {
 			mode = PosnChars
@@ -997,7 +995,6 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 			if ap.next == nil || ap.next.typ == '+' || ap.next.typ == '-' {
 				a = lineaddr(1, a, sign)
 			}
-			break
 		default:
 			acmeerror("cmdaddress", nil)
 			return a

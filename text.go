@@ -739,7 +739,6 @@ func (t *Text) Type(r rune) {
 			t.w.tagexpand = true
 			t.w.Resize(t.w.r, false, true)
 		}
-		return
 	}
 
 	Tagup := func() {
@@ -749,18 +748,15 @@ func (t *Text) Type(r rune) {
 			t.w.taglines = 1
 			t.w.Resize(t.w.r, false, true)
 		}
-		return
 	}
 
 	caseDown := func() {
 		q0 = t.org + t.fr.Charofpt(image.Pt(t.fr.Rect().Min.X, t.fr.Rect().Min.Y+n*t.fr.DefaultFontHeight()))
 		t.SetOrigin(q0, true)
-		return
 	}
 	caseUp := func() {
 		q0 = t.Backnl(t.org, n)
 		t.SetOrigin(q0, true)
-		return
 	}
 
 	switch r {
@@ -930,7 +926,7 @@ func (t *Text) Type(r rune) {
 			return
 		}
 		nr = len(rp) // runestrlen(rp);
-		break        // fall through to normal insertion case
+		// break into normal insertion case
 	case 0x1B:
 		if t.eq0 != ^0 {
 			if t.eq0 <= t.q0 {

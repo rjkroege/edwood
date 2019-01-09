@@ -183,7 +183,6 @@ func xfidopen(x *Xfid) {
 				return
 			}
 			w.wrselrange = Range{t.q1, t.q1}
-			break
 		}
 		w.Unlock()
 	} else {
@@ -235,7 +234,6 @@ func xfidclose(x *Xfid) {
 				w.ctlfid = MaxFid
 				w.ctrllock.Unlock()
 			}
-			break
 		case QWdata:
 			fallthrough
 		case QWxdata:
@@ -258,20 +256,16 @@ func xfidclose(x *Xfid) {
 					w.dumpdir = ""
 				}
 			}
-			break
 		case QWrdsel:
 			w.rdselfd.Close()
 			w.rdselfd = nil
-			break
 		case QWwrsel:
 			w.nomark = false
 			t = &w.body
 			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
-			break
 		case QWeditout:
 			<-w.editoutlk
-			break
 		}
 		w.Close()
 		w.Unlock()
@@ -279,7 +273,6 @@ func xfidclose(x *Xfid) {
 		switch q {
 		case Qeditout:
 			<-editoutlk
-			break
 		}
 	}
 	respond(x, &fc, nil)
@@ -309,7 +302,6 @@ func xfidread(x *Xfid) {
 			return
 		default:
 			warning(nil, "unknown qid %d\n", q)
-			break
 		}
 		respond(x, &fc, nil)
 		return
@@ -521,7 +513,6 @@ func xfidwrite(x *Xfid) {
 		w.addr = a
 		fc.Count = x.fcall.Count
 		respond(x, &fc, nil)
-		break
 
 	case Qeditout:
 		fallthrough
@@ -538,7 +529,6 @@ func xfidwrite(x *Xfid) {
 		}
 		fc.Count = x.fcall.Count
 		respond(x, &fc, nil)
-		break
 
 	case QWerrors:
 		w = errorwinforwin(w)
@@ -553,7 +543,6 @@ func xfidwrite(x *Xfid) {
 
 	case QWctl:
 		xfidctlwrite(x, w)
-		break
 
 	case QWdata:
 		a = w.addr
