@@ -624,7 +624,6 @@ func (w *Window) AddIncl(r string) {
 		}
 	}
 	w.incl = append(w.incl, r)
-	return
 }
 
 // Clean returns true iff w can be treated as unmodified.
