@@ -41,17 +41,12 @@ func clampaddr(w *Window) {
 func xfidctl(x *Xfid, d *draw.Display) {
 	// log.Println("xfidctl", x)
 	// defer log.Println("done xfidctl")
-	for {
-		select {
-		case f := <-x.c:
-			f(x)
-			if d != nil {
-				d.Flush()
-			} // d here is for testability.
-			cxfidfree <- x
-			//		case <-exit:
-			//			return
-		}
+	for f := range x.c {
+		f(x)
+		if d != nil {
+			d.Flush()
+		} // d here is for testability.
+		cxfidfree <- x
 	}
 }
 
@@ -216,7 +211,7 @@ func xfidclose(x *Xfid) {
 	w = x.f.w
 	x.f.busy = false
 	x.f.w = nil
-	if x.f.open == false {
+	if !x.f.open {
 		if w != nil {
 			w.Close()
 		}
@@ -463,7 +458,7 @@ func xfidwrite(x *Xfid) {
 			if qid == QWtag {
 				t.Insert(q0, r, true)
 			} else {
-				if w.nomark == false {
+				if !w.nomark {
 					seq++
 					t.file.Mark()
 				}
@@ -553,7 +548,7 @@ func xfidwrite(x *Xfid) {
 			break
 		}
 		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
-		if w.nomark == false {
+		if !w.nomark {
 			seq++
 			t.file.Mark()
 		}

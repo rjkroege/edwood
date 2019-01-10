@@ -200,10 +200,7 @@ func errorwinforwin(w *Window) *Window {
 	if dir == "." { // sigh
 		dir = ""
 	}
-	incl = []string{}
-	for _, in := range w.incl {
-		incl = append(incl, in)
-	}
+	incl = append(incl, w.incl...)
 	owner = w.owner
 	w.Unlock()
 	for {

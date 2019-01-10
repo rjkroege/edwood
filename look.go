@@ -82,7 +82,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 	e, expanded = expand(t, q0, q1)
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		// send alphanumeric expansion to external client
-		if expanded == false {
+		if !expanded {
 			return
 		}
 		f = 0
@@ -182,7 +182,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		}
 	}
 	// interpret alphanumeric string ourselves
-	if expanded == false {
+	if !expanded {
 		return
 	}
 	if e.name != "" || e.at != nil {
@@ -755,11 +755,11 @@ func openfile(t *Text, e *Expand) *Window {
 			eval = false
 			warning(nil, "addresses out of order\n")
 		}
-		if eval == false {
+		if !eval {
 			e.jump = false // don't jump if invalid address
 		}
 	}
-	if eval == false {
+	if !eval {
 		r.q0 = t.q0
 		r.q1 = t.q1
 	}

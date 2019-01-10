@@ -410,10 +410,10 @@ Occasion
 	tfs.Write("/new/body", text)
 
 	op := <-reportchan
-	for strings.Index(op, "focus") != -1 {
+	for strings.Contains(op, "focus") {
 		op = <-reportchan
 	}
-	if strings.Index(op, "new") == -1 {
+	if !strings.Contains(op, "new") {
 		t.Fatalf("Didn't get report of window creation.")
 	}
 

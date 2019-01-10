@@ -416,7 +416,7 @@ func (r *Row) Dump(file string) {
 					0, 0,
 					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
 					fontname)
-			} else if w.body.file.Dirty() == false && access(t.file.name) || w.isdir {
+			} else if !w.body.file.Dirty() && access(t.file.name) || w.isdir {
 				dumped = false
 				t.file.dumpid = w.id
 				fmt.Fprintf(b, "f%11d %11d %11d %11d %11.7f %s\n", i, w.id,
