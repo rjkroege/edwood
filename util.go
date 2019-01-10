@@ -276,11 +276,6 @@ func makenewwindow(t *Text) *Window {
 	return w
 }
 
-func mousescrollsize(nl int) int {
-	// Unimpl()
-	return 1
-}
-
 type Warning struct {
 	md  *MntDir
 	buf Buffer
