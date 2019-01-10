@@ -416,7 +416,7 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 			// if are doing a Put, want to synthesize name even for non-existent file
 			// best guess is that file name doesn't contain a slash
 			promote = true
-			if strings.Index(r, "/") != -1 {
+			if strings.ContainsRune(r, '/') {
 				t = argt
 				arg = r
 			}

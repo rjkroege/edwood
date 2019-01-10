@@ -93,7 +93,7 @@ func (h *FileHash) Set(b []byte) {
 }
 
 func (h FileHash) Eq(h1 FileHash) bool {
-	return bytes.Compare(h[:], h1[:]) == 0
+	return bytes.Equal(h[:], h1[:])
 }
 
 func calcFileHash(b []byte) FileHash {

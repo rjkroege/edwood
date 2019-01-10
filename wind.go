@@ -611,14 +611,14 @@ func (w *Window) AddIncl(r string) {
 	// Tries to open absolute paths, and if fails, tries
 	// to use dirname instead.
 	d, err := isDir(r)
-	if d == false {
+	if !d {
 		if filepath.IsAbs(r) {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}
 		r = string(dirname(&w.body, []rune(r)))
 		d, err := isDir(r)
-		if d == false {
+		if !d {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}

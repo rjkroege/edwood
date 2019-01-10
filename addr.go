@@ -1,5 +1,7 @@
 package main
 
+import "strings"
+
 const (
 	None = iota
 	Fore = '+'
@@ -13,10 +15,7 @@ const (
 
 // Return if r is valid character in an address
 func isaddrc(r rune) bool {
-	if utfrune([]rune("0123456789+-/$.#,;?"), r) != -1 {
-		return true
-	}
-	return false
+	return strings.ContainsRune("0123456789+-/$.#,;?", r)
 }
 
 // quite hard: could be almost anything but white space, but we are a little conservative,

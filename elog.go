@@ -87,7 +87,7 @@ func (e *Elog) secondlast() *ElogOperation {
 
 func (eo *ElogOperation) setr(r []rune) {
 	if eo.r == nil || cap(eo.r) < len(r) {
-		eo.r = make([]rune, len(r), len(r))
+		eo.r = make([]rune, len(r))
 	} else {
 		eo.r = eo.r[0:len(r)]
 	}

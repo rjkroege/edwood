@@ -10,11 +10,8 @@ func acmeTestingMain() {
 	cwait = make(chan *os.ProcessState)
 	cerr = make(chan error)
 	go func() {
-		for {
-			select {
-			case <-cerr:
-				// Do nothing with command output.
-			}
+		for range cerr {
+			// Do nothing with command output.
 		}
 	}()
 }
