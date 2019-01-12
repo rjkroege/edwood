@@ -16,12 +16,15 @@ import (
 
 const Ctlsize = 5 * 12
 
-var Edel = fmt.Errorf("deleted window")
-var Ebadctl = fmt.Errorf("ill-formed control message")
-var Ebadaddr = fmt.Errorf("bad address syntax")
-var Eaddr = fmt.Errorf("address out of range")
-var Einuse = fmt.Errorf("already in use")
-var Ebadevent = fmt.Errorf("bad event syntax")
+// Errors returned by file server.
+var (
+	ErrDeletedWin = fmt.Errorf("deleted window")
+	ErrBadCtl     = fmt.Errorf("ill-formed control message")
+	ErrBadAddr    = fmt.Errorf("bad address syntax")
+	ErrAddrRange  = fmt.Errorf("address out of range")
+	ErrInUse      = fmt.Errorf("already in use")
+	ErrBadEvent   = fmt.Errorf("bad event syntax")
+)
 
 func clampaddr(w *Window) {
 	if w.addr.q0 < 0 {
@@ -126,7 +129,7 @@ func xfidopen(x *Xfid) {
 			// modified during the operation, e.g. by |sort
 			if w.rdselfd != nil {
 				w.Unlock()
-				respond(x, &fc, Einuse)
+				respond(x, &fc, ErrInUse)
 				return
 			}
 			var err error
@@ -167,14 +170,14 @@ func xfidopen(x *Xfid) {
 		case QWeditout:
 			if editing == Inactive {
 				w.Unlock()
-				respond(x, &fc, Eperm)
+				respond(x, &fc, ErrPermission)
 				return
 			}
 			select {
 			case w.editoutlk <- true:
 			default:
 				w.Unlock()
-				respond(x, &fc, Einuse)
+				respond(x, &fc, ErrInUse)
 				return
 			}
 			w.wrselrange = Range{t.q1, t.q1}
@@ -188,7 +191,7 @@ func xfidopen(x *Xfid) {
 			select {
 			case editoutlk <- true:
 			default:
-				respond(x, &fc, Einuse)
+				respond(x, &fc, ErrInUse)
 				return
 			}
 		}
@@ -304,7 +307,7 @@ func xfidread(x *Xfid) {
 	w.Lock('F')
 	if w.col == nil {
 		w.Unlock()
-		respond(x, &fc, Edel)
+		respond(x, &fc, ErrDeletedWin)
 		return
 	}
 	off := x.fcall.Offset
@@ -345,7 +348,7 @@ func xfidread(x *Xfid) {
 	case QWdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > w.body.Nc() {
-			respond(x, &fc, Eaddr)
+			respond(x, &fc, ErrAddrRange)
 			break
 		}
 		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.Nc())
@@ -354,7 +357,7 @@ func xfidread(x *Xfid) {
 	case QWxdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > w.body.Nc() {
-			respond(x, &fc, Eaddr)
+			respond(x, &fc, ErrAddrRange)
 			break
 		}
 		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
@@ -437,7 +440,7 @@ func xfidwrite(x *Xfid) {
 		w.Lock(c)
 		if w.col == nil {
 			w.Unlock()
-			respond(x, &fc, Edel)
+			respond(x, &fc, ErrDeletedWin)
 			return
 		}
 	}
@@ -498,11 +501,11 @@ func xfidwrite(x *Xfid) {
 		a, eval, nb = address(false, t, w.limit, w.addr, 0, (len(r)),
 			func(q int) rune { return r[q] }, eval)
 		if nb < (len(r)) {
-			respond(x, &fc, Ebadaddr)
+			respond(x, &fc, ErrBadAddr)
 			break
 		}
 		if !eval {
-			respond(x, &fc, Eaddr)
+			respond(x, &fc, ErrAddrRange)
 			break
 		}
 		w.addr = a
@@ -544,7 +547,7 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		w.Commit(t)
 		if a.q0 > t.Nc() || a.q1 > t.Nc() {
-			respond(x, &fc, Eaddr)
+			respond(x, &fc, ErrAddrRange)
 			break
 		}
 		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
@@ -638,7 +641,7 @@ forloop:
 			t.Show(t.q0, t.q1, true)
 		case "name": // set file name
 			if len(words) < 2 {
-				err = Ebadctl
+				err = ErrBadCtl
 				break forloop
 			}
 			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
@@ -657,7 +660,7 @@ forloop:
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
-				err = Ebadctl
+				err = ErrBadCtl
 				break forloop
 			}
 			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
@@ -668,7 +671,7 @@ forloop:
 			w.dumpstr = string(r)
 		case "dumpdir": // set dump directory
 			if len(words) < 2 {
-				err = Ebadctl
+				err = ErrBadCtl
 				break forloop
 			}
 			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
@@ -719,7 +722,7 @@ forloop:
 			settag = true
 
 		default:
-			err = Ebadctl
+			err = ErrBadCtl
 			break forloop
 		}
 	}
@@ -769,26 +772,26 @@ forloop:
 			continue
 		}
 		if len(events) < 2 {
-			err = Ebadevent
+			err = ErrBadEvent
 			break
 		}
 		w.owner = int(events[0])
 		c := events[1]
 		words := strings.Fields(events[2:])
 		if len(words) < 2 {
-			err = Ebadevent
+			err = ErrBadEvent
 			break
 		}
 		var num int64
 		num, err = strconv.ParseInt(words[0], 10, 32)
 		if err != nil {
-			err = Ebadevent
+			err = ErrBadEvent
 			break
 		}
 		q0 := int(num)
 		num, err = strconv.ParseInt(words[1], 10, 32)
 		if err != nil {
-			err = Ebadevent
+			err = ErrBadEvent
 			break
 		}
 		q1 := int(num)
@@ -800,11 +803,11 @@ forloop:
 		case 'A' <= c && c <= 'Z':
 			t = &w.body
 		default:
-			err = Ebadevent
+			err = ErrBadEvent
 			break forloop
 		}
 		if q0 > t.Nc() || q1 > t.Nc() || q0 > q1 {
-			err = Ebadevent
+			err = ErrBadEvent
 			break
 		}
 
@@ -816,7 +819,7 @@ forloop:
 			look3(t, q0, q1, true)
 		default:
 			row.lk.Unlock()
-			err = Ebadevent
+			err = ErrBadEvent
 			break forloop
 		}
 		row.lk.Unlock()

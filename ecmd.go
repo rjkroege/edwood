@@ -113,7 +113,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 func edittext(w *Window, q int, r []rune) error {
 	switch editing {
 	case Inactive:
-		return Eperm
+		return ErrPermission
 	case Inserting:
 		f := w.body.file
 		f.elog.Insert(q, r)
