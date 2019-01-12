@@ -768,7 +768,7 @@ func (row *Row) loadimpl(file string, initing bool) error {
 				return fmt.Errorf("bad line %#v in dumpfile", l)
 			}
 			// We discard a line
-			l, err = readtrim(b) // ctl line; ignored
+			_, err = readtrim(b) // ctl line; ignored
 			if err != nil {
 				return err
 			}
