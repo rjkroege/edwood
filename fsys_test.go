@@ -351,8 +351,8 @@ func TestFSys(t *testing.T) {
 		}
 		defer fid.Close()
 		_, err = fid.Write([]byte("hello\n"))
-		if err == nil || err.Error() != Eperm.Error() {
-			t.Fatalf("write to editout returned %v; expected %v", err, Eperm)
+		if err == nil || err.Error() != ErrPermission.Error() {
+			t.Fatalf("write to editout returned %v; expected %v", err, ErrPermission)
 		}
 	})
 	t.Run("WriteEvent", func(t *testing.T) {
@@ -372,15 +372,15 @@ func TestFSys(t *testing.T) {
 			{nil, "Ml0 0 \n"},
 			{nil, "MX0 0 \n"},
 			{nil, "ML0 0 \nMl0 0 \n"},
-			{Ebadevent, "M\n"},
-			{Ebadevent, "ML\n"},
-			{Ebadevent, "ML0 \n"},
-			{Ebadevent, "MLA 0 \n"},
-			{Ebadevent, "ML0 A \n"},
-			{Ebadevent, "M40 0 \n"},
-			{Ebadevent, "ML9 9 \n"},
-			{Ebadevent, "MZ0 0 \n"},
-			{Ebadevent, "MZ0 0 \nML0 0 \n"}, // bad event followed by a good one
+			{ErrBadEvent, "M\n"},
+			{ErrBadEvent, "ML\n"},
+			{ErrBadEvent, "ML0 \n"},
+			{ErrBadEvent, "MLA 0 \n"},
+			{ErrBadEvent, "ML0 A \n"},
+			{ErrBadEvent, "M40 0 \n"},
+			{ErrBadEvent, "ML9 9 \n"},
+			{ErrBadEvent, "MZ0 0 \n"},
+			{ErrBadEvent, "MZ0 0 \nML0 0 \n"}, // bad event followed by a good one
 		}
 		for _, tc := range tt {
 			_, err = w.Write("event", []byte(tc.s))

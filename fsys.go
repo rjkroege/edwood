@@ -48,10 +48,11 @@ func initfcall() {
 	fcall[plan9.Twstat] = fsyswstat
 }
 
+// Errors returned by file server.
 var (
-	Eperm   = errors.New("permission denied")
-	Eexist  = errors.New("file does not exist")
-	Enotdir = errors.New("not a directory")
+	ErrPermission = os.ErrPermission
+	ErrNotExist   = os.ErrNotExist
+	ErrNotDir     = errors.New("not a directory")
 )
 
 var dirtab = []*DirTab{
@@ -245,7 +246,7 @@ func fsysflush(x *Xfid, f *Fid) *Xfid {
 func fsysattach(x *Xfid, f *Fid) *Xfid {
 	if x.fcall.Uname != username {
 		var t plan9.Fcall
-		return respond(x, &t, Eperm)
+		return respond(x, &t, ErrPermission)
 	}
 	f.busy = true
 	f.open = false
@@ -333,7 +334,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 		for i = 0; i < len(x.fcall.Wname); i++ {
 			wname = x.fcall.Wname[i]
 			if (q.Type & plan9.QTDIR) == 0 {
-				err = Enotdir
+				err = ErrNotDir
 				break
 			}
 
@@ -427,7 +428,7 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 
 		// If we never incremented
 		if i == 0 && err == nil {
-			err = Eexist
+			err = ErrNotExist
 		}
 		if i == plan9.MAXWELEM {
 			err = fmt.Errorf("name too long")
@@ -485,12 +486,12 @@ func fsysopen(x *Xfid, f *Fid) *Xfid {
 
 Deny:
 	var t plan9.Fcall
-	return respond(x, &t, Eperm)
+	return respond(x, &t, ErrPermission)
 }
 
 func fsyscreate(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	return respond(x, &t, Eperm)
+	return respond(x, &t, ErrPermission)
 }
 
 //func idcmp (const  void *a, const  void *b) (int) {
@@ -589,7 +590,7 @@ func fsysclunk(x *Xfid, f *Fid) *Xfid {
 
 func fsysremove(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	return respond(x, &t, Eperm)
+	return respond(x, &t, ErrPermission)
 }
 
 func fsysstat(x *Xfid, f *Fid) *Xfid {
@@ -605,7 +606,7 @@ func fsysstat(x *Xfid, f *Fid) *Xfid {
 func fsyswstat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
-	return respond(x, &t, Eperm)
+	return respond(x, &t, ErrPermission)
 }
 
 func newfid(fid uint32) *Fid {
