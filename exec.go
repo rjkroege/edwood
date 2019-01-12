@@ -432,7 +432,7 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 	return r
 }
 
-func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
+func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	if flag1 {
 		if et == nil || et.w == nil {
 			return
@@ -442,7 +442,7 @@ func get(et *Text, t *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		return
 	}
 	w := et.w
-	t = &w.body
+	t := &w.body
 	name := getname(t, argt, arg, false)
 	if name == "" {
 		warning(nil, "no file name\n")
@@ -692,11 +692,11 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	go runwaittask(c, cpid)
 }
 
-func sendx(et *Text, t *Text, _ *Text, _, _ bool, _ string) {
+func sendx(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	if et.w == nil {
 		return
 	}
-	t = &et.w.body
+	t := &et.w.body
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
@@ -710,9 +710,9 @@ func sendx(et *Text, t *Text, _ *Text, _, _ bool, _ string) {
 	t.Show(t.q1, t.q1, true)
 }
 
-func look(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
+func look(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	if et != nil && et.w != nil {
-		t = &et.w.body
+		t := &et.w.body
 		if len(arg) > 0 {
 			search(t, []rune(arg))
 			return
@@ -759,17 +759,15 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 }
 
-func fontx(et *Text, t *Text, argt *Text, _, _ bool, arg string) {
+func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	if et == nil || et.w == nil {
 		return
 	}
-	t = &et.w.body
+	t := &et.w.body
 	file := ""
 	// Parse parameter.  It might be in arg, or argt, or both
 	r, _ := getarg(argt, false, true)
-	r = r + " " + arg
-	r = wsre.ReplaceAllString(r, " ")
-	words := strings.Split(arg, " ")
+	words := strings.Fields(r + " " + arg)
 
 	for _, wrd := range words {
 		switch wrd {

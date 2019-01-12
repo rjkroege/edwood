@@ -331,7 +331,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)
 		if err != nil {
 			warning(nil, "Error reading file %s: %v", filename, err)
-			return 0, fmt.Errorf("Error reading file %s: %v", filename, err)
+			return 0, fmt.Errorf("error reading file %s: %v", filename, err)
 		}
 		q1 = q0 + count
 	}
