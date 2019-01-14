@@ -353,8 +353,9 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 				continue
 			}
 			// is it a numeric name?
-			_, err := strconv.ParseInt(wname, 10, 32)
+			_, err = strconv.ParseInt(wname, 10, 32)
 			if err != nil {
+				err = nil
 				goto Regular
 			}
 			// yes: it's a directory

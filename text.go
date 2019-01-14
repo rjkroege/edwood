@@ -331,7 +331,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)
 		if err != nil {
 			warning(nil, "Error reading file %s: %v", filename, err)
-			return 0, fmt.Errorf("Error reading file %s: %v", filename, err)
+			return 0, fmt.Errorf("error reading file %s: %v", filename, err)
 		}
 		q1 = q0 + count
 	}
@@ -1446,8 +1446,10 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	return inq, cl == '\n' && nest == 1
 }
 
+// ishtmlstart checks whether the text starting at location q an html tag.
+// Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
+// Returned q1 is the location after the tag.
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-	Untested()
 	if q+2 > t.file.b.Nc() {
 		return 0, 0
 	}
@@ -1467,17 +1469,19 @@ func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
 		c = t.ReadC(q)
 		q++
 	}
-	if c1 == '/' {
+	if c1 == '/' { // closing tag
 		return q, -1
 	}
-	if c2 == '/' || c2 == '!' {
+	if c2 == '/' || c2 == '!' { // open + close tag or comment
 		return 0, 0
 	}
 	return q, 1
 }
 
+// ishtmlend checks whether the text ending at location q an html tag.
+// Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
+// Returned q0 is the start of the tag.
 func (t *Text) ishtmlend(q int) (q1 int, stat int) {
-	Untested()
 	if q < 2 {
 		return 0, 0
 	}
@@ -1497,24 +1501,23 @@ func (t *Text) ishtmlend(q int) (q1 int, stat int) {
 		q--
 		c = t.ReadC(q)
 	}
-	if c1 == '/' {
+	if c1 == '/' { // closing tag
 		return q, -1
 	}
-	if c2 == '/' || c2 == '!' {
+	if c2 == '/' || c2 == '!' { // open + close tag or comment
 		return 0, 0
 	}
 	return q, 1
 }
 
 func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
-	depth := 0
-	q := inq0
 	q0 = inq0
+	q1 = inq0
 
 	// after opening tag?  scan forward for closing tag
-	_, stat := t.ishtmlend(inq0)
-	if stat == 1 {
-		depth = 1
+	if _, stat := t.ishtmlend(q0); stat == 1 {
+		depth := 1
+		q := q1
 		for q < t.file.b.Nc() {
 			nq, n := t.ishtmlstart(q)
 			if n != 0 {
@@ -1530,9 +1533,9 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	}
 
 	// before closing tag?  scan backward for opening tag
-	_, stat = t.ishtmlstart(q)
-	if stat == -1 {
-		depth = -1
+	if _, stat := t.ishtmlstart(q1); stat == -1 {
+		depth := -1
+		q := q0
 		for q > 0 {
 			nq, n := t.ishtmlend(q)
 			if n != 0 {

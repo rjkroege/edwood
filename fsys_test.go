@@ -172,7 +172,7 @@ func TestFSys(t *testing.T) {
 		t.SkipNow()                   // Only used for debugging?
 		fid, err := fsys.Open("/", 0) // Readonly
 		if err != nil {
-			t.Errorf("Failed to open/: %v", err)
+			t.Fatalf("Failed to open/: %v", err)
 		}
 
 		dirs, err := fid.Dirread()
@@ -186,7 +186,7 @@ func TestFSys(t *testing.T) {
 
 		fid, err = fsys.Open("/1", plan9.OREAD)
 		if err != nil {
-			t.Errorf("Failed to walk to /1: %v", err)
+			t.Fatalf("Failed to walk to /1: %v", err)
 		}
 		dirs, err = fid.Dirread()
 		if err != nil {
@@ -199,7 +199,7 @@ func TestFSys(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		fid, err := fsys.Open("/new/body", plan9.OWRITE)
 		if err != nil {
-			t.Errorf("Failed to open/: %v", err)
+			t.Fatalf("Failed to open/: %v", err)
 		}
 		text := []byte("This is a test\nof the emergency typing system\n")
 		fid.Write(text)
@@ -207,7 +207,7 @@ func TestFSys(t *testing.T) {
 
 		fid, err = fsys.Open("/2/body", plan9.OREAD)
 		if err != nil {
-			t.Errorf("Failed to open /2/body: %v", err)
+			t.Fatalf("Failed to open /2/body: %v", err)
 		}
 		buf := make([]byte, len(text))
 		_, err = fid.ReadFull(buf)
@@ -221,7 +221,7 @@ func TestFSys(t *testing.T) {
 
 		fid, err = fsys.Open("/2/addr", plan9.OWRITE)
 		if err != nil {
-			t.Errorf("Failed to open /2/addr: %v", err)
+			t.Fatalf("Failed to open /2/addr: %v", err)
 		}
 		fid.Write([]byte("#5"))
 		fid.Close()
@@ -229,14 +229,14 @@ func TestFSys(t *testing.T) {
 		// test insertion
 		fid, err = fsys.Open("/2/data", plan9.OWRITE)
 		if err != nil {
-			t.Errorf("Failed to open /2/data: %v", err)
+			t.Fatalf("Failed to open /2/data: %v", err)
 		}
 		fid.Write([]byte("insertion"))
 		fid.Close()
 
 		fid, err = fsys.Open("/2/body", plan9.OREAD)
 		if err != nil {
-			t.Errorf("Failed to open /2/body: %v", err)
+			t.Fatalf("Failed to open /2/body: %v", err)
 		}
 		text = append(text[0:5], append([]byte("insertion"), text[5:]...)...)
 		buf = make([]byte, len(text))
@@ -252,7 +252,7 @@ func TestFSys(t *testing.T) {
 		// Delete the window
 		fid, err = fsys.Open("/2/ctl", plan9.OWRITE)
 		if err != nil {
-			t.Errorf("Failed to open /2/ctl: %v", err)
+			t.Fatalf("Failed to open /2/ctl: %v", err)
 		}
 		fid.Write([]byte("delete"))
 		fid.Close()
@@ -260,7 +260,7 @@ func TestFSys(t *testing.T) {
 		// Make sure it's gone from the directory
 		fid, err = fsys.Open("/1", plan9.OREAD)
 		if err != nil {
-			t.Errorf("Failed to walk to /1: %v", err)
+			t.Fatalf("Failed to walk to /1: %v", err)
 		}
 		dirs, err := fid.Dirread()
 		if err != nil {
@@ -453,7 +453,7 @@ func (tfs tFsys) startlog() (rc chan string, exit chan struct{}) {
 	exit = make(chan struct{})
 	fid, err := tfs.fsys.Open("/log", plan9.OREAD)
 	if err != nil {
-		tfs.t.Errorf("Failed to open acme/log: %v", err)
+		tfs.t.Fatalf("Failed to open acme/log: %v", err)
 	}
 
 	go func() {
@@ -476,7 +476,7 @@ func (tfs tFsys) startlog() (rc chan string, exit chan struct{}) {
 func (tfs tFsys) Read(file string) (s string) {
 	fid, err := tfs.fsys.Open(file, plan9.OREAD)
 	if err != nil {
-		tfs.t.Errorf("Failed to open %s: %v", file, err)
+		tfs.t.Fatalf("Failed to open %s: %v", file, err)
 	}
 	var buf [8192]byte
 	n, err := fid.Read(buf[:])
@@ -490,7 +490,7 @@ func (tfs tFsys) Read(file string) (s string) {
 func (tfs tFsys) Write(file, s string) {
 	fid, err := tfs.fsys.Open(file, plan9.OWRITE)
 	if err != nil {
-		tfs.t.Errorf("Failed to open %s: %v", file, err)
+		tfs.t.Fatalf("Failed to open %s: %v", file, err)
 	}
 	_, err = fid.Write([]byte(s))
 	if err != nil {
