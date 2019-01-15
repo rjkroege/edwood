@@ -17,5 +17,8 @@ env:
 script:
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d -s .)
-  - go test -v -race ./...
+  - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
   - go tool vet .
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
