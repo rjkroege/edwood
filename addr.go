@@ -217,13 +217,12 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			return r, evalp, q - 1
 		case c == ';':
 			ar = r
-			// fall through
+			fallthrough
 		case c == ',':
 			if prevc == 0 { // lhs defaults to 0
 				r.q0 = 0
 			}
-			text, ok := t.(*Text)
-			if q >= q1 && t != nil && ok && text.file != nil { // rhs defaults to $
+			if q >= q1 && t != nil { // rhs defaults to $
 				r.q1 = t.Nc()
 			} else {
 				nr, evalp, q = address(showerr, t, lim, ar, q, q1, getc, evalp)
@@ -262,14 +261,10 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 				dir = None
 			}
 		case c == '#':
-			if q == q1 {
+			if q >= q1 {
 				return r, evalp, q - 1
 			}
-			if q < q1 {
-				c = getc(q)
-			} else {
-				c = 0
-			}
+			c = getc(q)
 			q++
 			if c < '0' || '9' < c {
 				return r, evalp, q - 1
@@ -279,12 +274,7 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 		case c >= '0' && c <= '9':
 			n = int(c - '0')
 			for q < q1 {
-				if q < q1 {
-					c = getc(q)
-				} else {
-					c = 0
-				}
-
+				c = getc(q)
 				q++
 				if c < '0' || '9' < c {
 					q--
