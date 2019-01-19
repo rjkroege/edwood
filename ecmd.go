@@ -16,7 +16,6 @@ const Enoname = "no file name given"
 
 var (
 	addr       Address
-	menu       *File
 	sel        RangeSet
 	curtext    *Text
 	collection []rune

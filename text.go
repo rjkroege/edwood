@@ -43,7 +43,7 @@ var (
 type TextKind byte
 
 const (
-	Columntag = iota
+	Columntag TextKind = iota
 	Rowtag
 	Tag
 	Body
@@ -109,17 +109,19 @@ func (t *Text) Nc() int {
 	return t.file.b.Nc()
 }
 
-// whatstring provides an easy-reading version of the Text usage.
-func (t *Text) whatstring() string {
-	switch t.what {
+// String returns a string representation of the TextKind.
+func (tk TextKind) String() string {
+	switch tk {
 	case Body:
 		return "Body"
+	case Columntag:
+		return "Columntag"
 	case Rowtag:
 		return "Rowtag"
 	case Tag:
 		return "Tag"
 	}
-	return "Columntag"
+	return fmt.Sprintf("TextKind(%v)", int(tk))
 }
 
 func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {

@@ -43,22 +43,6 @@ type Cmdtab struct {
 	fn      func(*Text, *Cmd) bool // function to call with parse tree
 }
 
-const INCR = 25 // delta when growing list
-
-type List struct { // code depends on a long being able to hold a pointer
-
-	nalloc int
-	nused  int
-
-	u interface{}
-	/*
-		listptr	*void
-		void*	*ptr;
-		byte*	*ucharptr;
-		string	*stringptr;
-	*/
-}
-
 type Defaddr int
 
 const (

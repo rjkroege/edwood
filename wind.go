@@ -45,7 +45,6 @@ type Window struct {
 	dirnames    []string
 	widths      []int
 	incl        []string
-	reffont     *draw.Font
 	ctrllock    *sync.Mutex
 	ctlfid      uint32
 	dumpstr     string

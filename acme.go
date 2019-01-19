@@ -19,19 +19,10 @@ import (
 	"github.com/rjkroege/edwood/frame"
 )
 
-const (
-	NSnarf = 1000
-)
-
 var (
-	snarfrune         [NSnarf + 1]rune
 	command           *Command
 	swapscrollButtons bool
 )
-
-func timefmt( /*Fmt* */ ) int {
-	return 0
-}
 
 // var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
 var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
@@ -115,7 +106,6 @@ func main() {
 	cxfidalloc = make(chan *Xfid)
 	cxfidfree = make(chan *Xfid)
 	cnewwindow = make(chan *Window)
-	mouseexit0 = make(chan int)
 	csignal = make(chan os.Signal, 1)
 	cerr = make(chan error)
 	cedit = make(chan int)
@@ -645,10 +635,6 @@ func newwindowthread() {
 		xfidlog(w, "new")
 		cnewwindow <- w
 	}
-
-}
-
-func plumbproc() {
 
 }
 

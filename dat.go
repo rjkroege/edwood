@@ -61,8 +61,6 @@ const (
 	Inserting  = 1
 	Collecting = 2
 
-	NCOL = 5
-
 	// Always apply display scalesize to these.
 	Border       = 2
 	ButtonBorder = 2
@@ -93,8 +91,6 @@ var (
 	//	boxcursor Cursor
 	row Row
 
-	timerpid  int
-	disk      *Disk
 	seltext   *Text
 	argtext   *Text
 	mousetext *Text
@@ -107,7 +103,6 @@ var (
 	activecol         *Column
 	snarfbuf          Buffer
 	nullrect          image.Rectangle
-	fsyspid           int
 	cputype           string
 	objtype           string
 	home              string
@@ -118,7 +113,6 @@ var (
 	editing           = Inactive
 	messagesize       int
 	globalautoindent  bool
-	dodollarsigns     bool
 	mtpt              string
 
 	cplumb     chan *plumb.Message
@@ -128,8 +122,6 @@ var (
 	cxfidalloc chan *Xfid
 	cxfidfree  chan *Xfid
 	cnewwindow chan *Window
-	mouseexit0 chan int
-	mouseexit1 chan int
 	cexit      chan struct{}
 	csignal    chan os.Signal
 	cerr       chan error
@@ -180,7 +172,6 @@ type Fid struct {
 	qid    plan9.Qid
 	w      *Window
 	dir    *DirTab
-	next   *Fid
 	mntdir *MntDir
 	nrpart int
 	rpart  [utf8.UTFMax]byte
@@ -188,12 +179,10 @@ type Fid struct {
 }
 
 type Xfid struct {
-	arg   interface{}
-	fcall plan9.Fcall
-	next  *Xfid
-	c     chan func(*Xfid)
-	f     *Fid
-	//buf     []byte
+	fcall   plan9.Fcall
+	next    *Xfid
+	c       chan func(*Xfid)
+	f       *Fid
 	flushed bool
 }
 

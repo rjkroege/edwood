@@ -70,10 +70,6 @@ func (b *Buffer) Nbyte() int {
 	return bc
 }
 
-func fbufalloc() []rune {
-	return make([]rune, BUFSIZE/utf8.UTFMax)
-}
-
 // TODO(flux): This is another design constraint of Buffer - we want to efficiently
 // present contiguous segments of bytes, possibly by merging/flattening our tree
 // when a view is requested. This should be a rare operation...
