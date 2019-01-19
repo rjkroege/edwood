@@ -22,7 +22,6 @@ var (
 )
 
 const (
-	Nhash = 16
 	DEBUG = 0
 )
 

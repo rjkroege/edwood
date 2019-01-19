@@ -17,7 +17,6 @@ type File struct {
 	b       Buffer
 	delta   []*Undo
 	epsilon []*Undo
-	elogbuf *Buffer
 	elog    Elog
 	name    string
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness

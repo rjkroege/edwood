@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-type loadfontstest struct {
-	fname string
-	val   string
-}
-
 const shortFile = `/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
 /mnt/font/GoRegular/13a/font
 `
