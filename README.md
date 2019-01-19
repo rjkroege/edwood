@@ -33,6 +33,8 @@ with Edwood or if your favourite Acme feature doesn't work.
 * Revised text handling data structures.
 * More configurability: styles, keyboard shortcuts, autocomplete.
 * See the issues list for the details.
+* Improve the testing [code coverage](https://codecov.io/gh/rjkroege/edwood)
+
 
 
 
