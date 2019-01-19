@@ -125,7 +125,7 @@ func (tk TextKind) String() string {
 }
 
 func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
-	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.whatstring())
+	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.what)
 	// defer log.Println("--- Text Redraw end")
 	// use no wider than 3-space tabs in a directory
 	maxt := int(maxtab)
@@ -157,7 +157,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 }
 
 func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
-	// log.Println("--- Text Resize start", r, keepextra, t.whatstring())
+	// log.Println("--- Text Resize start", r, keepextra, t.what)
 	// defer log.Println("--- Text Resize end")
 	if r.Dy() <= 0 {
 		// TODO(rjk): Speculative change to draw better. Original:
@@ -507,7 +507,7 @@ func (t *Text) inSelection(q0 int) bool {
 
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
 func (t *Text) fill(fr frame.SelectScrollUpdater) {
-	// log.Println("Text.Fill Start", t.whatstring())
+	// log.Println("Text.Fill Start", t.what)
 	// defer log.Println("Text.Fill End")
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
