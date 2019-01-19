@@ -47,3 +47,22 @@ func TestClickHTMLMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestTextKindString(t *testing.T) {
+	tt := []struct {
+		tk TextKind
+		s  string
+	}{
+		{Body, "Body"},
+		{Columntag, "Columntag"},
+		{Rowtag, "Rowtag"},
+		{Tag, "Tag"},
+		{100, "TextKind(100)"},
+	}
+	for _, tc := range tt {
+		s := tc.tk.String()
+		if s != tc.s {
+			t.Errorf("string representation of TextKind(%d) is %s; expected %s", int(tc.tk), s, tc.s)
+		}
+	}
+}
