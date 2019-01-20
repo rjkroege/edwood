@@ -640,11 +640,9 @@ func newwindowthread() {
 
 func killprocs() {
 	fsysclose()
-	/*
-		for _, c := range command {
-			c.Signal(os.Interrupt)
-		}
-	*/
+	for c := command; c != nil; c = c.next {
+		c.proc.Kill()
+	}
 }
 
 var dumping bool
