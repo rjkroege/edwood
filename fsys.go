@@ -94,7 +94,7 @@ var mnt Mnt
 
 var (
 	username = "Wile E. Coyote"
-	closing  int
+	closing  bool
 )
 
 func fsysinit() {
@@ -118,6 +118,9 @@ func fsysproc() {
 	for {
 		fc, err := plan9.ReadFcall(sfd)
 		if err != nil || fc == nil {
+			if closing {
+				break
+			}
 			acmeerror("fsysproc", err)
 		}
 		if x == nil {
@@ -199,8 +202,10 @@ func fsysdelid(idm *MntDir) {
 }
 
 func fsysclose() {
-	closing = 1
-	sfd.Close()
+	closing = true
+	if sfd != nil {
+		sfd.Close()
+	}
 }
 
 func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
