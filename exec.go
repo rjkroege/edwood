@@ -681,8 +681,8 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	cpid = make(chan *os.Process)
 	go func() {
 		err := runproc(win, s, rdir, newns, argaddr, xarg, c, cpid, iseditcmd)
-		if err != nil {
-			warning(nil, "runproc: %v\n", err)
+		if err != nil && err != errEmptyCmd {
+			warning(nil, "%v\n", err)
 		}
 	}()
 	// This is to avoid blocking waiting for task launch.
@@ -844,6 +844,8 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 	cpid = nil
 }
 
+var errEmptyCmd = fmt.Errorf("empty command")
+
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
@@ -871,30 +873,11 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 	}
 	Fail := func() {
-		Untested()
 		Closeall()
 		// threadexec hasn't happened, so send a zero
 		cpid <- nil
 	}
 	Hard := func() error {
-		// ugly: set path = (. $cputype /bin)
-		// should honor $path if unusual.
-		/* TODO(flux): This looksl ike plan9 magic
-		if cputype {
-			n = 0;
-			memmove(buf+n, ".", 2);
-			n += 2;
-			i = strlen(cputype)+1;
-			memmove(buf+n, cputype, i);
-			n += i;
-			memmove(buf+n, "/bin", 5);
-			n += 5;
-			fd = create("/env/path", OWRITE, 0666);
-			write(fd, buf, n);
-			close(fd);
-		}
-		*/
-
 		if arg != "" {
 			s = fmt.Sprintf("%s '%s'", t, arg) // TODO(flux): BUG: what if quote in arg?
 			// This is a bug from the original; and I now know
@@ -917,11 +900,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			Fail()
 			return fmt.Errorf("exec %s: %v", shell, err)
 		}
-		if cpid != nil {
-			cpid <- cmd.Process
-		} else {
-			cpid <- nil
-		}
+		cpid <- cmd.Process
 		go func() {
 			cmd.Wait()
 			Closeall()
@@ -1030,7 +1009,10 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	if arg != "" {
 		c.av = append(c.av, arg)
 	}
-
+	if len(c.av) == 0 {
+		Fail()
+		return errEmptyCmd
+	}
 	cmd := exec.Command(c.av[0], c.av[1:]...)
 	cmd.Dir = dir
 	cmd.Stdin = sin
@@ -1041,11 +1023,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		Fail()
 		return err
 	}
-	if cpid != nil {
-		cpid <- cmd.Process
-	} else {
-		cpid <- nil
-	}
+	cpid <- cmd.Process
 	go func() {
 		cmd.Wait()
 		Closeall()
