@@ -6,7 +6,8 @@ package regexp
 
 import (
 	"regexp/syntax"
-	"strings"
+
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 // CompileAcme is like Compile but treats ^ and $ as only matching
@@ -188,13 +189,11 @@ func (i *inputRunes) canCheckPrefix() bool {
 }
 
 func (i *inputRunes) hasPrefix(re *Regexp) bool {
-	// TODO(fhs): avoid conversion from []rune to string?
-	return strings.HasPrefix(string(i.str[i.start:i.end]), re.prefix)
+	return runes.HasPrefix(i.str[i.start:i.end], []rune(re.prefix))
 }
 
 func (i *inputRunes) index(re *Regexp, pos int) int {
-	// TODO(fhs): avoid conversion from []rune to string?
-	return strings.Index(string(i.str[pos:i.end]), re.prefix)
+	return runes.Index(i.str[pos:i.end], []rune(re.prefix))
 }
 
 func (i *inputRunes) context(pos int) lazyFlag {
