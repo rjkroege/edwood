@@ -18,35 +18,68 @@ func acmeTestingMain() {
 
 func TestRunproc(t *testing.T) {
 	tt := []struct {
-		s, arg string
+		hard      bool
+		startfail bool
+		waitfail  bool
+		s, arg    string
 	}{
-		{"ls", ""},
-		{"ls .", ""},
-		{" ls . ", ""},
-		{"	 ls	 .	 ", ""},
-		{"ls", "."},
+		{false, true, true, "", ""},
+		{false, true, true, " ", ""},
+		{false, true, true, "   ", "   "},
+		{false, false, false, "ls", ""},
+		{false, false, false, "ls .", ""},
+		{false, false, false, " ls . ", ""},
+		{false, false, false, "	 ls	 .	 ", ""},
+		{false, false, false, "ls", "."},
+		{false, false, false, "|ls", "."},
+		{false, false, false, "<ls", "."},
+		{false, false, false, ">ls", "."},
+		{false, true, true, "nonexistantcommand", ""},
 
-		// Hard: executed using a shell
-		{"ls '.'", ""},
-		{" ls '.' ", ""},
-		{"	 ls	 '.'	 ", ""},
-		{"ls '.'", "."},
+		// Hard: must be executed using a shell
+		{true, false, false, "ls '.'", ""},
+		{true, false, false, " ls '.' ", ""},
+		{true, false, false, "	 ls	 '.'	 ", ""},
+		{true, false, false, "ls '.'", "."},
+		{true, false, true, "dat\x08\x08ate", ""},
+		{true, false, true, "/non-existant-command", ""},
 	}
 	acmeTestingMain()
 
 	for _, tc := range tt {
+		// runproc goes into Hard path if acmeshell is non-empty.
+		// Unset acmeshell for non-hard cases.
+		if tc.hard {
+			acmeshell = os.Getenv("acmeshell")
+		} else {
+			acmeshell = ""
+		}
+
 		cpid := make(chan *os.Process)
+		done := make(chan struct{})
 		go func() {
 			err := runproc(nil, tc.s, "", false, "", tc.arg, &Command{}, cpid, false)
-			if err != nil {
-				t.Errorf("runproc failed for command %q: %v", tc.s, err)
-				cwait <- nil
+			if tc.startfail && err == nil {
+				t.Errorf("expected command %q to fail", tc.s)
 			}
+			if !tc.startfail && err != nil {
+				t.Errorf("runproc failed for command %q: %v", tc.s, err)
+			}
+			close(done)
 		}()
-		<-cpid
-		status := <-cwait
-		if status != nil && !status.Success() {
-			t.Errorf("command %q exited with status %v", tc.s, status)
+		proc := <-cpid
+		if !tc.waitfail && proc == nil {
+			t.Errorf("nil proc for command %v", tc.s)
 		}
+		if proc != nil {
+			status := <-cwait
+			if tc.waitfail && status.Success() {
+				t.Errorf("command %q exited with status %v", tc.s, status)
+			}
+			if !tc.waitfail && !status.Success() {
+				t.Errorf("command %q exited with status %v", tc.s, status)
+			}
+		}
+		<-done
 	}
 }
