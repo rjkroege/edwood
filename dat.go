@@ -189,16 +189,14 @@ type Xfid struct {
 type RangeSet []Range
 
 type Expand struct {
-	q0    int
-	q1    int
-	name  string
-	bname string
-	jump  bool
-	at    *Text
-	ar    []rune
-	agetc func(int) rune
-	a0    int
-	a1    int
+	q0    int            // start of expansion
+	q1    int            // end of expansion
+	name  string         // filename, if it exists
+	jump  bool           // move cursor?
+	at    *Text          // address text
+	agetc func(int) rune // input: used to evaluate address
+	a0    int            // start of address
+	a1    int            // end of address
 }
 
 type Ref int

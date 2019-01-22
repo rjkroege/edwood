@@ -68,18 +68,16 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 	var (
 		n, c, f int
 		ct      *Text
-		e       Expand
 		r       []rune
 		//m *Plumbmsg
 		//dir string
-		expanded bool
 	)
 
 	ct = seltext
 	if ct == nil {
 		seltext = t
 	}
-	e, expanded = expand(t, q0, q1)
+	e, expanded := expand(t, q0, q1)
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		// send alphanumeric expansion to external client
 		if !expanded {
@@ -187,7 +185,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 	}
 	if e.name != "" || e.at != nil {
 		e.agetc = func(q int) rune { return e.at.ReadC(q) }
-		openfile(t, &e)
+		openfile(t, e)
 	} else {
 		if t.w == nil {
 			return
@@ -221,17 +219,15 @@ func plumblook(m *plumb.Message) {
 	if len(m.Data) == 0 {
 		return
 	}
-	e.ar = nil
-	e.bname = string(m.Data)
-	e.name = e.bname
+	e.name = string(m.Data)
 	e.jump = true
 	e.a0 = 0
 	e.a1 = 0
 	addr := findattr(m.Attr, "addr")
 	if addr != "" {
-		e.ar = []rune(addr)
-		e.a1 = len(e.ar)
-		e.agetc = func(q int) rune { return e.ar[q] }
+		ar := []rune(addr)
+		e.a1 = len(ar)
+		e.agetc = func(q int) rune { return ar[q] }
 	}
 	// drawtopwindow(); TODO(flux): Get focus
 	openfile(nil, &e)
@@ -353,83 +349,6 @@ func cleanrname(rs []rune) []rune {
 	return r
 }
 
-/*
-func includefile (Rune *dir, Rune *file, int nfile) (Runestr) {
-	int m, n;
-	char *a;
-	Rune *r;
-	static Rune Lslash[] = { '/', 0 };
-
-	m = runestrlen(dir);
-	a = emalloc((m+1+nfile)*UTFmax+1);
-	sprint(a, "%S/%.*S", dir, nfile, file);
-	n = access(a);
-	free(a);
-	if n < 0
-		return runestr(nil, 0);
-	r = runemalloc(m+1+nfile);
-	runemove(r, dir, m);
-	runemove(r+m, Lslash, 1);
-	runemove(r+m+1, file, nfile);
-	free(file);
-	return cleanrname(runestr(r, m+1+nfile));
-}
-
-static	Rune	*objdir;
-*/
-func includename(t *Text, r string) string {
-	Unimpl()
-	return ""
-}
-
-/*
-	Window *w;
-	char buf[128];
-	Rune Lsysinclude[] = { '/', 's', 'y', 's', '/', 'i', 'n', 'c', 'l', 'u', 'd', 'e', 0 };
-	Rune Lusrinclude[] = { '/', 'u', 's', 'r', '/', 'i', 'n', 'c', 'l', 'u', 'd', 'e', 0 };
-	Rune Lusrlocalinclude[] = { '/', 'u', 's', 'r', '/', 'l', 'o', 'c', 'a', 'l',
-			'/', 'i', 'n', 'c', 'l', 'u', 'd', 'e', 0 };
-	Rune Lusrlocalplan9include[] = { '/', 'u', 's', 'r', '/', 'l', 'o', 'c', 'a', 'l',
-			'/', 'p', 'l', 'a', 'n', '9', '/', 'i', 'n', 'c', 'l', 'u', 'd', 'e', 0 };
-	Runestr file;
-	int i;
-
-	if objdir==nil && objtype!=nil {
-		sprint(buf, "/%s/include", objtype);
-		objdir = bytetorune(buf, &i);
-		objdir = runerealloc(objdir, i+1);
-		objdir[i] = '\0';
-	}
-
-	w = t.w;
-	if n==0 || r[0]=='/' || w==nil
-		goto Rescue;
-	if n>2 && r[0]=='.' && r[1]=='/'
-		goto Rescue;
-	file.r = nil;
-	file.nr = 0;
-	for i=0; i<w.nincl && file.r==nil; i++
-		file = includefile(w.incl[i], r, n);
-
-	if file.r == nil
-		file = includefile(Lsysinclude, r, n);
-	if file.r == nil
-		file = includefile(Lusrlocalplan9include, r, n);
-	if file.r == nil
-		file = includefile(Lusrlocalinclude, r, n);
-	if file.r == nil
-		file = includefile(Lusrinclude, r, n);
-	if file.r==nil && objdir!=nil
-		file = includefile(objdir, r, n);
-	if file.r == nil
-		goto Rescue;
-	return file;
-
-    Rescue:
-	return runestr(r, n);
-}
-*/
-
 // Dirname returns the directory name of the path in the tag file of t.
 // If the filename r is not nil, it'll be appended to the result.
 func dirname(t *Text, r []rune) []rune {
@@ -478,24 +397,22 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		colon := int(-1)
 		for q1 < t.file.b.Nc() {
 			c := t.ReadC(q1)
-			if isfilec(c) {
-				if c == ':' {
-					colon = q1
-					break
-				}
-			} else {
+			if !isfilec(c) {
+				break
+			}
+			if c == ':' {
+				colon = q1
 				break
 			}
 			q1++
 		}
 		for q0 > 0 {
 			c := t.ReadC(q0 - 1)
-			if isfilec(c) || isaddrc(c) || isregexc(c) {
-				if colon < 0 && c == ':' {
-					colon = q0 - 1
-				}
-			} else {
+			if !isfilec(c) && !isaddrc(c) && !isregexc(c) {
 				break
+			}
+			if colon < 0 && c == ':' {
+				colon = q0 - 1
 			}
 			q0--
 		}
@@ -509,11 +426,10 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 					q1 = colon + 1
 					for q1 < t.file.b.Nc() {
 						c := t.ReadC(q1)
-						if isaddrc(c) {
-							q1++
-						} else {
+						if !isaddrc(c) {
 							break
 						}
+						q1++
 					}
 				}
 			}
@@ -541,18 +457,19 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	// see if it's a file name
 	rb := make([]rune, n)
 	t.file.b.Read(q0, rb[:n])
-	r := string(rb[:n])
 	// first, does it have bad chars?
 	nname := -1
-	for i := 0; i < n; i++ {
-		c := r[i]
+	for i, c := range rb {
 		if c == ':' && nname < 0 {
-			cc := t.ReadC(q0 + i + 1)
-			if q0+i+1 < t.file.b.Nc() && (i == n-1 || isaddrc(cc)) {
-				amin = q0 + i
-			} else {
+			if q0+i+1 >= t.file.b.Nc() {
 				return false
 			}
+			if i != n-1 {
+				if cc := t.ReadC(q0 + i + 1); !isaddrc(cc) {
+					return false
+				}
+			}
+			amin = q0 + i
 			nname = i
 		}
 	}
@@ -564,46 +481,28 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 			return false
 		}
 	}
-	// See if it's a file name in <>, and turn that into an include
-	// file name if so.  Should probably do it for "" too, but that's not
-	// restrictive enough syntax and checking for a #include earlier on the
-	// line would be silly.
-	// TODO(flux) This is even crazier when working in Go - is this even
-	// a feature we want to support?
-	if q0 > 0 && t.ReadC(q0-1) == '<' && q1 < t.file.b.Nc() && t.ReadC(q1) == '>' {
-		r = includename(t, r)
-	} else {
-		if amin == q0 {
-			e.name = string([]rune(r)[:nname])
-			e.at = t
-			e.a0 = amin + 1
-			_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
-				func(q int) rune { return t.ReadC(q) }, false)
-			return true
-		}
-		r = t.DirName(string([]rune(r)[:nname]))
-	}
-	e.bname = r
-	// if it's already a window name, it's a file
-	w := lookfile(r)
-	if w != nil {
-		e.name = r
+	isFile := func(name string) bool {
+		e.name = name
 		e.at = t
 		e.a0 = amin + 1
 		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
 			func(q int) rune { return t.ReadC(q) }, false)
 		return true
 	}
+	s := string(rb[:nname])
+	if amin == q0 {
+		return isFile(s)
+	}
+	dname := t.DirName(s)
+	// if it's already a window name, it's a file
+	if lookfile(dname) != nil {
+		return isFile(dname)
+	}
 	// if it's the name of a file, it's a file
-	if ismtpt(e.bname) || !access(e.bname) {
+	if ismtpt(dname) || !access(dname) {
 		return false
 	}
-	e.name = r
-	e.at = t
-	e.a0 = amin + 1
-	_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
-		func(q int) rune { return t.ReadC(q) }, false)
-	return true
+	return isFile(dname)
 }
 
 func access(name string) bool {
@@ -611,8 +510,8 @@ func access(name string) bool {
 	return err == nil
 }
 
-func expand(t *Text, q0 int, q1 int) (Expand, bool) {
-	e := Expand{}
+func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
+	var e Expand
 	e.agetc = func(q int) rune {
 		if q < t.Nc() {
 			return t.ReadC(q)
@@ -631,7 +530,7 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 	}
 	ok := true
 	if ok = expandfile(t, q0, q1, &e); ok {
-		return e, true
+		return &e, true
 	}
 
 	if q0 == q1 {
@@ -644,7 +543,7 @@ func expand(t *Text, q0 int, q1 int) (Expand, bool) {
 	}
 	e.q0 = q0
 	e.q1 = q1
-	return e, q1 > q0
+	return &e, q1 > q0
 }
 
 func lookfile(s string) *Window {
@@ -729,7 +628,7 @@ func openfile(t *Text, e *Expand) *Window {
 		w = makenewwindow(t)
 		t = &w.body
 		w.SetName(e.name)
-		_, err := t.Load(0, e.bname, true)
+		_, err := t.Load(0, e.name, true)
 		if err != nil {
 			t.file.unread = false
 		}
@@ -797,7 +696,6 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 		fmt.Printf("rs = %#v\n", rs)
 		e := Expand{}
 		e.name = rs
-		e.bname = rs
 		e.jump = true
 		fmt.Printf("e = %#v\n", e)
 		openfile(et, &e)
