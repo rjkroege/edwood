@@ -14,6 +14,7 @@ import (
 	"github.com/rjkroege/edwood/complete"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/drawutil"
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 const (
@@ -1373,7 +1374,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		} else {
 			c = t.ReadC(q - 1)
 		}
-		p := runestrchr(l, c)
+		p := runes.IndexRune(l, c)
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, r[p], 1, q); ok {
 				q1 = q
@@ -1389,7 +1390,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		} else {
 			c = t.ReadC(q)
 		}
-		p = runestrchr(r, c)
+		p = runes.IndexRune(r, c)
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0

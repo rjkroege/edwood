@@ -27,7 +27,7 @@ func isregexc(r rune) bool {
 	if isalnum(r) {
 		return true
 	}
-	if utfrune([]rune("^+-.*?#,;[]()$"), r) != -1 {
+	if strings.ContainsRune("^+-.*?#,;[]()$", r) {
 		return true
 	}
 	return false

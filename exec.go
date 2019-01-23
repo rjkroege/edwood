@@ -1000,7 +1000,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		if r < ' ' {
 			return Hard()
 		}
-		if utfrune([]rune("#;&|^$=`'{}()<>[]*?^~`/"), r) != -1 {
+		if strings.ContainsRune("#;&|^$=`'{}()<>[]*?^~`/", r) {
 			return Hard()
 		}
 	}

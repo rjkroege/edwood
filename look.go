@@ -13,6 +13,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 var (
@@ -290,7 +291,7 @@ func search(ct *Text, r []rune) bool {
 			//s[bi+nb] = 0; // null terminate
 		}
 		if nb > 0 {
-			ci := runestrchr(s[bi:bi+nb], r[0])
+			ci := runes.IndexRune(s[bi:bi+nb], r[0])
 			if ci == -1 {
 				q += nb
 				nb = 0
@@ -314,7 +315,7 @@ func search(ct *Text, r []rune) bool {
 			bi = 0
 		}
 		limit := min(len(s), bi+n)
-		if runeeq(s[bi:limit], r) {
+		if runes.Equal(s[bi:limit], r) {
 			if ct.w != nil {
 				ct.Show(q, q+n, true)
 				ct.w.SetTag()
@@ -340,7 +341,7 @@ func isfilec(r rune) bool {
 	if isalnum(r) {
 		return true
 	}
-	if runestrchr([]rune(Lx), r) != -1 {
+	if strings.ContainsRune(Lx, r) {
 		return true
 	}
 	return false
