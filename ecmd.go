@@ -48,7 +48,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 	}
 
 	if w == nil && (cp.addr == nil || cp.addr.typ != '"') &&
-		utfrune([]rune("bBnqUXY!"), cp.cmdc) == -1 && // Commands that don't need a window
+		!strings.ContainsRune("bBnqUXY!", cp.cmdc) && // Commands that don't need a window
 		!(cp.cmdc == 'D' && len(cp.text) > 0) {
 		editerror("no current window")
 	}

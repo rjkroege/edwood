@@ -77,39 +77,10 @@ func isalnum(c rune) bool {
 	if 0x7F <= c && c <= 0xA0 {
 		return false
 	}
-	if utfrune([]rune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~"), c) != -1 {
+	if strings.ContainsRune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~", c) {
 		return false
 	}
 	return true
-}
-
-func runeeq(s1, s2 []rune) bool {
-	if len(s1) != len(s2) {
-		return false
-	}
-	for i := range s1 {
-		if s1[i] != s2[i] {
-			return false
-		}
-	}
-	return true
-}
-func runestrchr(s []rune, r rune) int {
-	for ret, sr := range s {
-		if sr == r {
-			return ret
-		}
-	}
-	return -1
-}
-
-func utfrune(s []rune, r rune) int {
-	for i, c := range s {
-		if c == r {
-			return i
-		}
-	}
-	return -1
 }
 
 // Cvttorunes decodes runes r from p. It's guaranteed that first n

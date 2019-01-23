@@ -30,3 +30,33 @@ func Index(s, sep []rune) int {
 	}
 	return -1
 }
+
+// IndexRune returns the index of the first occurrence in s of the given rune r.
+// It returns -1 if rune is not present in s.
+func IndexRune(s []rune, r rune) int {
+	for i, c := range s {
+		if c == r {
+			return i
+		}
+	}
+	return -1
+}
+
+// ContainsRune reports whether the rune is contained in the runes slice s.
+func ContainsRune(s []rune, r rune) bool {
+	return IndexRune(s, r) >= 0
+}
+
+// Equal returns a boolean reporting whether a and b
+// are the same length and contain the same runes.
+func Equal(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, r := range a {
+		if r != b[i] {
+			return false
+		}
+	}
+	return true
+}

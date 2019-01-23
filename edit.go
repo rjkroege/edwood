@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 type Addr struct {
@@ -341,7 +343,7 @@ func collecttoken(end []rune) string {
 	}
 	for {
 		c = getch()
-		if c <= 0 || utfrune(end, c) != -1 {
+		if c <= 0 || runes.ContainsRune(end, c) {
 			break
 		}
 		s += string(c)
