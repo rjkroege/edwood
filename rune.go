@@ -21,15 +21,6 @@ func (r Buffer) Eq(s Buffer) bool {
 	return runes.Equal(r, s)
 }
 
-func trimLeft(r []rune, skip []rune) []rune {
-	for i, c := range r {
-		if !runes.ContainsRune(skip, c) {
-			return r[i:]
-		}
-	}
-	return r[0:0]
-}
-
 func skipbl(r []rune) []rune {
-	return trimLeft(r, []rune(" \t\n"))
+	return runes.TrimLeft(r, " \t\n")
 }
