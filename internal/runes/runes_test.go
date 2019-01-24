@@ -1,6 +1,9 @@
 package runes
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestIndex(t *testing.T) {
 	tt := []struct {
@@ -113,6 +116,44 @@ func TestEqual(t *testing.T) {
 		ok := Equal([]rune(tc.a), []rune(tc.b))
 		if ok != tc.ok {
 			t.Errorf("HasPrefix(%q, %q) returned %v; expected %v", tc.a, tc.b, ok, tc.ok)
+		}
+	}
+}
+
+func TestTrimLeft(t *testing.T) {
+	tt := []struct {
+		s      []rune
+		cutset string
+		q      []rune
+	}{
+		{nil, "", nil},
+		{[]rune(""), "", nil},
+		{[]rune("abc"), "", []rune("abc")},
+		{[]rune("abc"), "a", []rune("bc")},
+		{[]rune("abc"), "b", []rune("abc")},
+		{[]rune("abc"), "c", []rune("abc")},
+		{[]rune("aaabc"), "a", []rune("bc")},
+		{[]rune("aaabbbccc"), "", []rune("aaabbbccc")},
+		{[]rune("aaabbbccc"), "a", []rune("bbbccc")},
+		{[]rune("aaabbbccc"), "b", []rune("aaabbbccc")},
+		{[]rune("aaabbbccc"), "c", []rune("aaabbbccc")},
+		{[]rune("aaabbbccc"), "ac", []rune("bbbccc")},
+		{[]rune("aaabbbccc"), "ab", []rune("ccc")},
+		{[]rune("aaabbbccc"), "cb", []rune("aaabbbccc")},
+		{[]rune("aaabbbccc"), "cba", nil},
+		{[]rune("テテテススストトト"), "", []rune("テテテススストトト")},
+		{[]rune("テテテススストトト"), "テ", []rune("ススストトト")},
+		{[]rune("テテテススストトト"), "ス", []rune("テテテススストトト")},
+		{[]rune("テテテススストトト"), "ト", []rune("テテテススストトト")},
+		{[]rune("テテテススストトト"), "テト", []rune("ススストトト")},
+		{[]rune("テテテススストトト"), "テス", []rune("トトト")},
+		{[]rune("テテテススストトト"), "トス", []rune("テテテススストトト")},
+		{[]rune("テテテススストトト"), "トステ", nil},
+	}
+	for _, tc := range tt {
+		q := TrimLeft(tc.s, tc.cutset)
+		if !reflect.DeepEqual(q, tc.q) {
+			t.Errorf("TrimLeft(%q, %q) is %q; expected %q", tc.s, tc.cutset, q, tc.q)
 		}
 	}
 }

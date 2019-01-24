@@ -60,3 +60,28 @@ func Equal(a, b []rune) bool {
 	}
 	return true
 }
+
+// TrimLeft returns a subslice of s by slicing off all leading
+// UTF-8-encoded code points contained in cutset.
+func TrimLeft(s []rune, cutset string) []rune {
+	switch {
+	case len(s) == 0:
+		return nil
+	case len(cutset) == 0:
+		return s
+	}
+	inCutset := func(r rune) bool {
+		for _, c := range cutset {
+			if c == r {
+				return true
+			}
+		}
+		return false
+	}
+	for i, r := range s {
+		if !inCutset(r) {
+			return s[i:]
+		}
+	}
+	return nil
+}
