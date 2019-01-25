@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
-
-	"github.com/rjkroege/edwood/internal/runes"
+	"strings"
 )
 
 type Addr struct {
@@ -41,7 +40,7 @@ type Cmdtab struct {
 	defcmd  rune                   // default command; 0==>none
 	defaddr Defaddr                // default address
 	count   int                    // takes a count e.g. s2///
-	token   []rune                 // takes text terminated by one of these
+	token   string                 // takes text terminated by one of these
 	fn      func(*Text, *Cmd) bool // function to call with parse tree
 }
 
@@ -53,44 +52,44 @@ const (
 	aAll
 )
 
-var (
-	linex = []rune("\n")
-	wordx = []rune("\t\n")
+const (
+	linex = "\n"
+	wordx = "\t\n"
 )
 
 var cmdtab = []Cmdtab{
 	// cmdc	text	regexp	addr	defcmd	defaddr	count	token	 fn
-	{'\n', 0, 0, 0, 0, aDot, 0, nil, nl_cmd},
-	{'a', 1, 0, 0, 0, aDot, 0, nil, a_cmd},
+	{'\n', 0, 0, 0, 0, aDot, 0, "", nl_cmd},
+	{'a', 1, 0, 0, 0, aDot, 0, "", a_cmd},
 	{'b', 0, 0, 0, 0, aNo, 0, linex, b_cmd},
-	{'c', 1, 0, 0, 0, aDot, 0, nil, c_cmd},
-	{'d', 0, 0, 0, 0, aDot, 0, nil, d_cmd},
+	{'c', 1, 0, 0, 0, aDot, 0, "", c_cmd},
+	{'d', 0, 0, 0, 0, aDot, 0, "", d_cmd},
 	{'e', 0, 0, 0, 0, aNo, 0, wordx, e_cmd},
 	{'f', 0, 0, 0, 0, aNo, 0, wordx, f_cmd},
-	{'g', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to g_cmd in init() to avoid initialization loop
-	{'i', 1, 0, 0, 0, aDot, 0, nil, i_cmd},
-	{'m', 0, 0, 1, 0, aDot, 0, nil, m_cmd},
-	{'p', 0, 0, 0, 0, aDot, 0, nil, p_cmd},
+	{'g', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
+	{'i', 1, 0, 0, 0, aDot, 0, "", i_cmd},
+	{'m', 0, 0, 1, 0, aDot, 0, "", m_cmd},
+	{'p', 0, 0, 0, 0, aDot, 0, "", p_cmd},
 	{'r', 0, 0, 0, 0, aDot, 0, wordx, e_cmd},
-	{'s', 0, 1, 0, 0, aDot, 1, nil, s_cmd},
-	{'t', 0, 0, 1, 0, aDot, 0, nil, m_cmd},
-	{'u', 0, 0, 0, 0, aNo, 2, nil, u_cmd},
-	{'v', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to g_cmd in init() to avoid initialization loop
+	{'s', 0, 1, 0, 0, aDot, 1, "", s_cmd},
+	{'t', 0, 0, 1, 0, aDot, 0, "", m_cmd},
+	{'u', 0, 0, 0, 0, aNo, 2, "", u_cmd},
+	{'v', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
 	{'w', 0, 0, 0, 0, aAll, 0, wordx, w_cmd},
-	{'x', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to x_cmd in init() to avoid initialization loop
-	{'y', 0, 1, 0, 'p', aDot, 0, nil, nil}, // Assingned to x_cmd in init() to avoid initialization loop
+	{'x', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
+	{'y', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
 	{'=', 0, 0, 0, 0, aDot, 0, linex, eq_cmd},
 	{'B', 0, 0, 0, 0, aNo, 0, linex, B_cmd},
 	{'D', 0, 0, 0, 0, aNo, 0, linex, D_cmd},
-	{'X', 0, 1, 0, 'f', aNo, 0, nil, nil}, // Assingned to X_cmd in init() to avoid initialization loop
-	{'Y', 0, 1, 0, 'f', aNo, 0, nil, nil}, // Assingned to X_cmd in init() to avoid initialization loop
+	{'X', 0, 1, 0, 'f', aNo, 0, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
+	{'Y', 0, 1, 0, 'f', aNo, 0, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
 	{'<', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'|', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	{'>', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
 	/* deliberately unimplemented:
-	{'k',	0,	0,	0,	0,	aDot,	0,	nil,	k_cmd,},
-	{'n',	0,	0,	0,	0,	aNo,	0,	nil,	n_cmd,},
-	{'q',	0,	0,	0,	0,	aNo,	0,	nil,	q_cmd,},
+	{'k',	0,	0,	0,	0,	aDot,	0,	"",	k_cmd,},
+	{'n',	0,	0,	0,	0,	aNo,	0,	"",	n_cmd,},
+	{'q',	0,	0,	0,	0,	aNo,	0,	"",	q_cmd,},
 	{'!',	0,	0,	0,	0,	aNo,	0,	linex,	plan9_cmd,},
 	*/
 	//	{0,	0,	0,	0,	0,	0,	0,	0},
@@ -328,31 +327,28 @@ func getrhs(delim rune, cmd rune) (s string) {
 	return
 }
 
-func collecttoken(end []rune) string {
-	// TODO(fhs): use strings.Builder to build s
-	s := ""
+func collecttoken(end string) string {
+	var s strings.Builder
 	var c rune
 
-	fmt.Println("cmdstartp=", cmdstartp[cmdp:])
 	for {
 		c = nextc()
 		if c != ' ' && c != '\t' {
 			break
 		}
-		s += string(getch()) // blanks significant for getname()
+		s.WriteRune(getch()) // blanks significant for getname()
 	}
 	for {
 		c = getch()
-		if c <= 0 || runes.ContainsRune(end, c) {
+		if c <= 0 || strings.ContainsRune(end, c) {
 			break
 		}
-		s += string(c)
+		s.WriteRune(c)
 	}
-	fmt.Println("Collecttoken=", s)
 	if c != '\n' {
 		atnl()
 	}
-	return s
+	return s.String()
 }
 
 func collecttext() string {
@@ -478,7 +474,7 @@ func parsecmd(nest int) *Cmd {
 			}
 		case ct.text != 0:
 			cmd.text = collecttext()
-		case ct.token != nil:
+		case len(ct.token) > 0:
 			cmd.text = collecttoken(ct.token)
 		default:
 			atnl()
