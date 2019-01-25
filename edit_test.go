@@ -71,3 +71,27 @@ func TestEdit(t *testing.T) {
 		}
 	}
 }
+
+func TestCollecttoken(t *testing.T) {
+	tt := []struct {
+		cmd []rune
+		end string
+		out string
+	}{
+		{[]rune(" foo bar\t\n"), linex, " foo bar\t"},
+		{[]rune(" foo bar\t\nquux"), linex, " foo bar\t"},
+		{[]rune(" αβγ テスト\t\n世界"), linex, " αβγ テスト\t"},
+		{[]rune(" foo bar\t\n"), wordx, " foo bar"},
+		{[]rune(" foo bar\t\nquux"), wordx, " foo bar"},
+		{[]rune(" αβγ テスト\t\n世界"), wordx, " αβγ テスト"},
+	}
+	for _, tc := range tt {
+		cmdstartp = tc.cmd
+		cmdp = 0
+		out := collecttoken(tc.end)
+		if out != tc.out {
+			t.Errorf("collecttoken(%q) of command %q is %q; exptected %q",
+				tc.end, tc.cmd, out, tc.out)
+		}
+	}
+}
