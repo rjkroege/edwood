@@ -6,6 +6,8 @@ import (
 	"log"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 func min(a, b int) int {
@@ -354,4 +356,8 @@ func quote(s string) string {
 	}
 	b.WriteByte(quoteChar)
 	return b.String()
+}
+
+func skipbl(r []rune) []rune {
+	return runes.TrimLeft(r, " \t\n")
 }

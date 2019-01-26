@@ -46,3 +46,46 @@ func TestBufferInsert(t *testing.T) {
 		}
 	}
 }
+
+func TestBufferIndexRune(t *testing.T) {
+	tt := []struct {
+		b Buffer
+		r rune
+		n int
+	}{
+		{Buffer(nil), '0', -1},
+		{Buffer([]rune("01234")), '0', 0},
+		{Buffer([]rune("01234")), '3', 3},
+		{Buffer([]rune("αβγ")), 'α', 0},
+		{Buffer([]rune("αβγ")), 'γ', 2},
+	}
+	for _, tc := range tt {
+		n := tc.b.IndexRune(tc.r)
+		if n != tc.n {
+			t.Errorf("IndexRune(%v) for buffer %v returned %v; expected %v",
+				tc.r, tc.b, n, tc.n)
+		}
+	}
+}
+
+func TestBufferEqual(t *testing.T) {
+	tt := []struct {
+		a, b Buffer
+		ok   bool
+	}{
+		{Buffer(nil), Buffer(nil), true},
+		{Buffer(nil), Buffer([]rune{}), true},
+		{Buffer([]rune{}), Buffer(nil), true},
+		{Buffer([]rune("01234")), Buffer([]rune("01234")), true},
+		{Buffer([]rune("01234")), Buffer([]rune("01x34")), false},
+		{Buffer([]rune("αβγ")), Buffer([]rune("αβγ")), true},
+		{Buffer([]rune("αβγ")), Buffer([]rune("αλγ")), false},
+	}
+	for _, tc := range tt {
+		ok := tc.a.Equal(tc.b)
+		if ok != tc.ok {
+			t.Errorf("Equal(%v) for buffer %v returned %v; expected %v",
+				tc.b, tc.a, ok, tc.ok)
+		}
+	}
+}

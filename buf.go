@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 	"unicode/utf8"
+
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 // Buffer is a mutable array of runes.
@@ -78,4 +80,12 @@ func (b *Buffer) View(q0, q1 int) []rune {
 		q1 = len(*b)
 	}
 	return (*b)[q0:q1]
+}
+
+func (b Buffer) IndexRune(r rune) int {
+	return runes.IndexRune(b, r)
+}
+
+func (r Buffer) Equal(s Buffer) bool {
+	return runes.Equal(r, s)
 }
