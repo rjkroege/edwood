@@ -514,7 +514,7 @@ func (w *Window) SetTag1() {
 		sb.WriteString(Lget)
 	}
 	olds := string(w.tag.file.b)
-	oldbarIndex := w.tag.file.b.Index([]rune("|"))
+	oldbarIndex := w.tag.file.b.IndexRune('|')
 	if oldbarIndex >= 0 {
 		sb.WriteString(" ")
 		sb.WriteString(olds[oldbarIndex:])
@@ -529,12 +529,12 @@ func (w *Window) SetTag1() {
 
 	// replace tag if the new one is different
 	resize := false
-	if !new.Eq(w.tag.file.b) {
+	if !new.Equal(w.tag.file.b) {
 		resize = true // Might need to resize the tag
 		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, new, true)
 		// try to preserve user selection
-		newbarIndex := new.Index([]rune("|")) // New always has "|"
+		newbarIndex := new.IndexRune('|') // New always has '|'
 		q0 := w.tag.q0
 		q1 := w.tag.q1
 		if oldbarIndex != -1 {

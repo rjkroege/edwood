@@ -50,3 +50,23 @@ func TestQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestSkipbl(t *testing.T) {
+	tt := []struct {
+		s []rune
+		q []rune
+	}{
+		{nil, nil},
+		{[]rune(" \t\n"), nil},
+		{[]rune(" \t\nabc"), []rune("abc")},
+		{[]rune(" \t\n \t\nabc"), []rune("abc")},
+		{[]rune(" \t\nabc \t\nabc"), []rune("abc \t\nabc")},
+		{[]rune(" \t\nαβγ \t\nαβγ"), []rune("αβγ \t\nαβγ")},
+	}
+	for _, tc := range tt {
+		q := skipbl(tc.s)
+		if !reflect.DeepEqual(q, tc.q) {
+			t.Errorf("skipbl(%v) returned %v; expected %v", tc.s, q, tc.q)
+		}
+	}
+}
