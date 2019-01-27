@@ -166,7 +166,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if !w.isdir && !w.isscratch && (w.body.file.mod || len(w.body.cache) > 0) {
+	if !w.isdir && !w.isscratch && w.body.file.DiffersFromDisk() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -486,7 +486,7 @@ func (w *Window) SetTag1() {
 	//	Lpipe := (" |")
 
 	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if len(w.tag.cache) != 0 || w.tag.file.mod {
+	if w.tag.file.DiffersFromDisk() {
 		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
 	}
 
@@ -499,14 +499,13 @@ func (w *Window) SetTag1() {
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
 	if w.filemenu {
-		if w.body.needundo || len(w.body.file.delta) > 0 || len(w.body.cache) != 0 {
+		if w.body.needundo || w.body.file.HasUndoableChanges() {
 			sb.WriteString(Lundo)
 		}
-		if len(w.body.file.epsilon) > 0 {
+		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		dirty := w.body.file.name != "" && (len(w.body.cache) != 0 || w.body.file.SeqDiffer())
-		if !w.isdir && dirty {
+		if !w.isdir && w.body.file.HasSaveableChanges() {
 			sb.WriteString(Lput)
 		}
 	}
@@ -545,8 +544,9 @@ func (w *Window) SetTag1() {
 			}
 		}
 	}
+	//TOOD(rjk): should not reach into file.
 	w.tag.file.mod = false
-	n := w.tag.Nc() + len(w.tag.cache)
+	n := w.tag.file.Size()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}

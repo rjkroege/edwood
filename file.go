@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"time"
+	// remove
+	//	"log"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -37,7 +39,132 @@ type File struct {
 	dumpid  int
 
 	hash FileHash // Used to check if the file has changed on disk since loaded
+
+	// cache holds  that are not yet part of an undo record.
+	cache []rune
+
+	// TODO(rjk): may need to insert cq0 here?
+	cq0 int
 }
+
+// Remember that the high-level goal is to slowly coerce this into looking like
+// a scrawny wrapper around the Undo implementation. As a result, we should
+// expect to see the following entry points:
+
+// func (b *Buffer) Clean()
+//func (b *Buffer) Commit()
+//func (b *Buffer) Delete(off, length int64) error
+//func (b *Buffer) Dirty() bool
+//func (b *Buffer) Insert(off int64, data []byte) error
+//func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error)
+//func (b *Buffer) Redo() (off, n int64)
+//func (b *Buffer) Size() int64
+//func (b *Buffer) Undo() (off, n int64)
+
+// NB how the cache is folded into Buffer.
+//TODO(rjk): make undo.Buffer implement Reader and Writer.
+
+// HasUnCommittedChanges returns true if there are changes that
+// have been made to the File after the last Commit.
+func (t *File) HasUncommitedChanges() bool {
+	return len(t.cache) != 0
+}
+
+// HasUndoableChanges returns true if there are changes to the File
+// that can be undone.
+func (f *File) HasUndoableChanges() bool {
+	return len(f.delta) > 0 || len(f.cache) != 0
+}
+
+// HasSaveableChanges returns true if there are changes to the File
+// that can be saved.
+// TODO(rjk): HasUnsavedChanges should be its name
+// TODO(rjk): it's conceivable that mod and SeqDiffer track the same
+// thing.
+func (f *File) HasSaveableChanges() bool {
+	return f.name != "" && (len(f.cache) != 0 || f.SeqDiffer())
+}
+
+func (f *File) HasRedoableChanges() bool {
+	return len(f.epsilon) > 0
+}
+
+func (u *File) UpdateCq0(q0 int) {
+	if len(u.cache) == 0 {
+		u.cq0 = q0
+	} else {
+		if q0 != u.cq0+len(u.cache) {
+			acmeerror("File.UpdateCq0 cq1", nil)
+		}
+	}
+
+}
+
+// Size returns the complete size of the buffer including both commited
+// and uncommitted runes.
+// NB: converts naturally to use of Undo.
+// Buffers should be sized in int
+func (u *File) Size() int {
+	return int(u.b.Nc()) + len(u.cache)
+}
+
+// ReadC reads a single rune from the File.
+// Can be trivially converted to Undo.
+func (t *File) ReadC(q int) rune {
+	if t.cq0 <= q && q < t.cq0+len(t.cache) {
+		return t.cache[q-t.cq0]
+	}
+	return t.b.ReadC(q)
+}
+
+// DiffersFromDisk returns true if the File's contents differ from the
+// File.name's contents. When this is true, the tag's button should
+// be drawn in the modified state if appropriate to the window type.
+// TODO(rjk): figure out what mod really means anyway.
+// For files that aren't saved like tag Texts, it's not clear if this is
+// a very good name.
+func (f *File) DiffersFromDisk() bool {
+	return f.mod || len(f.cache) > 0
+}
+
+// Commit pushes the edits that are not undoable to something with
+// an undo record.
+func (t *File) Commit(tofile bool) {
+	if !t.HasUncommitedChanges() {
+		return
+	}
+	// Do we ever call this with false?
+	if tofile {
+		t.Insert(t.cq0, t.cache)
+	}
+	t.cache = t.cache[:0]
+}
+
+// AppendCache adds to the un-committed inserts. This
+func (b *File) AppendCache(rp []rune) {
+	b.cache = append(b.cache, rp...)
+}
+
+// DeleteAtMostNbChars removes nb characters from the cache and
+// updates the nb value.
+func (t *File) DeleteAtMostNbChars(nb, q1 int, u *Text) int {
+	n := len(t.cache)
+	if n > 0 {
+		if q1 != t.cq0+n {
+			acmeerror("text.type backspace", nil)
+		}
+		if n > nb {
+			n = nb
+		}
+		t.cache = t.cache[:len(t.cache)-n]
+		u.Delete(q1-n, q1, false)
+		nb -= n
+	}
+
+	return nb
+}
+
+// TODO(rjk): I could meld the Text.TypeCommit with HasUncommitedChanges
 
 type Undo struct {
 	t   int
