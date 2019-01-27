@@ -73,10 +73,7 @@ type Text struct {
 	iq1 int
 	eq0 int
 
-	// 	TODO(rjk): Relocate me to File
-	//	cq0      int
-	//	cache    []rune
-	nofill   bool
+	nofill   bool // When true, updates to the Text shouldn't update the frame.
 	needundo bool
 
 	lk sync.Mutex
@@ -980,19 +977,6 @@ func (t *Text) Type(r rune) {
 		// implementation. I need to call the Text.Delete action.
 		for _, u := range t.file.text { // u is *Text
 			u.nofill = true
-			//			nb = nnb
-			//			n = len(u.cache)
-			//			if n > 0 {
-			//				if q1 != u.cq0+n {
-			//					acmeerror("text.type backspace", nil)
-			//				}
-			//				if n > nb {
-			//					n = nb
-			//				}
-			//				u.cache = u.cache[:len(u.cache)-n]
-			//				u.Delete(q1-n, q1, false)
-			//				nb -= n
-			//			}
 			nb = u.file.DeleteAtMostNbChars(nnb, u.q1, u)
 			if u.eq0 == q1 || u.eq0 == ^0 {
 				u.eq0 = q0
@@ -1032,17 +1016,12 @@ func (t *Text) Type(r rune) {
 		}
 	}
 	// otherwise ordinary character; just insert, typically in caches of all texts
+	// TODO(rjk): this section needs to be handled through the
+	// improved observer pattern.
 	for _, u := range t.file.text { // u is *Text
 		if u.eq0 == ^0 {
 			u.eq0 = t.q0
 		}
-		//		if len(u.cache) == 0 {
-		//			u.cq0 = t.q0
-		//		} else {
-		//			if t.q0 != u.cq0+len(u.cache) {
-		//				acmeerror("text.type cq1", nil)
-		//			}
-		//		}
 		t.file.UpdateCq0(t.q0)
 
 		// Change the tag before we add to ncache,
@@ -1057,9 +1036,6 @@ func (t *Text) Type(r rune) {
 		if u != t {
 			u.SetSelect(u.q0, u.q1)
 		}
-		// TODO(rjk): this section needs to be handled through the
-		//improved observer pattern.
-		// u.cache = append(u.cache, rp[:nr]...)
 		u.file.AppendCache(rp[:nr])
 		if t.what == Tag { // TODO(flux): This is hideous work-around for
 			// what looks like a subtle bug near here.
