@@ -388,7 +388,7 @@ func (t *Text) Backnl(p int, n int) int {
 		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
 			j--
-			if t.ReadC(p-1) == '\n' {
+			if t.file.ReadC(p-1) == '\n' {
 				break
 			}
 		}
@@ -636,7 +636,7 @@ func (t *Text) BsWidth(c rune) int {
 	q := t.q0
 	skipping := true
 	for q > 0 {
-		r := t.ReadC(q - 1)
+		r := t.file.ReadC(q - 1)
 		if r == '\n' { // eat at most one more character
 			if q == t.q0 { // eat the newline
 				q--
@@ -661,7 +661,7 @@ func (t *Text) BsWidth(c rune) int {
 func (t *Text) FileWidth(q0 int, oneelement bool) int {
 	q := q0
 	for q > 0 {
-		r := t.ReadC(q - 1)
+		r := t.file.ReadC(q - 1)
 		if r <= ' ' {
 			break
 		}
@@ -674,19 +674,19 @@ func (t *Text) FileWidth(q0 int, oneelement bool) int {
 }
 
 func (t *Text) Complete() []rune {
-	if t.q0 < t.Nc() && t.ReadC(t.q0) > ' ' { // must be at end of word
+	if t.q0 < t.Nc() && t.file.ReadC(t.q0) > ' ' { // must be at end of word
 		return nil
 	}
 	str := make([]rune, t.FileWidth(t.q0, true))
 	q := t.q0 - len(str)
 	for i := range str {
-		str[i] = t.ReadC(q)
+		str[i] = t.file.ReadC(q)
 		q++
 	}
 	path := make([]rune, t.FileWidth(t.q0-len(str), false))
 	q = t.q0 - len(str) - len(path)
 	for i := range path {
-		path[i] = t.ReadC(q)
+		path[i] = t.file.ReadC(q)
 		q++
 	}
 
@@ -860,7 +860,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		// go to where ^U would erase, if not already at BOL
 		nnb = 0
-		if t.q0 > 0 && t.ReadC(t.q0-1) != '\n' {
+		if t.q0 > 0 && t.file.ReadC(t.q0-1) != '\n' {
 			nnb = t.BsWidth(0x15)
 		}
 		t.Show(t.q0-nnb, t.q0-nnb, true)
@@ -868,7 +868,7 @@ func (t *Text) Type(r rune) {
 	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.b.Nc() && t.ReadC(q0) != '\n' {
+		for q0 < t.file.b.Nc() && t.file.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
@@ -1021,7 +1021,7 @@ func (t *Text) Type(r rune) {
 			rp[nr] = r
 			nr++
 			for i = 0; i < nnb; i++ {
-				r = t.ReadC(t.q0 - nnb + i)
+				r = t.file.ReadC(t.q0 - nnb + i)
 				if r != ' ' && r != '\t' {
 					break
 				}
