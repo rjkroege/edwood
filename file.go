@@ -104,17 +104,30 @@ func (u *File) UpdateCq0(q0 int) {
 // and uncommitted runes.
 // NB: converts naturally to use of Undo.
 // Buffers should be sized in int
-func (u *File) Size() int {
-	return int(u.b.Nc()) + len(u.cache)
+func (f *File) Size() int {
+	return int(f.b.nc()) + len(f.cache)
 }
 
+// Nr returns the number of valid runes in the Buffer.
+// At the moment, this is the same as Size. But when File is backed
+// with utf8, this will require adjustment.
+// TODO(rjk): utf8 adjustment
+func (f *File) Nr() int {
+	return f.Size()
+}
+
+// ReadC reads a single rune from the file.
 // ReadC reads a single rune from the File.
-// Can be trivially converted to Undo.
-func (t *File) ReadC(q int) rune {
-	if t.cq0 <= q && q < t.cq0+len(t.cache) {
-		return t.cache[q-t.cq0]
+// Can be easily converted to being utf8 backed but
+// every caller will require adjustment.
+// TODO(rjk): utf8 adjustment here.
+// TODO(rjk): we frequently try to actually read the last rune so
+// adjust API surface to make that easier.
+func (f *File) ReadC(q int) rune {
+	if f.cq0 <= q && q < f.cq0+len(f.cache) {
+		return f.cache[q-f.cq0]
 	}
-	return t.b.ReadC(q)
+	return f.b.ReadC(q)
 }
 
 // DiffersFromDisk returns true if the File's contents differ from the
@@ -251,7 +264,7 @@ func (f *File) DelText(t *Text) error {
 }
 
 func (f *File) Insert(p0 int, s []rune) {
-	if p0 > f.b.Nc() {
+	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
 	}
 	if f.seq > 0 {
@@ -275,7 +288,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 }
 
 func (f *File) Delete(p0, p1 int) {
-	if !(p0 <= p1 && p0 <= f.b.Nc() && p1 <= f.b.Nc()) {
+	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
 		acmeerror("internal error: filedelete", nil)
 	}
 	if f.seq > 0 {

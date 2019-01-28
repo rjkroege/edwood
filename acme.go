@@ -188,7 +188,7 @@ func readfile(c *Column, filename string) {
 	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
-	w.tag.SetSelect(w.tag.file.b.Nc(), w.tag.file.b.Nc())
+	w.tag.SetSelect(w.tag.file.Size(), w.tag.file.Size())
 	xfidlog(w, "new")
 }
 
@@ -678,8 +678,8 @@ func (w errorWriter) Close() error {
 const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-	r := make([]rune, snarfbuf.Nc())
-	snarfbuf.Read(0, r[:snarfbuf.Nc()])
+	r := make([]rune, snarfbuf.nc())
+	snarfbuf.Read(0, r[:snarfbuf.nc()])
 	row.display.WriteSnarf([]byte(string(r)))
 }
 

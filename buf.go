@@ -58,7 +58,8 @@ func (b *Buffer) Reset() {
 	(*b) = (*b)[0:0]
 }
 
-func (b *Buffer) Nc() int {
+// nc returns the number of characters in the Buffer.
+func (b *Buffer) nc() int {
 	return len(*b)
 }
 

@@ -134,8 +134,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			q0 = t.q0
 			q1 = t.q1
 		} else {
-			for q1 < t.file.b.Nc() {
-				c := t.ReadC(q1)
+			for q1 < t.file.Size() {
+				c := t.file.ReadC(q1)
 				if isexecc(c) && c != ':' {
 					q1++
 				} else {
@@ -143,7 +143,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 				}
 			}
 			for q0 > 0 {
-				c := t.ReadC(q0 - 1)
+				c := t.file.ReadC(q0 - 1)
 				if isexecc(c) && c != ':' {
 					q0--
 				} else {
@@ -302,7 +302,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		snarfbuf.Delete(0, snarfbuf.Nc())
+		snarfbuf.Delete(0, snarfbuf.nc())
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
@@ -310,7 +310,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 				n = RBUFSIZE
 			}
 			t.file.b.Read(q0, r[:n])
-			snarfbuf.Insert(snarfbuf.Nc(), r[:n])
+			snarfbuf.Insert(snarfbuf.nc(), r[:n])
 			q0 += n
 		}
 		acmeputsnarf()
@@ -369,7 +369,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 
 	acmegetsnarf()
-	if t == nil || snarfbuf.Nc() == 0 {
+	if t == nil || snarfbuf.nc() == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -383,7 +383,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	cut(t, t, nil, false, true, "")
 	q = 0
 	q0 = t.q0
-	q1 = t.q0 + snarfbuf.Nc()
+	q1 = t.q0 + snarfbuf.nc()
 	r := make([]rune, RBUFSIZE)
 	for q0 < q1 {
 		n = q1 - q0
@@ -438,7 +438,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.isdir && (et.w.body.file.b.Nc() > 0 && !et.w.Clean(true)) {
+	if !et.w.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
 		return
 	}
 	w := et.w
@@ -470,7 +470,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	w.SetTag()
 	t.file.unread = false
 	for _, u := range t.file.text {
-		u.w.tag.SetSelect(u.w.tag.file.b.Nc(), u.w.tag.file.b.Nc())
+		u.w.tag.SetSelect(u.w.tag.file.Size(), u.w.tag.file.Size())
 		u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
 	}
 	xfidlog(w, "get")
@@ -569,7 +569,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		}
 	}
 	if name == f.name {
-		if q0 != 0 || q1 != f.b.Nc() {
+		if q0 != 0 || q1 != f.Size() {
 			f.Modded()
 			f.unread = true
 		} else {
@@ -600,7 +600,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	putfile(f, 0, f.b.Nc(), name)
+	putfile(f, 0, f.Size(), name)
 	xfidlog(w, "put")
 }
 
@@ -700,11 +700,11 @@ func sendx(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
-	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	t.SetSelect(t.file.Size(), t.file.Size())
 	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.b.Nc()-1) != '\n' {
-		t.Insert(t.file.b.Nc(), []rune("\n"), true)
-		t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	if t.ReadC(t.file.Size()-1) != '\n' {
+		t.Insert(t.file.Size(), []rune("\n"), true)
+		t.SetSelect(t.file.Size(), t.file.Size())
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)

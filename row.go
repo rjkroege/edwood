@@ -47,7 +47,7 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
 	t.Insert(0, []rune("Newcol Kill Putall Dump Exit "), true)
-	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	t.SetSelect(t.file.Size(), t.file.Size())
 	return row
 }
 
@@ -435,7 +435,7 @@ func (r *Row) Dump(file string) {
 			b.WriteString(w.CtlPrint(false))
 			fmt.Fprintf(b, "%s\n", firstbufline(&w.tag.file.b))
 			if dumped {
-				for q0, q1 := 0, t.file.b.Nc(); q0 < q1; {
+				for q0, q1 := 0, t.file.Size(); q0 < q1; {
 					ru := make([]rune, RBUFSIZE)
 					n, _ := t.file.b.Read(q0, ru)
 					su := string(ru[0:n])

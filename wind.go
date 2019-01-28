@@ -229,8 +229,8 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	// if tag ends with \n, include empty line at end for typing
 	n := w.tag.fr.GetFrameFillStatus().Nlines
-	if w.tag.file.b.Nc() > 0 {
-		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
+	if w.tag.file.Size() > 0 {
+		c := w.tag.file.b.ReadC(w.tag.file.Size() - 1)
 		if c == '\n' {
 			n++
 		}
