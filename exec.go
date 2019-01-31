@@ -95,7 +95,7 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	}
 	a := ""
 	var e *Expand
-	argt.Commit(true)
+	argt.Commit()
 	var ok bool
 	if e, ok = expand(argt, argt.q0, argt.q1); ok {
 		if len(e.name) > 0 && dofile {

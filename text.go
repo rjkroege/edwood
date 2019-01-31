@@ -499,7 +499,7 @@ func (t *Text) TypeCommit() {
 	if t.w != nil {
 		t.w.Commit(t)
 	} else {
-		t.Commit(true)
+		t.Commit()
 	}
 }
 
@@ -1018,11 +1018,11 @@ func (t *Text) Type(r rune) {
 	// otherwise ordinary character; just insert, typically in caches of all texts
 	// TODO(rjk): this section needs to be handled through the
 	// improved observer pattern.
+	t.file.UpdateCq0(t.q0)
 	for _, u := range t.file.text { // u is *Text
 		if u.eq0 == ^0 {
 			u.eq0 = t.q0
 		}
-		t.file.UpdateCq0(t.q0)
 
 		// Change the tag before we add to ncache,
 		// so that if the window body is resized the
@@ -1049,8 +1049,8 @@ func (t *Text) Type(r rune) {
 	t.iq1 = t.q0
 }
 
-func (t *Text) Commit(tofile bool) {
-	t.file.Commit(tofile)
+func (t *Text) Commit() {
+	t.file.Commit()
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}

@@ -26,8 +26,14 @@ type File struct {
 	// dev       int
 	unread bool
 
-	// TODO(rjk): Could possibly be removed.
-	editclean    bool
+	// TODO(rjk): Remove this when I've inserted undo.Buffer.
+	// At present, Insert and Delete have an implicit Commit operation
+	// associated with them. In an undo.Buffer context, these two ops
+	// don't have an implicit Commit. We set editclean in the Edit cmd
+	// implementation code to let multiple Inserts be grouped together.
+	editclean bool
+
+	// Tracks the Edit sequence.
 	seq          int
 	putseq       int // seq on last put
 	mod          bool
@@ -116,7 +122,6 @@ func (f *File) Nr() int {
 	return f.Size()
 }
 
-// ReadC reads a single rune from the file.
 // ReadC reads a single rune from the File.
 // Can be easily converted to being utf8 backed but
 // every caller will require adjustment.
@@ -140,20 +145,17 @@ func (f *File) DiffersFromDisk() bool {
 	return f.mod || len(f.cache) > 0
 }
 
-// Commit pushes the edits that are not undoable to something with
-// an undo record.
-func (t *File) Commit(tofile bool) {
+// Commit sets an undo point for the current state of the file.
+func (t *File) Commit() {
 	if !t.HasUncommitedChanges() {
 		return
 	}
-	// Do we ever call this with false?
-	if tofile {
-		t.Insert(t.cq0, t.cache)
-	}
+	t.Insert(t.cq0, t.cache)
 	t.cache = t.cache[:0]
 }
 
-// AppendCache adds to the un-committed inserts. This
+// AppendCache adds to the un-committed inserts.
+// TODO(rjk): Write in terms of Insert
 func (b *File) AppendCache(rp []rune) {
 	b.cache = append(b.cache, rp...)
 }
@@ -239,12 +241,15 @@ func calcFileHash(b []byte) FileHash {
 	return sha1.Sum(b)
 }
 
+// AddText adds t as an observer for edits to this File.
+// TODO(rjk): The observer should be an interface?
 func (f *File) AddText(t *Text) *File {
 	f.text = append(f.text, t)
 	f.curtext = t
 	return f
 }
 
+// DelText removes t as an observer for edits to this File.
 func (f *File) DelText(t *Text) error {
 	for i, text := range f.text {
 		if text == t {
@@ -263,6 +268,11 @@ func (f *File) DelText(t *Text) error {
 	return fmt.Errorf("can't find text in File.DelText")
 }
 
+// TODO(rjk): Modded feels redundant. Remove.
+
+// Insert inserts s runes at rune address p0.
+// TODO(rjk): utf8 conversion need a matching byte version.
+// TOOD(rjk): fold together with the cache implementation.
 func (f *File) Insert(p0 int, s []rune) {
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")

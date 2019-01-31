@@ -317,7 +317,7 @@ func xfidread(x *Xfid) {
 	off := x.fcall.Offset
 	switch q {
 	case QWaddr:
-		w.body.Commit(true)
+		w.body.Commit()
 		clampaddr(w)
 		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
 		n = len(buf)
@@ -613,7 +613,7 @@ func xfidctlwrite(x *Xfid, w *Window) {
 	scrdraw = false
 	settag = false
 
-	w.tag.Commit(true)
+	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
 	var lidx int
 	var line string
@@ -697,7 +697,7 @@ forloop:
 		case "put": // put file
 			put(&w.body, nil, nil, XXX, XXX, "")
 		case "dot=addr": // set dot
-			w.body.Commit(true)
+			w.body.Commit()
 			clampaddr(w)
 			w.body.q0 = w.addr.q0
 			w.body.q1 = w.addr.q1
@@ -707,7 +707,7 @@ forloop:
 			w.addr.q0 = w.body.q0
 			w.addr.q1 = w.body.q1
 		case "limit=addr": // set limit
-			w.body.Commit(true)
+			w.body.Commit()
 			clampaddr(w)
 			w.limit.q0 = w.addr.q0
 			w.limit.q1 = w.addr.q1

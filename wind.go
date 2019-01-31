@@ -562,13 +562,7 @@ func (w *Window) SetTag1() {
 }
 
 func (w *Window) Commit(t *Text) {
-	t.Commit(true) // will set the file.mod to true
-	f := t.file
-	if len(f.text) > 1 {
-		for _, te := range f.text {
-			te.Commit(false)
-		}
-	}
+	t.Commit() // will set the file.mod to true
 	if t.what == Body {
 		return
 	}

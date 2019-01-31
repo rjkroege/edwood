@@ -162,8 +162,8 @@ func allelogterm(w *Window) {
 }
 
 func alleditinit(w *Window) {
-	w.tag.Commit(true)
-	w.body.Commit(true)
+	w.tag.Commit()
+	w.body.Commit()
 	w.body.file.editclean = false
 }
 
@@ -221,7 +221,9 @@ func editcmd(ct *Text, r []rune) {
 		editerrc = make(chan error)
 		lastpat = ""
 	}
-	go editthread(cp)
+	// We would appear to run the Edit command on a different thread
+	// but block here.
+	go editthread()
 	err := <-editerrc
 	editing = Inactive
 	if err != nil {
