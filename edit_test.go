@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -92,6 +93,87 @@ func TestCollecttoken(t *testing.T) {
 		if out != tc.out {
 			t.Errorf("collecttoken(%q) of command %q is %q; exptected %q",
 				tc.end, tc.cmd, out, tc.out)
+		}
+	}
+}
+
+func TestSimpleaddr(t *testing.T) {
+	tt := []struct {
+		ok   bool
+		cmd  []rune
+		addr *Addr
+	}{
+		{true, nil, nil},
+		{true, []rune{}, nil},
+		{true, []rune("\n"), nil},
+		{true, []rune("#123\n"), &Addr{typ: '#', num: 123}},
+		{true, []rune("#\n"), &Addr{typ: '#', num: 1}},
+		{true, []rune("42\n"), &Addr{typ: 'l', num: 42}},
+		{true, []rune("1234567890\n"), &Addr{typ: 'l', num: 1234567890}},
+		{true, []rune("/abc\n"), &Addr{typ: '/', re: "abc"}},
+		{true, []rune("/abc/\n"), &Addr{typ: '/', re: "abc"}},
+		{true, []rune(`/a\/bc/` + "\n"), &Addr{typ: '/', re: "a/bc"}},
+		{true, []rune(`/a\nbc/` + "\n"), &Addr{typ: '/', re: `a\nbc`}},
+		{true, []rune(`/a\\bc/` + "\n"), &Addr{typ: '/', re: `a\\bc`}},
+		{true, []rune("?abc\n"), &Addr{typ: '?', re: "abc"}},
+		{true, []rune("?abc?\n"), &Addr{typ: '?', re: "abc"}},
+		{true, []rune(`?a\?bc?` + "\n"), &Addr{typ: '?', re: "a?bc"}},
+		{true, []rune(`?a\nbc?` + "\n"), &Addr{typ: '?', re: `a\nbc`}},
+		{true, []rune(`?a\\bc?` + "\n"), &Addr{typ: '?', re: `a\\bc`}},
+		{true, []rune(`"abc` + "\n"), &Addr{typ: '"', re: "abc"}},
+		{true, []rune(`"abc"` + "\n"), &Addr{typ: '"', re: "abc"}},
+		{true, []rune(".\n"), &Addr{typ: '.'}},
+		{true, []rune("$\n"), &Addr{typ: '$'}},
+		{true, []rune("+\n"), &Addr{typ: '+'}},
+		{true, []rune("-\n"), &Addr{typ: '-'}},
+		{true, []rune("'\n"), &Addr{typ: '\''}},
+		{true, []rune("abc\n"), nil},
+		{false, []rune("42.\n"), nil},
+		{false, []rune("42$\n"), nil},
+		{false, []rune("42'\n"), nil},
+		{false, []rune("42\"\n"), nil},
+		{false, []rune(`"abc" "cdf" "efg"` + "\n"), nil},
+		{true, []rune("\"abc\" 42\n"), &Addr{
+			typ: '"', re: "abc", next: &Addr{
+				typ: 'l', num: 42,
+			}}},
+		{true, []rune(".42\n"), &Addr{
+			typ: '.', next: &Addr{
+				typ: '+', next: &Addr{
+					typ: 'l', num: 42,
+				}}}},
+		{true, []rune("42/abc/\n"), &Addr{
+			typ: 'l', num: 42, next: &Addr{
+				typ: '+', next: &Addr{
+					typ: '/', re: "abc",
+				}}}},
+		{true, []rune("42/abc/\n"), &Addr{
+			typ: 'l', num: 42, next: &Addr{
+				typ: '+', next: &Addr{
+					typ: '/', re: "abc",
+				}}}},
+		{true, []rune("+/abc/\n"), &Addr{typ: '+', next: &Addr{typ: '/', re: "abc"}}},
+		{true, []rune("-/abc/\n"), &Addr{typ: '-', next: &Addr{typ: '/', re: "abc"}}},
+		{true, []rune(".+\n"), &Addr{typ: '.', next: &Addr{typ: '+', num: 0}}},
+		{true, []rune(".-\n"), &Addr{typ: '.', next: &Addr{typ: '-', num: 0}}},
+	}
+	for _, tc := range tt {
+		cmdstartp = tc.cmd
+		cmdp = 0
+		addr, err := simpleaddr()
+		if tc.ok && err != nil {
+			t.Errorf("simple address %q returned error %v", tc.cmd, err)
+			continue
+		}
+		if !tc.ok && err == nil {
+			t.Errorf("simple address %q returned nil error", tc.cmd)
+			continue
+		}
+		if !reflect.DeepEqual(addr, tc.addr) {
+			t.Errorf("bad parse result for address %q:\n"+
+				"     got: %v\n"+
+				"expected: %v",
+				tc.cmd, addr, tc.addr)
 		}
 	}
 }
