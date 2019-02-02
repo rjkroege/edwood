@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"runtime/debug"
@@ -13,6 +14,14 @@ type Addr struct {
 	left *Addr // left side of , and ;
 	num  int
 	next *Addr // or right side of , and ;
+}
+
+func (a *Addr) String() string {
+	if a == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("Addr{typ: %c, re: %q, left: %v, num: %v, next: %v}",
+		a.typ, a.re, a.left, a.num, a.next)
 }
 
 type Address struct {
@@ -455,7 +464,11 @@ func parsecmd(nest int) *Cmd {
 			}
 		}
 		if ct.addr != 0 {
-			cmd.mtaddr = simpleaddr()
+			var err error
+			cmd.mtaddr, err = simpleaddr()
+			if err != nil {
+				editerror(err.Error())
+			}
 			if cmd.mtaddr == nil {
 				editerror("bad address")
 			}
@@ -549,101 +562,67 @@ func getregexp(delim rune) string {
 	return lastpat
 }
 
-func simpleaddr() *Addr {
-	var (
-		addr Addr
-		nap  *Addr
-	)
+func simpleaddr() (*Addr, error) {
+	var addr Addr
+
 	switch cmdskipbl() {
 	case '#':
 		addr.typ = getch()
 		addr.num = getnum(1)
-	case '0':
-		fallthrough
-	case '1':
-		fallthrough
-	case '2':
-		fallthrough
-	case '3':
-		fallthrough
-	case '4':
-		fallthrough
-	case '5':
-		fallthrough
-	case '6':
-		fallthrough
-	case '7':
-		fallthrough
-	case '8':
-		fallthrough
-	case '9':
-		addr.num = (getnum(1))
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		addr.typ = 'l'
-	case '/':
-		fallthrough
-	case '?':
-		fallthrough
-	case '"':
+		addr.num = getnum(1)
+	case '/', '?', '"':
 		addr.typ = getch()
 		addr.re = getregexp(addr.typ)
-	case '.':
-		fallthrough
-	case '$':
-		fallthrough
-	case '+':
-		fallthrough
-	case '-':
-		fallthrough
-	case '\'':
+	case '.', '$', '+', '-', '\'':
 		addr.typ = getch()
 	default:
-		return nil
+		return nil, nil
 	}
-	addr.next = simpleaddr()
+	var err error
+	addr.next, err = simpleaddr()
+	if err != nil {
+		return nil, err
+	}
 	if addr.next != nil {
 		switch addr.next.typ {
-		case '.':
-			fallthrough
-		case '$':
-			fallthrough
-		case '\'':
+		case '.', '$', '\'':
 			if addr.typ != '"' {
-				editerror("bad address syntax")
+				return nil, errors.New("bad address syntax")
 			}
 		case '"':
-			editerror("bad address syntax")
-		case 'l':
-			fallthrough
-		case '#':
+			return nil, errors.New("bad address syntax")
+		case 'l', '#':
 			if addr.typ == '"' {
 				break
 			}
 			fallthrough
-		case '/':
-			fallthrough
-		case '?':
+		case '/', '?':
 			if addr.typ != '+' && addr.typ != '-' {
 				// insert the missing '+'
-				nap = newaddr()
+				nap := newaddr()
 				nap.typ = '+'
 				nap.next = addr.next
 				addr.next = nap
 			}
-		case '+':
-			fallthrough
-		case '-':
+		case '+', '-':
 			break
 		default:
 			panic("simpleaddr")
 		}
 	}
-	return &addr
+	return &addr, nil
 }
 
 func compoundaddr() *Addr {
 	var addr Addr
+	var err error
 
-	addr.left = simpleaddr()
+	addr.left, err = simpleaddr()
+	if err != nil {
+		editerror(err.Error())
+	}
 	addr.typ = cmdskipbl()
 	if addr.typ != ',' && addr.typ != ';' {
 		return addr.left
