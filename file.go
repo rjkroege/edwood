@@ -15,6 +15,15 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
+// TODO(rjk): File will be a facade pattern composing an undo.Buffer
+// and a wrapping utf8string.String indexing wrapper.
+// TODO(rjk): my version of undo.Buffer  will implement Reader, Writer,
+// RuneReader, Seeker and I will restructure this code to follow the
+// patterns of the Go I/O libraries. I will probably want to provide a cache
+// around undo.Buffer.
+// Observe: Character motion routines in Text can be written
+// in terms of any object that is Seeker and RuneReader.
+// Observe: Frame can report addresses in byte and rune offsets.
 type File struct {
 	b       Buffer
 	delta   []*Undo
@@ -27,10 +36,11 @@ type File struct {
 	unread bool
 
 	// TODO(rjk): Remove this when I've inserted undo.Buffer.
-	// At present, Insert and Delete have an implicit Commit operation
+	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.Buffer context, these two ops
 	// don't have an implicit Commit. We set editclean in the Edit cmd
-	// implementation code to let multiple Inserts be grouped together.
+	// implementation code to let multiple Inserts be grouped together?
+	// Figure out how this inter-operates with seq.
 	editclean bool
 
 	// Tracks the Edit sequence.
@@ -91,10 +101,13 @@ func (f *File) HasSaveableChanges() bool {
 	return f.name != "" && (len(f.cache) != 0 || f.SeqDiffer())
 }
 
+// HasRedoableChanges returns true if there are entries in the Redo
+// log that can be redone.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
+//
 func (u *File) UpdateCq0(q0 int) {
 	if len(u.cache) == 0 {
 		u.cq0 = q0
@@ -110,6 +123,7 @@ func (u *File) UpdateCq0(q0 int) {
 // and uncommitted runes.
 // NB: converts naturally to use of Undo.
 // Buffers should be sized in int
+// TODO(rjk): needs to return the size in bytes.
 func (f *File) Size() int {
 	return int(f.b.nc()) + len(f.cache)
 }
@@ -125,9 +139,8 @@ func (f *File) Nr() int {
 // ReadC reads a single rune from the File.
 // Can be easily converted to being utf8 backed but
 // every caller will require adjustment.
-// TODO(rjk): utf8 adjustment here.
-// TODO(rjk): we frequently try to actually read the last rune so
-// adjust API surface to make that easier.
+// TODO(rjk): File needs to implement RuneReader instead
+// TODO(rjk): Rename to At to align with utf8string.String.At().
 func (f *File) ReadC(q int) rune {
 	if f.cq0 <= q && q < f.cq0+len(f.cache) {
 		return f.cache[q-f.cq0]
@@ -150,7 +163,9 @@ func (t *File) Commit() {
 	if !t.HasUncommitedChanges() {
 		return
 	}
-	t.Insert(t.cq0, t.cache)
+	// TODO(rjk): This needs to be adjusted for the removal of implied Commit
+	// from InsertAt.
+	t.InsertAt(t.cq0, t.cache)
 	t.cache = t.cache[:0]
 }
 
@@ -162,6 +177,8 @@ func (b *File) AppendCache(rp []rune) {
 
 // DeleteAtMostNbChars removes nb characters from the cache and
 // updates the nb value.
+// Implement in terms of Insert and Delete.
+// TODO(rjk): Fold out the updates
 func (t *File) DeleteAtMostNbChars(nb, q1 int, u *Text) int {
 	n := len(t.cache)
 	if n > 0 {
@@ -270,10 +287,12 @@ func (f *File) DelText(t *Text) error {
 
 // TODO(rjk): Modded feels redundant. Remove.
 
-// Insert inserts s runes at rune address p0.
-// TODO(rjk): utf8 conversion need a matching byte version.
-// TOOD(rjk): fold together with the cache implementation.
-func (f *File) Insert(p0 int, s []rune) {
+// InsertAt inserts s runes at rune address p0.
+// TODO(rjk): run the observers here to simplify the Text code.
+// TODO(rjk): do not insert an Undo record. Leave that to Commit. This
+// change is for better alignment with buffer.Undo
+// NB: At suffix is to correspond to utf8string.String.At().
+func (f *File) InsertAt(p0 int, s []rune) {
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
 	}
@@ -286,6 +305,12 @@ func (f *File) Insert(p0 int, s []rune) {
 	}
 }
 
+// Insert inserts data bytes at byte address off.
+// TODO(rjk): Delegated to undo.Buffer. Not currently
+// available.
+// func (b *Buffer) Insert(off int, data []byte) error {
+//}
+
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
@@ -297,7 +322,10 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	(*delta) = append(*delta, &u)
 }
 
-func (f *File) Delete(p0, p1 int) {
+// DeleteAt removes the rune range [p0,p1) from File.
+// TODO(rjk): Needs to run the observers.
+// TODO(rjk): Currently, adds an Undo record. It shouldn't
+func (f *File) DeleteAt(p0, p1 int) {
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
 		acmeerror("internal error: filedelete", nil)
 	}
@@ -309,6 +337,9 @@ func (f *File) Delete(p0, p1 int) {
 		f.Modded()
 	}
 }
+
+// TODO(rjk): Implement me
+//func (b *Buffer) Delete(p0, p1 int) error
 
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting

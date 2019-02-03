@@ -239,19 +239,19 @@ func (t *Text) Columnate(names []string, widths []int) {
 	for i := 0; i < nrow; i++ {
 		for j := i; j < len(names); j += nrow {
 			dl := bytetorune([]byte(names[j]))
-			t.file.Insert(q1, dl)
+			t.file.InsertAt(q1, dl)
 			q1 += len(dl)
 			if j+nrow >= len(names) {
 				break
 			}
 			w := widths[j]
 			if maxt-w%maxt < mint {
-				t.file.Insert(q1, Ltab)
+				t.file.InsertAt(q1, Ltab)
 				q1++
 				w += mint
 			}
 			for {
-				t.file.Insert(q1, Ltab)
+				t.file.InsertAt(q1, Ltab)
 				q1++
 				w += maxt - (w % maxt)
 				if !(w < colw) {
@@ -259,7 +259,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 				}
 			}
 		}
-		t.file.Insert(q1, Lnl)
+		t.file.InsertAt(q1, Lnl)
 		q1++
 	}
 }
@@ -451,7 +451,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 		return
 	}
 	if tofile {
-		t.file.Insert(q0, r)
+		t.file.InsertAt(q0, r)
 		if t.what == Body {
 			t.w.utflastqid = -1
 		}
@@ -563,7 +563,7 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		return
 	}
 	if tofile {
-		t.file.Delete(q0, q1)
+		t.file.DeleteAt(q0, q1)
 		if t.what == Body {
 			t.w.utflastqid = -1
 		}
