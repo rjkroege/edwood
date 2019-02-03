@@ -16,6 +16,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 type Exectab struct {
@@ -503,7 +504,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 func checkhash(name string, f *File, d os.FileInfo) {
 	Untested()
 
-	h, err := HashFile(name)
+	h, err := file.HashFor(name)
 	if err != nil {
 		warning(nil, "Failed to open %v to compute hash", name)
 		return

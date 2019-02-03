@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 // Buffer is a mutable array of runes.
@@ -28,7 +29,7 @@ func (b *Buffer) Delete(q0, q1 int) {
 	(*b) = (*b)[:(len(*b))-(q1-q0)] // Reslice to length
 }
 
-func (b *Buffer) Load(q0 int, fd *os.File) (n int, h FileHash, hasNulls bool, err error) {
+func (b *Buffer) Load(q0 int, fd *os.File) (n int, h file.Hash, hasNulls bool, err error) {
 	// TODO(flux): Innefficient to load the file, then copy into the slice,
 	// but I need the UTF-8 interpretation.  I could fix this by using a
 	// UTF-8 -> []rune reader on top of the os.File instead.
@@ -39,7 +40,7 @@ func (b *Buffer) Load(q0 int, fd *os.File) (n int, h FileHash, hasNulls bool, er
 	}
 	runes, _, hasNulls := cvttorunes(d, len(d))
 	(*b).Insert(q0, runes)
-	return len(runes), calcFileHash(d), hasNulls, err
+	return len(runes), file.CalcHash(d), hasNulls, err
 }
 
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {

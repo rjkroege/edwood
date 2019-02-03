@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"fmt"
-	"io"
 	"os"
 	"time"
 	// remove
 	//	"log"
+
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -54,7 +53,7 @@ type File struct {
 	text    []*Text
 	dumpid  int
 
-	hash FileHash // Used to check if the file has changed on disk since loaded
+	hash file.Hash // Used to check if the file has changed on disk since loaded
 
 	// cache holds  that are not yet part of an undo record.
 	cache []rune
@@ -207,10 +206,9 @@ type Undo struct {
 	buf []rune
 }
 
-type FileHash [sha1.Size]byte
 
 func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
-	var h FileHash
+	var h file.Hash
 	n, h, hasNulls, err = f.b.Load(q0, fd)
 	if sethash {
 		f.hash = h
@@ -226,36 +224,6 @@ func (f *File) SnapshotSeq() {
 // SeqDiffer returns true if the current seq differs from a previously snapshot.
 func (f *File) SeqDiffer() bool {
 	return f.seq != f.putseq
-}
-
-func HashFile(filename string) (h FileHash, err error) {
-	fd, err := os.Open(filename)
-	if err != nil {
-		return h, err
-	}
-	defer fd.Close()
-
-	hh := sha1.New()
-	if _, err := io.Copy(hh, fd); err != nil {
-		return h, err
-	}
-	h.Set(hh.Sum(nil))
-	return
-}
-
-func (h *FileHash) Set(b []byte) {
-	if len(b) != len(h) {
-		panic("internal error: wrong hash size")
-	}
-	copy(h[:], b)
-}
-
-func (h FileHash) Eq(h1 FileHash) bool {
-	return bytes.Equal(h[:], h1[:])
-}
-
-func calcFileHash(b []byte) FileHash {
-	return sha1.Sum(b)
 }
 
 // AddText adds t as an observer for edits to this File.
