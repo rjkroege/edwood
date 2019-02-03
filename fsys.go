@@ -2,7 +2,6 @@ package main
 
 // TODO(flux): This is a hideous singleton.  Refactor into a type?
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -51,7 +50,7 @@ func initfcall() {
 var (
 	ErrPermission = os.ErrPermission
 	ErrNotExist   = os.ErrNotExist
-	ErrNotDir     = errors.New("not a directory")
+	ErrNotDir     = fmt.Errorf("not a directory")
 )
 
 var dirtab = []*DirTab{

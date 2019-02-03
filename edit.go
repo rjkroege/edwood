@@ -1,12 +1,13 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"runtime/debug"
 	"strings"
 )
+
+var errBadAddrSyntax = fmt.Errorf("bad address syntax")
 
 type Addr struct {
 	typ  rune // # (byte addr), l (line addr), / ? . $ + - , ;
@@ -14,14 +15,6 @@ type Addr struct {
 	left *Addr // left side of , and ;
 	num  int
 	next *Addr // or right side of , and ;
-}
-
-func (a *Addr) String() string {
-	if a == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("Addr{typ: %c, re: %q, left: %v, num: %v, next: %v}",
-		a.typ, a.re, a.left, a.num, a.next)
 }
 
 type Address struct {
@@ -412,8 +405,12 @@ func cmdlookup(c rune) int {
 func parsecmd(nest int) *Cmd {
 	var cp, ncp *Cmd
 	var cmd Cmd
+	var err error
 
-	cmd.addr = compoundaddr()
+	cmd.addr, err = compoundaddr()
+	if err != nil {
+		editerror(err.Error())
+	}
 	if cmdskipbl() == -1 {
 		return nil
 	}
@@ -589,10 +586,10 @@ func simpleaddr() (*Addr, error) {
 		switch addr.next.typ {
 		case '.', '$', '\'':
 			if addr.typ != '"' {
-				return nil, errors.New("bad address syntax")
+				return nil, errBadAddrSyntax
 			}
 		case '"':
-			return nil, errors.New("bad address syntax")
+			return nil, errBadAddrSyntax
 		case 'l', '#':
 			if addr.typ == '"' {
 				break
@@ -607,7 +604,7 @@ func simpleaddr() (*Addr, error) {
 				addr.next = nap
 			}
 		case '+', '-':
-			break
+			// Do nothing
 		default:
 			panic("simpleaddr")
 		}
@@ -615,23 +612,26 @@ func simpleaddr() (*Addr, error) {
 	return &addr, nil
 }
 
-func compoundaddr() *Addr {
+func compoundaddr() (*Addr, error) {
 	var addr Addr
 	var err error
 
 	addr.left, err = simpleaddr()
 	if err != nil {
-		editerror(err.Error())
+		return nil, err
 	}
 	addr.typ = cmdskipbl()
 	if addr.typ != ',' && addr.typ != ';' {
-		return addr.left
+		return addr.left, nil
 	}
 	getch()
-	addr.next = compoundaddr()
+	addr.next, err = compoundaddr()
+	if err != nil {
+		return nil, err
+	}
 	next := addr.next
 	if next != nil && (next.typ == ',' || next.typ == ';') && next.left == nil {
-		editerror("bad address syntax")
+		return nil, errBadAddrSyntax
 	}
-	return &addr
+	return &addr, nil
 }
