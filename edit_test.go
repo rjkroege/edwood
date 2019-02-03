@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -97,83 +98,113 @@ func TestCollecttoken(t *testing.T) {
 	}
 }
 
+type addrTest struct {
+	cmd  []rune
+	addr *Addr
+	err  error
+}
+
 func TestSimpleaddr(t *testing.T) {
-	tt := []struct {
-		ok   bool
-		cmd  []rune
-		addr *Addr
-	}{
-		{true, nil, nil},
-		{true, []rune{}, nil},
-		{true, []rune("\n"), nil},
-		{true, []rune("#123\n"), &Addr{typ: '#', num: 123}},
-		{true, []rune("#\n"), &Addr{typ: '#', num: 1}},
-		{true, []rune("42\n"), &Addr{typ: 'l', num: 42}},
-		{true, []rune("1234567890\n"), &Addr{typ: 'l', num: 1234567890}},
-		{true, []rune("/abc\n"), &Addr{typ: '/', re: "abc"}},
-		{true, []rune("/abc/\n"), &Addr{typ: '/', re: "abc"}},
-		{true, []rune(`/a\/bc/` + "\n"), &Addr{typ: '/', re: "a/bc"}},
-		{true, []rune(`/a\nbc/` + "\n"), &Addr{typ: '/', re: `a\nbc`}},
-		{true, []rune(`/a\\bc/` + "\n"), &Addr{typ: '/', re: `a\\bc`}},
-		{true, []rune("?abc\n"), &Addr{typ: '?', re: "abc"}},
-		{true, []rune("?abc?\n"), &Addr{typ: '?', re: "abc"}},
-		{true, []rune(`?a\?bc?` + "\n"), &Addr{typ: '?', re: "a?bc"}},
-		{true, []rune(`?a\nbc?` + "\n"), &Addr{typ: '?', re: `a\nbc`}},
-		{true, []rune(`?a\\bc?` + "\n"), &Addr{typ: '?', re: `a\\bc`}},
-		{true, []rune(`"abc` + "\n"), &Addr{typ: '"', re: "abc"}},
-		{true, []rune(`"abc"` + "\n"), &Addr{typ: '"', re: "abc"}},
-		{true, []rune(".\n"), &Addr{typ: '.'}},
-		{true, []rune("$\n"), &Addr{typ: '$'}},
-		{true, []rune("+\n"), &Addr{typ: '+'}},
-		{true, []rune("-\n"), &Addr{typ: '-'}},
-		{true, []rune("'\n"), &Addr{typ: '\''}},
-		{true, []rune("abc\n"), nil},
-		{false, []rune("42.\n"), nil},
-		{false, []rune("42$\n"), nil},
-		{false, []rune("42'\n"), nil},
-		{false, []rune("42\"\n"), nil},
-		{false, []rune(`"abc" "cdf" "efg"` + "\n"), nil},
-		{true, []rune("\"abc\" 42\n"), &Addr{
-			typ: '"', re: "abc", next: &Addr{
-				typ: 'l', num: 42,
-			}}},
-		{true, []rune(".42\n"), &Addr{
+	tt := []addrTest{
+		{nil, nil, nil},
+		{[]rune{}, nil, nil},
+		{[]rune("\n"), nil, nil},
+		{[]rune("#123\n"), &Addr{typ: '#', num: 123}, nil},
+		{[]rune("#\n"), &Addr{typ: '#', num: 1}, nil},
+		{[]rune("42\n"), &Addr{typ: 'l', num: 42}, nil},
+		{[]rune("1234567890\n"), &Addr{typ: 'l', num: 1234567890}, nil},
+		{[]rune("/abc\n"), &Addr{typ: '/', re: "abc"}, nil},
+		{[]rune("/abc/\n"), &Addr{typ: '/', re: "abc"}, nil},
+		{[]rune(`/a\/bc/` + "\n"), &Addr{typ: '/', re: "a/bc"}, nil},
+		{[]rune(`/a\nbc/` + "\n"), &Addr{typ: '/', re: `a\nbc`}, nil},
+		{[]rune(`/a\\bc/` + "\n"), &Addr{typ: '/', re: `a\\bc`}, nil},
+		{[]rune("?abc\n"), &Addr{typ: '?', re: "abc"}, nil},
+		{[]rune("?abc?\n"), &Addr{typ: '?', re: "abc"}, nil},
+		{[]rune(`?a\?bc?` + "\n"), &Addr{typ: '?', re: "a?bc"}, nil},
+		{[]rune(`?a\nbc?` + "\n"), &Addr{typ: '?', re: `a\nbc`}, nil},
+		{[]rune(`?a\\bc?` + "\n"), &Addr{typ: '?', re: `a\\bc`}, nil},
+		{[]rune(`"abc` + "\n"), &Addr{typ: '"', re: "abc"}, nil},
+		{[]rune(`"abc"` + "\n"), &Addr{typ: '"', re: "abc"}, nil},
+		{[]rune(".\n"), &Addr{typ: '.'}, nil},
+		{[]rune("$\n"), &Addr{typ: '$'}, nil},
+		{[]rune("+\n"), &Addr{typ: '+'}, nil},
+		{[]rune("-\n"), &Addr{typ: '-'}, nil},
+		{[]rune("'\n"), &Addr{typ: '\''}, nil},
+		{[]rune("abc\n"), nil, nil},
+		{[]rune("42.\n"), nil, errBadAddrSyntax},
+		{[]rune("42$\n"), nil, errBadAddrSyntax},
+		{[]rune("42'\n"), nil, errBadAddrSyntax},
+		{[]rune("42\"\n"), nil, errBadAddrSyntax},
+		{[]rune(`"abc" "cdf" "efg"` + "\n"), nil, errBadAddrSyntax},
+		{[]rune("\"abc\" 42\n"), &Addr{typ: '"', re: "abc", next: &Addr{typ: 'l', num: 42}}, nil},
+		{[]rune(".42\n"), &Addr{
 			typ: '.', next: &Addr{
-				typ: '+', next: &Addr{
-					typ: 'l', num: 42,
-				}}}},
-		{true, []rune("42/abc/\n"), &Addr{
+				typ: '+', next: &Addr{typ: 'l', num: 42},
+			},
+		}, nil},
+		{[]rune("42/abc/\n"), &Addr{
 			typ: 'l', num: 42, next: &Addr{
-				typ: '+', next: &Addr{
-					typ: '/', re: "abc",
-				}}}},
-		{true, []rune("42/abc/\n"), &Addr{
+				typ: '+', next: &Addr{typ: '/', re: "abc"},
+			},
+		}, nil},
+		{[]rune("42/abc/\n"), &Addr{
 			typ: 'l', num: 42, next: &Addr{
-				typ: '+', next: &Addr{
-					typ: '/', re: "abc",
-				}}}},
-		{true, []rune("+/abc/\n"), &Addr{typ: '+', next: &Addr{typ: '/', re: "abc"}}},
-		{true, []rune("-/abc/\n"), &Addr{typ: '-', next: &Addr{typ: '/', re: "abc"}}},
-		{true, []rune(".+\n"), &Addr{typ: '.', next: &Addr{typ: '+', num: 0}}},
-		{true, []rune(".-\n"), &Addr{typ: '.', next: &Addr{typ: '-', num: 0}}},
+				typ: '+', next: &Addr{typ: '/', re: "abc"},
+			},
+		}, nil},
+		{[]rune("+/abc/\n"), &Addr{typ: '+', next: &Addr{typ: '/', re: "abc"}}, nil},
+		{[]rune("-/abc/\n"), &Addr{typ: '-', next: &Addr{typ: '/', re: "abc"}}, nil},
+		{[]rune(".+\n"), &Addr{typ: '.', next: &Addr{typ: '+', num: 0}}, nil},
+		{[]rune(".-\n"), &Addr{typ: '.', next: &Addr{typ: '-', num: 0}}, nil},
 	}
+
+	runAddrTests(t, tt, simpleaddr)
+}
+
+func TestCompoundaddr(t *testing.T) {
+	tt := []addrTest{
+		{[]rune("3,17\n"), &Addr{
+			typ:  ',',
+			left: &Addr{typ: 'l', num: 3},
+			next: &Addr{typ: 'l', num: 17}}, nil},
+		{[]rune("3,\n"), &Addr{typ: ',', left: &Addr{typ: 'l', num: 3}, next: nil}, nil},
+		{[]rune(",17\n"), &Addr{typ: ',', left: nil, next: &Addr{typ: 'l', num: 17}}, nil},
+		{[]rune("37;/abc/\n"), &Addr{
+			typ:  ';',
+			left: &Addr{typ: 'l', num: 37},
+			next: &Addr{typ: '/', re: "abc"},
+		}, nil},
+		{[]rune("3.,17\n"), nil, errBadAddrSyntax},
+		{[]rune("3,17.\n"), nil, errBadAddrSyntax},
+		{[]rune("3,,17\n"), nil, errBadAddrSyntax},
+		{[]rune("3;;17\n"), nil, errBadAddrSyntax},
+	}
+	runAddrTests(t, tt, compoundaddr)
+}
+
+func runAddrTests(t *testing.T, tt []addrTest, parse func() (*Addr, error)) {
 	for _, tc := range tt {
 		cmdstartp = tc.cmd
 		cmdp = 0
-		addr, err := simpleaddr()
-		if tc.ok && err != nil {
-			t.Errorf("simple address %q returned error %v", tc.cmd, err)
-			continue
-		}
-		if !tc.ok && err == nil {
-			t.Errorf("simple address %q returned nil error", tc.cmd)
+		addr, err := parse()
+		if tc.err != err {
+			t.Errorf("simple address %q returned error %v; expected %v",
+				tc.cmd, err, tc.err)
 			continue
 		}
 		if !reflect.DeepEqual(addr, tc.addr) {
 			t.Errorf("bad parse result for address %q:\n"+
-				"     got: %v\n"+
+				"got: %v\n"+
 				"expected: %v",
 				tc.cmd, addr, tc.addr)
 		}
 	}
+}
+
+func (a *Addr) String() string {
+	if a == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("Addr{typ: %c, re: %q, left: %v, num: %v, next: %v}",
+		a.typ, a.re, a.left, a.num, a.next)
 }
