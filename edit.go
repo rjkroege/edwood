@@ -7,7 +7,27 @@ import (
 	"strings"
 )
 
-var errBadAddrSyntax = fmt.Errorf("bad address syntax")
+var (
+	errBadAddr          = fmt.Errorf("bad address")
+	errBadAddrSyntax    = fmt.Errorf("bad address syntax")
+	errAddressMissing   = fmt.Errorf("no address")
+	errAddrNotRequired  = fmt.Errorf("command takes no address")
+	errRegexpMissing    = fmt.Errorf("no regular expression defined")
+	errLeftBraceMissing = fmt.Errorf("right brace with no left brace")
+	errBadRHS           = fmt.Errorf("bad right hand side")
+)
+
+type invalidCmdError rune
+
+func (e invalidCmdError) Error() string {
+	return fmt.Sprintf("unknown command %c", rune(e))
+}
+
+type badDelimiterError rune
+
+func (e badDelimiterError) Error() string {
+	return fmt.Sprintf("bad delimiter %c", rune(e))
+}
 
 type Addr struct {
 	typ  rune // # (byte addr), l (line addr), / ? . $ + - , ;
@@ -123,7 +143,10 @@ var (
 
 func editthread() {
 	for {
-		cmd := parsecmd(0)
+		cmd, err := parsecmd(0)
+		if err != nil {
+			editerror(err.Error())
+		}
 		if cmd == nil {
 			break
 		}
@@ -282,10 +305,8 @@ func newaddr() *Addr {
 	return &Addr{}
 }
 
-func okdelim(c rune) {
-	if c == '\\' || ('a' <= c && c <= 'z' || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')) {
-		editerror("bad delimiter %c\n", c)
-	}
+func okdelim(c rune) bool {
+	return !(c == '\\' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'))
 }
 
 func atnl() {
@@ -297,7 +318,7 @@ func atnl() {
 	}
 }
 
-func getrhs(delim rune, cmd rune) (s string) {
+func getrhs(delim rune, cmd rune) (s string, err error) {
 	var c rune
 
 	for {
@@ -308,7 +329,7 @@ func getrhs(delim rune, cmd rune) (s string) {
 		if c == '\\' {
 			c = getch()
 			if (c) <= 0 {
-				panic("bad right hand side")
+				return "", errBadRHS
 			}
 			if c == '\n' {
 				ungetch()
@@ -353,7 +374,7 @@ func collecttoken(end string) string {
 	return s.String()
 }
 
-func collecttext() string {
+func collecttext() (string, error) {
 	var begline, i int
 	var c, delim rune
 
@@ -374,7 +395,7 @@ func collecttext() string {
 			i++
 			s = s + "\n"
 			if c < 0 {
-				return s
+				return s, nil
 			}
 			if !(s[begline] != '.' || s[begline+1] != '\n') {
 				break
@@ -383,14 +404,20 @@ func collecttext() string {
 		s = s[:len(s)-2]
 	} else {
 		delim = getch()
-		okdelim(delim)
-		s = getrhs(delim, 'a')
+		if !okdelim(delim) {
+			return "", badDelimiterError(delim)
+		}
+		var err error
+		s, err = getrhs(delim, 'a')
+		if err != nil {
+			return "", err
+		}
 		if nextc() == delim {
 			getch()
 		}
 		atnl()
 	}
-	return s
+	return s, nil
 }
 
 func cmdlookup(c rune) int {
@@ -402,21 +429,21 @@ func cmdlookup(c rune) int {
 	return -1
 }
 
-func parsecmd(nest int) *Cmd {
+func parsecmd(nest int) (*Cmd, error) {
 	var cp, ncp *Cmd
 	var cmd Cmd
 	var err error
 
 	cmd.addr, err = compoundaddr()
 	if err != nil {
-		editerror(err.Error())
+		return nil, err
 	}
 	if cmdskipbl() == -1 {
-		return nil
+		return nil, nil
 	}
 	c := getch()
 	if c == -1 {
-		return nil
+		return nil, nil
 	}
 	cmd.cmdc = c
 	if cmd.cmdc == 'c' && nextc() == 'd' { // sleazy two-character case
@@ -430,7 +457,7 @@ func parsecmd(nest int) *Cmd {
 		}
 		ct := &cmdtab[i]
 		if ct.defaddr == aNo && cmd.addr != nil {
-			editerror("command takes no address")
+			return nil, errAddrNotRequired
 		}
 		if ct.count != 0 {
 			cmd.num = getnum(ct.count)
@@ -443,13 +470,21 @@ func parsecmd(nest int) *Cmd {
 				cmdskipbl()
 				c := getch()
 				if c == '\n' || c < 0 {
-					editerror("no address")
+					return nil, errAddressMissing
 				}
-				okdelim(c)
-				cmd.re = getregexp(c)
+				if !okdelim(c) {
+					return nil, badDelimiterError(c)
+				}
+				cmd.re, err = getregexp(c)
+				if err != nil {
+					return nil, err
+				}
 				if ct.cmdc == 's' {
 					cmd.text = ""
-					cmd.text = getrhs(c, 's')
+					cmd.text, err = getrhs(c, 's')
+					if err != nil {
+						return nil, err
+					}
 					if nextc() == c {
 						getch()
 						if nextc() == 'g' {
@@ -464,10 +499,10 @@ func parsecmd(nest int) *Cmd {
 			var err error
 			cmd.mtaddr, err = simpleaddr()
 			if err != nil {
-				editerror(err.Error())
+				return nil, err
 			}
 			if cmd.mtaddr == nil {
-				editerror("bad address")
+				return nil, errBadAddr
 			}
 		}
 		switch {
@@ -477,13 +512,19 @@ func parsecmd(nest int) *Cmd {
 				cmd.cmd = newcmd()
 				cmd.cmd.cmdc = ct.defcmd
 			} else {
-				cmd.cmd = parsecmd(nest)
+				cmd.cmd, err = parsecmd(nest)
+				if err != nil {
+					return nil, err
+				}
 				if cmd.cmd == nil {
 					panic("defcmd")
 				}
 			}
 		case ct.text != 0:
-			cmd.text = collecttext()
+			cmd.text, err = collecttext()
+			if err != nil {
+				return nil, err
+			}
 		case len(ct.token) > 0:
 			cmd.text = collecttoken(ct.token)
 		default:
@@ -497,7 +538,10 @@ func parsecmd(nest int) *Cmd {
 				if cmdskipbl() == '\n' {
 					getch()
 				}
-				ncp = parsecmd(nest + 1)
+				ncp, err = parsecmd(nest + 1)
+				if err != nil {
+					return nil, err
+				}
 				if cp != nil {
 					cp.next = ncp
 				} else {
@@ -511,20 +555,20 @@ func parsecmd(nest int) *Cmd {
 		case '}':
 			atnl()
 			if nest == 0 {
-				editerror("right brace with no left brace")
+				return nil, errLeftBraceMissing
 			}
-			return nil
+			return nil, nil
 		default:
-			editerror("unknown command %c", cmd.cmdc)
+			return nil, invalidCmdError(cmd.cmdc)
 		}
 	}
 Return:
 	cp = newcmd()
 	*cp = cmd
-	return cp
+	return cp, nil
 }
 
-func getregexp(delim rune) string {
+func getregexp(delim rune) (string, error) {
 	var c rune
 
 	buf := string("")
@@ -554,9 +598,9 @@ func getregexp(delim rune) string {
 		lastpat = buf
 	}
 	if len(lastpat) == 0 {
-		editerror("no regular expression defined")
+		return "", errRegexpMissing
 	}
-	return lastpat
+	return lastpat, nil
 }
 
 func simpleaddr() (*Addr, error) {
@@ -571,7 +615,11 @@ func simpleaddr() (*Addr, error) {
 		addr.num = getnum(1)
 	case '/', '?', '"':
 		addr.typ = getch()
-		addr.re = getregexp(addr.typ)
+		var err error
+		addr.re, err = getregexp(addr.typ)
+		if err != nil {
+			return nil, err
+		}
 	case '.', '$', '+', '-', '\'':
 		addr.typ = getch()
 	default:
