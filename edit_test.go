@@ -74,6 +74,74 @@ func TestEdit(t *testing.T) {
 	}
 }
 
+func TestParsecmd(t *testing.T) {
+	tt := []struct {
+		input []rune
+		cmd   *Cmd
+		err   error
+	}{
+		{[]rune("\n"), &Cmd{cmdc: '\n'}, nil},
+		{[]rune("a\n"), &Cmd{cmdc: 'a', text: "\n"}, nil},
+		{[]rune("a\nabc"), &Cmd{cmdc: 'a', text: "abc\n"}, nil},
+		{[]rune("a\nabc\n.\n"), &Cmd{cmdc: 'a', text: "abc\n"}, nil},
+		{[]rune("a/abc/\n"), &Cmd{cmdc: 'a', text: "abc"}, nil},
+		{[]rune("a/abc/\n"), &Cmd{cmdc: 'a', text: "abc"}, nil},
+		{[]rune(`a/a\bc/` + "\n"), &Cmd{cmdc: 'a', text: `a\bc`}, nil},
+		{[]rune(`a/a\nc/` + "\n"), &Cmd{cmdc: 'a', text: "a\nc"}, nil},
+		{[]rune("a/ab\\\nc/\n"), &Cmd{cmdc: 'a', text: `ab\`}, nil},
+		{[]rune("a/ab\\"), nil, errBadRHS},
+		{[]rune(`a\abc\` + "\n"), nil, badDelimiterError('\\')},
+		{[]rune("x/abc/\n"), &Cmd{re: "abc", cmd: &Cmd{cmdc: 'p'}, cmdc: 'x'}, nil},
+		{[]rune("x/abc/j\n"), nil, invalidCmdError('j')},
+		{[]rune("s/abc/def/\n"), &Cmd{re: "abc", text: "def", num: 1, cmdc: 's'}, nil},
+		{[]rune("s/abc/def/g\n"), &Cmd{re: "abc", text: "def", num: 1, flag: 'g', cmdc: 's'}, nil},
+		{[]rune("s2/abc/def/\n"), &Cmd{re: "abc", text: "def", num: 2, cmdc: 's'}, nil},
+		{[]rune("/abc/ s//def/\n"), &Cmd{
+			addr: &Addr{typ: '/', re: "abc"},
+			re:   "abc", text: "def", num: 1, cmdc: 's',
+		}, nil},
+		{[]rune("s//xyz/\n"), nil, errRegexpMissing},
+		{[]rune("s/abc/def\\"), nil, errBadRHS},
+		{[]rune("3.,17d\n"), nil, errBadAddrSyntax},
+		{[]rune("5u\n"), nil, errAddrNotRequired},
+		{[]rune("j\n"), nil, invalidCmdError('j')},
+		{[]rune("{}\n"), &Cmd{cmdc: '{'}, nil},
+		{[]rune("{\nd\nu\n}\n"), &Cmd{
+			cmd:  &Cmd{cmdc: 'd', next: &Cmd{cmdc: 'u', num: 1}},
+			cmdc: '{',
+		}, nil},
+		{[]rune("{j}\n"), nil, invalidCmdError('j')},
+		{[]rune("{\nj\n}\n"), nil, invalidCmdError('j')},
+		{[]rune("}\n"), nil, errLeftBraceMissing},
+		{[]rune("cd\n"), nil, invalidCmdError('c' | 0x100)},
+		{[]rune("t 42.\n"), nil, errBadAddrSyntax},
+		{[]rune("t\n"), nil, errBadAddr},
+		{[]rune("B abc.txt\n"), &Cmd{cmdc: 'B', text: " abc.txt"}, nil},
+		{[]rune("g\n"), nil, errAddressMissing},
+		{[]rune(`g\abc\` + "\n"), nil, badDelimiterError('\\')},
+		{[]rune("u\n"), &Cmd{num: 1, cmdc: 'u'}, nil},
+		{[]rune("u5\n"), &Cmd{num: 5, cmdc: 'u'}, nil},
+		{[]rune("u-3\n"), &Cmd{num: -3, cmdc: 'u'}, nil},
+	}
+	for _, tc := range tt {
+		cmdstartp = tc.input
+		cmdp = 0
+		lastpat = ""
+		cmd, err := parsecmd(0)
+		if err != tc.err {
+			t.Errorf("parsing command %q returned error %v; expected %v",
+				tc.input, err, tc.err)
+			continue
+		}
+		if !reflect.DeepEqual(cmd, tc.cmd) {
+			t.Errorf("bad parse result for command %q:\n"+
+				"got: %v\n"+
+				"expected: %v",
+				tc.input, cmd, tc.cmd)
+		}
+	}
+}
+
 func TestCollecttoken(t *testing.T) {
 	tt := []struct {
 		cmd []rune
@@ -134,7 +202,7 @@ func TestSimpleaddr(t *testing.T) {
 		{[]rune("42.\n"), nil, errBadAddrSyntax},
 		{[]rune("42$\n"), nil, errBadAddrSyntax},
 		{[]rune("42'\n"), nil, errBadAddrSyntax},
-		{[]rune("42\"\n"), nil, errBadAddrSyntax},
+		{[]rune("42\"\n"), nil, errRegexpMissing},
 		{[]rune(`"abc" "cdf" "efg"` + "\n"), nil, errBadAddrSyntax},
 		{[]rune("\"abc\" 42\n"), &Addr{typ: '"', re: "abc", next: &Addr{typ: 'l', num: 42}}, nil},
 		{[]rune(".42\n"), &Addr{
@@ -186,9 +254,10 @@ func runAddrTests(t *testing.T, tt []addrTest, parse func() (*Addr, error)) {
 	for _, tc := range tt {
 		cmdstartp = tc.cmd
 		cmdp = 0
+		lastpat = ""
 		addr, err := parse()
 		if tc.err != err {
-			t.Errorf("simple address %q returned error %v; expected %v",
+			t.Errorf("parsing address %q returned error %v; expected %v",
 				tc.cmd, err, tc.err)
 			continue
 		}
@@ -207,4 +276,28 @@ func (a *Addr) String() string {
 	}
 	return fmt.Sprintf("Addr{typ: %c, re: %q, left: %v, num: %v, next: %v}",
 		a.typ, a.re, a.left, a.num, a.next)
+}
+
+func (c *Cmd) String() string {
+	if c == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("Cmd{addr: %v, re: %q, cmd: %v, text: %q, mtaddr: %v, next: %v, num: %v, flag: %v, cmdc: %q}",
+		c.addr, c.re, c.cmd, c.text, c.mtaddr, c.next, c.num, c.flag, c.cmdc)
+}
+
+func TestInvalidCmdError(t *testing.T) {
+	got := invalidCmdError('j').Error()
+	want := "unknown command j"
+	if got != want {
+		t.Errorf("invalidCmdError is %v; expected %v", got, want)
+	}
+}
+
+func TestBadDelimiterError(t *testing.T) {
+	got := badDelimiterError('x').Error()
+	want := "bad delimiter x"
+	if got != want {
+		t.Errorf("invalidCmdError is %v; expected %v", got, want)
+	}
 }
