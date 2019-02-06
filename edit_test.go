@@ -124,10 +124,12 @@ func TestParsecmd(t *testing.T) {
 		{[]rune("u-3\n"), &Cmd{num: -3, cmdc: 'u'}, nil},
 	}
 	for _, tc := range tt {
-		cmdstartp = tc.input
-		cmdp = 0
 		lastpat = ""
-		cmd, err := parsecmd(0)
+		cp := &cmdParser{
+			buf: tc.input,
+			pos: 0,
+		}
+		cmd, err := cp.parse(0)
 		if err != tc.err {
 			t.Errorf("parsing command %q returned error %v; expected %v",
 				tc.input, err, tc.err)
@@ -156,9 +158,11 @@ func TestCollecttoken(t *testing.T) {
 		{[]rune(" αβγ テスト\t\n世界"), wordx, " αβγ テスト"},
 	}
 	for _, tc := range tt {
-		cmdstartp = tc.cmd
-		cmdp = 0
-		out := collecttoken(tc.end)
+		cp := &cmdParser{
+			buf: tc.cmd,
+			pos: 0,
+		}
+		out := cp.collecttoken(tc.end)
 		if out != tc.out {
 			t.Errorf("collecttoken(%q) of command %q is %q; exptected %q",
 				tc.end, tc.cmd, out, tc.out)
@@ -225,8 +229,7 @@ func TestSimpleaddr(t *testing.T) {
 		{[]rune(".+\n"), &Addr{typ: '.', next: &Addr{typ: '+', num: 0}}, nil},
 		{[]rune(".-\n"), &Addr{typ: '.', next: &Addr{typ: '-', num: 0}}, nil},
 	}
-
-	runAddrTests(t, tt, simpleaddr)
+	runAddrTests(t, tt, (*cmdParser).simpleaddr)
 }
 
 func TestCompoundaddr(t *testing.T) {
@@ -247,15 +250,17 @@ func TestCompoundaddr(t *testing.T) {
 		{[]rune("3,,17\n"), nil, errBadAddrSyntax},
 		{[]rune("3;;17\n"), nil, errBadAddrSyntax},
 	}
-	runAddrTests(t, tt, compoundaddr)
+	runAddrTests(t, tt, (*cmdParser).compoundaddr)
 }
 
-func runAddrTests(t *testing.T, tt []addrTest, parse func() (*Addr, error)) {
+func runAddrTests(t *testing.T, tt []addrTest, parse func(*cmdParser) (*Addr, error)) {
 	for _, tc := range tt {
-		cmdstartp = tc.cmd
-		cmdp = 0
 		lastpat = ""
-		addr, err := parse()
+		cp := &cmdParser{
+			buf: tc.cmd,
+			pos: 0,
+		}
+		addr, err := parse(cp)
 		if tc.err != err {
 			t.Errorf("parsing address %q returned error %v; expected %v",
 				tc.cmd, err, tc.err)
@@ -298,6 +303,6 @@ func TestBadDelimiterError(t *testing.T) {
 	got := badDelimiterError('x').Error()
 	want := "bad delimiter x"
 	if got != want {
-		t.Errorf("invalidCmdError is %v; expected %v", got, want)
+		t.Errorf("badDelimiterError is %v; expected %v", got, want)
 	}
 }

@@ -131,21 +131,21 @@ func init() {
 }
 
 var (
-	cmdstartp []rune
-	cmdp      int
-	editerrc  chan error
+	editerrc chan error
 
 	lastpat string
-	patset  bool
-
-//	curtext	*Text
 )
 
-func editthread() {
+type cmdParser struct {
+	buf []rune
+	pos int
+}
+
+func editthread(cp *cmdParser) {
 	for {
-		cmd, err := parsecmd(0)
+		cmd, err := cp.parse(0)
 		if err != nil {
-			editerror(err.Error())
+			editerror("%v", err)
 		}
 		if cmd == nil {
 			break
@@ -210,12 +210,7 @@ func editcmd(ct *Text, r []rune) {
 	}
 
 	row.AllWindows(alleditinit)
-	cmdstartp = make([]rune, len(r), len(r)+1)
-	copy(cmdstartp, r)
-	if r[len(r)-1] != '\n' {
-		cmdstartp = append(r, '\n')
-	}
-	cmdp = 0
+	cp := newCmdParser(r)
 	if ct.w == nil {
 		curtext = nil
 	} else {
@@ -226,7 +221,7 @@ func editcmd(ct *Text, r []rune) {
 		editerrc = make(chan error)
 		lastpat = ""
 	}
-	go editthread()
+	go editthread(cp)
 	err := <-editerrc
 	editing = Inactive
 	if err != nil {
@@ -236,63 +231,75 @@ func editcmd(ct *Text, r []rune) {
 	row.AllWindows(allupdate)
 }
 
-func getch() rune {
-	if cmdp == len(cmdstartp) {
+func newCmdParser(r []rune) *cmdParser {
+	buf := make([]rune, len(r), len(r)+1)
+	copy(buf, r)
+	if r[len(r)-1] != '\n' {
+		buf = append(r, '\n')
+	}
+	return &cmdParser{
+		buf: buf,
+		pos: 0,
+	}
+}
+
+func (cp *cmdParser) getch() rune {
+	if cp.pos == len(cp.buf) {
 		return -1
 	}
-	c := cmdstartp[cmdp]
-	cmdp++
+	c := cp.buf[cp.pos]
+	cp.pos++
 	return c
 }
 
-func nextc() rune {
-	if cmdp == len(cmdstartp) {
+func (cp *cmdParser) nextc() rune {
+	if cp.pos == len(cp.buf) {
 		return -1
 	}
-	return cmdstartp[cmdp]
+	return cp.buf[cp.pos]
 }
 
-func ungetch() {
-	cmdp--
-	if cmdp < 0 {
+func (cp *cmdParser) ungetch() {
+	cp.pos--
+	if cp.pos < 0 {
 		panic("ungetch")
 	}
 }
 
-func getnum(signok int) int {
+func (cp *cmdParser) getnum(signok int) int {
 	n := int(0)
 	sign := int(1)
-	if signok > 1 && nextc() == '-' {
+	if signok > 1 && cp.nextc() == '-' {
 		sign = -1
-		getch()
+		cp.getch()
 	}
-	c := nextc()
+	c := cp.nextc()
 	if c < '0' || '9' < c { // no number defaults to 1
 		return sign
 	}
 
 	for {
-		c = getch()
+		c = cp.getch()
 		if !('0' <= c && c <= '9') {
 			break
 		}
 		n = n*10 + int(c-'0')
 	}
-	ungetch()
+	cp.ungetch()
 	return sign * n
 }
 
-func cmdskipbl() rune {
+func (cp *cmdParser) skipbl() rune {
 	var c rune
 	for {
-		c = getch()
+		c = cp.getch()
 		if !(c == ' ' || c == '\t') {
 			break
 		}
 	}
 
 	if c >= 0 {
-		ungetch()
+		cp.ungetch()
 	}
 	return c
 }
@@ -309,30 +316,30 @@ func okdelim(c rune) bool {
 	return !(c == '\\' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'))
 }
 
-func atnl() {
-	cmdskipbl()
-	c := getch()
+func (cp *cmdParser) atnl() {
+	cp.skipbl()
+	c := cp.getch()
 	if c != '\n' {
 		debug.PrintStack()
 		editerror("newline expected (saw %c)", c)
 	}
 }
 
-func getrhs(delim rune, cmd rune) (s string, err error) {
+func (cp *cmdParser) getrhs(delim rune, cmd rune) (s string, err error) {
 	var c rune
 
 	for {
-		c = getch()
+		c = cp.getch()
 		if !((c) > 0 && c != delim && c != '\n') {
 			break
 		}
 		if c == '\\' {
-			c = getch()
+			c = cp.getch()
 			if (c) <= 0 {
 				return "", errBadRHS
 			}
 			if c == '\n' {
-				ungetch()
+				cp.ungetch()
 				c = '\\'
 			} else {
 				if c == 'n' {
@@ -346,46 +353,46 @@ func getrhs(delim rune, cmd rune) (s string, err error) {
 		}
 		s = s + string(c)
 	}
-	ungetch() // let client read whether delimiter, '\n' or whatever
+	cp.ungetch() // let client read whether delimiter, '\n' or whatever
 	return
 }
 
-func collecttoken(end string) string {
+func (cp *cmdParser) collecttoken(end string) string {
 	var s strings.Builder
 	var c rune
 
 	for {
-		c = nextc()
+		c = cp.nextc()
 		if c != ' ' && c != '\t' {
 			break
 		}
-		s.WriteRune(getch()) // blanks significant for getname()
+		s.WriteRune(cp.getch()) // blanks significant for getname()
 	}
 	for {
-		c = getch()
+		c = cp.getch()
 		if c <= 0 || strings.ContainsRune(end, c) {
 			break
 		}
 		s.WriteRune(c)
 	}
 	if c != '\n' {
-		atnl()
+		cp.atnl()
 	}
 	return s.String()
 }
 
-func collecttext() (string, error) {
+func (cp *cmdParser) collecttext() (string, error) {
 	var begline, i int
 	var c, delim rune
 
 	s := ""
-	if cmdskipbl() == '\n' {
-		getch()
+	if cp.skipbl() == '\n' {
+		cp.getch()
 		i = 0
 		for {
 			begline = i
 			for {
-				c = getch()
+				c = cp.getch()
 				if !(c > 0 && c != '\n') {
 					break
 				}
@@ -403,19 +410,19 @@ func collecttext() (string, error) {
 		}
 		s = s[:len(s)-2]
 	} else {
-		delim = getch()
+		delim = cp.getch()
 		if !okdelim(delim) {
 			return "", badDelimiterError(delim)
 		}
 		var err error
-		s, err = getrhs(delim, 'a')
+		s, err = cp.getrhs(delim, 'a')
 		if err != nil {
 			return "", err
 		}
-		if nextc() == delim {
-			getch()
+		if cp.nextc() == delim {
+			cp.getch()
 		}
-		atnl()
+		cp.atnl()
 	}
 	return s, nil
 }
@@ -429,66 +436,65 @@ func cmdlookup(c rune) int {
 	return -1
 }
 
-func parsecmd(nest int) (*Cmd, error) {
-	var cp, ncp *Cmd
+func (cp *cmdParser) parse(nest int) (*Cmd, error) {
 	var cmd Cmd
 	var err error
 
-	cmd.addr, err = compoundaddr()
+	cmd.addr, err = cp.compoundaddr()
 	if err != nil {
 		return nil, err
 	}
-	if cmdskipbl() == -1 {
+	if cp.skipbl() == -1 {
 		return nil, nil
 	}
-	c := getch()
+	c := cp.getch()
 	if c == -1 {
 		return nil, nil
 	}
 	cmd.cmdc = c
-	if cmd.cmdc == 'c' && nextc() == 'd' { // sleazy two-character case
-		getch() // the 'd'
+	if cmd.cmdc == 'c' && cp.nextc() == 'd' { // sleazy two-character case
+		cp.getch() // the 'd'
 		cmd.cmdc = 'c' | 0x100
 	}
 	i := cmdlookup(cmd.cmdc)
 	if i >= 0 {
 		if cmd.cmdc == '\n' {
-			goto Return // let nl_cmd work it all out
+			return &cmd, nil // let nl_cmd work it all out
 		}
 		ct := &cmdtab[i]
 		if ct.defaddr == aNo && cmd.addr != nil {
 			return nil, errAddrNotRequired
 		}
 		if ct.count != 0 {
-			cmd.num = getnum(ct.count)
+			cmd.num = cp.getnum(ct.count)
 		}
 		if ct.regexp != 0 {
 			// x without pattern . .*\n, indicated by cmd.re==0
 			// X without pattern is all files
-			c := nextc()
+			c := cp.nextc()
 			if ct.cmdc != 'x' && ct.cmdc != 'X' || (c != ' ' && c != '\t' && c != '\n') {
-				cmdskipbl()
-				c := getch()
+				cp.skipbl()
+				c := cp.getch()
 				if c == '\n' || c < 0 {
 					return nil, errAddressMissing
 				}
 				if !okdelim(c) {
 					return nil, badDelimiterError(c)
 				}
-				cmd.re, err = getregexp(c)
+				cmd.re, err = cp.getregexp(c)
 				if err != nil {
 					return nil, err
 				}
 				if ct.cmdc == 's' {
 					cmd.text = ""
-					cmd.text, err = getrhs(c, 's')
+					cmd.text, err = cp.getrhs(c, 's')
 					if err != nil {
 						return nil, err
 					}
-					if nextc() == c {
-						getch()
-						if nextc() == 'g' {
-							cmd.flag = getch()
+					if cp.nextc() == c {
+						cp.getch()
+						if cp.nextc() == 'g' {
+							cmd.flag = cp.getch()
 						}
 					}
 
@@ -497,7 +503,7 @@ func parsecmd(nest int) (*Cmd, error) {
 		}
 		if ct.addr != 0 {
 			var err error
-			cmd.mtaddr, err = simpleaddr()
+			cmd.mtaddr, err = cp.simpleaddr()
 			if err != nil {
 				return nil, err
 			}
@@ -507,12 +513,12 @@ func parsecmd(nest int) (*Cmd, error) {
 		}
 		switch {
 		case ct.defcmd != 0:
-			if cmdskipbl() == '\n' {
-				getch()
+			if cp.skipbl() == '\n' {
+				cp.getch()
 				cmd.cmd = newcmd()
 				cmd.cmd.cmdc = ct.defcmd
 			} else {
-				cmd.cmd, err = parsecmd(nest)
+				cmd.cmd, err = cp.parse(nest)
 				if err != nil {
 					return nil, err
 				}
@@ -521,39 +527,39 @@ func parsecmd(nest int) (*Cmd, error) {
 				}
 			}
 		case ct.text != 0:
-			cmd.text, err = collecttext()
+			cmd.text, err = cp.collecttext()
 			if err != nil {
 				return nil, err
 			}
 		case len(ct.token) > 0:
-			cmd.text = collecttoken(ct.token)
+			cmd.text = cp.collecttoken(ct.token)
 		default:
-			atnl()
+			cp.atnl()
 		}
 	} else {
 		switch cmd.cmdc {
 		case '{':
-			cp = nil
+			var c, nc *Cmd
 			for {
-				if cmdskipbl() == '\n' {
-					getch()
+				if cp.skipbl() == '\n' {
+					cp.getch()
 				}
-				ncp, err = parsecmd(nest + 1)
+				nc, err = cp.parse(nest + 1)
 				if err != nil {
 					return nil, err
 				}
-				if cp != nil {
-					cp.next = ncp
+				if c != nil {
+					c.next = nc
 				} else {
-					cmd.cmd = ncp
+					cmd.cmd = nc
 				}
-				cp = ncp
-				if !(cp != nil) {
+				c = nc
+				if !(c != nil) {
 					break
 				}
 			}
 		case '}':
-			atnl()
+			cp.atnl()
 			if nest == 0 {
 				return nil, errLeftBraceMissing
 			}
@@ -562,25 +568,22 @@ func parsecmd(nest int) (*Cmd, error) {
 			return nil, invalidCmdError(cmd.cmdc)
 		}
 	}
-Return:
-	cp = newcmd()
-	*cp = cmd
-	return cp, nil
+	return &cmd, nil
 }
 
-func getregexp(delim rune) (string, error) {
+func (cp *cmdParser) getregexp(delim rune) (string, error) {
 	var c rune
 
 	buf := string("")
 	for i := int(0); ; i++ {
-		c = getch()
+		c = cp.getch()
 		if c == '\\' {
-			if nextc() == delim {
-				c = getch()
+			if cp.nextc() == delim {
+				c = cp.getch()
 			} else {
-				if nextc() == '\\' {
+				if cp.nextc() == '\\' {
 					buf = buf + string(c)
-					c = getch()
+					c = cp.getch()
 				}
 			}
 		} else {
@@ -591,10 +594,9 @@ func getregexp(delim rune) (string, error) {
 		buf = buf + string(c)
 	}
 	if c != delim && c != 0 {
-		ungetch()
+		cp.ungetch()
 	}
 	if len(buf) > 0 {
-		patset = true
 		lastpat = buf
 	}
 	if len(lastpat) == 0 {
@@ -603,30 +605,30 @@ func getregexp(delim rune) (string, error) {
 	return lastpat, nil
 }
 
-func simpleaddr() (*Addr, error) {
+func (cp *cmdParser) simpleaddr() (*Addr, error) {
 	var addr Addr
 
-	switch cmdskipbl() {
+	switch cp.skipbl() {
 	case '#':
-		addr.typ = getch()
-		addr.num = getnum(1)
+		addr.typ = cp.getch()
+		addr.num = cp.getnum(1)
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		addr.typ = 'l'
-		addr.num = getnum(1)
+		addr.num = cp.getnum(1)
 	case '/', '?', '"':
-		addr.typ = getch()
+		addr.typ = cp.getch()
 		var err error
-		addr.re, err = getregexp(addr.typ)
+		addr.re, err = cp.getregexp(addr.typ)
 		if err != nil {
 			return nil, err
 		}
 	case '.', '$', '+', '-', '\'':
-		addr.typ = getch()
+		addr.typ = cp.getch()
 	default:
 		return nil, nil
 	}
 	var err error
-	addr.next, err = simpleaddr()
+	addr.next, err = cp.simpleaddr()
 	if err != nil {
 		return nil, err
 	}
@@ -660,20 +662,20 @@ func simpleaddr() (*Addr, error) {
 	return &addr, nil
 }
 
-func compoundaddr() (*Addr, error) {
+func (cp *cmdParser) compoundaddr() (*Addr, error) {
 	var addr Addr
 	var err error
 
-	addr.left, err = simpleaddr()
+	addr.left, err = cp.simpleaddr()
 	if err != nil {
 		return nil, err
 	}
-	addr.typ = cmdskipbl()
+	addr.typ = cp.skipbl()
 	if addr.typ != ',' && addr.typ != ';' {
 		return addr.left, nil
 	}
-	getch()
-	addr.next, err = compoundaddr()
+	cp.getch()
+	addr.next, err = cp.compoundaddr()
 	if err != nil {
 		return nil, err
 	}
