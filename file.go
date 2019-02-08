@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"time"
-	// remove
-	//	"log"
 
 	"github.com/rjkroege/edwood/internal/file"
 )
@@ -51,23 +49,24 @@ type File struct {
 	// Observer pattern: many Text instances can share a File.
 	curtext *Text
 	text    []*Text
-	dumpid  int
+
+	dumpid  int	// Used to track the identifying name of this File for Dump.
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded
 
 	// cache holds  that are not yet part of an undo record.
 	cache []rune
 
-	// TODO(rjk): may need to insert cq0 here?
+	// cq0 tracks the insertion point for the cache.
 	cq0 int
 }
 
 // Remember that the high-level goal is to slowly coerce this into looking like
 // a scrawny wrapper around the Undo implementation. As a result, we should
 // expect to see the following entry points:
-
+//
 // func (b *Buffer) Clean()
-//func (b *Buffer) Commit()
+//func (b *Buffer) Commit() 
 //func (b *Buffer) Delete(off, length int64) error
 //func (b *Buffer) Dirty() bool
 //func (b *Buffer) Insert(off int64, data []byte) error
@@ -75,7 +74,7 @@ type File struct {
 //func (b *Buffer) Redo() (off, n int64)
 //func (b *Buffer) Size() int64
 //func (b *Buffer) Undo() (off, n int64)
-
+//
 // NB how the cache is folded into Buffer.
 //TODO(rjk): make undo.Buffer implement Reader and Writer.
 
@@ -106,22 +105,9 @@ func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
-//
-func (u *File) UpdateCq0(q0 int) {
-	if len(u.cache) == 0 {
-		u.cq0 = q0
-	} else {
-		if q0 != u.cq0+len(u.cache) {
-			acmeerror("File.UpdateCq0 cq1", nil)
-		}
-	}
-
-}
-
 // Size returns the complete size of the buffer including both commited
 // and uncommitted runes.
-// NB: converts naturally to use of Undo.
-// Buffers should be sized in int
+// NB: naturally forwards to undo.Buffer.Size()
 // TODO(rjk): needs to return the size in bytes.
 func (f *File) Size() int {
 	return int(f.b.nc()) + len(f.cache)
@@ -153,25 +139,32 @@ func (f *File) ReadC(q int) rune {
 // TODO(rjk): figure out what mod really means anyway.
 // For files that aren't saved like tag Texts, it's not clear if this is
 // a very good name.
+// TODO(rjk): figure out how this overlaps with hash.
 func (f *File) DiffersFromDisk() bool {
 	return f.mod || len(f.cache) > 0
 }
 
 // Commit sets an undo point for the current state of the file.
-func (t *File) Commit() {
-	if !t.HasUncommitedChanges() {
+// The File observers are not run as part of a Commit. Observers
+// only run on an InsertAt* operation.
+// TODO(rjk): AFAIK. maps to undo.Buffer.Commit() correctly.
+func (f *File) Commit() {
+	if !f.HasUncommitedChanges() {
 		return
 	}
-	// TODO(rjk): This needs to be adjusted for the removal of implied Commit
-	// from InsertAt.
-	t.InsertAt(t.cq0, t.cache)
-	t.cache = t.cache[:0]
-}
 
-// AppendCache adds to the un-committed inserts.
-// TODO(rjk): Write in terms of Insert
-func (b *File) AppendCache(rp []rune) {
-	b.cache = append(b.cache, rp...)
+	if f.cq0 > f.b.nc() {
+		// TODO(rjk): Generate a better error message.
+		panic("internal error: File.Commit")
+	}
+	if f.seq > 0 {
+		f.Uninsert(&f.delta, f.cq0, len(f.cache))
+	}
+	f.b.Insert(f.cq0, f.cache)
+	if len( f.cache) != 0 {
+		f.Modded()
+	}
+	f.cache = f.cache[:0]
 }
 
 // DeleteAtMostNbChars removes nb characters from the cache and
@@ -195,8 +188,6 @@ func (t *File) DeleteAtMostNbChars(nb, q1 int, u *Text) int {
 	return nb
 }
 
-// TODO(rjk): I could meld the Text.TypeCommit with HasUncommitedChanges
-
 type Undo struct {
 	t   int
 	mod bool
@@ -205,7 +196,6 @@ type Undo struct {
 	n   int
 	buf []rune
 }
-
 
 func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
 	var h file.Hash
@@ -217,17 +207,19 @@ func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, er
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
+// TODO(rjk): switching to undo.Buffer will require removing use of seq
 func (f *File) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
 // SeqDiffer returns true if the current seq differs from a previously snapshot.
+// TODO(rjk): switching to undo.Buffer will require removing use of seq
 func (f *File) SeqDiffer() bool {
 	return f.seq != f.putseq
 }
 
 // AddText adds t as an observer for edits to this File.
-// TODO(rjk): The observer should be an interface?
+// TODO(rjk): The observer should be an interface.
 func (f *File) AddText(t *Text) *File {
 	f.text = append(f.text, t)
 	f.curtext = t
@@ -235,6 +227,8 @@ func (f *File) AddText(t *Text) *File {
 }
 
 // DelText removes t as an observer for edits to this File.
+// TODO(rjk): The observer should be an interface.
+// TODO(rjk): Can make this more idiomatic?
 func (f *File) DelText(t *Text) error {
 	for i, text := range f.text {
 		if text == t {
@@ -253,7 +247,6 @@ func (f *File) DelText(t *Text) error {
 	return fmt.Errorf("can't find text in File.DelText")
 }
 
-// TODO(rjk): Modded feels redundant. Remove.
 
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
@@ -271,18 +264,42 @@ func (f *File) InsertAt(p0 int, s []rune) {
 	if len(s) != 0 {
 		f.Modded()
 	}
+	for _, text := range f.text {
+		text.inserted(p0, s)
+	}
 }
 
-// Insert inserts data bytes at byte address off.
-// TODO(rjk): Delegated to undo.Buffer. Not currently
-// available.
-// func (b *Buffer) Insert(off int, data []byte) error {
-//}
+// InsertAtWithoutCommit inserts s at p0 without creating
+// an undo record.
+// TODO(rjk): This method aligns with undo.Buffer.Insert semantics.
+func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
+	if p0 > f.b.nc() + len(f.cache) {
+		panic("File.InsertAtWithoutCommit insertion off the end")
+	}
 
+	if len(f.cache) == 0 {
+		f.cq0 = p0
+	} else {
+		if p0 != f.cq0+len(f.cache) {
+			// TODO(rjk): actually print something useful here
+			acmeerror("File.InsertAtWithoutCommit cq0", nil)
+		}
+	}
+	f.cache = append(f.cache, s...)
+
+	// run the observers
+	for _, text := range f.text {
+		text.inserted(p0, s)
+	}
+}
+
+// Uninsert generates an action record that deletes runes from the File
+// to undo an insertion.
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
 	u.t = Delete
+
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = q0
@@ -306,9 +323,8 @@ func (f *File) DeleteAt(p0, p1 int) {
 	}
 }
 
-// TODO(rjk): Implement me
-//func (b *Buffer) Delete(p0, p1 int) error
-
+// Undelete generates an action record that inserts runes into the File
+// to undo a deletion.
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting
 	var u Undo
@@ -443,7 +459,6 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			}
 			q0p = u.p0
 			q1p = u.p0
-
 		case Insert:
 			f.seq = u.seq
 			f.Uninsert(epsilon, u.p0, u.n)
@@ -451,12 +466,12 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.treatasclean = false
 			f.b.Insert(u.p0, u.buf)
 			for _, text := range f.text {
-				text.Insert(u.p0, u.buf, false)
+				text.inserted(u.p0, u.buf)
 			}
 			q0p = u.p0
 			q1p = u.p0 + u.n
-
 		case Filename:
+			// TODO(rjk): If I have a zerox, does undo a filename change update?
 			f.seq = u.seq
 			f.UnsetName(epsilon)
 			f.mod = u.mod
@@ -502,6 +517,9 @@ func (f *File) TreatAsClean() {
 	f.treatasclean = true
 }
 
+// Modded marks the file as modified.
+// TODO(rjk): Modded is strange. I can improve (or simplify) how I track
+// the modification state of a file.
 func (f *File) Modded() {
 	f.mod = true
 	f.treatasclean = false

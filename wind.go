@@ -426,11 +426,11 @@ func (w *Window) SetName(name string) {
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-	if t.what == Body {
-		for _, text := range t.file.text {
-			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
-		}
-	}
+//	if t.what == Body {
+//		for _, text := range t.file.text {
+//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
+//		}
+//	}
 	w.SetTag()
 }
 
@@ -467,6 +467,8 @@ func (w *Window) ClearTag() {
 
 func (w *Window) SetTag() {
 	f := w.body.file
+
+	// TODO(rjk): I think that I can fold this into Text.inserted()
 	for _, u := range f.text {
 		v := u.w
 		if v.col.safe || v.body.fr.GetFrameFillStatus().Maxlines > 0 {
@@ -498,6 +500,7 @@ func (w *Window) SetTag1() {
 	sb := strings.Builder{}
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
+
 	if w.filemenu {
 		if w.body.needundo || w.body.file.HasUndoableChanges() {
 			sb.WriteString(Lundo)

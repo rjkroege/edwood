@@ -443,28 +443,13 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 	return q0, nrp
 }
 
-func (t *Text) Insert(q0 int, r []rune, tofile bool) {
-	if tofile && t.file.HasUncommitedChanges() {
-		panic("text.insert")
-	}
-	if len(r) == 0 {
-		return
-	}
-	if tofile {
-		t.file.InsertAt(q0, r)
+
+// inserted is a callback invoked by File on Insert* to update each Text
+// that is using a given File.
+func (t *Text) inserted(q0 int, r []rune) {
 		if t.what == Body {
 			t.w.utflastqid = -1
 		}
-		if len(t.file.text) > 1 {
-			for _, u := range t.file.text {
-				if u != t {
-					u.Insert(q0, r, false)
-					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
-				}
-			}
-		}
-	}
 	n := (len(r))
 	if q0 < t.iq1 {
 		t.iq1 += n
@@ -482,6 +467,22 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 			t.fr.Insert(r[:n], q0-t.org)
 		}
 	}
+
+	t.logInsert(q0, r)
+	t.SetSelect(t.q0, t.q1)
+	if t.fr != nil {
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+	}
+
+}
+
+// writeEventLog emits an event log for an insertion.
+// TODO(rjk): Refactor this with the other event log insertions.
+// TODO(rjk): can be more stateless.
+// TODO(rjk): Can express this more precisely with an interface
+// that makes its state dependency obvious
+func (t *Text) logInsert(q0 int, r []rune) {
+	n := len(r)
 	if t.w != nil {
 		c := 'i'
 		if t.what == Body {
@@ -493,6 +494,19 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+n)
 		}
 	}
+}
+
+func (t *Text) Insert(q0 int, r []rune, tofile bool) {
+	if !tofile {
+		panic("text.insert")
+	}
+	if tofile && t.file.HasUncommitedChanges() {
+		panic("text.insert")
+	}
+	if len(r) == 0 {
+		return
+	}
+		t.file.InsertAt(q0, r)
 }
 
 func (t *Text) TypeCommit() {
@@ -1016,33 +1030,11 @@ func (t *Text) Type(r rune) {
 		}
 	}
 	// otherwise ordinary character; just insert, typically in caches of all texts
-	// TODO(rjk): this section needs to be handled through the
-	// improved observer pattern.
-	t.file.UpdateCq0(t.q0)
-	for _, u := range t.file.text { // u is *Text
-		if u.eq0 == ^0 {
-			u.eq0 = t.q0
-		}
-
-		// Change the tag before we add to ncache,
-		// so that if the window body is resized the
-		// commit will not find anything in ncache.
-		if u.what == Body && !t.file.HasUncommitedChanges() {
-			u.needundo = true
-			t.w.SetTag()
-			u.needundo = false
-		}
-		u.Insert(t.q0, rp, false)
-		if u != t {
-			u.SetSelect(u.q0, u.q1)
-		}
-		u.file.AppendCache(rp[:nr])
-		if t.what == Tag { // TODO(flux): This is hideous work-around for
-			// what looks like a subtle bug near here.
-			t.w.Commit(t)
-		}
-	}
+	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
+
+	// TODO(rjk): Do we always want to commit if editing a
+	// a tag?
 	if r == '\n' && t.w != nil {
 		t.w.Commit(t)
 	}
