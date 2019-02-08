@@ -7,16 +7,18 @@ func TestDelText(t *testing.T) {
 		text: []*Text{{}, {}, {}, {}, {}},
 	}
 	t.Run("Nonexistent", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Errorf("expected panic when deleting nonexistent text")
-			}
-		}()
-		f.DelText(&Text{})
+		err := f.DelText(&Text{})
+		if err == nil {
+			t.Errorf("expected panic when deleting nonexistent text")
+		}
 	})
 	for i := len(f.text) - 1; i >= 0; i-- {
 		text := f.text[i]
-		f.DelText(text)
+		err := f.DelText(text)
+		if err != nil {
+			t.Errorf("DelText of text at index %d failed: %v", i, err)
+			continue
+		}
 		if got, want := len(f.text), i; got != want {
 			t.Fatalf("DelText resulted in text of length %v; expected %v", got, want)
 		}
