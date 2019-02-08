@@ -184,7 +184,9 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 
 func (t *Text) Close() {
 	t.fr.Clear(true)
-	t.file.DelText(t)
+	if err := t.file.DelText(t); err != nil {
+		acmeerror(err.Error(), nil)
+	}
 	t.file = nil
 	if argtext == t {
 		argtext = nil
