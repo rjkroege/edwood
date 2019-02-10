@@ -426,11 +426,11 @@ func (w *Window) SetName(name string) {
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-//	if t.what == Body {
-//		for _, text := range t.file.text {
-//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
-//		}
-//	}
+	//	if t.what == Body {
+	//		for _, text := range t.file.text {
+	//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
+	//		}
+	//	}
 	w.SetTag()
 }
 

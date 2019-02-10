@@ -15,6 +15,8 @@ import (
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/drawutil"
 	"github.com/rjkroege/edwood/internal/runes"
+
+	"log"
 )
 
 const (
@@ -443,13 +445,12 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 	return q0, nrp
 }
 
-
 // inserted is a callback invoked by File on Insert* to update each Text
 // that is using a given File.
 func (t *Text) inserted(q0 int, r []rune) {
-		if t.what == Body {
-			t.w.utflastqid = -1
-		}
+	if t.what == Body {
+		t.w.utflastqid = -1
+	}
 	n := (len(r))
 	if q0 < t.iq1 {
 		t.iq1 += n
@@ -506,7 +507,7 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if len(r) == 0 {
 		return
 	}
-		t.file.InsertAt(q0, r)
+	t.file.InsertAt(q0, r)
 }
 
 func (t *Text) TypeCommit() {
@@ -576,20 +577,16 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 	if n == 0 {
 		return
 	}
-	if tofile {
-		t.file.DeleteAt(q0, q1)
-		if t.what == Body {
-			t.w.utflastqid = -1
-		}
-		if len(t.file.text) > 1 {
-			for _, u := range t.file.text {
-				if u != t {
-					u.Delete(q0, q1, false)
-					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
-				}
-			}
-		}
+	t.file.DeleteAt(q0, q1)
+}
+
+// deleted implements the single-text deletion observer for this Text's
+// backing File. It updates the Text (i.e. the view) for the removal of
+// runes [q0, q1).
+func (t *Text) deleted(q0, q1 int) {
+	n := q1 - q0
+	if t.what == Body {
+		t.w.utflastqid = -1
 	}
 	if q0 < t.iq1 {
 		t.iq1 -= min(n, t.iq1-q0)
@@ -617,6 +614,17 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		t.fr.Delete((p0), (p1))
 		t.fill(t.fr)
 	}
+
+	t.logInsertDelete(q0, q1)
+
+	t.SetSelect(t.q0, t.q1)
+	if t.fr != nil {
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+	}
+}
+
+// TODO(rjk): Fold this into logInsert is a nice way.
+func (t *Text) logInsertDelete(q0, q1 int) {
 	if t.w != nil {
 		c := 'd'
 		if t.what == Body {
@@ -737,9 +745,9 @@ func (t *Text) Complete() []rune {
 
 func (t *Text) Type(r rune) {
 	var (
-		q0, q1        int
-		nnb, nb, n, i int
-		nr            int
+		q0, q1    int
+		nnb, n, i int
+		nr        int
 	)
 	// Avoid growing column and row tags.
 	if t.what != Body && t.what != Tag && r == '\n' {
@@ -976,6 +984,8 @@ func (t *Text) Type(r rune) {
 		if t.q0 == 0 { // nothing to erase
 			return
 		}
+
+		log.Println("erasing!")
 		nnb = t.BsWidth(r)
 		q1 = t.q0
 		q0 = q1 - nnb
@@ -987,27 +997,14 @@ func (t *Text) Type(r rune) {
 		if nnb <= 0 {
 			return
 		}
-		// TODO(rjk): This loop should be folded into the File observer pattern
-		// implementation. I need to call the Text.Delete action.
-		for _, u := range t.file.text { // u is *Text
-			u.nofill = true
-			nb = u.file.DeleteAtMostNbChars(nnb, u.q1, u)
-			if u.eq0 == q1 || u.eq0 == ^0 {
-				u.eq0 = q0
-			}
-			if nb != 0 && u == t {
-				u.Delete(q0, q0+nb, true)
-			}
-			if u != t {
-				u.SetSelect(u.q0, u.q1)
-			} else {
-				t.SetSelect(q0, q0)
-			}
-			u.nofill = false
-		}
-		for _, t := range t.file.text {
-			t.fill(t.fr)
-		}
+
+		// New way.
+		// Every point before we delete is an Undo point.
+		// TODO(rjk): figure out the way of nofill
+		// TODO(rjk): I'd like the Undo op to group typing better.
+		t.file.Commit()
+		t.Delete(q0, q0+nnb, true)
+
 		t.iq1 = t.q0
 		return
 	case '\n':

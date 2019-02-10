@@ -5,8 +5,8 @@ import (
 	"os"
 	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/runes"
 	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 // Buffer is a mutable array of runes.

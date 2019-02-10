@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rjkroege/edwood/internal/file"
+	//	"log"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -50,7 +51,7 @@ type File struct {
 	curtext *Text
 	text    []*Text
 
-	dumpid  int	// Used to track the identifying name of this File for Dump.
+	dumpid int // Used to track the identifying name of this File for Dump.
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded
 
@@ -66,7 +67,7 @@ type File struct {
 // expect to see the following entry points:
 //
 // func (b *Buffer) Clean()
-//func (b *Buffer) Commit() 
+//func (b *Buffer) Commit()
 //func (b *Buffer) Delete(off, length int64) error
 //func (b *Buffer) Dirty() bool
 //func (b *Buffer) Insert(off int64, data []byte) error
@@ -161,31 +162,10 @@ func (f *File) Commit() {
 		f.Uninsert(&f.delta, f.cq0, len(f.cache))
 	}
 	f.b.Insert(f.cq0, f.cache)
-	if len( f.cache) != 0 {
+	if len(f.cache) != 0 {
 		f.Modded()
 	}
 	f.cache = f.cache[:0]
-}
-
-// DeleteAtMostNbChars removes nb characters from the cache and
-// updates the nb value.
-// Implement in terms of Insert and Delete.
-// TODO(rjk): Fold out the updates
-func (t *File) DeleteAtMostNbChars(nb, q1 int, u *Text) int {
-	n := len(t.cache)
-	if n > 0 {
-		if q1 != t.cq0+n {
-			acmeerror("text.type backspace", nil)
-		}
-		if n > nb {
-			n = nb
-		}
-		t.cache = t.cache[:len(t.cache)-n]
-		u.Delete(q1-n, q1, false)
-		nb -= n
-	}
-
-	return nb
 }
 
 type Undo struct {
@@ -247,7 +227,6 @@ func (f *File) DelText(t *Text) error {
 	return fmt.Errorf("can't find text in File.DelText")
 }
 
-
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
 // TODO(rjk): do not insert an Undo record. Leave that to Commit. This
@@ -273,7 +252,7 @@ func (f *File) InsertAt(p0 int, s []rune) {
 // an undo record.
 // TODO(rjk): This method aligns with undo.Buffer.Insert semantics.
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
-	if p0 > f.b.nc() + len(f.cache) {
+	if p0 > f.b.nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
 
@@ -308,18 +287,29 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 }
 
 // DeleteAt removes the rune range [p0,p1) from File.
-// TODO(rjk): Needs to run the observers.
 // TODO(rjk): Currently, adds an Undo record. It shouldn't
+// TODO(rjk): should map onto undo.Buffer.Delete
+// TODO(rjk): DeleteAt has an implied Commit operation
+// that makes it not match with undo.Buffer.Delete
 func (f *File) DeleteAt(p0, p1 int) {
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
-		acmeerror("internal error: filedelete", nil)
+		acmeerror("internal error: DeleteAt", nil)
 	}
+	if len(f.cache) > 0 {
+		acmeerror("internal error: DeleteAt", nil)
+	}
+
 	if f.seq > 0 {
 		f.Undelete(&f.delta, p0, p1)
 	}
 	f.b.Delete(p0, p1)
+
+	// Validate if this is right.
 	if p1 > p0 {
 		f.Modded()
+	}
+	for _, text := range f.text {
+		text.deleted(p0, p1)
 	}
 }
 
@@ -455,7 +445,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.treatasclean = false
 			f.b.Delete(u.p0, u.p0+u.n)
 			for _, text := range f.text {
-				text.Delete(u.p0, u.p0+u.n, false)
+				text.deleted(u.p0, u.p0+u.n)
 			}
 			q0p = u.p0
 			q1p = u.p0
