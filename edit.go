@@ -179,7 +179,7 @@ func allupdate(w *Window) {
 			t.w.owner = 'E'
 		}
 		f.Mark()
-		f.elog.Apply(f.text[0])
+		f.elog.Apply(t)
 		if f.editclean {
 			f.Unmodded()
 		}
