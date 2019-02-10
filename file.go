@@ -227,6 +227,12 @@ func (f *File) DelText(t *Text) error {
 	return fmt.Errorf("can't find text in File.DelText")
 }
 
+// HasMultipleTexts returns true if this File has multiple texts
+// display its contents.
+func (f *File) HasMultipleTexts() bool {
+	return len(f.text) > 1
+}
+
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
 // TODO(rjk): do not insert an Undo record. Leave that to Commit. This

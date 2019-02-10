@@ -259,7 +259,7 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 	if et.col == nil || et.w == nil {
 		return
 	}
-	if flag1 || len(et.w.body.file.text) > 1 || et.w.Clean(false) {
+	if flag1 || et.w.body.file.HasMultipleTexts() || et.w.Clean(false) {
 		et.col.Close(et.w, true)
 	}
 }
@@ -449,7 +449,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	if len(t.file.text) > 1 {
+	if t.file.HasMultipleTexts() {
 		isdir, _ := isDir(name)
 		if isdir {
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)

@@ -194,7 +194,7 @@ func d_cmd(t *Text, cp *Cmd) bool {
 }
 
 func D1(t *Text) {
-	if len(t.w.body.file.text) > 1 || t.w.Clean(false) {
+	if t.w.body.file.HasMultipleTexts() || t.w.Clean(false) {
 		t.col.Close(t.w, true)
 	}
 }

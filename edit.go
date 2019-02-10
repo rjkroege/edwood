@@ -170,6 +170,8 @@ func alleditinit(w *Window) {
 func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
+
+	// Speculation: we are using curtext here to only playback the edits once / file?
 	if f.curtext != t { // do curtext only
 		return
 	}
@@ -178,6 +180,8 @@ func allupdate(w *Window) {
 		if owner == 0 {
 			t.w.owner = 'E'
 		}
+		// TODO(rjk): This code exists to permit work around the fact that
+		// InsertAt and DeleteAt are both implicitly Commit-ing.
 		f.Mark()
 		f.elog.Apply(t)
 		if f.editclean {
