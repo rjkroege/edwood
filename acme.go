@@ -116,7 +116,7 @@ func main() {
 	mouse = &mousectl.Mouse
 
 	startplumbing()
-	fsysinit()
+	fs := fsysinit()
 
 	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
 
@@ -170,10 +170,10 @@ func main() {
 	for {
 		select {
 		case <-cexit:
-			shutdown(os.Interrupt)
+			shutdown(os.Interrupt, fs)
 
 		case s := <-csignal:
-			shutdown(s)
+			shutdown(s, fs)
 		}
 	}
 
@@ -638,8 +638,8 @@ func newwindowthread() {
 
 }
 
-func killprocs() {
-	fsysclose()
+func killprocs(fs *fileServer) {
+	fs.close()
 	for c := command; c != nil; c = c.next {
 		c.proc.Kill()
 	}
@@ -650,9 +650,9 @@ var dumping bool
 // TODO(rjk): I'm not sure that this is the right thing to do? It fails to
 // handle the situation that is most interesting: trying to save the state
 // if we would otherwise crash. It's also conceivably racy.
-func shutdown(s os.Signal) {
+func shutdown(s os.Signal, fs *fileServer) {
 	if !dumping && os.Getpid() == mainpid {
-		killprocs()
+		killprocs(fs)
 		dumping = true
 		row.Dump("")
 	} else {

@@ -1,6 +1,5 @@
 package main
 
-// TODO(flux): This is a hideous singleton.  Refactor into a type?
 import (
 	"fmt"
 	"net"
@@ -14,36 +13,35 @@ import (
 	"9fans.net/go/plan9"
 )
 
-// TODO(flux): Wrap fsys into a tidy object.
-
-var (
-	sfd net.Conn
-)
+type fileServer struct {
+	conn     net.Conn
+	fids     map[uint32]*Fid
+	fcall    []fsfunc
+	closing  bool
+	username string
+}
 
 const (
 	DEBUG = 0
 )
 
-var fids = make(map[uint32]*Fid)
-
 type fsfunc func(*Xfid, *Fid) *Xfid
 
-var fcall = make([]fsfunc, plan9.Tmax)
-
-func initfcall() {
-	fcall[plan9.Tflush] = fsysflush
-	fcall[plan9.Tversion] = fsysversion
-	fcall[plan9.Tauth] = fsysauth
-	fcall[plan9.Tattach] = fsysattach
-	fcall[plan9.Twalk] = fsyswalk
-	fcall[plan9.Topen] = fsysopen
-	fcall[plan9.Tcreate] = fsyscreate
-	fcall[plan9.Tread] = fsysread
-	fcall[plan9.Twrite] = fsyswrite
-	fcall[plan9.Tclunk] = fsysclunk
-	fcall[plan9.Tremove] = fsysremove
-	fcall[plan9.Tstat] = fsysstat
-	fcall[plan9.Twstat] = fsyswstat
+func (fs *fileServer) initfcall() {
+	fs.fcall = make([]fsfunc, plan9.Tmax)
+	fs.fcall[plan9.Tflush] = fs.flush
+	fs.fcall[plan9.Tversion] = fs.version
+	fs.fcall[plan9.Tauth] = fs.auth
+	fs.fcall[plan9.Tattach] = fs.attach
+	fs.fcall[plan9.Twalk] = fs.walk
+	fs.fcall[plan9.Topen] = fs.open
+	fs.fcall[plan9.Tcreate] = fs.create
+	fs.fcall[plan9.Tread] = fs.read
+	fs.fcall[plan9.Twrite] = fs.write
+	fs.fcall[plan9.Tclunk] = fs.clunk
+	fs.fcall[plan9.Tremove] = fs.remove
+	fs.fcall[plan9.Tstat] = fs.stat
+	fs.fcall[plan9.Twstat] = fs.wstat
 }
 
 // Errors returned by file server.
@@ -91,13 +89,7 @@ type Mnt struct {
 
 var mnt Mnt
 
-var (
-	username = "Wile E. Coyote"
-	closing  bool
-)
-
-func fsysinit() {
-	initfcall()
+func fsysinit() *fileServer {
 	reader, writer, err := newPipe()
 	if err != nil {
 		acmeerror("failed to create pipe", err)
@@ -105,19 +97,26 @@ func fsysinit() {
 	if err := post9pservice(reader, "acme", mtpt); err != nil {
 		acmeerror("can't post service", err)
 	}
-	sfd = writer
-	username = getuser()
 
-	go fsysproc()
+	fs := &fileServer{
+		conn:     writer,
+		fids:     make(map[uint32]*Fid),
+		fcall:    nil, // initialized by initfcall
+		closing:  false,
+		username: getuser(),
+	}
+	fs.initfcall()
+	go fs.fsysproc()
+	return fs
 }
 
-func fsysproc() {
+func (fs *fileServer) fsysproc() {
 	x := (*Xfid)(nil)
 	var f *Fid
 	for {
-		fc, err := plan9.ReadFcall(sfd)
+		fc, err := plan9.ReadFcall(fs.conn)
 		if err != nil || fc == nil {
-			if closing {
+			if fs.closing {
 				break
 			}
 			acmeerror("fsysproc", err)
@@ -127,6 +126,7 @@ func fsysproc() {
 			x = <-cxfidalloc
 		}
 		x.fcall = *fc
+		x.fs = fs
 		switch x.fcall.Type {
 		case plan9.Tversion:
 			fallthrough
@@ -135,17 +135,17 @@ func fsysproc() {
 		case plan9.Tflush:
 			f = nil
 		case plan9.Tattach:
-			f = newfid(x.fcall.Fid)
+			f = fs.newfid(x.fcall.Fid)
 		default:
-			f = newfid(x.fcall.Fid)
+			f = fs.newfid(x.fcall.Fid)
 			if !f.busy {
 				x.f = f
-				x = respond(x, fc, fmt.Errorf("fid not in use"))
+				x = fs.respond(x, fc, fmt.Errorf("fid not in use"))
 				continue
 			}
 		}
 		x.f = f
-		x = fcall[x.fcall.Type](x, f)
+		x = fs.fcall[x.fcall.Type](x, f)
 	}
 }
 
@@ -200,14 +200,14 @@ func fsysdelid(idm *MntDir) {
 	cerr <- fmt.Errorf("fsysdelid: can't find id %d", idm.id)
 }
 
-func fsysclose() {
-	closing = true
-	if sfd != nil {
-		sfd.Close()
+func (fs *fileServer) close() {
+	if fs != nil {
+		fs.closing = true
+		fs.conn.Close()
 	}
 }
 
-func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
+func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	if err != nil {
 		t.Type = plan9.Rerror
 		t.Ename = err.Error()
@@ -216,7 +216,7 @@ func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	}
 	t.Fid = x.fcall.Fid
 	t.Tag = x.fcall.Tag
-	if err := plan9.WriteFcall(sfd, t); err != nil {
+	if err := plan9.WriteFcall(fs.conn, t); err != nil {
 		acmeerror("write error in respond", err)
 	}
 	if DEBUG != 0 {
@@ -225,31 +225,31 @@ func respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	return x
 }
 
-func fsysversion(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) version(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 	messagesize = int(x.fcall.Msize)
 	t.Msize = x.fcall.Msize
 	if x.fcall.Version != "9P2000" {
-		return respond(x, &t, fmt.Errorf("unrecognized 9P version"))
+		return fs.respond(x, &t, fmt.Errorf("unrecognized 9P version"))
 	}
 	t.Version = "9P2000"
-	return respond(x, &t, nil)
+	return fs.respond(x, &t, nil)
 }
 
-func fsysauth(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) auth(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	return respond(x, &t, fmt.Errorf("acme: authentication not required"))
+	return fs.respond(x, &t, fmt.Errorf("acme: authentication not required"))
 }
 
-func fsysflush(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) flush(x *Xfid, f *Fid) *Xfid {
 	x.c <- xfidflush
 	return nil
 }
 
-func fsysattach(x *Xfid, f *Fid) *Xfid {
-	if x.fcall.Uname != username {
+func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
+	if x.fcall.Uname != fs.username {
 		var t plan9.Fcall
-		return respond(x, &t, ErrPermission)
+		return fs.respond(x, &t, ErrPermission)
 	}
 	f.busy = true
 	f.open = false
@@ -283,10 +283,10 @@ func fsysattach(x *Xfid, f *Fid) *Xfid {
 		cerr <- fmt.Errorf("unknown id '%s' in attach", x.fcall.Aname)
 	}
 	mnt.lk.Unlock()
-	return respond(x, &t, nil)
+	return fs.respond(x, &t, nil)
 }
 
-func fsyswalk(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 	var (
 		t    plan9.Fcall
 		q    plan9.Qid
@@ -299,12 +299,12 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 	nf := (*Fid)(nil)
 	w := (*Window)(nil)
 	if f.open {
-		return respond(x, &t, fmt.Errorf("walk of open file"))
+		return fs.respond(x, &t, fmt.Errorf("walk of open file"))
 	}
 	if x.fcall.Fid != x.fcall.Newfid {
-		nf = newfid(x.fcall.Newfid)
+		nf = fs.newfid(x.fcall.Newfid)
 		if nf.busy {
-			return respond(x, &t, fmt.Errorf("newfid already in use"))
+			return fs.respond(x, &t, fmt.Errorf("newfid already in use"))
 		}
 		nf.busy = true
 		nf.open = false
@@ -460,10 +460,10 @@ func fsyswalk(x *Xfid, f *Fid) *Xfid {
 		w.Close()
 	}
 
-	return respond(x, &t, err)
+	return fs.respond(x, &t, err)
 }
 
-func fsysopen(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
 	var m uint
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^(uint8(plan9.OTRUNC | plan9.OCEXEC))
@@ -489,12 +489,12 @@ func fsysopen(x *Xfid, f *Fid) *Xfid {
 
 Deny:
 	var t plan9.Fcall
-	return respond(x, &t, ErrPermission)
+	return fs.respond(x, &t, ErrPermission)
 }
 
-func fsyscreate(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	return respond(x, &t, ErrPermission)
+	return fs.respond(x, &t, ErrPermission)
 }
 
 //func idcmp (const  void *a, const  void *b) (int) {
@@ -502,7 +502,7 @@ func fsyscreate(x *Xfid, f *Fid) *Xfid {
 //}
 
 // TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
-func fsysread(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 	var (
 		t           plan9.Fcall
 		id, n, j, k int
@@ -517,7 +517,7 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 		if FILE(f.qid) == Qacme { // empty dir
 			t.Data = nil
 			t.Count = 0
-			respond(x, &t, nil)
+			fs.respond(x, &t, nil)
 			return x
 		}
 		o = x.fcall.Offset
@@ -537,7 +537,7 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 			if !(i < e) {
 				break
 			}
-			length = dostat(WIN(x.f.qid), de, b[n:], clock)
+			length = fs.dostat(WIN(x.f.qid), de, b[n:], clock)
 			if i >= o {
 				n += length
 			}
@@ -561,7 +561,7 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 				dt.qid = QID(k, Qdir)
 				dt.t = plan9.QTDIR
 				dt.perm = plan9.DMDIR | 0700
-				length = dostat(k, &dt, b[n:], clock)
+				length = fs.dostat(k, &dt, b[n:], clock)
 				if length == 0 {
 					break
 				}
@@ -573,51 +573,51 @@ func fsysread(x *Xfid, f *Fid) *Xfid {
 		}
 		t.Data = b[0:n]
 		t.Count = uint32(n)
-		respond(x, &t, nil)
+		fs.respond(x, &t, nil)
 		return x
 	}
 	x.c <- xfidread
 	return nil
 }
 
-func fsyswrite(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) write(x *Xfid, f *Fid) *Xfid {
 	x.c <- xfidwrite
 	return nil
 }
 
-func fsysclunk(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) clunk(x *Xfid, f *Fid) *Xfid {
 	fsysdelid(f.mntdir)
 	x.c <- xfidclose
 	return nil
 }
 
-func fsysremove(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) remove(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	return respond(x, &t, ErrPermission)
+	return fs.respond(x, &t, ErrPermission)
 }
 
-func fsysstat(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) stat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
 	t.Stat = make([]byte, messagesize-plan9.IOHDRSZ)
-	length := dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
+	length := fs.dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
 	t.Stat = t.Stat[:length]
-	x = respond(x, &t, nil)
+	x = fs.respond(x, &t, nil)
 	return x
 }
 
-func fsyswstat(x *Xfid, f *Fid) *Xfid {
+func (fs *fileServer) wstat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
-	return respond(x, &t, ErrPermission)
+	return fs.respond(x, &t, ErrPermission)
 }
 
-func newfid(fid uint32) *Fid {
-	ff, ok := fids[fid]
+func (fs *fileServer) newfid(fid uint32) *Fid {
+	ff, ok := fs.fids[fid]
 	if !ok {
 		ff = &Fid{}
 		ff.fid = fid
-		fids[fid] = ff
+		fs.fids[fid] = ff
 	}
 	return ff
 }
@@ -627,7 +627,7 @@ func getclock() int64 {
 }
 
 // buf must have enough length to fit this stat object.
-func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
+func (fs *fileServer) dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	var d plan9.Dir
 
 	d.Qid.Path = QID(id, dir.qid)
@@ -636,9 +636,9 @@ func dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	d.Mode = plan9.Perm(dir.perm)
 	d.Length = 0 // would be nice to do better
 	d.Name = dir.name
-	d.Uid = username
-	d.Gid = username
-	d.Muid = username
+	d.Uid = fs.username
+	d.Gid = fs.username
+	d.Muid = fs.username
 	d.Atime = uint32(clock)
 	d.Mtime = uint32(clock)
 

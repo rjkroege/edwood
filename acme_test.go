@@ -47,7 +47,7 @@ func TestKillprocs(t *testing.T) {
 	command = &Command{
 		proc: cmd.Process,
 	}
-	killprocs()
+	killprocs(nil)
 	timer := time.NewTimer(5 * time.Second)
 	select {
 	case <-done:
