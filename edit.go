@@ -171,10 +171,6 @@ func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
 
-	// Speculation: we are using curtext here to only playback the edits once / file?
-	if f.curtext != t { // do curtext only
-		return
-	}
 	if !f.elog.Empty() {
 		owner := t.w.owner
 		if owner == 0 {
@@ -187,12 +183,9 @@ func allupdate(w *Window) {
 		if f.editclean {
 			f.Unmodded()
 		}
-
 		t.w.owner = owner
 	}
 
-	t.SetSelect(t.q0, t.q1)
-	t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	w.SetTag()
 }
 
