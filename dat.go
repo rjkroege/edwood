@@ -184,6 +184,11 @@ type Xfid struct {
 	c       chan func(*Xfid)
 	f       *Fid
 	flushed bool
+	fs      responder
+}
+
+type responder interface {
+	respond(x *Xfid, t *plan9.Fcall, err error) *Xfid
 }
 
 type RangeSet []Range

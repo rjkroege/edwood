@@ -41,6 +41,10 @@ func clampaddr(w *Window) {
 	}
 }
 
+func (x *Xfid) respond(t *plan9.Fcall, err error) *Xfid {
+	return x.fs.respond(x, t, err)
+}
+
 func xfidctl(x *Xfid, d *draw.Display) {
 	// log.Println("xfidctl", x)
 	// defer log.Println("done xfidctl")
@@ -81,7 +85,7 @@ func xfidflush(x *Xfid) {
 		}
 	}
 out:
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }
 
 func xfidopen(x *Xfid) {
@@ -129,7 +133,7 @@ func xfidopen(x *Xfid) {
 			// modified during the operation, e.g. by |sort
 			if w.rdselfd != nil {
 				w.Unlock()
-				respond(x, &fc, ErrInUse)
+				x.respond(&fc, ErrInUse)
 				return
 			}
 			var err error
@@ -138,7 +142,7 @@ func xfidopen(x *Xfid) {
 			w.rdselfd, err = ioutil.TempFile("", "acme")
 			if err != nil {
 				w.Unlock()
-				respond(x, &fc, fmt.Errorf("can't create temp file"))
+				x.respond(&fc, fmt.Errorf("can't create temp file"))
 				return
 			}
 			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
@@ -170,14 +174,14 @@ func xfidopen(x *Xfid) {
 		case QWeditout:
 			if editing == Inactive {
 				w.Unlock()
-				respond(x, &fc, ErrPermission)
+				x.respond(&fc, ErrPermission)
 				return
 			}
 			select {
 			case w.editoutlk <- true:
 			default:
 				w.Unlock()
-				respond(x, &fc, ErrInUse)
+				x.respond(&fc, ErrInUse)
 				return
 			}
 			w.wrselrange = Range{t.q1, t.q1}
@@ -191,7 +195,7 @@ func xfidopen(x *Xfid) {
 			select {
 			case editoutlk <- true:
 			default:
-				respond(x, &fc, ErrInUse)
+				x.respond(&fc, ErrInUse)
 				return
 			}
 		}
@@ -199,7 +203,7 @@ func xfidopen(x *Xfid) {
 	fc.Qid = x.f.qid
 	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ)
 	x.f.open = true
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }
 
 func xfidclose(x *Xfid) {
@@ -218,7 +222,7 @@ func xfidclose(x *Xfid) {
 		if w != nil {
 			w.Close()
 		}
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 		return
 	}
 
@@ -273,7 +277,7 @@ func xfidclose(x *Xfid) {
 			<-editoutlk
 		}
 	}
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }
 
 func xfidread(x *Xfid) {
@@ -301,13 +305,13 @@ func xfidread(x *Xfid) {
 		default:
 			warning(nil, "unknown qid %d\n", q)
 		}
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 		return
 	}
 	w.Lock('F')
 	if w.col == nil {
 		w.Unlock()
-		respond(x, &fc, ErrDeletedWin)
+		x.respond(&fc, ErrDeletedWin)
 		return
 	}
 	off := x.fcall.Offset
@@ -325,7 +329,7 @@ func xfidread(x *Xfid) {
 		}
 		fc.Count = x.fcall.Count
 		fc.Data = []byte(buf[off:])
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 	case QWbody:
 		xfidutfread(x, &w.body, w.body.Nc(), int(QWbody))
 
@@ -340,7 +344,7 @@ func xfidread(x *Xfid) {
 		}
 		fc.Count = x.fcall.Count
 		fc.Data = []byte(b[off : off+uint64(x.fcall.Count)])
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 
 	case QWevent:
 		xfideventread(x, w)
@@ -348,7 +352,7 @@ func xfidread(x *Xfid) {
 	case QWdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > w.body.Nc() {
-			respond(x, &fc, ErrAddrRange)
+			x.respond(&fc, ErrAddrRange)
 			break
 		}
 		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.Nc())
@@ -357,7 +361,7 @@ func xfidread(x *Xfid) {
 	case QWxdata:
 		// BUG: what should happen if q1 > q0?
 		if w.addr.q0 > w.body.Nc() {
-			respond(x, &fc, ErrAddrRange)
+			x.respond(&fc, ErrAddrRange)
 			break
 		}
 		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
@@ -374,14 +378,14 @@ func xfidread(x *Xfid) {
 		b := make([]byte, n)
 		n, err := w.rdselfd.Read(b[:n])
 		if err != nil && err != io.EOF {
-			respond(x, &fc, fmt.Errorf("I/O error in temp file: %v", err))
+			x.respond(&fc, fmt.Errorf("I/O error in temp file: %v", err))
 			break
 		}
 		fc.Count = uint32(n)
 		fc.Data = b[:n]
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 	default:
-		respond(x, &fc, fmt.Errorf("unknown qid %d in read", q))
+		x.respond(&fc, fmt.Errorf("unknown qid %d in read", q))
 	}
 	w.Unlock()
 }
@@ -440,7 +444,7 @@ func xfidwrite(x *Xfid) {
 		w.Lock(c)
 		if w.col == nil {
 			w.Unlock()
-			respond(x, &fc, ErrDeletedWin)
+			x.respond(&fc, ErrDeletedWin)
 			return
 		}
 	}
@@ -479,7 +483,7 @@ func xfidwrite(x *Xfid) {
 			}
 		}
 		fc.Count = x.fcall.Count
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 	}
 
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
@@ -491,7 +495,7 @@ func xfidwrite(x *Xfid) {
 
 	case Qlabel:
 		fc.Count = x.fcall.Count
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 
 	case QWaddr:
 		r = []rune(string(x.fcall.Data))
@@ -501,16 +505,16 @@ func xfidwrite(x *Xfid) {
 		a, eval, nb = address(false, t, w.limit, w.addr, 0, (len(r)),
 			func(q int) rune { return r[q] }, eval)
 		if nb < (len(r)) {
-			respond(x, &fc, ErrBadAddr)
+			x.respond(&fc, ErrBadAddr)
 			break
 		}
 		if !eval {
-			respond(x, &fc, ErrAddrRange)
+			x.respond(&fc, ErrAddrRange)
 			break
 		}
 		w.addr = a
 		fc.Count = x.fcall.Count
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 
 	case Qeditout:
 		fallthrough
@@ -522,11 +526,11 @@ func xfidwrite(x *Xfid) {
 			err = edittext(nil, 0, r)
 		}
 		if err != nil {
-			respond(x, &fc, err)
+			x.respond(&fc, err)
 			break
 		}
 		fc.Count = x.fcall.Count
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 
 	case QWerrors:
 		w = errorwinforwin(w)
@@ -547,7 +551,7 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		w.Commit(t)
 		if a.q0 > t.Nc() || a.q1 > t.Nc() {
-			respond(x, &fc, ErrAddrRange)
+			x.respond(&fc, ErrAddrRange)
 			break
 		}
 		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
@@ -578,7 +582,7 @@ func xfidwrite(x *Xfid) {
 		w.addr.q0 += len(r)
 		w.addr.q1 = w.addr.q0
 		fc.Count = x.fcall.Count
-		respond(x, &fc, nil)
+		x.respond(&fc, nil)
 
 	case QWevent:
 		xfideventwrite(x, w)
@@ -588,7 +592,7 @@ func xfidwrite(x *Xfid) {
 		BodyTag()
 
 	default:
-		respond(x, &fc, fmt.Errorf("unknown qid %d in write", qid))
+		x.respond(&fc, fmt.Errorf("unknown qid %d in write", qid))
 	}
 	if w != nil {
 		w.Unlock()
@@ -744,7 +748,7 @@ forloop:
 		}
 	}
 	fc.Count = uint32(n)
-	respond(x, &fc, err)
+	x.respond(&fc, err)
 	if settag {
 		w.SetTag()
 	}
@@ -831,7 +835,7 @@ forloop:
 	} else {
 		fc.Count = uint32(len(x.fcall.Data))
 	}
-	respond(x, &fc, err)
+	x.respond(&fc, err)
 }
 
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
@@ -897,7 +901,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	}
 	fc.Data = b1[:n]
 	fc.Count = uint32(len(fc.Data))
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }
 
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
@@ -941,7 +945,7 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 
 	fc.Count = uint32(len(buf))
 	fc.Data = buf
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 	return len(string(buf))
 }
 
@@ -955,7 +959,7 @@ func xfideventread(x *Xfid, w *Window) {
 	for len(w.events) == 0 {
 		if i != 0 {
 			if !x.flushed {
-				respond(x, &fc, fmt.Errorf("window shut down"))
+				x.respond(&fc, fmt.Errorf("window shut down"))
 			}
 			return
 		}
@@ -972,7 +976,7 @@ func xfideventread(x *Xfid, w *Window) {
 	}
 	fc.Count = uint32(n)
 	fc.Data = w.events[:n]
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 	nn := len(w.events)
 	copy(w.events[0:], w.events[n:])
 
@@ -1026,5 +1030,5 @@ func xfidindexread(x *Xfid) {
 	}
 	fc.Count = cnt
 	fc.Data = s[off : off+uint64(cnt)]
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }

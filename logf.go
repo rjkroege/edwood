@@ -80,7 +80,7 @@ func xfidlogread(x *Xfid) {
 	fc := plan9.Fcall{}
 	fc.Data = []byte(p)
 	fc.Count = uint32(len(p))
-	respond(x, &fc, nil)
+	x.respond(&fc, nil)
 }
 
 func xfidlogflush(x *Xfid) {
