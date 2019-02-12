@@ -290,7 +290,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, fmt.Errorf("can't fstat %s: %v", filename, err)
 	}
 
-	q1 := (0)
+	q1 := 0
 	hasNulls := false
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
@@ -569,8 +569,8 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	}
 }
 
-func (t *Text) Delete(q0, q1 int, tofile bool) {
-	if tofile && t.file.HasUncommitedChanges() {
+func (t *Text) Delete(q0, q1 int, _ bool) {
+	if t.file.HasUncommitedChanges() {
 		panic("text.delete")
 	}
 	n := q1 - q0
