@@ -502,9 +502,9 @@ func xfidwrite(x *Xfid) {
 		t = &w.body
 		w.Commit(t)
 		eval = true
-		a, eval, nb = address(false, t, w.limit, w.addr, 0, (len(r)),
+		a, eval, nb = address(false, t, w.limit, w.addr, 0, len(r),
 			func(q int) rune { return r[q] }, eval)
-		if nb < (len(r)) {
+		if nb < len(r) {
 			x.respond(&fc, ErrBadAddr)
 			break
 		}
@@ -568,14 +568,14 @@ func xfidwrite(x *Xfid) {
 		tq1 = t.q1
 		t.Insert(q0, r, true)
 		if tq0 >= q0 {
-			tq0 += (len(r))
+			tq0 += len(r)
 		}
 		if tq1 >= q0 {
-			tq1 += (len(r))
+			tq1 += len(r)
 		}
 		t.SetSelect(tq0, tq1)
 		if shouldscroll(t, q0, qid) {
-			t.Show(q0+(len(r)), q0+(len(r)), false)
+			t.Show(q0+len(r), q0+len(r), false)
 		}
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.SetTag()

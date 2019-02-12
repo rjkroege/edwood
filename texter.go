@@ -24,8 +24,8 @@ type TextBuffer struct {
 }
 
 func (t TextBuffer) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, (len(t.buf)))
-	p1 = min(q1, (len(t.buf)))
+	p0 = min(q0, len(t.buf))
+	p1 = min(q1, len(t.buf))
 	return p0, p1
 }
 
@@ -38,16 +38,16 @@ func (t *TextBuffer) View(q0, q1 int) []rune {
 
 func (t *TextBuffer) Delete(q0, q1 int, tofile bool) {
 	_ = tofile
-	if q0 > (len(t.buf)) || q1 > (len(t.buf)) {
+	if q0 > len(t.buf) || q1 > len(t.buf) {
 		panic("Out-of-range Delete")
 	}
 	copy(t.buf[q0:], t.buf[q1:])
-	t.buf = t.buf[:(len(t.buf))-(q1-q0)] // Reslice to length
+	t.buf = t.buf[:len(t.buf)-(q1-q0)] // Reslice to length
 }
 
 func (t *TextBuffer) Insert(q0 int, r []rune, tofile bool) {
 	_ = tofile
-	if q0 > (len(t.buf)) {
+	if q0 > len(t.buf) {
 		panic("Out of range insertion")
 	}
 	t.buf = append(t.buf[:q0], append(r, t.buf[q0:]...)...)
