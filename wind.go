@@ -397,8 +397,8 @@ func (w *Window) Undo(isundo bool) {
 	for _, text := range f.text {
 		v := text.w
 		if v != w {
-			v.body.q0 = (getP0(v.body.fr)) + v.body.org
-			v.body.q1 = (getP1(v.body.fr)) + v.body.org
+			v.body.q0 = getP0(v.body.fr) + v.body.org
+			v.body.q1 = getP1(v.body.fr) + v.body.org
 		}
 	}
 	w.SetTag()
