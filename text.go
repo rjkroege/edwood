@@ -347,25 +347,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.file.qidpath = d.Name() // TODO(flux): Gross hack to use filename as unique ID of file.
 	}
 	fd.Close()
-	n := q1 - q0
-	if q0 < t.org {
-		t.org += n
-	} else {
-		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.
-			t.fr.Insert(t.file.b[q0:q0+n], q0-t.org)
-		}
-	}
-	// For each clone, redraw
-	for _, u := range t.file.text {
-		if u != t { // Skip the one we just redrew
-			if u.org > u.file.Size() { // will be 0 because of reset(), but safety first
-				u.org = 0
-			}
-			u.Resize(u.all, true, false /* noredraw */)
-			u.Backnl(u.org, 0) // go to beginning of line
-		}
-		u.SetSelect(q0, q0)
-	}
+
 	if hasNulls {
 		warning(nil, "%s: NUL bytes elided\n", filename)
 	}

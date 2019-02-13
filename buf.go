@@ -1,11 +1,8 @@
 package main
 
 import (
-	"io/ioutil"
-	"os"
 	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/runes"
 )
 
@@ -27,20 +24,6 @@ func (b *Buffer) Delete(q0, q1 int) {
 	}
 	copy((*b)[q0:], (*b)[q1:])
 	(*b) = (*b)[:(len(*b))-(q1-q0)] // Reslice to length
-}
-
-func (b *Buffer) Load(q0 int, fd *os.File) (n int, h file.Hash, hasNulls bool, err error) {
-	// TODO(flux): Innefficient to load the file, then copy into the slice,
-	// but I need the UTF-8 interpretation.  I could fix this by using a
-	// UTF-8 -> []rune reader on top of the os.File instead.
-
-	d, err := ioutil.ReadAll(fd)
-	if err != nil {
-		warning(nil, "read error in Buffer.Load")
-	}
-	runes, _, hasNulls := cvttorunes(d, len(d))
-	(*b).Insert(q0, runes)
-	return len(runes), file.CalcHash(d), hasNulls, err
 }
 
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -177,13 +178,28 @@ type Undo struct {
 	buf []rune
 }
 
+// Load inserts fd's contents into File at location q0.
+// TODO(rjk): Consider renaming InsertAtFromFd or something similar.
+// TODO(rjk): Read and insert in chunks.
+// TODO(flux): Innefficient to load the file, then copy into the slice,
+// but I need the UTF-8 interpretation.  I could fix this by using a
+// UTF-8 -> []rune reader on top of the os.File instead.
 func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
-	var h file.Hash
-	n, h, hasNulls, err = f.b.Load(q0, fd)
-	if sethash {
-		f.hash = h
+	d, err := ioutil.ReadAll(fd)
+	if err != nil {
+		warning(nil, "read error in Buffer.Load")
 	}
-	return n, hasNulls, err
+	runes, _, hasNulls := cvttorunes(d, len(d))
+
+	if sethash {
+		f.hash = file.CalcHash(d)
+	}
+
+	// Would appear to require a commit operation.
+	// NB: Runs the observers.
+	f.InsertAt(q0, runes)
+
+	return len(runes), hasNulls, err
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
