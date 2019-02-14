@@ -14,11 +14,12 @@ import (
 )
 
 type fileServer struct {
-	conn     net.Conn
-	fids     map[uint32]*Fid
-	fcall    []fsfunc
-	closing  bool
-	username string
+	conn        net.Conn
+	fids        map[uint32]*Fid
+	fcall       []fsfunc
+	closing     bool
+	username    string
+	messagesize int
 }
 
 const (
@@ -99,11 +100,12 @@ func fsysinit() *fileServer {
 	}
 
 	fs := &fileServer{
-		conn:     writer,
-		fids:     make(map[uint32]*Fid),
-		fcall:    nil, // initialized by initfcall
-		closing:  false,
-		username: getuser(),
+		conn:        writer,
+		fids:        make(map[uint32]*Fid),
+		fcall:       nil, // initialized by initfcall
+		closing:     false,
+		username:    getuser(),
+		messagesize: 0, // we'll know after Tversion
 	}
 	fs.initfcall()
 	go fs.fsysproc()
@@ -225,9 +227,13 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	return x
 }
 
+func (fs *fileServer) msize() int {
+	return fs.messagesize
+}
+
 func (fs *fileServer) version(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
-	messagesize = int(x.fcall.Msize)
+	fs.messagesize = int(x.fcall.Msize)
 	t.Msize = x.fcall.Msize
 	if x.fcall.Version != "9P2000" {
 		return fs.respond(x, &t, fmt.Errorf("unrecognized 9P version"))
@@ -599,7 +605,7 @@ func (fs *fileServer) remove(x *Xfid, f *Fid) *Xfid {
 func (fs *fileServer) stat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
-	t.Stat = make([]byte, messagesize-plan9.IOHDRSZ)
+	t.Stat = make([]byte, fs.messagesize-plan9.IOHDRSZ)
 	length := fs.dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
 	t.Stat = t.Stat[:length]
 	x = fs.respond(x, &t, nil)

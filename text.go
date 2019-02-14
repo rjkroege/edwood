@@ -96,7 +96,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.all = r
 	t.scrollr = r
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
-	t.lastsr = nullrect
+	t.lastsr = image.ZR
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
 	t.font = rf
