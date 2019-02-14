@@ -291,7 +291,7 @@ func flushwarnings() {
 		w.owner = owner
 		t.file.TreatAsClean()
 		w.Unlock()
-		warn.buf.Close()
+		// warn.buf.Close()
 		if warn.md != nil {
 			fsysdelid(warn.md)
 		}

@@ -33,11 +33,6 @@ func (b *Buffer) Read(q0 int, r []rune) (int, error) {
 
 func (b *Buffer) ReadC(q int) rune { return (*b)[q] }
 
-func (b *Buffer) Close() {
-	(*b).Reset()
-
-}
-
 func (b *Buffer) Reset() {
 	(*b) = (*b)[0:0]
 }

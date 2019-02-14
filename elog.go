@@ -62,8 +62,6 @@ func (eo *ElogOperation) reset() {
 	eo.r = eo.r[0:0]
 }
 
-func elogclose(f *File) {}
-
 // Make sure buffer is large enough.  This could be simplified, but at the
 // cost of significant allocation churn.
 func (e *Elog) extend() {

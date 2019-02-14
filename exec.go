@@ -457,6 +457,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		}
 	}
 	r := name
+	// TODO(rjk): Remove this loop.
 	for _, u := range t.file.text {
 		u.Reset()
 		u.w.DirFree()
@@ -470,6 +471,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	}
 	w.SetTag()
 	t.file.unread = false
+	// TODO(rjk): Remove this loop too.
 	for _, u := range t.file.text {
 		u.w.tag.SetSelect(u.w.tag.file.Size(), u.w.tag.file.Size())
 		u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)

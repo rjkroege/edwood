@@ -231,7 +231,6 @@ func (f *File) DelText(t *Text) error {
 			f.text[i] = f.text[len(f.text)-1]
 			f.text = f.text[:len(f.text)-1]
 			if len(f.text) == 0 {
-				f.Close()
 				return nil
 			}
 			if t == f.curtext {
@@ -502,15 +501,13 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	return q0p, q1p
 }
 
+// Reset removes all Undo records for this File.
+// TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
+// Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
 	f.epsilon = f.epsilon[0:0]
 	f.seq = 0
-}
-
-func (f *File) Close() {
-	f.b.Close()
-	elogclose(f)
 }
 
 func (f *File) Mark() {
