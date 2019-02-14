@@ -39,7 +39,6 @@ type Window struct {
 	eventx *Xfid
 	events []byte
 
-	nevents     int
 	owner       int
 	maxlines    int
 	dirnames    []string
@@ -683,7 +682,6 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 	b := []byte(fmt.Sprintf(format, args...))
 	w.events = append(w.events, byte(w.owner))
 	w.events = append(w.events, b...)
-	w.nevents = len(w.events)
 	x = w.eventx
 	if x != nil {
 		w.eventx = nil

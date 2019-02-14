@@ -201,7 +201,7 @@ func xfidopen(x *Xfid) {
 		}
 	}
 	fc.Qid = x.f.qid
-	fc.Iounit = uint32(messagesize - plan9.IOHDRSZ)
+	fc.Iounit = uint32(x.fs.msize() - plan9.IOHDRSZ)
 	x.f.open = true
 	x.respond(&fc, nil)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"math"
 	"os"
 	"runtime/debug"
@@ -102,16 +101,12 @@ var (
 	activewin         *Window
 	activecol         *Column
 	snarfbuf          Buffer
-	nullrect          image.Rectangle
-	cputype           string
-	objtype           string
 	home              string
 	acmeshell         string
 	tagcolors         [frame.NumColours]*draw.Image
 	textcolors        [frame.NumColours]*draw.Image
 	wdir              string
 	editing           = Inactive
-	messagesize       int
 	globalautoindent  bool
 	mtpt              string
 
@@ -189,6 +184,7 @@ type Xfid struct {
 
 type responder interface {
 	respond(x *Xfid, t *plan9.Fcall, err error) *Xfid
+	msize() int
 }
 
 type RangeSet []Range
