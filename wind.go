@@ -20,7 +20,7 @@ type Window struct {
 	body    Text
 	r       image.Rectangle
 
-	isdir      bool
+	isdir      bool		// true if this Window is showing a directory in its body.
 	isscratch  bool
 	filemenu   bool
 	autoindent bool

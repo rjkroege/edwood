@@ -1582,8 +1582,6 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 func (t *Text) Reset() {
 	t.file.seq = 0
 	t.eq0 = ^0
-	// do t.delete(0, t.nc, true) without building backup stuff
-	t.SetSelect(t.org, t.org)
 	t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 	t.org = 0
 	t.q0 = 0
