@@ -449,20 +449,17 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	if t.file.HasMultipleTexts() {
-		isdir, _ := isDir(name)
-		if isdir {
-			warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
-			return
-		}
+	newNameIsdir, _ := isDir(name)
+	if t.file.HasMultipleTexts() && newNameIsdir {
+		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
+		return
 	}
-	r := name
-	// TODO(rjk): Remove this loop.
-	for _, u := range t.file.text {
-		u.Reset()
-		u.w.DirFree()
+	if w.isdir && !newNameIsdir {
+		w.DirFree()
 	}
-	samename := r == t.file.name
+
+	t.Delete(0, t.file.Nr(), true)
+	samename := name == t.file.name
 	t.Load(0, name, samename)
 	if samename {
 		t.file.Unmodded()
@@ -470,12 +467,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		t.file.Modded()
 	}
 	w.SetTag()
+
+	// what is this for?
 	t.file.unread = false
-	// TODO(rjk): Remove this loop too.
-	for _, u := range t.file.text {
-		u.w.tag.SetSelect(u.w.tag.file.Size(), u.w.tag.file.Size())
-		u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
-	}
 	xfidlog(w, "get")
 }
 
