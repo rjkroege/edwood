@@ -822,7 +822,8 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
 		// ugly: fix locks so w.unlock works
-		nw.Lock1(t.w.owner)
+		// TODO(rjk): We need to handle this better.
+		nw.lock1(t.w.owner)
 		xfidlog(nw, "zerox")
 	}
 }

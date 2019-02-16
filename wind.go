@@ -322,8 +322,9 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	return w.r.Max.Y
 }
 
-// Lock1 locks
-func (w *Window) Lock1(owner int) {
+// Lock1 locks just this Window. This is a helper for Lock.
+// TODO(rjk): This should be an internal detail of Window.
+func (w *Window) lock1(owner int) {
 	w.lk.Lock()
 	w.ref.Inc()
 	w.owner = owner
@@ -337,7 +338,7 @@ func (w *Window) Lock(owner int) {
 	f := w.body.file
 	f.AllText(func(t *Text) {
 		if t.w != w {
-			t.w.Lock1(owner)
+			t.w.lock1(owner)
 		}
 	})
 }
@@ -348,7 +349,8 @@ func (w *Window) Unlock() {
 	// avoid tripping over Window.Close indirectly editing f.text and
 	// freeing f on the last iteration of the loop.
 	f := w.body.file
-	// TODO(rjk): Remove loop.
+	// TODO(rjk): Remove loop. Requires special attention because
+	// of its impack on locking.
 	for i := len(f.text) - 1; i >= 0; i-- {
 		w = f.text[i].w
 		w.owner = 0
@@ -394,12 +396,13 @@ func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
 	body.q0, body.q1 = body.file.Undo(isundo)
+
+	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
 	f := body.file
 
-	// TODO(rjk): Remove loop
-	// Do I even have to do this?
-	// Won't it have happened already?
+	// TODO(rjk): Removing this code doesn't seem to have any impact.
+	// TODO(rjk): Remove the loop.
 	for _, text := range f.text {
 		v := text.w
 		if v != w {
@@ -407,6 +410,7 @@ func (w *Window) Undo(isundo bool) {
 			v.body.q1 = (getP1(v.body.fr)) + v.body.org
 		}
 	}
+
 	w.SetTag()
 }
 
@@ -426,8 +430,6 @@ func (w *Window) SetName(name string) {
 
 	w.SetTag()
 	for _, te := range t.file.text {
-		// TODO(rjk): SetTag already loops. We should not loop again.
-		// te.w.SetTag()
 
 		// A value that's per-File should be in the File.
 		te.w.isscratch = w.isscratch
@@ -475,6 +477,7 @@ func (w *Window) ClearTag() {
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 }
 
+// SetTag updates the tag for this Window and all of its clones.
 func (w *Window) SetTag() {
 	f := w.body.file
 	f.AllText(func(u *Text) {
@@ -484,6 +487,10 @@ func (w *Window) SetTag() {
 	})
 }
 
+// SetTag1 updates the tag contents for a given window w.
+// TODO(rjk): Make sure that this handles updating the selection
+// correctly.
+// TODO(rjk): Handle files with spaces in their names.
 func (w *Window) SetTag1() {
 	Ldelsnarf := (" Del Snarf")
 	Lundo := (" Undo")
