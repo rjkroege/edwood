@@ -242,6 +242,12 @@ func (f *File) DelText(t *Text) error {
 	return fmt.Errorf("can't find text in File.DelText")
 }
 
+func (f *File) AllText(tf func(t *Text)) {
+	for _, t := range f.text {
+		tf(t)
+	}
+}
+
 // HasMultipleTexts returns true if this File has multiple texts
 // display its contents.
 func (f *File) HasMultipleTexts() bool {

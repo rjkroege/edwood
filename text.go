@@ -212,9 +212,10 @@ func (t *Text) Columnate(names []string, widths []int) {
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
-	if len(t.file.text) > 1 {
-		return
+	if t.file.HasMultipleTexts() {
+		panic("Text.Columnate is only for directories that can't have zerox")
 	}
+
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
 	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
@@ -294,7 +295,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	hasNulls := false
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
-		if len(t.file.text) > 1 {
+		if t.file.HasMultipleTexts() {
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
 			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
 		}

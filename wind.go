@@ -20,7 +20,7 @@ type Window struct {
 	body    Text
 	r       image.Rectangle
 
-	isdir      bool		// true if this Window is showing a directory in its body.
+	isdir      bool // true if this Window is showing a directory in its body.
 	isscratch  bool
 	filemenu   bool
 	autoindent bool
@@ -322,6 +322,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	return w.r.Max.Y
 }
 
+// Lock1 locks
 func (w *Window) Lock1(owner int) {
 	w.lk.Lock()
 	w.ref.Inc()
@@ -334,11 +335,11 @@ func (w *Window) Lock(owner int) {
 	w.ref.Inc()
 	w.owner = owner
 	f := w.body.file
-	for _, t := range f.text {
+	f.AllText(func(t *Text) {
 		if t.w != w {
 			t.w.Lock1(owner)
 		}
-	}
+	})
 }
 
 // Unlock releases the lock on each clone of w
@@ -347,6 +348,7 @@ func (w *Window) Unlock() {
 	// avoid tripping over Window.Close indirectly editing f.text and
 	// freeing f on the last iteration of the loop.
 	f := w.body.file
+	// TODO(rjk): Remove loop.
 	for i := len(f.text) - 1; i >= 0; i-- {
 		w = f.text[i].w
 		w.owner = 0
@@ -394,6 +396,10 @@ func (w *Window) Undo(isundo bool) {
 	body.q0, body.q1 = body.file.Undo(isundo)
 	body.Show(body.q0, body.q1, true)
 	f := body.file
+
+	// TODO(rjk): Remove loop
+	// Do I even have to do this?
+	// Won't it have happened already?
 	for _, text := range f.text {
 		v := text.w
 		if v != w {
@@ -418,8 +424,12 @@ func (w *Window) SetName(name string) {
 	}
 	t.file.SetName(name)
 
+	w.SetTag()
 	for _, te := range t.file.text {
-		te.w.SetTag()
+		// TODO(rjk): SetTag already loops. We should not loop again.
+		// te.w.SetTag()
+
+		// A value that's per-File should be in the File.
 		te.w.isscratch = w.isscratch
 	}
 }
@@ -467,14 +477,11 @@ func (w *Window) ClearTag() {
 
 func (w *Window) SetTag() {
 	f := w.body.file
-
-	// TODO(rjk): I think that I can fold this into Text.inserted()
-	for _, u := range f.text {
-		v := u.w
-		if v.col.safe || v.body.fr.GetFrameFillStatus().Maxlines > 0 {
-			v.SetTag1()
+	f.AllText(func(u *Text) {
+		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
+			u.w.SetTag1()
 		}
-	}
+	})
 }
 
 func (w *Window) SetTag1() {
@@ -556,6 +563,8 @@ func (w *Window) SetTag1() {
 	if w.tag.q1 > n {
 		w.tag.q1 = n
 	}
+	// TODO(rjk): This can redraw the selection unnecessarily
+	// if we replaced the tag above.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 	w.DrawButton()
 	if resize {
