@@ -186,7 +186,7 @@ func readfile(c *Column, filename string) {
 	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
-	w.tag.SetSelect(w.tag.file.b.Nc(), w.tag.file.b.Nc())
+	w.tag.SetSelect(w.tag.file.Size(), w.tag.file.Size())
 	xfidlog(w, "new")
 }
 
@@ -402,7 +402,7 @@ func MovedMouse(m draw.Mouse) {
 		if w != nil {
 			w.Commit(t)
 		} else {
-			t.Commit(true)
+			t.Commit()
 		}
 		switch {
 		case m.Buttons&1 != 0:
@@ -539,7 +539,7 @@ func waitthread() {
 			}
 			row.lk.Lock()
 			t := &row.tag
-			t.Commit(true)
+			t.Commit()
 			if c == nil {
 				// helper processes use this exit status
 				// TODO(flux): I don't understand what this libthread code is doing
@@ -586,7 +586,7 @@ func waitthread() {
 			command = c
 			row.lk.Lock()
 			t := &row.tag
-			t.Commit(true)
+			t.Commit()
 			t.Insert(0, []rune(c.name), true)
 			t.SetSelect(0, 0)
 			row.display.Flush()
@@ -676,8 +676,8 @@ func (w errorWriter) Close() error {
 const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-	r := make([]rune, snarfbuf.Nc())
-	snarfbuf.Read(0, r[:snarfbuf.Nc()])
+	r := make([]rune, snarfbuf.nc())
+	snarfbuf.Read(0, r[:snarfbuf.nc()])
 	row.display.WriteSnarf([]byte(string(r)))
 }
 

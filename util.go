@@ -276,8 +276,9 @@ func flushwarnings() {
 		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)
-		for n = 0; n < warn.buf.Nc(); n += nr {
-			nr = warn.buf.Nc() - n
+		// TODO(rjk): Figure out why Warning doesn't use a File.
+		for n = 0; n < warn.buf.nc(); n += nr {
+			nr = warn.buf.nc() - n
 			if nr > RBUFSIZE {
 				nr = RBUFSIZE
 			}
@@ -290,7 +291,7 @@ func flushwarnings() {
 		w.owner = owner
 		t.file.TreatAsClean()
 		w.Unlock()
-		warn.buf.Close()
+		// warn.buf.Close()
 		if warn.md != nil {
 			fsysdelid(warn.md)
 		}
@@ -306,7 +307,7 @@ func warning(md *MntDir, s string, args ...interface{}) {
 func addwarningtext(md *MntDir, r []rune) {
 	for _, warn := range warnings {
 		if warn.md == md {
-			warn.buf.Insert(warn.buf.Nc(), r)
+			warn.buf.Insert(warn.buf.nc(), r)
 			return
 		}
 	}

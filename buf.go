@@ -1,8 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
-	"os"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/runes"
@@ -28,20 +26,6 @@ func (b *Buffer) Delete(q0, q1 int) {
 	(*b) = (*b)[:len(*b)-(q1-q0)] // Reslice to length
 }
 
-func (b *Buffer) Load(q0 int, fd *os.File) (n int, h FileHash, hasNulls bool, err error) {
-	// TODO(flux): Innefficient to load the file, then copy into the slice,
-	// but I need the UTF-8 interpretation.  I could fix this by using a
-	// UTF-8 -> []rune reader on top of the os.File instead.
-
-	d, err := ioutil.ReadAll(fd)
-	if err != nil {
-		warning(nil, "read error in Buffer.Load")
-	}
-	runes, _, hasNulls := cvttorunes(d, len(d))
-	(*b).Insert(q0, runes)
-	return len(runes), calcFileHash(d), hasNulls, err
-}
-
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {
 	n := copy(r, (*b)[q0:])
 	return n, nil
@@ -49,16 +33,12 @@ func (b *Buffer) Read(q0 int, r []rune) (int, error) {
 
 func (b *Buffer) ReadC(q int) rune { return (*b)[q] }
 
-func (b *Buffer) Close() {
-	(*b).Reset()
-
-}
-
 func (b *Buffer) Reset() {
 	(*b) = (*b)[0:0]
 }
 
-func (b *Buffer) Nc() int {
+// nc returns the number of characters in the Buffer.
+func (b *Buffer) nc() int {
 	return len(*b)
 }
 

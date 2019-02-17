@@ -16,6 +16,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 type Exectab struct {
@@ -95,7 +96,7 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	}
 	a := ""
 	var e *Expand
-	argt.Commit(true)
+	argt.Commit()
 	var ok bool
 	if e, ok = expand(argt, argt.q0, argt.q1); ok {
 		if len(e.name) > 0 && dofile {
@@ -134,8 +135,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			q0 = t.q0
 			q1 = t.q1
 		} else {
-			for q1 < t.file.b.Nc() {
-				c := t.ReadC(q1)
+			for q1 < t.file.Size() {
+				c := t.file.ReadC(q1)
 				if isexecc(c) && c != ':' {
 					q1++
 				} else {
@@ -143,7 +144,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 				}
 			}
 			for q0 > 0 {
-				c := t.ReadC(q0 - 1)
+				c := t.file.ReadC(q0 - 1)
 				if isexecc(c) && c != ':' {
 					q0--
 				} else {
@@ -258,7 +259,7 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 	if et.col == nil || et.w == nil {
 		return
 	}
-	if flag1 || len(et.w.body.file.text) > 1 || et.w.Clean(false) {
+	if flag1 || et.w.body.file.HasMultipleTexts() || et.w.Clean(false) {
 		et.col.Close(et.w, true)
 	}
 }
@@ -302,7 +303,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		snarfbuf.Delete(0, snarfbuf.Nc())
+		snarfbuf.Delete(0, snarfbuf.nc())
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
@@ -310,7 +311,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 				n = RBUFSIZE
 			}
 			t.file.b.Read(q0, r[:n])
-			snarfbuf.Insert(snarfbuf.Nc(), r[:n])
+			snarfbuf.Insert(snarfbuf.nc(), r[:n])
 			q0 += n
 		}
 		acmeputsnarf()
@@ -369,7 +370,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 
 	acmegetsnarf()
-	if t == nil || snarfbuf.Nc() == 0 {
+	if t == nil || snarfbuf.nc() == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -383,7 +384,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	cut(t, t, nil, false, true, "")
 	q = 0
 	q0 = t.q0
-	q1 = t.q0 + snarfbuf.Nc()
+	q1 = t.q0 + snarfbuf.nc()
 	r := make([]rune, RBUFSIZE)
 	for q0 < q1 {
 		n = q1 - q0
@@ -438,7 +439,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.isdir && (et.w.body.file.b.Nc() > 0 && !et.w.Clean(true)) {
+	if !et.w.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
 		return
 	}
 	w := et.w
@@ -448,19 +449,17 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	if len(t.file.text) > 1 {
-		isdir, _ := isDir(name)
-		if isdir {
-			warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
-			return
-		}
+	newNameIsdir, _ := isDir(name)
+	if t.file.HasMultipleTexts() && newNameIsdir {
+		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
+		return
 	}
-	r := name
-	for _, u := range t.file.text {
-		u.Reset()
-		u.w.DirFree()
+	if w.isdir && !newNameIsdir {
+		w.DirFree()
 	}
-	samename := r == t.file.name
+
+	t.Delete(0, t.file.Nr(), true)
+	samename := name == t.file.name
 	t.Load(0, name, samename)
 	if samename {
 		t.file.Unmodded()
@@ -468,11 +467,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		t.file.Modded()
 	}
 	w.SetTag()
+
+	// what is this for?
 	t.file.unread = false
-	for _, u := range t.file.text {
-		u.w.tag.SetSelect(u.w.tag.file.b.Nc(), u.w.tag.file.b.Nc())
-		u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
-	}
 	xfidlog(w, "get")
 }
 
@@ -503,7 +500,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 func checkhash(name string, f *File, d os.FileInfo) {
 	Untested()
 
-	h, err := HashFile(name)
+	h, err := file.HashFor(name)
 	if err != nil {
 		warning(nil, "Failed to open %v to compute hash", name)
 		return
@@ -569,7 +566,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		}
 	}
 	if name == f.name {
-		if q0 != 0 || q1 != f.b.Nc() {
+		if q0 != 0 || q1 != f.Size() {
 			f.Modded()
 			f.unread = true
 		} else {
@@ -600,7 +597,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	putfile(f, 0, f.b.Nc(), name)
+	putfile(f, 0, f.Size(), name)
 	xfidlog(w, "put")
 }
 
@@ -614,7 +611,7 @@ func putall(et, _, _ *Text, _, _ bool, arg string) {
 				continue
 			}
 			a := w.body.file.name
-			if w.body.file.mod || len(w.body.cache) > 0 {
+			if w.body.file.HasSaveableChanges() {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {
@@ -700,11 +697,11 @@ func sendx(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
-	t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	t.SetSelect(t.file.Size(), t.file.Size())
 	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.b.Nc()-1) != '\n' {
-		t.Insert(t.file.b.Nc(), []rune("\n"), true)
-		t.SetSelect(t.file.b.Nc(), t.file.b.Nc())
+	if t.ReadC(t.file.Size()-1) != '\n' {
+		t.Insert(t.file.Size(), []rune("\n"), true)
+		t.SetSelect(t.file.Size(), t.file.Size())
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)
@@ -825,7 +822,8 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
 		// ugly: fix locks so w.unlock works
-		nw.Lock1(t.w.owner)
+		// TODO(rjk): We need to handle this better.
+		nw.lock1(t.w.owner)
 		xfidlog(nw, "zerox")
 	}
 }

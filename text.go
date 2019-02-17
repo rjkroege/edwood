@@ -15,6 +15,8 @@ import (
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/drawutil"
 	"github.com/rjkroege/edwood/internal/runes"
+
+	"log"
 )
 
 const (
@@ -70,11 +72,10 @@ type Text struct {
 	row     *Row
 	col     *Column
 
-	iq1      int
-	eq0      int
-	cq0      int
-	cache    []rune
-	nofill   bool
+	iq1 int
+	eq0 int
+
+	nofill   bool // When true, updates to the Text shouldn't update the frame.
 	needundo bool
 
 	lk sync.Mutex
@@ -107,7 +108,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 }
 
 func (t *Text) Nc() int {
-	return t.file.b.Nc()
+	return t.file.Size()
 }
 
 // String returns a string representation of the TextKind.
@@ -211,9 +212,10 @@ func (t *Text) Columnate(names []string, widths []int) {
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
-	if len(t.file.text) > 1 {
-		return
+	if t.file.HasMultipleTexts() {
+		panic("Text.Columnate is only for directories that can't have zerox")
 	}
+
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
 	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
@@ -240,19 +242,19 @@ func (t *Text) Columnate(names []string, widths []int) {
 	for i := 0; i < nrow; i++ {
 		for j := i; j < len(names); j += nrow {
 			dl := bytetorune([]byte(names[j]))
-			t.file.Insert(q1, dl)
+			t.file.InsertAt(q1, dl)
 			q1 += len(dl)
 			if j+nrow >= len(names) {
 				break
 			}
 			w := widths[j]
 			if maxt-w%maxt < mint {
-				t.file.Insert(q1, Ltab)
+				t.file.InsertAt(q1, Ltab)
 				q1++
 				w += mint
 			}
 			for {
-				t.file.Insert(q1, Ltab)
+				t.file.InsertAt(q1, Ltab)
 				q1++
 				w += maxt - (w % maxt)
 				if !(w < colw) {
@@ -260,13 +262,13 @@ func (t *Text) Columnate(names []string, widths []int) {
 				}
 			}
 		}
-		t.file.Insert(q1, Lnl)
+		t.file.InsertAt(q1, Lnl)
 		q1++
 	}
 }
 
 func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
-	if len(t.cache) != 0 || t.file.b.Nc() > 0 || t.w == nil || t != &t.w.body {
+	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 	if t.w.isdir && t.file.name == "" {
@@ -289,11 +291,11 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, fmt.Errorf("can't fstat %s: %v", filename, err)
 	}
 
-	q1 := (0)
+	q1 := 0
 	hasNulls := false
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
-		if len(t.file.text) > 1 {
+		if t.file.HasMultipleTexts() {
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
 			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
 		}
@@ -328,7 +330,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 = t.file.b.Nc()
+		q1 = t.file.Size()
 	} else {
 		t.w.isdir = false
 		t.w.filemenu = true
@@ -346,25 +348,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.file.qidpath = d.Name() // TODO(flux): Gross hack to use filename as unique ID of file.
 	}
 	fd.Close()
-	n := q1 - q0
-	if q0 < t.org {
-		t.org += n
-	} else {
-		if q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) { // Text is within the window, put it there.
-			t.fr.Insert(t.file.b[q0:q0+n], q0-t.org)
-		}
-	}
-	// For each clone, redraw
-	for _, u := range t.file.text {
-		if u != t { // Skip the one we just redrew
-			if u.org > u.file.b.Nc() { // will be 0 because of reset(), but safety first
-				u.org = 0
-			}
-			u.Resize(u.all, true, false /* noredraw */)
-			u.Backnl(u.org, 0) // go to beginning of line
-		}
-		u.SetSelect(q0, q0)
-	}
+
 	if hasNulls {
 		warning(nil, "%s: NUL bytes elided\n", filename)
 	}
@@ -373,7 +357,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 
 func (t *Text) Backnl(p int, n int) int {
 	// look for start of this line if n==0
-	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
+	if n == 0 && p > 0 && t.file.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	i := n
@@ -386,7 +370,7 @@ func (t *Text) Backnl(p int, n int) int {
 		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
 			j--
-			if t.ReadC(p-1) == '\n' {
+			if t.file.ReadC(p-1) == '\n' {
 				break
 			}
 		}
@@ -444,27 +428,11 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 	return q0, nrp
 }
 
-func (t *Text) Insert(q0 int, r []rune, tofile bool) {
-	if tofile && len(t.cache) != 0 {
-		panic("text.insert")
-	}
-	if len(r) == 0 {
-		return
-	}
-	if tofile {
-		t.file.Insert(q0, r)
-		if t.what == Body {
-			t.w.utflastqid = -1
-		}
-		if len(t.file.text) > 1 {
-			for _, u := range t.file.text {
-				if u != t {
-					u.Insert(q0, r, false)
-					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw(u.fr.GetFrameFillStatus().Nchars)
-				}
-			}
-		}
+// inserted is a callback invoked by File on Insert* to update each Text
+// that is using a given File.
+func (t *Text) inserted(q0 int, r []rune) {
+	if t.what == Body {
+		t.w.utflastqid = -1
 	}
 	n := len(r)
 	if q0 < t.iq1 {
@@ -483,6 +451,22 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 			t.fr.Insert(r[:n], q0-t.org)
 		}
 	}
+
+	t.logInsert(q0, r)
+	t.SetSelect(t.q0, t.q1)
+	if t.fr != nil {
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+	}
+
+}
+
+// writeEventLog emits an event log for an insertion.
+// TODO(rjk): Refactor this with the other event log insertions.
+// TODO(rjk): can be more stateless.
+// TODO(rjk): Can express this more precisely with an interface
+// that makes its state dependency obvious
+func (t *Text) logInsert(q0 int, r []rune) {
+	n := len(r)
 	if t.w != nil {
 		c := 'i'
 		if t.what == Body {
@@ -496,11 +480,24 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	}
 }
 
+func (t *Text) Insert(q0 int, r []rune, tofile bool) {
+	if !tofile {
+		panic("text.insert")
+	}
+	if tofile && t.file.HasUncommitedChanges() {
+		panic("text.insert")
+	}
+	if len(r) == 0 {
+		return
+	}
+	t.file.InsertAt(q0, r)
+}
+
 func (t *Text) TypeCommit() {
 	if t.w != nil {
 		t.w.Commit(t)
 	} else {
-		t.Commit(true)
+		t.Commit()
 	}
 }
 
@@ -518,11 +515,11 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	if fr.IsLastLineFull() || t.nofill {
 		return
 	}
-	if len(t.cache) > 0 {
+	if t.file.HasUncommitedChanges() {
 		t.TypeCommit()
 	}
 	for {
-		n := t.file.b.Nc() - (t.org + fr.GetFrameFillStatus().Nchars)
+		n := t.file.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n == 0 {
 			break
 		}
@@ -555,28 +552,24 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	}
 }
 
-func (t *Text) Delete(q0, q1 int, tofile bool) {
-	if tofile && len(t.cache) != 0 {
+func (t *Text) Delete(q0, q1 int, _ bool) {
+	if t.file.HasUncommitedChanges() {
 		panic("text.delete")
 	}
 	n := q1 - q0
 	if n == 0 {
 		return
 	}
-	if tofile {
-		t.file.Delete(q0, q1)
-		if t.what == Body {
-			t.w.utflastqid = -1
-		}
-		if len(t.file.text) > 1 {
-			for _, u := range t.file.text {
-				if u != t {
-					u.Delete(q0, q1, false)
-					u.SetSelect(u.q0, u.q1)
-					u.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
-				}
-			}
-		}
+	t.file.DeleteAt(q0, q1)
+}
+
+// deleted implements the single-text deletion observer for this Text's
+// backing File. It updates the Text (i.e. the view) for the removal of
+// runes [q0, q1).
+func (t *Text) deleted(q0, q1 int) {
+	n := q1 - q0
+	if t.what == Body {
+		t.w.utflastqid = -1
 	}
 	if q0 < t.iq1 {
 		t.iq1 -= min(n, t.iq1-q0)
@@ -604,6 +597,17 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 		t.fr.Delete((p0), (p1))
 		t.fill(t.fr)
 	}
+
+	t.logInsertDelete(q0, q1)
+
+	t.SetSelect(t.q0, t.q1)
+	if t.fr != nil {
+		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+	}
+}
+
+// TODO(rjk): Fold this into logInsert is a nice way.
+func (t *Text) logInsertDelete(q0, q1 int) {
 	if t.w != nil {
 		c := 'd'
 		if t.what == Body {
@@ -615,14 +619,14 @@ func (t *Text) Delete(q0, q1 int, tofile bool) {
 
 func (t *Text) View(q0, q1 int) []rune                   { return t.file.b.View(q0, q1) }
 func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
-func (t *Text) nc() int                                  { return t.file.b.Nc() }
+func (t *Text) nc() int                                  { return t.file.Size() }
 func (t *Text) Q0() int                                  { return t.q0 }
 func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, t.file.b.Nc())
-	p1 = min(q1, t.file.b.Nc())
+	p0 = min(q0, t.file.Size())
+	p1 = min(q1, t.file.Size())
 	return p0, p1
 }
 
@@ -634,7 +638,7 @@ func (t *Text) BsWidth(c rune) int {
 	q := t.q0
 	skipping := true
 	for q > 0 {
-		r := t.ReadC(q - 1)
+		r := t.file.ReadC(q - 1)
 		if r == '\n' { // eat at most one more character
 			if q == t.q0 { // eat the newline
 				q--
@@ -659,7 +663,7 @@ func (t *Text) BsWidth(c rune) int {
 func (t *Text) FileWidth(q0 int, oneelement bool) int {
 	q := q0
 	for q > 0 {
-		r := t.ReadC(q - 1)
+		r := t.file.ReadC(q - 1)
 		if r <= ' ' {
 			break
 		}
@@ -672,19 +676,19 @@ func (t *Text) FileWidth(q0 int, oneelement bool) int {
 }
 
 func (t *Text) Complete() []rune {
-	if t.q0 < t.Nc() && t.ReadC(t.q0) > ' ' { // must be at end of word
+	if t.q0 < t.Nc() && t.file.ReadC(t.q0) > ' ' { // must be at end of word
 		return nil
 	}
 	str := make([]rune, t.FileWidth(t.q0, true))
 	q := t.q0 - len(str)
 	for i := range str {
-		str[i] = t.ReadC(q)
+		str[i] = t.file.ReadC(q)
 		q++
 	}
 	path := make([]rune, t.FileWidth(t.q0-len(str), false))
 	q = t.q0 - len(str) - len(path)
 	for i := range path {
-		path[i] = t.ReadC(q)
+		path[i] = t.file.ReadC(q)
 		q++
 	}
 
@@ -724,9 +728,9 @@ func (t *Text) Complete() []rune {
 
 func (t *Text) Type(r rune) {
 	var (
-		q0, q1        int
-		nnb, nb, n, i int
-		nr            int
+		q0, q1    int
+		nnb, n, i int
+		nr        int
 	)
 	// Avoid growing column and row tags.
 	if t.what != Body && t.what != Tag && r == '\n' {
@@ -777,7 +781,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyRight:
 		t.TypeCommit()
-		if t.q1 < t.file.b.Nc() {
+		if t.q1 < t.file.Size() {
 			// This is a departure from the plan9/plan9port acme
 			// Instead of always going right one char from q1, it
 			// collapses multi-character selections first, behaving
@@ -844,21 +848,21 @@ func (t *Text) Type(r rune) {
 	case draw.KeyEnd:
 		t.TypeCommit()
 		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.b.Nc() {
+			if t.iq1 > t.file.Size() {
 				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.b.Nc()
+				t.iq1 = t.file.Size()
 			}
 			q0 = t.Backnl(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
-			t.Show(t.file.b.Nc(), t.file.b.Nc(), false)
+			t.Show(t.file.Size(), t.file.Size(), false)
 		}
 		return
 	case 0x01: // ^A: beginning of line
 		t.TypeCommit()
 		// go to where ^U would erase, if not already at BOL
 		nnb = 0
-		if t.q0 > 0 && t.ReadC(t.q0-1) != '\n' {
+		if t.q0 > 0 && t.file.ReadC(t.q0-1) != '\n' {
 			nnb = t.BsWidth(0x15)
 		}
 		t.Show(t.q0-nnb, t.q0-nnb, true)
@@ -866,7 +870,7 @@ func (t *Text) Type(r rune) {
 	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.b.Nc() && t.ReadC(q0) != '\n' {
+		for q0 < t.file.Size() && t.file.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
@@ -914,7 +918,7 @@ func (t *Text) Type(r rune) {
 	}
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
-		if len(t.cache) != 0 {
+		if t.file.HasUncommitedChanges() {
 			acmeerror("text.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
@@ -940,7 +944,7 @@ func (t *Text) Type(r rune) {
 				t.SetSelect(t.q0, t.eq0)
 			}
 		}
-		if len(t.cache) > 0 {
+		if t.file.HasUncommitedChanges() {
 			t.TypeCommit()
 		}
 		t.iq1 = t.q0
@@ -963,6 +967,8 @@ func (t *Text) Type(r rune) {
 		if t.q0 == 0 { // nothing to erase
 			return
 		}
+
+		log.Println("erasing!")
 		nnb = t.BsWidth(r)
 		q1 = t.q0
 		q0 = q1 - nnb
@@ -974,37 +980,14 @@ func (t *Text) Type(r rune) {
 		if nnb <= 0 {
 			return
 		}
-		for _, u := range t.file.text { // u is *Text
-			u.nofill = true
-			nb = nnb
-			n = len(u.cache)
-			if n > 0 {
-				if q1 != u.cq0+n {
-					acmeerror("text.type backspace", nil)
-				}
-				if n > nb {
-					n = nb
-				}
-				u.cache = u.cache[:len(u.cache)-n]
-				u.Delete(q1-n, q1, false)
-				nb -= n
-			}
-			if u.eq0 == q1 || u.eq0 == ^0 {
-				u.eq0 = q0
-			}
-			if nb != 0 && u == t {
-				u.Delete(q0, q0+nb, true)
-			}
-			if u != t {
-				u.SetSelect(u.q0, u.q1)
-			} else {
-				t.SetSelect(q0, q0)
-			}
-			u.nofill = false
-		}
-		for _, t := range t.file.text {
-			t.fill(t.fr)
-		}
+
+		// New way.
+		// Every point before we delete is an Undo point.
+		// TODO(rjk): figure out the way of nofill
+		// TODO(rjk): I'd like the Undo op to group typing better.
+		t.file.Commit()
+		t.Delete(q0, q0+nnb, true)
+
 		t.iq1 = t.q0
 		return
 	case '\n':
@@ -1016,7 +999,7 @@ func (t *Text) Type(r rune) {
 			rp[nr] = r
 			nr++
 			for i = 0; i < nnb; i++ {
-				r = t.ReadC(t.q0 - nnb + i)
+				r = t.file.ReadC(t.q0 - nnb + i)
 				if r != ' ' && r != '\t' {
 					break
 				}
@@ -1027,53 +1010,22 @@ func (t *Text) Type(r rune) {
 		}
 	}
 	// otherwise ordinary character; just insert, typically in caches of all texts
-	for _, u := range t.file.text { // u is *Text
-		if u.eq0 == ^0 {
-			u.eq0 = t.q0
-		}
-		if len(u.cache) == 0 {
-			u.cq0 = t.q0
-		} else {
-			if t.q0 != u.cq0+len(u.cache) {
-				acmeerror("text.type cq1", nil)
-			}
-		}
-		// Change the tag before we add to ncache,
-		// so that if the window body is resized the
-		// commit will not find anything in ncache.
-		if u.what == Body && len(u.cache) == 0 {
-			u.needundo = true
-			t.w.SetTag()
-			u.needundo = false
-		}
-		u.Insert(t.q0, rp, false)
-		if u != t {
-			u.SetSelect(u.q0, u.q1)
-		}
-		u.cache = append(u.cache, rp[:nr]...)
-		if t.what == Tag { // TODO(flux): This is hideous work-around for
-			// what looks like a subtle bug near here.
-			t.w.Commit(t)
-		}
-	}
+	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
+
+	// TODO(rjk): Do we always want to commit if editing a
+	// a tag?
 	if r == '\n' && t.w != nil {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0
 }
 
-func (t *Text) Commit(tofile bool) {
-	if len(t.cache) == 0 {
-		return
-	}
-	if tofile {
-		t.file.Insert(t.cq0, t.cache)
-	}
+func (t *Text) Commit() {
+	t.file.Commit()
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
-	t.cache = t.cache[:0]
 }
 
 // TODO(rjk): Conceivably, this can be removed.
@@ -1096,7 +1048,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	if dl < 0 {
 		q0 = t.Backnl(t.org, (-dl))
 	} else {
-		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.b.Nc() {
+		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
 			return
 		}
 		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
@@ -1158,7 +1110,7 @@ func (t *Text) Select() {
 		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		// horrible botch: while asleep, may have lost selection altogether
-		if selectq > t.file.b.Nc() {
+		if selectq > t.file.Size() {
 			selectq = t.org + sP0
 		}
 		if selectq < t.org {
@@ -1252,13 +1204,13 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false // do we call textscrdraw?
-	nc = t.file.b.Nc() + len(t.cache)
+	nc = t.file.Size()
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
 		} else {
 			if q0 == qe && qe == nc {
-				if t.ReadC(nc-1) == '\n' {
+				if t.file.ReadC(nc-1) == '\n' {
 					if t.fr.GetFrameFillStatus().Nlines < t.fr.GetFrameFillStatus().Maxlines {
 						tsd = true
 					}
@@ -1287,11 +1239,9 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 }
 
+// TODO(rjk): remove me in a subsequent CL.
 func (t *Text) ReadC(q int) rune {
-	if t.cq0 <= q && q < t.cq0+len(t.cache) {
-		return t.cache[q-t.cq0]
-	}
-	return t.file.b.ReadC(q)
+	return t.file.ReadC(q)
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
@@ -1374,7 +1324,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		if q == 0 {
 			c = '\n'
 		} else {
-			c = t.ReadC(q - 1)
+			c = t.file.ReadC(q - 1)
 		}
 		p := runes.IndexRune(l, c)
 		if p != -1 {
@@ -1387,20 +1337,20 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			return
 		}
 		// try matching character to right, looking left
-		if q == t.file.b.Nc() {
+		if q == t.file.Size() {
 			c = '\n'
 		} else {
-			c = t.ReadC(q)
+			c = t.file.ReadC(q)
 		}
 		p = runes.IndexRune(r, c)
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0
-				if q0 < t.file.b.Nc() && c == '\n' {
+				if q0 < t.file.Size() && c == '\n' {
 					q1++
 				}
 				q0 = q
-				if c != '\n' || q != 0 || t.ReadC(0) == '\n' {
+				if c != '\n' || q != 0 || t.file.ReadC(0) == '\n' {
 					q0++
 				}
 			}
@@ -1409,11 +1359,11 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	}
 	// try filling out word to right
 	q1 = inq0
-	for q1 < t.file.b.Nc() && isalnum(t.ReadC(q1)) {
+	for q1 < t.file.Size() && isalnum(t.file.ReadC(q1)) {
 		q1++
 	}
 	// try filling out word to left
-	for q0 > 0 && isalnum(t.ReadC(q0-1)) {
+	for q0 > 0 && isalnum(t.file.ReadC(q0-1)) {
 		q0--
 	}
 
@@ -1425,17 +1375,17 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	var c rune
 	for {
 		if dir > 0 {
-			if inq == t.file.b.Nc() {
+			if inq == t.file.Size() {
 				break
 			}
-			c = t.ReadC(inq)
+			c = t.file.ReadC(inq)
 			(inq)++
 		} else {
 			if inq == 0 {
 				break
 			}
 			(inq)--
-			c = t.ReadC(inq)
+			c = t.file.ReadC(inq)
 		}
 		if c == cr {
 			nest--
@@ -1455,23 +1405,23 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 // Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
 // Returned q1 is the location after the tag.
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-	if q+2 > t.file.b.Nc() {
+	if q+2 > t.file.Size() {
 		return 0, 0
 	}
-	if t.ReadC(q) != '<' {
+	if t.file.ReadC(q) != '<' {
 		return 0, 0
 	}
 	q++
-	c := t.ReadC(q)
+	c := t.file.ReadC(q)
 	q++
 	c1 := c
 	c2 := c
 	for c != '>' {
-		if q >= t.file.b.Nc() {
+		if q >= t.file.Size() {
 			return 0, 0
 		}
 		c2 = c
-		c = t.ReadC(q)
+		c = t.file.ReadC(q)
 		q++
 	}
 	if c1 == '/' { // closing tag
@@ -1491,11 +1441,11 @@ func (t *Text) ishtmlend(q int) (q1 int, stat int) {
 		return 0, 0
 	}
 	q--
-	if t.ReadC(q) != '>' {
+	if t.file.ReadC(q) != '>' {
 		return 0, 0
 	}
 	q--
-	c := t.ReadC(q)
+	c := t.file.ReadC(q)
 	c1 := c
 	c2 := c
 	for c != '<' {
@@ -1504,7 +1454,7 @@ func (t *Text) ishtmlend(q int) (q1 int, stat int) {
 		}
 		c1 = c
 		q--
-		c = t.ReadC(q)
+		c = t.file.ReadC(q)
 	}
 	if c1 == '/' { // closing tag
 		return q, -1
@@ -1523,7 +1473,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	if _, stat := t.ishtmlend(q0); stat == 1 {
 		depth := 1
 		q := q1
-		for q < t.file.b.Nc() {
+		for q < t.file.Size() {
 			nq, n := t.ishtmlstart(q)
 			if n != 0 {
 				depth += n
@@ -1560,7 +1510,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 
 func (t *Text) BackNL(p, n int) int {
 	// look for start of this line if n==0
-	if n == 0 && p > 0 && t.ReadC(p-1) != '\n' {
+	if n == 0 && p > 0 && t.file.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	i := n
@@ -1572,7 +1522,7 @@ func (t *Text) BackNL(p, n int) int {
 		}
 		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
-			if t.ReadC(p-1) == '\n' {
+			if t.file.ReadC(p-1) == '\n' {
 				break
 			}
 			j--
@@ -1597,11 +1547,11 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	)
 
 	// rjk: I'm not sure what this is for exactly.
-	if org > 0 && !exact && t.ReadC(org-1) != '\n' {
+	if org > 0 && !exact && t.file.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
-		for i = 0; i < 256 && org < t.file.b.Nc(); i++ {
-			if t.ReadC(org) == '\n' {
+		for i = 0; i < 256 && org < t.file.Size(); i++ {
+			if t.file.ReadC(org) == '\n' {
 				org++
 				break
 			}
@@ -1633,8 +1583,6 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 func (t *Text) Reset() {
 	t.file.seq = 0
 	t.eq0 = ^0
-	// do t.delete(0, t.nc, true) without building backup stuff
-	t.SetSelect(t.org, t.org)
 	t.fr.Delete(0, t.fr.GetFrameFillStatus().Nchars)
 	t.org = 0
 	t.q0 = 0
@@ -1650,7 +1598,7 @@ func (t *Text) DirName(name string) string {
 	if filepath.IsAbs(name) {
 		return filepath.Clean(name)
 	}
-	b := make([]rune, t.w.tag.file.b.Nc())
+	b := make([]rune, t.w.tag.file.Size())
 	t.w.tag.file.b.Read(0, b)
 	spl := strings.SplitN(string(b), " ", 2)[0]
 	if !strings.HasSuffix(spl, string(filepath.Separator)) {

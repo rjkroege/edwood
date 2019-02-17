@@ -20,7 +20,7 @@ type Window struct {
 	body    Text
 	r       image.Rectangle
 
-	isdir      bool
+	isdir      bool // true if this Window is showing a directory in its body.
 	isscratch  bool
 	filemenu   bool
 	autoindent bool
@@ -165,7 +165,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if !w.isdir && !w.isscratch && (w.body.file.mod || len(w.body.cache) > 0) {
+	if !w.isdir && !w.isscratch && w.body.file.DiffersFromDisk() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -228,8 +228,8 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	// if tag ends with \n, include empty line at end for typing
 	n := w.tag.fr.GetFrameFillStatus().Nlines
-	if w.tag.file.b.Nc() > 0 {
-		c := w.tag.file.b.ReadC(w.tag.file.b.Nc() - 1)
+	if w.tag.file.Size() > 0 {
+		c := w.tag.file.b.ReadC(w.tag.file.Size() - 1)
 		if c == '\n' {
 			n++
 		}
@@ -321,7 +321,9 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	return w.r.Max.Y
 }
 
-func (w *Window) Lock1(owner int) {
+// Lock1 locks just this Window. This is a helper for Lock.
+// TODO(rjk): This should be an internal detail of Window.
+func (w *Window) lock1(owner int) {
 	w.lk.Lock()
 	w.ref.Inc()
 	w.owner = owner
@@ -333,11 +335,11 @@ func (w *Window) Lock(owner int) {
 	w.ref.Inc()
 	w.owner = owner
 	f := w.body.file
-	for _, t := range f.text {
+	f.AllText(func(t *Text) {
 		if t.w != w {
-			t.w.Lock1(owner)
+			t.w.lock1(owner)
 		}
-	}
+	})
 }
 
 // Unlock releases the lock on each clone of w
@@ -346,6 +348,8 @@ func (w *Window) Unlock() {
 	// avoid tripping over Window.Close indirectly editing f.text and
 	// freeing f on the last iteration of the loop.
 	f := w.body.file
+	// TODO(rjk): Remove loop. Requires special attention because
+	// of its impack on locking.
 	for i := len(f.text) - 1; i >= 0; i-- {
 		w = f.text[i].w
 		w.owner = 0
@@ -391,8 +395,13 @@ func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
 	body.q0, body.q1 = body.file.Undo(isundo)
+
+	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
 	f := body.file
+
+	// TODO(rjk): Removing this code doesn't seem to have any impact.
+	// TODO(rjk): Remove the loop.
 	for _, text := range f.text {
 		v := text.w
 		if v != w {
@@ -400,6 +409,7 @@ func (w *Window) Undo(isundo bool) {
 			v.body.q1 = getP1(v.body.fr) + v.body.org
 		}
 	}
+
 	w.SetTag()
 }
 
@@ -417,19 +427,21 @@ func (w *Window) SetName(name string) {
 	}
 	t.file.SetName(name)
 
+	w.SetTag()
 	for _, te := range t.file.text {
-		te.w.SetTag()
+
+		// A value that's per-File should be in the File.
 		te.w.isscratch = w.isscratch
 	}
 }
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-	if t.what == Body {
-		for _, text := range t.file.text {
-			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
-		}
-	}
+	//	if t.what == Body {
+	//		for _, text := range t.file.text {
+	//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
+	//		}
+	//	}
 	w.SetTag()
 }
 
@@ -464,16 +476,20 @@ func (w *Window) ClearTag() {
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 }
 
+// SetTag updates the tag for this Window and all of its clones.
 func (w *Window) SetTag() {
 	f := w.body.file
-	for _, u := range f.text {
-		v := u.w
-		if v.col.safe || v.body.fr.GetFrameFillStatus().Maxlines > 0 {
-			v.SetTag1()
+	f.AllText(func(u *Text) {
+		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
+			u.w.SetTag1()
 		}
-	}
+	})
 }
 
+// SetTag1 updates the tag contents for a given window w.
+// TODO(rjk): Make sure that this handles updating the selection
+// correctly.
+// TODO(rjk): Handle files with spaces in their names.
 func (w *Window) SetTag1() {
 	Ldelsnarf := (" Del Snarf")
 	Lundo := (" Undo")
@@ -485,7 +501,7 @@ func (w *Window) SetTag1() {
 	//	Lpipe := (" |")
 
 	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if len(w.tag.cache) != 0 || w.tag.file.mod {
+	if w.tag.file.DiffersFromDisk() {
 		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
 	}
 
@@ -497,15 +513,15 @@ func (w *Window) SetTag1() {
 	sb := strings.Builder{}
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
+
 	if w.filemenu {
-		if w.body.needundo || len(w.body.file.delta) > 0 || len(w.body.cache) != 0 {
+		if w.body.needundo || w.body.file.HasUndoableChanges() {
 			sb.WriteString(Lundo)
 		}
-		if len(w.body.file.epsilon) > 0 {
+		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		dirty := w.body.file.name != "" && (len(w.body.cache) != 0 || w.body.file.SeqDiffer())
-		if !w.isdir && dirty {
+		if !w.isdir && w.body.file.HasSaveableChanges() {
 			sb.WriteString(Lput)
 		}
 	}
@@ -544,14 +560,17 @@ func (w *Window) SetTag1() {
 			}
 		}
 	}
+	//TOOD(rjk): should not reach into file.
 	w.tag.file.mod = false
-	n := w.tag.Nc() + len(w.tag.cache)
+	n := w.tag.file.Size()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}
 	if w.tag.q1 > n {
 		w.tag.q1 = n
 	}
+	// TODO(rjk): This can redraw the selection unnecessarily
+	// if we replaced the tag above.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 	w.DrawButton()
 	if resize {
@@ -561,13 +580,7 @@ func (w *Window) SetTag1() {
 }
 
 func (w *Window) Commit(t *Text) {
-	t.Commit(true) // will set the file.mod to true
-	f := t.file
-	if len(f.text) > 1 {
-		for _, te := range f.text {
-			te.Commit(false)
-		}
-	}
+	t.Commit() // will set the file.mod to true
 	if t.what == Body {
 		return
 	}

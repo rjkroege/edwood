@@ -93,9 +93,10 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > t.file.b.Nc() {
+			if dot.r.q1 > t.file.Nr() {
 				editerror("dot extends past end of buffer during { command")
 			}
+			// TODO(rjk): utf8 buffer addressing change.
 			t.q0 = dot.r.q0
 			t.q1 = dot.r.q1
 			cmdexec(t, cp)
@@ -193,7 +194,7 @@ func d_cmd(t *Text, cp *Cmd) bool {
 }
 
 func D1(t *Text) {
-	if len(t.w.body.file.text) > 1 || t.w.Clean(false) {
+	if t.w.body.file.HasMultipleTexts() || t.w.Clean(false) {
 		t.col.Close(t.w, true)
 	}
 }
@@ -228,9 +229,9 @@ func e_cmd(t *Text, cp *Cmd) bool {
 			editerror("") // Clean generated message already
 		}
 		q0 = 0
-		q1 = f.b.Nc()
+		q1 = f.Nr()
 	}
-	allreplaced := q0 == 0 && q1 == f.b.Nc()
+	allreplaced := q0 == 0 && q1 == f.Nr()
 	name := cmdname(f, cp.text, cp.cmdc == 'e')
 	if name == "" {
 		editerror(Enoname)
@@ -670,8 +671,8 @@ func appendx(f *File, cp *Cmd, p int) bool {
 func pdisplay(f *File) bool {
 	p1 := addr.r.q0
 	p2 := addr.r.q1
-	if p2 > f.b.Nc() {
-		p2 = f.b.Nc()
+	if p2 > f.Nr() {
+		p2 = f.Nr()
 	}
 	buf := make([]rune, RBUFSIZE)
 	for p1 < p2 {
@@ -876,7 +877,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 				sel = sels[1]
 			} else { // wrap around
 				p++
-				if p > f.b.Nc() {
+				if p > f.Nr() {
 					p = 0
 				}
 				sels := are.rxexecute(f.curtext, nil, p, -1, 1)
@@ -895,7 +896,7 @@ func nextmatch(f *File, r string, p int, sign int) {
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
 			if p < 0 {
-				p = f.b.Nc()
+				p = f.Nr()
 			}
 			sel = are.rxbexecute(f.curtext, p, NRange)
 			if len(sel) != 0 {
@@ -919,7 +920,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 			a = mkaddr(f)
 
 		case '$':
-			a.r.q0 = f.b.Nc()
+			a.r.q0 = f.Nr()
 			a.r.q1 = a.r.q0
 
 		case '\'':
@@ -948,7 +949,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 
 		case '*':
 			a.r.q0 = 0
-			a.r.q1 = f.b.Nc()
+			a.r.q1 = f.Nr()
 
 		case ',':
 			fallthrough
@@ -971,7 +972,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 			} else {
 				a2.f = a.f
 				a2.r.q0 = 0
-				a2.r.q1 = f.b.Nc()
+				a2.r.q1 = f.Nr()
 			}
 			if a1.f != a2.f {
 				editerror("addresses in different files")
@@ -1108,7 +1109,7 @@ func charaddr(l int, addr Address, sign int) Address {
 		addr.r.q1 += l
 		addr.r.q0 = addr.r.q1
 	}
-	if addr.r.q0 < 0 || addr.r.q1 > addr.f.b.Nc() {
+	if addr.r.q0 < 0 || addr.r.q1 > addr.f.Nr() {
 		editerror("address out of range")
 	}
 	return addr
@@ -1135,23 +1136,24 @@ func lineaddr(l int, addr Address, sign int) Address {
 				n = 1
 			} else {
 				p = addr.r.q1 - 1
-				if f.curtext.ReadC(p) == '\n' {
+				if f.ReadC(p) == '\n' {
 					n = 1
 				}
 				p++
 			}
 			for n < l {
-				if p >= f.b.Nc() {
+				// TODO(rjk) utf8 buffer issue p
+				if p >= f.Size() {
 					editerror("address out of range")
 				}
-				if f.curtext.ReadC(p) == '\n' {
+				if f.ReadC(p) == '\n' {
 					n++
 				}
 				p++
 			}
 			a.r.q0 = p
 		}
-		for p < f.b.Nc() && f.curtext.ReadC(p) != '\n' {
+		for p < f.Size() && f.ReadC(p) != '\n' {
 			p++
 		}
 		a.r.q1 = p
@@ -1167,7 +1169,7 @@ func lineaddr(l int, addr Address, sign int) Address {
 						editerror("address out of range")
 					}
 				} else {
-					c := f.curtext.ReadC(p - 1)
+					c := f.ReadC(p - 1)
 					n++
 					if c != '\n' || n != l {
 						p--
@@ -1179,7 +1181,7 @@ func lineaddr(l int, addr Address, sign int) Address {
 				p--
 			}
 		}
-		for p > 0 && f.curtext.ReadC(p-1) != '\n' { // lines start after a newline
+		for p > 0 && f.ReadC(p-1) != '\n' { // lines start after a newline
 			p--
 		}
 		a.r.q0 = p

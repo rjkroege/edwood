@@ -162,33 +162,30 @@ func allelogterm(w *Window) {
 }
 
 func alleditinit(w *Window) {
-	w.tag.Commit(true)
-	w.body.Commit(true)
+	w.tag.Commit()
+	w.body.Commit()
 	w.body.file.editclean = false
 }
 
 func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
-	if f.curtext != t { // do curtext only
-		return
-	}
+
 	if !f.elog.Empty() {
 		owner := t.w.owner
 		if owner == 0 {
 			t.w.owner = 'E'
 		}
+		// TODO(rjk): This code exists to permit work around the fact that
+		// InsertAt and DeleteAt are both implicitly Commit-ing.
 		f.Mark()
-		f.elog.Apply(f.text[0])
+		f.elog.Apply(t)
 		if f.editclean {
 			f.Unmodded()
 		}
-
 		t.w.owner = owner
 	}
 
-	t.SetSelect(t.q0, t.q1)
-	t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	w.SetTag()
 }
 
@@ -221,6 +218,8 @@ func editcmd(ct *Text, r []rune) {
 		editerrc = make(chan error)
 		lastpat = ""
 	}
+	// We would appear to run the Edit command on a different thread
+	// but block here.
 	go editthread(cp)
 	err := <-editerrc
 	editing = Inactive
