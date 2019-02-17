@@ -342,20 +342,21 @@ func (w *Window) Lock(owner int) {
 	})
 }
 
+// unlock1 unlcoks a single window.
+func (w *Window) unlock1() {
+	w.owner = 0
+	w.Close()
+	w.lk.Unlock()
+}
+
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
-	// Special handling for clones, run backwards to
-	// avoid tripping over Window.Close indirectly editing f.text and
-	// freeing f on the last iteration of the loop.
-	f := w.body.file
-	// TODO(rjk): Remove loop. Requires special attention because
-	// of its impack on locking.
-	for i := len(f.text) - 1; i >= 0; i-- {
-		w = f.text[i].w
-		w.owner = 0
-		w.Close()
-		w.lk.Unlock()
-	}
+	w.body.file.AllText(func(t *Text) {
+		if t.w != w {
+			t.w.unlock1()
+		}
+	})
+	w.unlock1()
 }
 
 func (w *Window) MouseBut() {
