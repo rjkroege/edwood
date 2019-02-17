@@ -403,13 +403,13 @@ func (w *Window) Undo(isundo bool) {
 
 	// TODO(rjk): Removing this code doesn't seem to have any impact.
 	// TODO(rjk): Remove the loop.
-	for _, text := range f.text {
-		v := text.w
-		if v != w {
-			v.body.q0 = getP0(v.body.fr) + v.body.org
-			v.body.q1 = getP1(v.body.fr) + v.body.org
-		}
-	}
+//	for _, text := range f.text {
+//		v := text.w
+//		if v != w {
+//			v.body.q0 = getP0(v.body.fr) + v.body.org
+//			v.body.q1 = getP1(v.body.fr) + v.body.org
+//		}
+//	}
 
 	w.SetTag()
 }
