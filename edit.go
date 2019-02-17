@@ -220,7 +220,7 @@ func editcmd(ct *Text, r []rune) {
 	}
 	// We would appear to run the Edit command on a different thread
 	// but block here.
-	go editthread()
+	go editthread(cp)
 	err := <-editerrc
 	editing = Inactive
 	if err != nil {
