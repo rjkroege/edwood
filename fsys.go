@@ -472,7 +472,7 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
 	var m uint
 	// can't truncate anything, so just disregard
-	x.fcall.Mode &= ^(uint8(plan9.OTRUNC | plan9.OCEXEC))
+	x.fcall.Mode &= ^uint8(plan9.OTRUNC | plan9.OCEXEC)
 	// can't execute or remove anything
 	if x.fcall.Mode == plan9.OEXEC || (x.fcall.Mode&plan9.ORCLOSE) != 0 {
 		goto Deny

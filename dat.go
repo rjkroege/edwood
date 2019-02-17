@@ -232,7 +232,7 @@ func Unimpl() {
 }
 
 func WIN(q plan9.Qid) int {
-	return int(((uint(q.Path)) >> 8) & 0xFFFFFF)
+	return int((uint(q.Path) >> 8) & 0xFFFFFF)
 }
 
 func FILE(q plan9.Qid) uint64 {
