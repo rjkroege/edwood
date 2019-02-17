@@ -97,7 +97,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.all = r
 	t.scrollr = r
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
-	t.lastsr = nullrect
+	t.lastsr = image.ZR
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
 	t.font = rf
@@ -434,7 +434,7 @@ func (t *Text) inserted(q0 int, r []rune) {
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
-	n := (len(r))
+	n := len(r)
 	if q0 < t.iq1 {
 		t.iq1 += n
 	}
@@ -1051,7 +1051,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
 			return
 		}
-		q0 = t.org + (fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight())))
+		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
 	}
 	// Insert text into the frame.
 	t.setorigin(fr, q0, true, true)
@@ -1082,7 +1082,7 @@ func (t *Text) Select() {
 	b := mouse.Buttons
 	q0 := t.q0
 	q1 := t.q1
-	selectq = t.org + (t.fr.Charofpt(mouse.Point))
+	selectq = t.org + t.fr.Charofpt(mouse.Point)
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
 	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {

@@ -52,8 +52,6 @@ func main() {
 	bartflag = *bartflagflag
 	swapscrollbuttons = *swapscrollbuttonsflag
 
-	cputype = os.Getenv("cputype")
-	objtype = os.Getenv("objtype")
 	home = os.Getenv("HOME")
 	acmeshell = os.Getenv("acmeshell")
 	p := os.Getenv("tabstop")

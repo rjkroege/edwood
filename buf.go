@@ -12,18 +12,18 @@ type Buffer []rune
 func NewBuffer() Buffer { return []rune{} }
 
 func (b *Buffer) Insert(q0 int, r []rune) {
-	if q0 > (len(*b)) {
+	if q0 > len(*b) {
 		panic("internal error: buffer.Insert: Out of range insertion")
 	}
 	(*b) = append((*b)[:q0], append(r, (*b)[q0:]...)...)
 }
 
 func (b *Buffer) Delete(q0, q1 int) {
-	if q0 > (len(*b)) || q1 > (len(*b)) {
+	if q0 > len(*b) || q1 > len(*b) {
 		panic("internal error: buffer.Delete: Out-of-range Delete")
 	}
 	copy((*b)[q0:], (*b)[q1:])
-	(*b) = (*b)[:(len(*b))-(q1-q0)] // Reslice to length
+	(*b) = (*b)[:len(*b)-(q1-q0)] // Reslice to length
 }
 
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {

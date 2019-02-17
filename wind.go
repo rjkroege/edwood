@@ -39,7 +39,6 @@ type Window struct {
 	eventx *Xfid
 	events []byte
 
-	nevents     int
 	owner       int
 	maxlines    int
 	dirnames    []string
@@ -406,8 +405,8 @@ func (w *Window) Undo(isundo bool) {
 	for _, text := range f.text {
 		v := text.w
 		if v != w {
-			v.body.q0 = (getP0(v.body.fr)) + v.body.org
-			v.body.q1 = (getP1(v.body.fr)) + v.body.org
+			v.body.q0 = getP0(v.body.fr) + v.body.org
+			v.body.q1 = getP1(v.body.fr) + v.body.org
 		}
 	}
 
@@ -696,7 +695,6 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 	b := []byte(fmt.Sprintf(format, args...))
 	w.events = append(w.events, byte(w.owner))
 	w.events = append(w.events, b...)
-	w.nevents = len(w.events)
 	x = w.eventx
 	if x != nil {
 		w.eventx = nil
