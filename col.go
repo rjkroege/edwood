@@ -4,8 +4,8 @@ import (
 	"image"
 	"sort"
 
-	"9fans.net/go/draw"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 var (

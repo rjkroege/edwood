@@ -14,7 +14,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 type Row struct {

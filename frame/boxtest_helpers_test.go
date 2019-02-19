@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 const fixedwidth = 10
