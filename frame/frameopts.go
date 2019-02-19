@@ -1,7 +1,7 @@
 package frame
 
 import (
-	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 // optioncontext is context passed into each option function

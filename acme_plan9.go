@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	defaultVarFont = "/lib/font/bit/lucidasans/euro.8.font"
-	defaultMtpt    = "/mnt/acme"
+	defaultVarFont   = "/lib/font/bit/lucidasans/euro.8.font"
+	defaultFixedFont = "/lib/font/bit/lucm/unicode.9.font"
+	defaultMtpt      = "/mnt/acme"
 )
 
 var ignoreSignals = []os.Signal{

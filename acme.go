@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"9fans.net/go/draw"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 var (
@@ -29,7 +29,7 @@ var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
 var bartflagflag = flag.Bool("b", false, "Bart's Flag")
 var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
 var varfontflag = flag.String("f", defaultVarFont, "Variable Width Font")
-var fixedfontflag = flag.String("F", "/lib/font/bit/lucm/unicode.9.font", "Fixed Width Font")
+var fixedfontflag = flag.String("F", defaultFixedFont, "Fixed Width Font")
 var loadfileflag = flag.String("l", "", "Load file name")
 var mtptflag = flag.String("m", defaultMtpt, "Mountpoint")
 var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")

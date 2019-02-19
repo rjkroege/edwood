@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	defaultVarFont = "/lib/font/bit/lucsans/euro.8.font"
-	defaultMtpt    = ""
+	defaultVarFont   = `C:\Windows\Fonts\arial.ttf@12pt`
+	defaultFixedFont = `C:\Windows\Fonts\lucon.ttf@12pt`
+	defaultMtpt      = ""
 )
 
 var ignoreSignals = []os.Signal{

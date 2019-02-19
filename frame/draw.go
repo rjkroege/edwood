@@ -3,7 +3,7 @@ package frame
 import (
 	"image"
 
-	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 func (f *frameimpl) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"9fans.net/go/draw"
 	"9fans.net/go/plan9"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 const Ctlsize = 5 * 12

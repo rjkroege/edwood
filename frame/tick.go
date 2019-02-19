@@ -3,7 +3,7 @@ package frame
 import (
 	"image"
 
-	"9fans.net/go/draw"
+	"github.com/rjkroege/edwood/internal/draw"
 )
 
 // InitTick sets up the TickImage (e.g. cursor)
