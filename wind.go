@@ -21,7 +21,6 @@ type Window struct {
 	r       image.Rectangle
 
 	isdir      bool // true if this Window is showing a directory in its body.
-	isscratch  bool
 	filemenu   bool
 	autoindent bool
 	showdel    bool
@@ -90,7 +89,6 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	if clone != nil {
 		f = clone.body.file
 		w.body.org = clone.body.org
-		w.isscratch = clone.isscratch
 	}
 	w.body.file = f.AddText(&w.body)
 
@@ -105,11 +103,6 @@ func (w *Window) initHeadless(clone *Window) *Window {
 }
 
 func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
-	//	var r1, br image.Rectangle
-	//	var f *File
-	//	var rp []rune
-	//	var nc int
-
 	w.initHeadless(clone)
 	w.display = dis
 	r1 := r
@@ -165,7 +158,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if !w.isdir && !w.isscratch && w.body.file.DiffersFromDisk() {
+	if !w.isdir && !w.body.file.isscratch && w.body.file.DiffersFromDisk() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -411,18 +404,13 @@ func (w *Window) SetName(name string) {
 	if t.file.name == name {
 		return
 	}
-	w.isscratch = false
+	w.body.file.isscratch = false
 	if strings.HasSuffix(name, Lslashguide) || strings.HasSuffix(name, LplusErrors) {
-		w.isscratch = true
+		w.body.file.isscratch = true
 	}
 	t.file.SetName(name)
 
 	w.SetTag()
-	for _, te := range t.file.text {
-
-		// A value that's per-File should be in the File.
-		te.w.isscratch = w.isscratch
-	}
 }
 
 func (w *Window) Type(t *Text, r rune) {
@@ -624,7 +612,7 @@ func (w *Window) AddIncl(r string) {
 
 // Clean returns true iff w can be treated as unmodified.
 func (w *Window) Clean(conservative bool) bool {
-	if w.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
+	if w.body.file.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {

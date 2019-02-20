@@ -604,7 +604,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if w.isscratch || w.isdir || w.body.file.name == "" {
+			if w.body.file.isscratch || w.isdir || w.body.file.name == "" {
 				continue
 			}
 			if w.nopen[QWevent] > 0 {

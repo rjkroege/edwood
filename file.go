@@ -54,6 +54,8 @@ type File struct {
 
 	dumpid int // Used to track the identifying name of this File for Dump.
 
+	isscratch bool // Used to track if this file should warn on unsaved deletion.
+
 	hash file.Hash // Used to check if the file has changed on disk since loaded
 
 	// cache holds  that are not yet part of an undo record.
