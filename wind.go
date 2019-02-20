@@ -399,17 +399,6 @@ func (w *Window) Undo(isundo bool) {
 
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
-	f := body.file
-
-	// TODO(rjk): Removing this code doesn't seem to have any impact.
-	// TODO(rjk): Remove the loop.
-//	for _, text := range f.text {
-//		v := text.w
-//		if v != w {
-//			v.body.q0 = getP0(v.body.fr) + v.body.org
-//			v.body.q1 = getP1(v.body.fr) + v.body.org
-//		}
-//	}
 
 	w.SetTag()
 }
@@ -438,11 +427,6 @@ func (w *Window) SetName(name string) {
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-	//	if t.what == Body {
-	//		for _, text := range t.file.text {
-	//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
-	//		}
-	//	}
 	w.SetTag()
 }
 
