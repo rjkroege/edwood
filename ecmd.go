@@ -692,7 +692,7 @@ func pdisplay(f *File) bool {
 func pfilename(f *File) {
 	w := f.curtext.w
 	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod
+	dirty := !w.isdir && !w.body.file.isscratch && f.mod
 	dirtychar := ' '
 	if dirty {
 		dirtychar = '\''
@@ -1016,7 +1016,7 @@ func alltofile(w *Window, tp *Tofile) {
 	if tp.f != nil {
 		return
 	}
-	if w.isscratch || w.isdir {
+	if w.body.file.isscratch || w.isdir {
 		return
 	}
 	t := &w.body
@@ -1044,7 +1044,7 @@ func tofile(r string) *File {
 }
 
 func allmatchfile(w *Window, tp *Tofile) {
-	if w.isscratch || w.isdir {
+	if w.body.file.isscratch || w.isdir {
 		return
 	}
 	t := &w.body
@@ -1083,7 +1083,7 @@ func filematch(f *File, r string) bool {
 	}
 	w := f.curtext.w
 	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod
+	dirty := !w.isdir && !w.body.file.isscratch && f.mod
 	dmark := ' '
 	if dirty {
 		dmark = '\''
