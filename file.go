@@ -25,8 +25,8 @@ import (
 // Observe: Frame can report addresses in byte and rune offsets.
 type File struct {
 	b       Buffer
-	delta   []*Undo
-	epsilon []*Undo
+	delta   []*Undo // [private]
+	epsilon []*Undo // [private]
 	elog    Elog
 	name    string
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
@@ -44,13 +44,13 @@ type File struct {
 
 	// Tracks the Edit sequence.
 	seq          int
-	putseq       int // seq on last put
+	putseq       int // seq on last put [private]
 	mod          bool
-	treatasclean bool // Window Clean tests should succeed if set.
+	treatasclean bool // Window Clean tests should succeed if set. [private]
 
 	// Observer pattern: many Text instances can share a File.
 	curtext *Text
-	text    []*Text
+	text    []*Text // [private I think]
 
 	dumpid int // Used to track the identifying name of this File for Dump.
 
@@ -59,10 +59,10 @@ type File struct {
 	hash file.Hash // Used to check if the file has changed on disk since loaded
 
 	// cache holds  that are not yet part of an undo record.
-	cache []rune
+	cache []rune // [private]
 
 	// cq0 tracks the insertion point for the cache.
-	cq0 int
+	cq0 int // [private]
 }
 
 // Remember that the high-level goal is to slowly coerce this into looking like
@@ -511,6 +511,8 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 
 // Reset removes all Undo records for this File.
 // TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
+// Or is it part of Clean()? I think that undo.Buffer.Clean should
+// reset the buffer.
 // Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
@@ -542,7 +544,13 @@ func (f *File) Modded() {
 	f.treatasclean = false
 }
 
-func (f *File) Unmodded() {
+// Clean marks the file as not modified. In particular DiffersFromDisk()
+// will return false after calling this.
+// This probably maps to undo.Buffer.Clean.
+// TODO(rjkroege): Perhaps I should discard Undo records.
+func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
+	// TODO(rjk): Should I do this? It seems desirable.
+	// f.Reset()
 }

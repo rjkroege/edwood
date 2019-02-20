@@ -633,7 +633,7 @@ forloop:
 			t = &w.body
 			t.eq0 = ^0
 			t.file.Reset()
-			t.file.Unmodded()
+			t.file.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'
 			t = &w.body

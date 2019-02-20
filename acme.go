@@ -182,7 +182,7 @@ func readfile(c *Column, filename string) {
 	abspath, _ := filepath.Abs(filename)
 	w.SetName(abspath)
 	w.body.Load(0, filename, true)
-	w.body.file.Unmodded()
+	w.body.file.Clean()
 	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)

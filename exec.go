@@ -462,7 +462,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	samename := name == t.file.name
 	t.Load(0, name, samename)
 	if samename {
-		t.file.Unmodded()
+		t.file.Clean()
 	} else {
 		t.file.Modded()
 	}
@@ -577,7 +577,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			//f.dev = d.dev;
 			f.mtime = d.ModTime()
 			f.hash.Set(h.Sum(nil))
-			f.Unmodded()
+			f.Clean()
 			f.unread = false
 		}
 		f.SnapshotSeq()
