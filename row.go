@@ -302,7 +302,6 @@ func (row *Row) Type(r rune, p image.Point) *Text {
 }
 
 func (row *Row) Clean() bool {
-
 	clean := true
 	for _, col := range row.col {
 		clean = clean && col.Clean()
@@ -366,6 +365,10 @@ func (r *Row) Dump(file string) {
 	for _, c := range r.col {
 		for _, w := range c.w {
 			w.body.file.dumpid = 0
+			if w.nopen[QWevent] != 0 {
+				// Mark zeroxes of external windows specially.
+				w.body.file.dumpid = -1
+			}
 		}
 	}
 
@@ -375,13 +378,12 @@ func (r *Row) Dump(file string) {
 	}
 
 	for i, c := range r.col {
-	NextWindow:
 		for j, w := range c.w {
 			// Do we need to Commit on the other tags?
 			w.Commit(&w.tag)
 			t := &w.body
 
-			// windows owned by others get special treatment
+			// External windows can't be recreated so skip them.
 			if w.nopen[QWevent] > 0 {
 				if w.dumpstr == "" {
 					continue
@@ -389,16 +391,8 @@ func (r *Row) Dump(file string) {
 			}
 
 			// zeroxes of external windows are tossed
-			if len(t.file.text) > 1 {
-				for _, t1 := range t.file.text {
-					if w == t1.w {
-						continue
-					}
-
-					if t1.w.nopen[QWevent] != 0 {
-						continue NextWindow
-					}
-				}
+			if w.body.file.dumpid < 0 && w.nopen[QWevent] == 0 {
+				continue
 			}
 
 			// We always include the font name.
