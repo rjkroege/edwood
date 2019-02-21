@@ -132,7 +132,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// use no wider than 3-space tabs in a directory
 	maxt := int(maxtab)
 	if t.what == Body {
-		if t.w.isdir {
+		if t.file.isdir {
 			maxt = min(TABDIR, int(maxtab))
 		} else {
 			maxt = t.tabstop
@@ -146,7 +146,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 		t.fr.Redraw(enclosing)
 	}
 
-	if t.what == Body && t.w.isdir && odx != t.all.Dx() {
+	if t.what == Body && t.file.isdir && odx != t.all.Dx() {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
@@ -267,11 +267,12 @@ func (t *Text) Columnate(names []string, widths []int) {
 	}
 }
 
+// Load loads filename into the Text.file. Text must be of type body.
 func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
 	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
-	if t.w.isdir && t.file.name == "" {
+	if t.file.isdir && t.file.name == "" {
 		warning(nil, "empty directory name")
 		return 0, fmt.Errorf("empty directory name")
 	}
@@ -299,7 +300,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
 			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
 		}
-		t.w.isdir = true
+		t.file.isdir = true
 		t.w.filemenu = false
 		// TODO(flux): Find all '/' and replace with filepath.Separator properly
 		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, "/") {
@@ -332,7 +333,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.w.widths = widths
 		q1 = t.file.Size()
 	} else {
-		t.w.isdir = false
+		t.file.isdir = false
 		t.w.filemenu = true
 		var count int
 		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)

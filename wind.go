@@ -20,7 +20,7 @@ type Window struct {
 	body    Text
 	r       image.Rectangle
 
-	isdir      bool // true if this Window is showing a directory in its body.
+	//	isdir      bool // true if this Window is showing a directory in its body.
 	filemenu   bool
 	autoindent bool
 	showdel    bool
@@ -158,7 +158,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if !w.isdir && !w.body.file.isscratch && w.body.file.DiffersFromDisk() {
+	if w.body.file.SaveableAndDirty() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -439,7 +439,7 @@ func (w *Window) ClearTag() {
 	}
 	i++
 	w.tag.Delete(i, n, true)
-	w.tag.file.mod = false
+	w.tag.file.Clean()
 	if w.tag.q0 > i {
 		w.tag.q0 = i
 	}
@@ -474,7 +474,7 @@ func (w *Window) SetTag1() {
 	//	Lpipe := (" |")
 
 	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if w.tag.file.DiffersFromDisk() {
+	if w.tag.file.SaveableAndDirty() {
 		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
 	}
 
@@ -494,11 +494,11 @@ func (w *Window) SetTag1() {
 		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		if !w.isdir && w.body.file.HasSaveableChanges() {
+		if !w.body.file.isdir && w.body.file.HasSaveableChanges() {
 			sb.WriteString(Lput)
 		}
 	}
-	if w.isdir {
+	if w.body.file.isdir {
 		sb.WriteString(Lget)
 	}
 	olds := string(w.tag.file.b)
@@ -533,8 +533,7 @@ func (w *Window) SetTag1() {
 			}
 		}
 	}
-	//TOOD(rjk): should not reach into file.
-	w.tag.file.mod = false
+	w.tag.file.Clean()
 	n := w.tag.file.Size()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
@@ -612,7 +611,7 @@ func (w *Window) AddIncl(r string) {
 
 // Clean returns true iff w can be treated as unmodified.
 func (w *Window) Clean(conservative bool) bool {
-	if w.body.file.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
+	if w.body.file.isscratch || w.body.file.isdir { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
@@ -638,7 +637,7 @@ func (w *Window) Clean(conservative bool) bool {
 // Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
-	if w.isdir {
+	if w.body.file.isdir {
 		isdir = 1
 	}
 	dirty := 0

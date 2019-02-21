@@ -54,7 +54,8 @@ type File struct {
 
 	dumpid int // Used to track the identifying name of this File for Dump.
 
-	isscratch bool // Used to track if this file should warn on unsaved deletion.
+	isscratch bool // Used to track if this File should warn on unsaved deletion.
+	isdir     bool // Used to track if this File is populated from a directory list.
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded
 
@@ -90,6 +91,7 @@ func (t *File) HasUncommitedChanges() bool {
 
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
+// Corresponds to undo.Buffer.Dirty()
 func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
@@ -137,15 +139,20 @@ func (f *File) ReadC(q int) rune {
 	return f.b.ReadC(q)
 }
 
-// DiffersFromDisk returns true if the File's contents differ from the
-// File.name's contents. When this is true, the tag's button should
-// be drawn in the modified state if appropriate to the window type.
-// TODO(rjk): figure out what mod really means anyway.
-// For files that aren't saved like tag Texts, it's not clear if this is
-// a very good name.
+// SaveableAndDirty returns true if the File's contents differ from the
+// File.name's initial contents and that those changes are pushable to
+// a persistent store. In particular: if the backing original contents
+// are immutable from the Edwood editing experience, this will
+// return false even if there are still undoable changes available.
+//
+// When this is true, the tag's button should
+// be drawn in the modified state if appropriate to the window type
+// and Edit commands should treat the file as modified.
+//
 // TODO(rjk): figure out how this overlaps with hash.
-func (f *File) DiffersFromDisk() bool {
-	return f.mod || len(f.cache) > 0
+// TOOD(rjk): HasSaveableChanges and this overlap.
+func (f *File) SaveableAndDirty() bool {
+	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
 }
 
 // Commit sets an undo point for the current state of the file.
@@ -526,6 +533,7 @@ func (f *File) Mark() {
 }
 
 // Dirty returns true if the File should be considered modified.
+// TODO(rjk): This method's purpose is unclear.
 func (f *File) Dirty() bool {
 	return !f.treatasclean && f.mod
 }
