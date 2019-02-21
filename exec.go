@@ -439,7 +439,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
+	if !et.w.body.file.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
 		return
 	}
 	w := et.w
@@ -454,7 +454,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
 	}
-	if w.isdir && !newNameIsdir {
+	if w.body.file.isdir && !newNameIsdir {
 		w.DirFree()
 	}
 
@@ -587,7 +587,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
-	if et == nil || et.w == nil || et.w.isdir {
+	if et == nil || et.w == nil || et.w.body.file.isdir {
 		return
 	}
 	w := et.w
@@ -604,7 +604,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if w.body.file.isscratch || w.isdir || w.body.file.name == "" {
+			if w.body.file.isscratch || w.body.file.isdir || w.body.file.name == "" {
 				continue
 			}
 			if w.nopen[QWevent] > 0 {
@@ -790,7 +790,7 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage))
-		if t.w.isdir {
+		if t.w.body.file.isdir {
 			t.all.Min.X++ // force recolumnation; disgusting!
 			for i, dir := range t.w.dirnames {
 				t.w.widths[i] = newfont.StringWidth(dir)
@@ -817,7 +817,7 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		return
 	}
 	t = &t.w.body
-	if t.w.isdir {
+	if t.w.body.file.isdir {
 		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
