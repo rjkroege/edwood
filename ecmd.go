@@ -247,6 +247,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror("%v is a directory", name)
 	}
 	f.elog.Delete(q0, q1)
+	// TODO(rjk): Prove that this should be false.
 	_, nulls, err := f.Load(q1, fd, false)
 	if err != nil {
 		warning(nil, "Error reading file %v: %v", name, err)

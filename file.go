@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rjkroege/edwood/internal/file"
-	//	"log"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -32,7 +31,7 @@ type File struct {
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
 	mtime   time.Time
 	// dev       int
-	unread bool
+	// unread bool
 
 	// TODO(rjk): Remove this when I've inserted undo.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
@@ -44,8 +43,8 @@ type File struct {
 
 	// Tracks the Edit sequence.
 	seq          int
-	putseq       int // seq on last put [private]
-	mod          bool
+	putseq       int  // seq on last put [private]
+	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
 
 	// Observer pattern: many Text instances can share a File.
@@ -57,7 +56,7 @@ type File struct {
 	isscratch bool // Used to track if this File should warn on unsaved deletion.
 	isdir     bool // Used to track if this File is populated from a directory list.
 
-	hash file.Hash // Used to check if the file has changed on disk since loaded
+	hash file.Hash // Used to check if the file has changed on disk since loaded.
 
 	// cache holds  that are not yet part of an undo record.
 	cache []rune // [private]
@@ -140,17 +139,18 @@ func (f *File) ReadC(q int) rune {
 }
 
 // SaveableAndDirty returns true if the File's contents differ from the
-// File.name's initial contents and that those changes are pushable to
-// a persistent store. In particular: if the backing original contents
-// are immutable from the Edwood editing experience, this will
-// return false even if there are still undoable changes available.
+// File.name's contents on disk and the File contents could be written
+// to that disk file.
 //
 // When this is true, the tag's button should
 // be drawn in the modified state if appropriate to the window type
 // and Edit commands should treat the file as modified.
 //
-// TODO(rjk): figure out how this overlaps with hash.
-// TOOD(rjk): HasSaveableChanges and this overlap.
+// TODO(rjk): figure out how this overlaps with hash. (hash would appear
+// to be used to determine the "if the contents differ")
+//
+// TOOD(rjk): HasSaveableChanges and this overlap. They are almost
+// the same and could perhaps be unified.
 func (f *File) SaveableAndDirty() bool {
 	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
 }
@@ -369,7 +369,6 @@ func (f *File) SetName(name string) {
 		f.UnsetName(&f.delta)
 	}
 	f.name = name
-	f.unread = true
 }
 
 func (f *File) UnsetName(delta *[]*Undo) {
@@ -394,7 +393,6 @@ func NewFile(filename string) *File {
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		unread:    true,
 		editclean: true,
 		//	seq       int
 		mod: false,
@@ -418,7 +416,6 @@ func NewTagFile() *File {
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		unread:    true,
 		editclean: true,
 		//	seq       int
 		mod: false,
@@ -544,18 +541,19 @@ func (f *File) TreatAsClean() {
 	f.treatasclean = true
 }
 
-// Modded marks the file as modified.
-// TODO(rjk): Modded is strange. I can improve (or simplify) how I track
-// the modification state of a file.
+// Modded marks the File as having changes that could be written to the
+// File's backing disk file if it exists per SaveableAndDirty.
+// TODO(rjk): File.mod is unneeded?
+// f.mod is true when the File contents do not match the backing file.
 func (f *File) Modded() {
 	f.mod = true
 	f.treatasclean = false
 }
 
-// Clean marks the file as not modified. In particular DiffersFromDisk()
+// Clean marks the file as not modified. In particular SaveableAndDirty()
 // will return false after calling this.
-// This probably maps to undo.Buffer.Clean.
-// TODO(rjkroege): Perhaps I should discard Undo records.
+// This may maps to undo.Buffer.Clean.
+// TODO(rjkroege): Perhaps I should discard Undo records here?
 func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
