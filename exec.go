@@ -461,15 +461,14 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	t.Delete(0, t.file.Nr(), true)
 	samename := name == t.file.name
 	t.Load(0, name, samename)
+
+	// TODO(rjk): Understand this logic.
 	if samename {
 		t.file.Clean()
 	} else {
 		t.file.Modded()
 	}
 	w.SetTag()
-
-	// what is this for?
-	t.file.unread = false
 	xfidlog(w, "get")
 }
 
@@ -497,6 +496,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 	run(nil, arg, string(dir), false, aa, a, false)
 }
 
+// TODO(rjk): move this into File.
 func checkhash(name string, f *File, d os.FileInfo) {
 	Untested()
 
@@ -515,25 +515,34 @@ func checkhash(name string, f *File, d os.FileInfo) {
 // TODO(flux): dev and qidpath?
 // I haven't spelunked into plan9port to see what it returns for qidpath for regular
 // files.  inode?  For now, use the filename.  Awful.
+// Write this in terms of the various cases.
 func putfile(f *File, q0 int, q1 int, name string) {
 	w := f.curtext.w
 	d, err := os.Stat(name)
+
+	// Putting to the same file that we already read from.
 	if err == nil && name == f.name {
 		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
 			checkhash(name, f, d)
 		}
 		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
-			if f.unread {
+			if f.hash == file.EmptyHash {
+				// Edwood created the File but a disk file with the same name exists.
 				warning(nil, "%s not written; file already exists\n", name)
 			} else {
+				// Edwood loaded the disk file to File but the disk file has been modified since.
 				warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.mtime, d.ModTime())
 			}
 			//	f.dev = d.dev;
 			f.qidpath = d.Name()
+
+			// By setting File.mtime here, a subsequent Put will ignore that
+			// the disk file was mutated and will write File to the disk file.
 			f.mtime = d.ModTime()
 			return
 		}
 	}
+
 	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		warning(nil, "can't create file %s: %v\n", name, err)
@@ -565,11 +574,16 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			return
 		}
 	}
+
+	// Putting to the same file as the one that we originally read from.
 	if name == f.name {
 		if q0 != 0 || q1 != f.Size() {
+			// The backing disk file contents now differ from File because
+			// we've over-written the disk file with part of File.
 			f.Modded()
-			f.unread = true
 		} else {
+			// A normal put operation of a file modified in Edwood but not
+			// modified on disk.
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
@@ -578,11 +592,9 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			f.mtime = d.ModTime()
 			f.hash.Set(h.Sum(nil))
 			f.Clean()
-			f.unread = false
 		}
 		f.SnapshotSeq()
 	}
-
 	w.SetTag()
 }
 

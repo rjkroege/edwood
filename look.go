@@ -631,10 +631,7 @@ func openfile(t *Text, e *Expand) *Window {
 		w = makenewwindow(t)
 		t = &w.body
 		w.SetName(e.name)
-		_, err := t.Load(0, e.name, true)
-		if err != nil {
-			t.file.unread = false
-		}
+		t.Load(0, e.name, true)
 		t.file.Clean()
 		t.w.SetTag()
 		t.w.tag.SetSelect(t.w.tag.file.Size(), t.w.tag.file.Size())
