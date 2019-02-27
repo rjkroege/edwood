@@ -210,7 +210,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	if e != nil {
 		if (e.mark && seltext != nil) && seltext.what == Body {
 			seq++
-			seltext.w.body.file.Mark()
+			seltext.w.body.file.Mark(seq)
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
@@ -276,7 +276,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark() // seq has been incremented by execute
+				t.file.Mark(seq) // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -363,7 +363,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark() // seq has been incremented by execute
+		t.file.Mark(seq) // seq has been incremented by execute
 	}
 	if t == nil {
 		return
