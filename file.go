@@ -82,7 +82,7 @@ type File struct {
 // NB how the cache is folded into Buffer.
 //TODO(rjk): make undo.Buffer implement Reader and Writer.
 
-// HasUnCommittedChanges returns true if there are changes that
+// HasUncommitedChanges returns true if there are changes that
 // have been made to the File after the last Commit.
 func (t *File) HasUncommitedChanges() bool {
 	return len(t.cache) != 0
@@ -129,13 +129,22 @@ func (f *File) Nr() int {
 // ReadC reads a single rune from the File.
 // Can be easily converted to being utf8 backed but
 // every caller will require adjustment.
-// TODO(rjk): File needs to implement RuneReader instead
-// TODO(rjk): Rename to At to align with utf8string.String.At().
+// TODO(rjk): File needs to implement RuneReader and code should
+// use that interface instead.
+// TODO(rjk): Better name to align with utf8string.String.At().
 func (f *File) ReadC(q int) rune {
 	if f.cq0 <= q && q < f.cq0+len(f.cache) {
 		return f.cache[q-f.cq0]
 	}
 	return f.b.ReadC(q)
+}
+
+// ReadAtRune reads at most len(r) runes from File at rune off.
+// It returns the number of  runes read and an error if something goes wrong.
+func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
+	// TODO(rjk): This should include cache contents but currently
+	// callers do not require it to.
+	return f.b.Read(off, r)
 }
 
 // SaveableAndDirty returns true if the File's contents differ from the
@@ -265,8 +274,8 @@ func (f *File) HasMultipleTexts() bool {
 
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
-// TODO(rjk): do not insert an Undo record. Leave that to Commit. This
-// change is for better alignment with buffer.Undo
+// TODO(rjk): In terms of the undo.Buffer conversion, this correponds
+// to undo.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
 	if p0 > f.b.nc() {
@@ -286,7 +295,7 @@ func (f *File) InsertAt(p0 int, s []rune) {
 
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
-// TODO(rjk): This method aligns with undo.Buffer.Insert semantics.
+// TODO(rjk): Remove this as a prelude to converting to undo.Buffer
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	if p0 > f.b.nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
@@ -436,6 +445,10 @@ func (f *File) RedoSeq() int {
 	return u.seq
 }
 
+// TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
+// TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
+// The number actually processed is controlled by mutations to File.seq.
+// This does not align with the semantics of undo.Buffer.
 func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	var (
 		stop           int
@@ -524,6 +537,10 @@ func (f *File) Reset() {
 	f.seq = 0
 }
 
+// Mark starts a new set of records that can be undone as
+// a unit and discards Redo records. Call this at the beginning
+// of a set of edits that ought to be undo-able as a unit. This
+// should be implemented in terms of undo.Buffer.Commit()
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
