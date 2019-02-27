@@ -892,7 +892,7 @@ func (t *Text) Type(r rune) {
 	}
 	if t.what == Body {
 		seq++
-		t.file.Mark()
+		t.file.Mark(seq)
 	}
 	// cut/paste must be done after the seq++/filemark
 	switch r {
@@ -900,7 +900,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
-			t.file.Mark()
+			t.file.Mark(seq)
 		}
 		cut(t, t, nil, true, true, "")
 		t.Show(t.q0, t.q0, true)
@@ -910,7 +910,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
-			t.file.Mark()
+			t.file.Mark(seq)
 		}
 		paste(t, t, nil, true, false, "")
 		t.Show(t.q0, t.q1, true)
@@ -1145,7 +1145,7 @@ func (t *Text) Select() {
 		if (b&1) != 0 && (b&6) != 0 {
 			if state == None && t.what == Body {
 				seq++
-				t.w.body.file.Mark()
+				t.w.body.file.Mark(seq)
 			}
 			if b&2 != 0 {
 				if state == Paste && t.what == Body {

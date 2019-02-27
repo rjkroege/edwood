@@ -1229,7 +1229,7 @@ func cmdname(f *File, str string, set bool) string {
 
 Return:
 	if set && !(r == f.name) {
-		f.Mark()
+		f.Mark(seq)
 		f.Modded()
 		f.curtext.w.SetName(r)
 	}

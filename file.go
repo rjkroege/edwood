@@ -541,7 +541,7 @@ func (f *File) Reset() {
 // a unit and discards Redo records. Call this at the beginning
 // of a set of edits that ought to be undo-able as a unit. This
 // should be implemented in terms of undo.Buffer.Commit()
-func (f *File) Mark() {
+func (f *File) Mark(seq int) {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
 }

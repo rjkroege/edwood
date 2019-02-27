@@ -564,7 +564,7 @@ func (w *Window) Commit(t *Text) {
 	}
 	if filename != w.body.file.name {
 		seq++
-		w.body.file.Mark()
+		w.body.file.Mark(seq)
 		w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()
