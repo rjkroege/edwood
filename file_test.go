@@ -1,10 +1,8 @@
 package main
 
 import (
-	"reflect"
 	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
 func TestDelText(t *testing.T) {
@@ -38,10 +36,10 @@ func TestDelText(t *testing.T) {
 func TestFileInsertAtWithoutCommit(t *testing.T) {
 	f := NewFile("edwood")
 
-	f.InsertAtWithoutCommit(0, []rune("hi 海老麺"))
+	f.InsertAtWithoutCommit(0, []rune(s1))
 
 	i := 0
-	for _, r := range "hi 海老麺" {
+	for _, r := range s1 {
 		if got, want := f.ReadC(i), r; got != want {
 			t.Errorf("ReadC failed. got %v want % v", got, want)
 		}
@@ -51,115 +49,9 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 	if got, want := f.Nr(), 6; got != want {
 		t.Errorf("Nr failed. got %v want % v", got, want)
 	}
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
 
-	if got, want := f.HasUndoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasRedoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUncommitedChanges(), true; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
-}
-
-func TestFileCommitNoUndo(t *testing.T) {
-	f := NewFile("edwood")
-
-	f.InsertAtWithoutCommit(0, []rune("hi 海老麺"))
-	f.Commit()
-
-	i := 0
-	for _, r := range "hi 海老麺" {
-		if got, want := f.ReadC(i), r; got != want {
-			t.Errorf("ReadC failed. got %v want % v", got, want)
-		}
-		i++
-	}
-
-	rr := make([]rune, 6)
-	if n, err := f.ReadAtRune(rr, 0); n != 6 || err != nil {
-		t.Errorf("ReadAtRune failed, bad length %v or err %v", n, err)
-	}
-
-	if !reflect.DeepEqual(rr, []rune("hi 海老麺")) {
-		t.Errorf("ReadAtRune failed: got %v want % v", string(rr), "hi 海老麺")
-	}
-
-	if got, want := f.HasSaveableChanges(), false; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUndoableChanges(), false; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasRedoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
-
-}
-
-func TestFileCommit(t *testing.T) {
-	f := NewFile("edwood")
-
-	// Force Undo.
-	f.seq = 1
-
-	f.InsertAtWithoutCommit(0, []rune("hi 海老麺"))
-	f.Commit()
-
-	i := 0
-	for _, r := range "hi 海老麺" {
-		if got, want := f.ReadC(i), r; got != want {
-			t.Errorf("ReadC failed. got %v want % v", got, want)
-		}
-		i++
-	}
-
-	rr := make([]rune, 6)
-	if n, err := f.ReadAtRune(rr, 0); n != 6 || err != nil {
-		t.Errorf("ReadAtRune failed, bad length %v or err %v", n, err)
-	}
-
-	if !reflect.DeepEqual(rr, []rune("hi 海老麺")) {
-		t.Errorf("ReadAtRune failed: got %v want % v", string(rr), "hi 海老麺")
-	}
-
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUndoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasRedoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
-
+	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
+		&fileStateSummary{true, true, false, true, true, s1})
 }
 
 const s1 = "hi 海老麺"
@@ -172,58 +64,38 @@ func TestFileInsertAt(t *testing.T) {
 	f.seq = 1
 
 	f.InsertAtWithoutCommit(0, []rune(s1))
+
+	// NB: the read code not include the uncommited content.
+	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
+		&fileStateSummary{true, true, false, true, true, s1})
+
 	f.Commit()
 
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-
-	// TODO(rjk): Read and write different sized chunks.
+	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
+		&fileStateSummary{false, true, false, true, true, s1})
 
 	f.InsertAt(f.Nr(), []rune(s2))
 
-	runecount := utf8.RuneCount([]byte(s1 + s2))
-	rr := make([]rune, runecount)
-
-	if n, err := f.ReadAtRune(rr, 0); n != runecount || err != nil {
-		t.Errorf("ReadAtRune failed, bad length %v or err %v", n, err)
-	}
-
-	if !reflect.DeepEqual(rr, []rune(s1+s2)) {
-		t.Errorf("ReadAtRune failed: got %v want % v", string(rr), s1+s2)
-	}
-
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUndoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasRedoableChanges failed. got %v want % v", got, want)
-	}
-
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
+	check(t, "TestFileUndoRedo after InsertAt", f,
+		&fileStateSummary{false, true, false, true, true, s1 + s2})
 }
 
 func readwholefile(t *testing.T, f *File) string {
-	targetbuffer := make([]rune, f.Nr())
+	var sb strings.Builder
 
+	// Currently ReadAtRune does not return runes in the cache.
+	if f.HasUncommitedChanges() {
+		for i := 0; i < f.Nr(); i++ {
+			sb.WriteRune(f.ReadC(i))
+		}
+		return sb.String()
+	}
+
+	targetbuffer := make([]rune, f.Nr())
 	if _, err := f.ReadAtRune(targetbuffer, 0); err != nil {
 		t.Fatalf("readwhole could not read File %v", f)
 	}
 
-	var sb strings.Builder
 	for _, r := range targetbuffer {
 		if _, err := sb.WriteRune(r); err != nil {
 			t.Fatalf("readwhole could not write rune %v to strings.Builder %s", r, sb.String())
@@ -242,70 +114,76 @@ func TestFileUndoRedo(t *testing.T) {
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(f.Nr(), []rune(s2))
 
-	// Validate state: we have s1 + s2 inserted.
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasUndoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-	if got, want := readwholefile(t, f), s1+s2; got != want {
-		t.Errorf("File contents not expected. got %v want % v", got, want)
-	}
+	check(t, "TestFileUndoRedo after 2 inserts", f,
+		&fileStateSummary{false, true, false, true, true, s1 + s2})
 
 	// Because of how seq managed the number of Undo actions, this corresponds
 	// to the case of not incrementing seq and undoes every action in the log.
 	f.Undo(true)
 
-	// Validate state: we have s1 inserted.
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasUndoableChanges(), false; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasRedoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.HasSaveableChanges(), false; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
-	}
-	if got, want := f.SaveableAndDirty(), false; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
-	}
-	if got, want := readwholefile(t, f), ""; got != want {
-		t.Errorf("File contents not expected. got %v want % v", got, want)
-	}
+	check(t, "TestFileUndoRedo after 1 undo", f,
+		&fileStateSummary{false, false, true, false, false, ""})
 
 	// Redo
 	f.Undo(false)
 
 	// Validate state: we have s1 + s2 inserted.
-	if got, want := f.HasUncommitedChanges(), false; got != want {
-		t.Errorf("HasUncommitedChanges failed. got %v want % v", got, want)
+	check(t, "TestFileUndoRedo after 1 Redos", f,
+		&fileStateSummary{false, true, false, true, true, s1 + s2})
+}
+
+type fileStateSummary struct {
+	HasUncommitedChanges bool
+	HasUndoableChanges   bool
+	HasRedoableChanges   bool
+	HasSaveableChanges   bool
+	SaveableAndDirty     bool
+	filecontents         string
+}
+
+func check(t *testing.T, testname string, f *File, fss *fileStateSummary) {
+	if got, want := f.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
+		t.Errorf("%s: HasUncommitedChanges failed. got %v want % v", testname, got, want)
 	}
-	if got, want := f.HasUndoableChanges(), true; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
+	if got, want := f.HasUndoableChanges(), fss.HasUndoableChanges; got != want {
+		t.Errorf("%s: HasUndoableChanges failed. got %v want % v", testname, got, want)
 	}
-	if got, want := f.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasUndoableChanges failed. got %v want % v", got, want)
+	if got, want := f.HasRedoableChanges(), fss.HasRedoableChanges; got != want {
+		t.Errorf("%s: HasUndoableChanges failed. got %v want % v", testname, got, want)
 	}
-	if got, want := f.HasSaveableChanges(), true; got != want {
-		t.Errorf("HasSaveableChanges failed. got %v want % v", got, want)
+	if got, want := f.HasSaveableChanges(), fss.HasSaveableChanges; got != want {
+		t.Errorf("%s: HasSaveableChanges failed. got %v want % v", testname, got, want)
 	}
-	if got, want := f.SaveableAndDirty(), true; got != want {
-		t.Errorf("SaveableAndDirty failed. got %v want % v", got, want)
+	if got, want := f.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
+		t.Errorf("%s: SaveableAndDirty failed. got %v want % v", testname, got, want)
 	}
-	if got, want := readwholefile(t, f), s1+s2; got != want {
-		t.Errorf("File contents not expected. got %v want % v", got, want)
+	if got, want := readwholefile(t, f), fss.filecontents; got != want {
+		t.Errorf("%s: File contents not expected. got «%#v» want «%#v»", testname, got, want)
 	}
+}
+
+func TestFileUndoRedoWithMark(t *testing.T) {
+	f := NewFile("edwood")
+
+	// Force Undo to operate.
+	f.Mark(1)
+	f.InsertAt(0, []rune(s1))
+
+	f.Mark(2)
+	f.InsertAt(f.Nr(), []rune(s2))
+
+	check(t, "TestFileUndoRedoWithMark after 2 inserts", f,
+		&fileStateSummary{false, true, false, true, true, s1 + s2})
+
+	f.Undo(true)
+
+	check(t, "TestFileUndoRedoWithMark after 1 undo", f,
+		&fileStateSummary{false, true, true, true, true, s1})
+
+	// Redo
+	f.Undo(false)
+
+	check(t, "TestFileUndoRedoWithMark after 1 redo", f,
+		&fileStateSummary{false, true, false, true, true, s1 + s2})
+
 }
