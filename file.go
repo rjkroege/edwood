@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
-	"os"
 	"time"
 
 	"github.com/rjkroege/edwood/internal/file"
@@ -90,7 +90,7 @@ func (t *File) HasUncommitedChanges() bool {
 
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
-// Corresponds to undo.Buffer.Dirty()
+// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
@@ -106,6 +106,7 @@ func (f *File) HasSaveableChanges() bool {
 
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
+// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
@@ -148,8 +149,8 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 }
 
 // SaveableAndDirty returns true if the File's contents differ from the
-// File.name's contents on disk and the File contents could be written
-// to that disk file.
+// backing diskfile File.name, and the diskfile is plausibly writable
+// (not a directory or scratch file).
 //
 // When this is true, the tag's button should
 // be drawn in the modified state if appropriate to the window type
@@ -159,7 +160,14 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // to be used to determine the "if the contents differ")
 //
 // TOOD(rjk): HasSaveableChanges and this overlap. They are almost
-// the same and could perhaps be unified.
+// the same and could perhaps be unified. They differ in the following
+// way: HasSaveableChanges will be the same when seq > 0. I should
+// unify this. I don't think Edwood should be depending on this difference.
+// Also: note overlap with Dirty.
+//
+// Latest thought: there are two separate issues: are we at a point marked
+// as clean and is this File writable to a backing. They are combined in this
+// this method.
 func (f *File) SaveableAndDirty() bool {
 	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
 }
@@ -196,13 +204,17 @@ type Undo struct {
 	buf []rune
 }
 
-// Load inserts fd's contents into File at location q0.
+// Load inserts fd's contents into File at location q0. Load will always
+// mark the file as modified so follow this up with a call to f.Clean() to
+// indicate that the file corresponds to its disk file backing.
+// TODO(rjk): hypothesis: we can make this API cleaner: we will only
+// compute a hash when the file corresponds to its diskfile right?
 // TODO(rjk): Consider renaming InsertAtFromFd or something similar.
 // TODO(rjk): Read and insert in chunks.
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
+func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
 	d, err := ioutil.ReadAll(fd)
 	if err != nil {
 		warning(nil, "read error in Buffer.Load")
@@ -436,6 +448,8 @@ func NewTagFile() *File {
 	}
 }
 
+// RedoSeq finds the seq of the last redo record.
+// TODO(rjk): Make sure that this is true.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
@@ -567,13 +581,12 @@ func (f *File) Modded() {
 	f.treatasclean = false
 }
 
-// Clean marks the file as not modified. In particular SaveableAndDirty()
-// will return false after calling this.
-// This may maps to undo.Buffer.Clean.
-// TODO(rjkroege): Perhaps I should discard Undo records here?
+// Clean marks f as being identical to f's backing disk file.
+// TODO(rjk): rename this to better reflect its purpose.
 func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
-	// TODO(rjk): Should I do this? It seems desirable.
+	// TODO(rjk): it had occurred to me that I should reset the
+	// the File here. But this is would be definitely wrong.
 	// f.Reset()
 }
