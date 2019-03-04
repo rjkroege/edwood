@@ -462,11 +462,12 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	samename := name == t.file.name
 	t.Load(0, name, samename)
 
-	// TODO(rjk): Understand this logic.
+	// Text.Delete followed by Text.Load will always mark the File as
+	// modified unless loading a 0-length file over a 0-length file. But if
+	// samename is true here, we know that the Text.body.File is now the same
+	// as it is on disk. So indicate this with file.Clean().
 	if samename {
 		t.file.Clean()
-	} else {
-		t.file.Modded()
 	}
 	w.SetTag()
 	xfidlog(w, "get")
