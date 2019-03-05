@@ -10,8 +10,8 @@ import (
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plumb"
-	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 const (

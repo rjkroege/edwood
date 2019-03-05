@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/complete"
-	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/complete"
 	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/drawutil"
+	"github.com/rjkroege/edwood/internal/draw/drawutil"
+	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/rjkroege/edwood/internal/runes"
 
 	"log"
