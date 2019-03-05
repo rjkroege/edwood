@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 type Window struct {
