@@ -253,8 +253,8 @@ func iconinit(display *draw.Display) {
 	r = button.R
 	colbutton, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Purpleblue)
 
-	but2col, _ = display.AllocImage(r, display.ScreenImage.Pix, true, 0xAA0000FF)
-	but3col, _ = display.AllocImage(r, display.ScreenImage.Pix, true, 0x006600FF)
+	but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, 0xAA0000FF)
+	but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, 0x006600FF)
 
 }
 
