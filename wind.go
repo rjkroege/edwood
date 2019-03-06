@@ -454,16 +454,14 @@ func (w *Window) SetTag() {
 	f := w.body.file
 	f.AllText(func(u *Text) {
 		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
-			u.w.SetTag1()
+			u.w.setTag1()
 		}
 	})
 }
 
-// SetTag1 updates the tag contents for a given window w.
-// TODO(rjk): Make sure that this handles updating the selection
-// correctly.
+// setTag1 updates the tag contents for a given window w.
 // TODO(rjk): Handle files with spaces in their names.
-func (w *Window) SetTag1() {
+func (w *Window) setTag1() {
 	Ldelsnarf := (" Del Snarf")
 	Lundo := (" Undo")
 	Lredo := (" Redo")
@@ -519,12 +517,18 @@ func (w *Window) SetTag1() {
 	resize := false
 	if !new.Equal(w.tag.file.b) {
 		resize = true // Might need to resize the tag
-		w.tag.Delete(0, w.tag.Nc(), true)
-		w.tag.Insert(0, new, true)
 		// try to preserve user selection
 		newbarIndex := new.IndexRune('|') // New always has '|'
 		q0 := w.tag.q0
 		q1 := w.tag.q1
+
+		// These alter the Text's selection values.
+		w.tag.Delete(0, w.tag.Nc(), true)
+		w.tag.Insert(0, new, true)
+
+		// Rationalize the selection as best as possible
+		w.tag.q0 = min(q0, w.tag.Nc())
+		w.tag.q1 = min(q1, w.tag.Nc())
 		if oldbarIndex != -1 {
 			if q0 > (oldbarIndex) {
 				bar := (newbarIndex - oldbarIndex)
@@ -541,7 +545,7 @@ func (w *Window) SetTag1() {
 	if w.tag.q1 > n {
 		w.tag.q1 = n
 	}
-	// TODO(rjk): This can redraw the selection unnecessarily
+	// TODO(rjk): This may redraw the selection unnecessarily
 	// if we replaced the tag above.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 	w.DrawButton()

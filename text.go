@@ -481,6 +481,8 @@ func (t *Text) logInsert(q0 int, r []rune) {
 	}
 }
 
+// Insert inserts rune buffer r at q0. The selection values will be
+// updated appropriately.
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if !tofile {
 		panic("text.insert")
@@ -553,6 +555,8 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 	}
 }
 
+// Delete removes runes [q0, q1). The selection values will be
+// updated appropriately.
 func (t *Text) Delete(q0, q1 int, _ bool) {
 	if t.file.HasUncommitedChanges() {
 		panic("text.delete")
