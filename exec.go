@@ -15,8 +15,8 @@ import (
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
-	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 type Exectab struct {
@@ -210,7 +210,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	if e != nil {
 		if (e.mark && seltext != nil) && seltext.what == Body {
 			seq++
-			seltext.w.body.file.Mark()
+			seltext.w.body.file.Mark(seq)
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
@@ -276,7 +276,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark() // seq has been incremented by execute
+				t.file.Mark(seq) // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -363,7 +363,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark() // seq has been incremented by execute
+		t.file.Mark(seq) // seq has been incremented by execute
 	}
 	if t == nil {
 		return
@@ -439,7 +439,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
+	if !et.w.body.file.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
 		return
 	}
 	w := et.w
@@ -454,22 +454,22 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
 	}
-	if w.isdir && !newNameIsdir {
+	if w.body.file.isdir && !newNameIsdir {
 		w.DirFree()
 	}
 
 	t.Delete(0, t.file.Nr(), true)
 	samename := name == t.file.name
 	t.Load(0, name, samename)
+
+	// Text.Delete followed by Text.Load will always mark the File as
+	// modified unless loading a 0-length file over a 0-length file. But if
+	// samename is true here, we know that the Text.body.File is now the same
+	// as it is on disk. So indicate this with file.Clean().
 	if samename {
-		t.file.Unmodded()
-	} else {
-		t.file.Modded()
+		t.file.Clean()
 	}
 	w.SetTag()
-
-	// what is this for?
-	t.file.unread = false
 	xfidlog(w, "get")
 }
 
@@ -497,6 +497,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 	run(nil, arg, string(dir), false, aa, a, false)
 }
 
+// TODO(rjk): move this into File.
 func checkhash(name string, f *File, d os.FileInfo) {
 	Untested()
 
@@ -515,25 +516,34 @@ func checkhash(name string, f *File, d os.FileInfo) {
 // TODO(flux): dev and qidpath?
 // I haven't spelunked into plan9port to see what it returns for qidpath for regular
 // files.  inode?  For now, use the filename.  Awful.
+// Write this in terms of the various cases.
 func putfile(f *File, q0 int, q1 int, name string) {
 	w := f.curtext.w
 	d, err := os.Stat(name)
+
+	// Putting to the same file that we already read from.
 	if err == nil && name == f.name {
 		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
 			checkhash(name, f, d)
 		}
 		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
-			if f.unread {
+			if f.hash == file.EmptyHash {
+				// Edwood created the File but a disk file with the same name exists.
 				warning(nil, "%s not written; file already exists\n", name)
 			} else {
+				// Edwood loaded the disk file to File but the disk file has been modified since.
 				warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.mtime, d.ModTime())
 			}
 			//	f.dev = d.dev;
 			f.qidpath = d.Name()
+
+			// By setting File.mtime here, a subsequent Put will ignore that
+			// the disk file was mutated and will write File to the disk file.
 			f.mtime = d.ModTime()
 			return
 		}
 	}
+
 	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		warning(nil, "can't create file %s: %v\n", name, err)
@@ -565,11 +575,16 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			return
 		}
 	}
+
+	// Putting to the same file as the one that we originally read from.
 	if name == f.name {
 		if q0 != 0 || q1 != f.Size() {
+			// The backing disk file contents now differ from File because
+			// we've over-written the disk file with part of File.
 			f.Modded()
-			f.unread = true
 		} else {
+			// A normal put operation of a file modified in Edwood but not
+			// modified on disk.
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
@@ -577,17 +592,15 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			//f.dev = d.dev;
 			f.mtime = d.ModTime()
 			f.hash.Set(h.Sum(nil))
-			f.Unmodded()
-			f.unread = false
+			f.Clean()
 		}
 		f.SnapshotSeq()
 	}
-
 	w.SetTag()
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
-	if et == nil || et.w == nil || et.w.isdir {
+	if et == nil || et.w == nil || et.w.body.file.isdir {
 		return
 	}
 	w := et.w
@@ -604,7 +617,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if w.isscratch || w.isdir || w.body.file.name == "" {
+			if w.body.file.isscratch || w.body.file.isdir || w.body.file.name == "" {
 				continue
 			}
 			if w.nopen[QWevent] > 0 {
@@ -790,7 +803,7 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage))
-		if t.w.isdir {
+		if t.w.body.file.isdir {
 			t.all.Min.X++ // force recolumnation; disgusting!
 			for i, dir := range t.w.dirnames {
 				t.w.widths[i] = newfont.StringWidth(dir)
@@ -817,7 +830,7 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		return
 	}
 	t = &t.w.body
-	if t.w.isdir {
+	if t.w.body.file.isdir {
 		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
