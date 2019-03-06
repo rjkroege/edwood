@@ -9,6 +9,8 @@ import (
 
 type Hash [sha1.Size]byte
 
+var EmptyHash Hash
+
 func (h *Hash) Set(b []byte) {
 	if len(b) != len(h) {
 		panic("internal error: wrong hash size")

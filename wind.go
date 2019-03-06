@@ -20,8 +20,7 @@ type Window struct {
 	body    Text
 	r       image.Rectangle
 
-	isdir      bool // true if this Window is showing a directory in its body.
-	isscratch  bool
+	//	isdir      bool // true if this Window is showing a directory in its body.
 	filemenu   bool
 	autoindent bool
 	showdel    bool
@@ -90,7 +89,6 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	if clone != nil {
 		f = clone.body.file
 		w.body.org = clone.body.org
-		w.isscratch = clone.isscratch
 	}
 	w.body.file = f.AddText(&w.body)
 
@@ -105,11 +103,6 @@ func (w *Window) initHeadless(clone *Window) *Window {
 }
 
 func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
-	//	var r1, br image.Rectangle
-	//	var f *File
-	//	var rp []rune
-	//	var nc int
-
 	w.initHeadless(clone)
 	w.display = dis
 	r1 := r
@@ -165,7 +158,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if !w.isdir && !w.isscratch && w.body.file.DiffersFromDisk() {
+	if w.body.file.SaveableAndDirty() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -342,20 +335,21 @@ func (w *Window) Lock(owner int) {
 	})
 }
 
+// unlock1 unlcoks a single window.
+func (w *Window) unlock1() {
+	w.owner = 0
+	w.Close()
+	w.lk.Unlock()
+}
+
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
-	// Special handling for clones, run backwards to
-	// avoid tripping over Window.Close indirectly editing f.text and
-	// freeing f on the last iteration of the loop.
-	f := w.body.file
-	// TODO(rjk): Remove loop. Requires special attention because
-	// of its impack on locking.
-	for i := len(f.text) - 1; i >= 0; i-- {
-		w = f.text[i].w
-		w.owner = 0
-		w.Close()
-		w.lk.Unlock()
-	}
+	w.body.file.AllText(func(t *Text) {
+		if t.w != w {
+			t.w.unlock1()
+		}
+	})
+	w.unlock1()
 }
 
 func (w *Window) MouseBut() {
@@ -398,17 +392,6 @@ func (w *Window) Undo(isundo bool) {
 
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
-	f := body.file
-
-	// TODO(rjk): Removing this code doesn't seem to have any impact.
-	// TODO(rjk): Remove the loop.
-	for _, text := range f.text {
-		v := text.w
-		if v != w {
-			v.body.q0 = getP0(v.body.fr) + v.body.org
-			v.body.q1 = getP1(v.body.fr) + v.body.org
-		}
-	}
 
 	w.SetTag()
 }
@@ -421,27 +404,17 @@ func (w *Window) SetName(name string) {
 	if t.file.name == name {
 		return
 	}
-	w.isscratch = false
+	w.body.file.isscratch = false
 	if strings.HasSuffix(name, Lslashguide) || strings.HasSuffix(name, LplusErrors) {
-		w.isscratch = true
+		w.body.file.isscratch = true
 	}
 	t.file.SetName(name)
 
 	w.SetTag()
-	for _, te := range t.file.text {
-
-		// A value that's per-File should be in the File.
-		te.w.isscratch = w.isscratch
-	}
 }
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-	//	if t.what == Body {
-	//		for _, text := range t.file.text {
-	//			text.ScrDraw(text.fr.GetFrameFillStatus().Nchars)
-	//		}
-	//	}
 	w.SetTag()
 }
 
@@ -466,7 +439,7 @@ func (w *Window) ClearTag() {
 	}
 	i++
 	w.tag.Delete(i, n, true)
-	w.tag.file.mod = false
+	w.tag.file.Clean()
 	if w.tag.q0 > i {
 		w.tag.q0 = i
 	}
@@ -481,16 +454,14 @@ func (w *Window) SetTag() {
 	f := w.body.file
 	f.AllText(func(u *Text) {
 		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
-			u.w.SetTag1()
+			u.w.setTag1()
 		}
 	})
 }
 
-// SetTag1 updates the tag contents for a given window w.
-// TODO(rjk): Make sure that this handles updating the selection
-// correctly.
+// setTag1 updates the tag contents for a given window w.
 // TODO(rjk): Handle files with spaces in their names.
-func (w *Window) SetTag1() {
+func (w *Window) setTag1() {
 	Ldelsnarf := (" Del Snarf")
 	Lundo := (" Undo")
 	Lredo := (" Redo")
@@ -501,7 +472,7 @@ func (w *Window) SetTag1() {
 	//	Lpipe := (" |")
 
 	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if w.tag.file.DiffersFromDisk() {
+	if w.tag.file.SaveableAndDirty() {
 		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
 	}
 
@@ -521,11 +492,11 @@ func (w *Window) SetTag1() {
 		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		if !w.isdir && w.body.file.HasSaveableChanges() {
+		if !w.body.file.isdir && w.body.file.HasSaveableChanges() {
 			sb.WriteString(Lput)
 		}
 	}
-	if w.isdir {
+	if w.body.file.isdir {
 		sb.WriteString(Lget)
 	}
 	olds := string(w.tag.file.b)
@@ -546,12 +517,18 @@ func (w *Window) SetTag1() {
 	resize := false
 	if !new.Equal(w.tag.file.b) {
 		resize = true // Might need to resize the tag
-		w.tag.Delete(0, w.tag.Nc(), true)
-		w.tag.Insert(0, new, true)
 		// try to preserve user selection
 		newbarIndex := new.IndexRune('|') // New always has '|'
 		q0 := w.tag.q0
 		q1 := w.tag.q1
+
+		// These alter the Text's selection values.
+		w.tag.Delete(0, w.tag.Nc(), true)
+		w.tag.Insert(0, new, true)
+
+		// Rationalize the selection as best as possible
+		w.tag.q0 = min(q0, w.tag.Nc())
+		w.tag.q1 = min(q1, w.tag.Nc())
 		if oldbarIndex != -1 {
 			if q0 > (oldbarIndex) {
 				bar := (newbarIndex - oldbarIndex)
@@ -560,8 +537,7 @@ func (w *Window) SetTag1() {
 			}
 		}
 	}
-	//TOOD(rjk): should not reach into file.
-	w.tag.file.mod = false
+	w.tag.file.Clean()
 	n := w.tag.file.Size()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
@@ -569,7 +545,7 @@ func (w *Window) SetTag1() {
 	if w.tag.q1 > n {
 		w.tag.q1 = n
 	}
-	// TODO(rjk): This can redraw the selection unnecessarily
+	// TODO(rjk): This may redraw the selection unnecessarily
 	// if we replaced the tag above.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 	w.DrawButton()
@@ -592,7 +568,7 @@ func (w *Window) Commit(t *Text) {
 	}
 	if filename != w.body.file.name {
 		seq++
-		w.body.file.Mark()
+		w.body.file.Mark(seq)
 		w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()
@@ -639,7 +615,7 @@ func (w *Window) AddIncl(r string) {
 
 // Clean returns true iff w can be treated as unmodified.
 func (w *Window) Clean(conservative bool) bool {
-	if w.isscratch || w.isdir { // don't whine if it's a guide file, error window, etc.
+	if w.body.file.isscratch || w.body.file.isdir { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
@@ -665,7 +641,7 @@ func (w *Window) Clean(conservative bool) bool {
 // Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
-	if w.isdir {
+	if w.body.file.isdir {
 		isdir = 1
 	}
 	dirty := 0

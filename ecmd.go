@@ -247,6 +247,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror("%v is a directory", name)
 	}
 	f.elog.Delete(q0, q1)
+	// TODO(rjk): Prove that this should be false.
 	_, nulls, err := f.Load(q1, fd, false)
 	if err != nil {
 		warning(nil, "Error reading file %v: %v", name, err)
@@ -690,11 +691,8 @@ func pdisplay(f *File) bool {
 }
 
 func pfilename(f *File) {
-	w := f.curtext.w
-	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod
 	dirtychar := ' '
-	if dirty {
+	if f.SaveableAndDirty() {
 		dirtychar = '\''
 	}
 	fc := ' '
@@ -1016,7 +1014,7 @@ func alltofile(w *Window, tp *Tofile) {
 	if tp.f != nil {
 		return
 	}
-	if w.isscratch || w.isdir {
+	if w.body.file.isscratch || w.body.file.isdir {
 		return
 	}
 	t := &w.body
@@ -1044,7 +1042,7 @@ func tofile(r string) *File {
 }
 
 func allmatchfile(w *Window, tp *Tofile) {
-	if w.isscratch || w.isdir {
+	if w.body.file.isscratch || w.body.file.isdir {
 		return
 	}
 	t := &w.body
@@ -1081,11 +1079,8 @@ func filematch(f *File, r string) bool {
 	if err != nil {
 		editerror("bad regexp in file match")
 	}
-	w := f.curtext.w
-	// same check for dirty as in settag, but we know ncache==0
-	dirty := !w.isdir && !w.isscratch && f.mod
 	dmark := ' '
-	if dirty {
+	if f.SaveableAndDirty() {
 		dmark = '\''
 	}
 	fmark := ' '
@@ -1234,7 +1229,7 @@ func cmdname(f *File, str string, set bool) string {
 
 Return:
 	if set && !(r == f.name) {
-		f.Mark()
+		f.Mark(seq)
 		f.Modded()
 		f.curtext.w.SetName(r)
 	}

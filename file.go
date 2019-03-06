@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
-	"os"
 	"time"
 
 	"github.com/rjkroege/edwood/internal/file"
-	//	"log"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -25,14 +24,14 @@ import (
 // Observe: Frame can report addresses in byte and rune offsets.
 type File struct {
 	b       Buffer
-	delta   []*Undo
-	epsilon []*Undo
+	delta   []*Undo // [private]
+	epsilon []*Undo // [private]
 	elog    Elog
 	name    string
 	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
 	mtime   time.Time
 	// dev       int
-	unread bool
+	// unread bool
 
 	// TODO(rjk): Remove this when I've inserted undo.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
@@ -44,23 +43,26 @@ type File struct {
 
 	// Tracks the Edit sequence.
 	seq          int
-	putseq       int // seq on last put
-	mod          bool
-	treatasclean bool // Window Clean tests should succeed if set.
+	putseq       int  // seq on last put [private]
+	mod          bool // true if the file has been changed. [private]
+	treatasclean bool // Window Clean tests should succeed if set. [private]
 
 	// Observer pattern: many Text instances can share a File.
 	curtext *Text
-	text    []*Text
+	text    []*Text // [private I think]
 
 	dumpid int // Used to track the identifying name of this File for Dump.
 
-	hash file.Hash // Used to check if the file has changed on disk since loaded
+	isscratch bool // Used to track if this File should warn on unsaved deletion.
+	isdir     bool // Used to track if this File is populated from a directory list.
+
+	hash file.Hash // Used to check if the file has changed on disk since loaded.
 
 	// cache holds  that are not yet part of an undo record.
-	cache []rune
+	cache []rune // [private]
 
 	// cq0 tracks the insertion point for the cache.
-	cq0 int
+	cq0 int // [private]
 }
 
 // Remember that the high-level goal is to slowly coerce this into looking like
@@ -80,7 +82,7 @@ type File struct {
 // NB how the cache is folded into Buffer.
 //TODO(rjk): make undo.Buffer implement Reader and Writer.
 
-// HasUnCommittedChanges returns true if there are changes that
+// HasUncommitedChanges returns true if there are changes that
 // have been made to the File after the last Commit.
 func (t *File) HasUncommitedChanges() bool {
 	return len(t.cache) != 0
@@ -88,6 +90,7 @@ func (t *File) HasUncommitedChanges() bool {
 
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
+// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
@@ -103,6 +106,7 @@ func (f *File) HasSaveableChanges() bool {
 
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
+// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
@@ -126,8 +130,9 @@ func (f *File) Nr() int {
 // ReadC reads a single rune from the File.
 // Can be easily converted to being utf8 backed but
 // every caller will require adjustment.
-// TODO(rjk): File needs to implement RuneReader instead
-// TODO(rjk): Rename to At to align with utf8string.String.At().
+// TODO(rjk): File needs to implement RuneReader and code should
+// use that interface instead.
+// TODO(rjk): Better name to align with utf8string.String.At().
 func (f *File) ReadC(q int) rune {
 	if f.cq0 <= q && q < f.cq0+len(f.cache) {
 		return f.cache[q-f.cq0]
@@ -135,15 +140,36 @@ func (f *File) ReadC(q int) rune {
 	return f.b.ReadC(q)
 }
 
-// DiffersFromDisk returns true if the File's contents differ from the
-// File.name's contents. When this is true, the tag's button should
-// be drawn in the modified state if appropriate to the window type.
-// TODO(rjk): figure out what mod really means anyway.
-// For files that aren't saved like tag Texts, it's not clear if this is
-// a very good name.
-// TODO(rjk): figure out how this overlaps with hash.
-func (f *File) DiffersFromDisk() bool {
-	return f.mod || len(f.cache) > 0
+// ReadAtRune reads at most len(r) runes from File at rune off.
+// It returns the number of  runes read and an error if something goes wrong.
+func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
+	// TODO(rjk): This should include cache contents but currently
+	// callers do not require it to.
+	return f.b.Read(off, r)
+}
+
+// SaveableAndDirty returns true if the File's contents differ from the
+// backing diskfile File.name, and the diskfile is plausibly writable
+// (not a directory or scratch file).
+//
+// When this is true, the tag's button should
+// be drawn in the modified state if appropriate to the window type
+// and Edit commands should treat the file as modified.
+//
+// TODO(rjk): figure out how this overlaps with hash. (hash would appear
+// to be used to determine the "if the contents differ")
+//
+// TOOD(rjk): HasSaveableChanges and this overlap. They are almost
+// the same and could perhaps be unified. They differ in the following
+// way: HasSaveableChanges will be the same when seq > 0. I should
+// unify this. I don't think Edwood should be depending on this difference.
+// Also: note overlap with Dirty.
+//
+// Latest thought: there are two separate issues: are we at a point marked
+// as clean and is this File writable to a backing. They are combined in this
+// this method.
+func (f *File) SaveableAndDirty() bool {
+	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
 }
 
 // Commit sets an undo point for the current state of the file.
@@ -178,13 +204,17 @@ type Undo struct {
 	buf []rune
 }
 
-// Load inserts fd's contents into File at location q0.
+// Load inserts fd's contents into File at location q0. Load will always
+// mark the file as modified so follow this up with a call to f.Clean() to
+// indicate that the file corresponds to its disk file backing.
+// TODO(rjk): hypothesis: we can make this API cleaner: we will only
+// compute a hash when the file corresponds to its diskfile right?
 // TODO(rjk): Consider renaming InsertAtFromFd or something similar.
 // TODO(rjk): Read and insert in chunks.
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, fd *os.File, sethash bool) (n int, hasNulls bool, err error) {
+func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
 	d, err := ioutil.ReadAll(fd)
 	if err != nil {
 		warning(nil, "read error in Buffer.Load")
@@ -256,8 +286,8 @@ func (f *File) HasMultipleTexts() bool {
 
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
-// TODO(rjk): do not insert an Undo record. Leave that to Commit. This
-// change is for better alignment with buffer.Undo
+// TODO(rjk): In terms of the undo.Buffer conversion, this correponds
+// to undo.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
 	if p0 > f.b.nc() {
@@ -277,7 +307,7 @@ func (f *File) InsertAt(p0 int, s []rune) {
 
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
-// TODO(rjk): This method aligns with undo.Buffer.Insert semantics.
+// TODO(rjk): Remove this as a prelude to converting to undo.Buffer
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	if p0 > f.b.nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
@@ -360,7 +390,6 @@ func (f *File) SetName(name string) {
 		f.UnsetName(&f.delta)
 	}
 	f.name = name
-	f.unread = true
 }
 
 func (f *File) UnsetName(delta *[]*Undo) {
@@ -385,7 +414,6 @@ func NewFile(filename string) *File {
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		unread:    true,
 		editclean: true,
 		//	seq       int
 		mod: false,
@@ -409,7 +437,6 @@ func NewTagFile() *File {
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		unread:    true,
 		editclean: true,
 		//	seq       int
 		mod: false,
@@ -421,6 +448,8 @@ func NewTagFile() *File {
 	}
 }
 
+// RedoSeq finds the seq of the last redo record.
+// TODO(rjk): Make sure that this is true.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
@@ -430,6 +459,10 @@ func (f *File) RedoSeq() int {
 	return u.seq
 }
 
+// TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
+// TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
+// The number actually processed is controlled by mutations to File.seq.
+// This does not align with the semantics of undo.Buffer.
 func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	var (
 		stop           int
@@ -509,6 +542,8 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 
 // Reset removes all Undo records for this File.
 // TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
+// Or is it part of Clean()? I think that undo.Buffer.Clean should
+// reset the buffer.
 // Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
@@ -516,12 +551,17 @@ func (f *File) Reset() {
 	f.seq = 0
 }
 
-func (f *File) Mark() {
+// Mark starts a new set of records that can be undone as
+// a unit and discards Redo records. Call this at the beginning
+// of a set of edits that ought to be undo-able as a unit. This
+// should be implemented in terms of undo.Buffer.Commit()
+func (f *File) Mark(seq int) {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
 }
 
 // Dirty returns true if the File should be considered modified.
+// TODO(rjk): This method's purpose is unclear.
 func (f *File) Dirty() bool {
 	return !f.treatasclean && f.mod
 }
@@ -532,15 +572,21 @@ func (f *File) TreatAsClean() {
 	f.treatasclean = true
 }
 
-// Modded marks the file as modified.
-// TODO(rjk): Modded is strange. I can improve (or simplify) how I track
-// the modification state of a file.
+// Modded marks the File as having changes that could be written to the
+// File's backing disk file if it exists per SaveableAndDirty.
+// TODO(rjk): File.mod is unneeded?
+// f.mod is true when the File contents do not match the backing file.
 func (f *File) Modded() {
 	f.mod = true
 	f.treatasclean = false
 }
 
-func (f *File) Unmodded() {
+// Clean marks f as being identical to f's backing disk file.
+// TODO(rjk): rename this to better reflect its purpose.
+func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
+	// TODO(rjk): it had occurred to me that I should reset the
+	// the File here. But this is would be definitely wrong.
+	// f.Reset()
 }

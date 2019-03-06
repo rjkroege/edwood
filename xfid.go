@@ -118,7 +118,7 @@ func xfidopen(x *Xfid) {
 			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
-				if !w.isdir && w.col != nil {
+				if !w.body.file.isdir && w.col != nil {
 					w.filemenu = false
 					w.SetTag()
 				}
@@ -167,7 +167,7 @@ func xfidopen(x *Xfid) {
 		case QWwrsel:
 			w.nopen[q]++
 			seq++
-			t.file.Mark()
+			t.file.Mark(seq)
 			cut(t, t, nil, false, true, "")
 			w.wrselrange = Range{t.q1, t.q1}
 			w.nomark = true
@@ -249,7 +249,7 @@ func xfidclose(x *Xfid) {
 				if q == QWdata || q == QWxdata {
 					w.nomark = false
 				}
-				if q == QWevent && !w.isdir && w.col != nil {
+				if q == QWevent && !w.body.file.isdir && w.col != nil {
 					w.filemenu = true
 					w.SetTag()
 				}
@@ -467,7 +467,7 @@ func xfidwrite(x *Xfid) {
 			} else {
 				if !w.nomark {
 					seq++
-					t.file.Mark()
+					t.file.Mark(seq)
 				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
@@ -557,7 +557,7 @@ func xfidwrite(x *Xfid) {
 		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
 		if !w.nomark {
 			seq++
-			t.file.Mark()
+			t.file.Mark(seq)
 		}
 		q0 = (a.q0)
 		if a.q1 > (q0) {
@@ -633,7 +633,7 @@ forloop:
 			t = &w.body
 			t.eq0 = ^0
 			t.file.Reset()
-			t.file.Unmodded()
+			t.file.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'
 			t = &w.body
@@ -660,7 +660,7 @@ forloop:
 				}
 			}
 			seq++
-			w.body.file.Mark()
+			w.body.file.Mark(seq)
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
@@ -715,7 +715,7 @@ forloop:
 			w.nomark = true
 		case "mark": // mark file
 			seq++
-			w.body.file.Mark()
+			w.body.file.Mark(seq)
 			settag = true
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
