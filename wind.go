@@ -620,7 +620,7 @@ func (w *Window) Clean(conservative bool) bool {
 	if !conservative && w.nopen[QWevent] > 0 {
 		return true
 	}
-	if w.body.file.Dirty() {
+	if w.body.file.TreatAsDirty() {
 		if len(w.body.file.name) != 0 {
 			warning(nil, "%v modified\n", w.body.file.name)
 		} else {

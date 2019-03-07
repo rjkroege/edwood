@@ -13,6 +13,17 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
+// 
+// A File tracks several related concepts. First it is a text buffer with
+// undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
+// an undo point.
+//
+// Next, a File might have a backing to a disk file.
+//
+// Lastly the text buffer might be clean/dirty. A clean buffer is possibly
+// the same as its disk backing. A specific point in the undo record is
+// considered clean.
+//
 // TODO(rjk): File will be a facade pattern composing an undo.Buffer
 // and a wrapping utf8string.String indexing wrapper.
 // TODO(rjk): my version of undo.Buffer  will implement Reader, Writer,
@@ -96,7 +107,7 @@ func (f *File) HasUndoableChanges() bool {
 // TODO(rjk): it's conceivable that mod and SeqDiffer track the same
 // thing.
 func (f *File) HasSaveableChanges() bool {
-	return f.name != "" && (len(f.cache) != 0 || f.SeqDiffer())
+	return f.name != "" && (len(f.cache) != 0 || f.Dirty())
 }
 
 // HasRedoableChanges returns true if there are entries in the Redo
@@ -241,13 +252,17 @@ func (f *File) UpdateInfo(filename string, d os.FileInfo) {
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): switching to undo.Buffer will require removing use of seq
+// TODO(rjk): Rename this to Clean.
 func (f *File) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
-// SeqDiffer returns true if the current seq differs from a previously snapshot.
-// TODO(rjk): switching to undo.Buffer will require removing use of seq
-func (f *File) SeqDiffer() bool {
+// Dirty reports whether the current state of the File is different from the initial state or from the one in the time of calling Clean.
+// This maps directly onto Buffer.Dirty()
+// 
+// TODO(rjk): switching to undo.Buffer will require removing external uses
+// of seq.
+func (f *File) Dirty() bool {
 	return f.seq != f.putseq
 }
 
@@ -562,10 +577,10 @@ func (f *File) Mark(seq int) {
 	f.seq = seq
 }
 
-// Dirty returns true if the File should be considered modified.
-// TODO(rjk): This method's purpose is unclear.
-func (f *File) Dirty() bool {
-	return !f.treatasclean && f.mod
+// TreatAsDirty returns true if the File should be considered modified
+// for the purpose of warning the user if Del-ing a Dirty() file.
+func (f *File) TreatAsDirty() bool {
+	return !f.treatasclean && f.Dirty()
 }
 
 // TreatAsClean notes that the File should be considered as not Dirty
@@ -583,11 +598,14 @@ func (f *File) Modded() {
 	f.treatasclean = false
 }
 
-// Clean marks f as being identical to f's backing disk file.
+// Clean marks File as being non-dirty.
 // TODO(rjk): rename this to better reflect its purpose.
 func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
+
+	// TODO(rjk): Remove mod...
+	f.SnapshotSeq()
 	// TODO(rjk): it had occurred to me that I should reset the
 	// the File here. But this is would be definitely wrong.
 	// f.Reset()
