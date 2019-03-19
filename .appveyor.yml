@@ -1,0 +1,30 @@
+build: off
+
+clone_folder: c:\gopath\src\github.com\rjkroege\edwood
+
+cache:
+  - '%LocalAppData%\go-build'
+
+environment:
+  GOPATH: c:\gopath
+  GO111MODULE: on
+
+  matrix:
+    - GOARCH: amd64
+    - GOARCH: 386
+
+stack: go 1.11
+
+before_test:
+  - go version
+  - go get -t -v ./...
+  - go vet ./...
+
+test_script:
+  - go test -v ./...
+
+after_test:
+  - go build
+
+artifacts:
+  - path: edwood.exe
