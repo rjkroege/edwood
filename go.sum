@@ -20,6 +20,8 @@ github.com/ktye/duitdraw v0.0.0-20190217185847-c4348e891223 h1:YQevYvo1sXIWqEBDU
 github.com/ktye/duitdraw v0.0.0-20190217185847-c4348e891223/go.mod h1:TsTcPGNjOvXTtzBTFZdpRDbSnhDizngqzp0Q6ZipRYk=
 github.com/ktye/duitdraw v0.0.0-20190219064924-3c3ad83d3d95 h1:CE5Ax9xJ0Z5qLxMZRTVXBHn5wLGz6LkmG48Y93BAAYA=
 github.com/ktye/duitdraw v0.0.0-20190219064924-3c3ad83d3d95/go.mod h1:TsTcPGNjOvXTtzBTFZdpRDbSnhDizngqzp0Q6ZipRYk=
+github.com/ktye/duitdraw v0.0.0-20190318200808-2a25ee932d93 h1:5PNDr3d4AwJNzdzaD48JIkP1YSOS8y6/vTGaBlVWY54=
+github.com/ktye/duitdraw v0.0.0-20190318200808-2a25ee932d93/go.mod h1:TsTcPGNjOvXTtzBTFZdpRDbSnhDizngqzp0Q6ZipRYk=
 golang.org/x/exp v0.0.0-20190212162250-21964bba6549 h1:lHlZGt5KQ2yKMtuXfrRfOEyKdH94NK3PR9o4Zr+Qn6g=
 golang.org/x/exp v0.0.0-20190212162250-21964bba6549/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/image v0.0.0-20190209060608-ef4a1470e0dc h1:P8UBp9iv2ZY5xjf9rnwI9s/hywlCgyKzpLsfk30IVyw=

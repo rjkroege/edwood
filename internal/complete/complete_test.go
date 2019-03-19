@@ -2,6 +2,7 @@ package complete
 
 import (
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -20,6 +21,9 @@ var testCases = []struct {
 }
 
 func TestComplete(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	for _, tc := range testCases {
 		c, err := Complete(tc.dir, tc.s)
 		if err != nil {

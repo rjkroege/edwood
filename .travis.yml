@@ -2,9 +2,20 @@ sudo: false
 language: go
 go_import_path: github.com/rjkroege/edwood
 
+os:
+  - linux
+  - windows
+  - osx
+
 go:
   - "1.10.x"
   - "1.11.x"
+  - "1.12.x"
+
+addons:
+  homebrew:
+    packages:
+      - plan9port
 
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
@@ -15,12 +26,14 @@ env:
     - GO111MODULE=on
 
 script:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PLAN9=/usr/local/opt/plan9port/libexec; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH=$PATH:$PLAN9/bin; fi
   - go get -t -v ./...
-  - diff -u <(echo -n) <(gofmt -d -s .)
+  - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then diff -u <(echo -n) <(gofmt -d -s .); fi
   - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-  - go tool vet .
-  - go get -tags duitdraw -t -v ./...
-  - GOOS=windows go get -t -v ./...
+  - go vet .
+  - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then go get -tags duitdraw -t -v ./...; fi
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  # codecov can't seem to combine reports from multiple OSes correctly
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then bash <(curl -s https://codecov.io/bash); fi

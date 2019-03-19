@@ -3,10 +3,14 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
 func TestDirname(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	testCases := []struct {
 		b, r, dir []rune
 	}{
@@ -33,6 +37,9 @@ func TestDirname(t *testing.T) {
 }
 
 func TestExpand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	tt := []struct {
 		ok   bool
 		sel1 int

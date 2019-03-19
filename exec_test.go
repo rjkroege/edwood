@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"testing"
 )
 
@@ -17,6 +18,9 @@ func acmeTestingMain() {
 }
 
 func TestRunproc(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	tt := []struct {
 		hard      bool
 		startfail bool

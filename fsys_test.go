@@ -164,6 +164,9 @@ func (a *Acme) Cleanup() {
 // externally.
 
 func TestFSys(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	a := startAcme(t)
 	defer a.Cleanup()
 	fsys := a.fsys
@@ -393,6 +396,9 @@ func TestFSys(t *testing.T) {
 }
 
 func TestFSysAddr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	a := startAcme(t)
 	defer a.Cleanup()
 	tfs := tFsys{t, a.fsys}
