@@ -302,9 +302,8 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		}
 		t.file.isdir = true
 		t.w.filemenu = false
-		// TODO(flux): Find all '/' and replace with filepath.Separator properly
-		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, "/") {
-			t.file.name = t.file.name + "/"
+		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, string(filepath.Separator)) {
+			t.file.name = t.file.name + string(filepath.Separator)
 			t.w.SetName(t.file.name)
 		}
 		dirNames, err := fd.Readdirnames(0)
@@ -318,7 +317,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 				warning(nil, "can't stat %s: %v\n", dn, err)
 			} else {
 				if s.IsDir() {
-					dirNames[i] = dn + "/"
+					dirNames[i] = dn + string(filepath.Separator)
 				}
 			}
 		}
