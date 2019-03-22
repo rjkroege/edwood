@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -29,6 +30,27 @@ func TestCvttorunes(t *testing.T) {
 		if !reflect.DeepEqual(r, tc.r) || nb != tc.nb || nulls != tc.nulls {
 			t.Errorf("cvttorunes of (%q, %v) returned %q, %v, %v; expected %q, %v, %v\n",
 				tc.p, tc.n, r, nb, nulls, tc.r, tc.nb, tc.nulls)
+		}
+	}
+}
+
+func TestErrorwin1Name(t *testing.T) {
+	tt := []struct {
+		dir, name string
+	}{
+		{"", "+Errors"},
+		{"/", "/+Errors"},
+		{"/home/gopher", "/home/gopher/+Errors"},
+		{"/home/gopher/", "/home/gopher/+Errors"},
+		{"C:/Users/gopher", "C:/Users/gopher/+Errors"},
+		{"C:/Users/gopher/", "C:/Users/gopher/+Errors"},
+		{"C:", "C:/+Errors"},
+		{"C:/", "C:/+Errors"},
+	}
+	for _, tc := range tt {
+		name := filepath.ToSlash(errorwin1Name(filepath.FromSlash(tc.dir)))
+		if name != tc.name {
+			t.Errorf("errorwin1Name(%q) is %q; expected %q", tc.dir, name, tc.name)
 		}
 	}
 }

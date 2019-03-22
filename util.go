@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -114,10 +115,22 @@ func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
 	return
 }
 
-func errorwin1(dir string, incl []string) *Window {
-	var Lpluserrors = "+Errors"
+func errorwin1Name(dir string) string {
+	const Lpluserrors = "+Errors"
+	var b strings.Builder
 
-	r := dir + string("/") + Lpluserrors
+	if len(dir) > 0 {
+		b.WriteString(dir)
+		if !strings.HasSuffix(dir, string(filepath.Separator)) {
+			b.WriteRune(filepath.Separator)
+		}
+	}
+	b.WriteString(Lpluserrors)
+	return b.String()
+}
+
+func errorwin1(dir string, incl []string) *Window {
+	r := errorwin1Name(dir)
 	w := lookfile(r)
 	if w == nil {
 		if len(row.col) == 0 {
