@@ -79,102 +79,101 @@ func main() {
 
 	wdir, _ = os.Getwd()
 
-	var err error
-	var display *draw.Display
-	display, err = draw.Init(nil, *varfontflag, "edwood", *winsize)
-	if err != nil {
-		log.Fatalf("can't open display: %v\n", err)
-	}
-	if err := display.Attach(draw.Refnone); err != nil {
-		panic("failed to attach to window")
-	}
-	display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
+	draw.Main(func(dd *draw.Device) {
+		display, err := dd.NewDisplay(nil, *varfontflag, "edwood", *winsize)
+		if err != nil {
+			log.Fatalf("can't open display: %v\n", err)
+		}
+		if err := display.Attach(draw.Refnone); err != nil {
+			panic("failed to attach to window")
+		}
+		display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
 
-	mousectl = display.InitMouse()
-	keyboardctl = display.InitKeyboard()
-	mainpid = os.Getpid()
+		mousectl = display.InitMouse()
+		keyboardctl = display.InitKeyboard()
+		mainpid = os.Getpid()
 
-	tagfont = *varfontflag
+		tagfont = *varfontflag
 
-	iconinit(display)
+		iconinit(display)
 
-	cwait = make(chan *os.ProcessState)
-	ccommand = make(chan *Command)
-	ckill = make(chan string)
-	cxfidalloc = make(chan *Xfid)
-	cxfidfree = make(chan *Xfid)
-	cnewwindow = make(chan *Window)
-	csignal = make(chan os.Signal, 1)
-	cerr = make(chan error)
-	cedit = make(chan int)
-	cexit = make(chan struct{})
-	cwarn = make(chan uint)
+		cwait = make(chan *os.ProcessState)
+		ccommand = make(chan *Command)
+		ckill = make(chan string)
+		cxfidalloc = make(chan *Xfid)
+		cxfidfree = make(chan *Xfid)
+		cnewwindow = make(chan *Window)
+		csignal = make(chan os.Signal, 1)
+		cerr = make(chan error)
+		cedit = make(chan int)
+		cexit = make(chan struct{})
+		cwarn = make(chan uint)
 
-	mousectl = display.InitMouse()
-	mouse = &mousectl.Mouse
+		mousectl = display.InitMouse()
+		mouse = &mousectl.Mouse
 
-	startplumbing()
-	fs := fsysinit()
+		startplumbing()
+		fs := fsysinit()
 
-	// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
+		// disk = NewDisk()  TODO(flux): Let's be sure we'll avoid this paging stuff
 
-	const WindowsPerCol = 6
+		const WindowsPerCol = 6
 
-	row.Init(display.ScreenImage.R, display)
-	if loadfile == "" || row.Load(loadfile, true) != nil {
-		// Open the files from the command line, up to WindowsPerCol each
-		files := flag.Args()
-		if ncol < 0 {
-			if len(files) == 0 {
-				ncol = 2
-			} else {
-				ncol = (len(files) + (WindowsPerCol - 1)) / WindowsPerCol
-				if ncol < 2 {
+		row.Init(display.ScreenImage.R, display)
+		if loadfile == "" || row.Load(loadfile, true) != nil {
+			// Open the files from the command line, up to WindowsPerCol each
+			files := flag.Args()
+			if ncol < 0 {
+				if len(files) == 0 {
 					ncol = 2
-				}
-			}
-		}
-		if ncol == 0 {
-			ncol = 2
-		}
-		for i := 0; i < ncol; i++ {
-			row.Add(nil, -1)
-		}
-		rightmostcol := row.col[len(row.col)-1]
-		if len(files) == 0 {
-			readfile(row.col[len(row.col)-1], wdir)
-		} else {
-			for i, filename := range files {
-				// guide  always goes in the rightmost column
-				if filepath.Base(filename) == "guide" || i/WindowsPerCol >= len(row.col) {
-					readfile(rightmostcol, filename)
 				} else {
-					readfile(row.col[i/WindowsPerCol], filename)
+					ncol = (len(files) + (WindowsPerCol - 1)) / WindowsPerCol
+					if ncol < 2 {
+						ncol = 2
+					}
+				}
+			}
+			if ncol == 0 {
+				ncol = 2
+			}
+			for i := 0; i < ncol; i++ {
+				row.Add(nil, -1)
+			}
+			rightmostcol := row.col[len(row.col)-1]
+			if len(files) == 0 {
+				readfile(row.col[len(row.col)-1], wdir)
+			} else {
+				for i, filename := range files {
+					// guide  always goes in the rightmost column
+					if filepath.Base(filename) == "guide" || i/WindowsPerCol >= len(row.col) {
+						readfile(rightmostcol, filename)
+					} else {
+						readfile(row.col[i/WindowsPerCol], filename)
+					}
 				}
 			}
 		}
-	}
-	display.Flush()
+		display.Flush()
 
-	// After row is initialized
-	go mousethread(display)
-	go keyboardthread(display)
-	go waitthread()
-	go newwindowthread()
-	go xfidallocthread(display)
+		// After row is initialized
+		go mousethread(display)
+		go keyboardthread(display)
+		go waitthread()
+		go newwindowthread()
+		go xfidallocthread(display)
 
-	signal.Ignore(ignoreSignals...)
-	signal.Notify(csignal, hangupSignals...)
-	for {
-		select {
-		case <-cexit:
-			shutdown(os.Interrupt, fs)
+		signal.Ignore(ignoreSignals...)
+		signal.Notify(csignal, hangupSignals...)
+		for {
+			select {
+			case <-cexit:
+				shutdown(os.Interrupt, fs)
 
-		case s := <-csignal:
-			shutdown(s, fs)
+			case s := <-csignal:
+				shutdown(s, fs)
+			}
 		}
-	}
-
+	})
 }
 
 func readfile(c *Column, filename string) {
