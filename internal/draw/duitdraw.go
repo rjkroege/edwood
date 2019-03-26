@@ -35,6 +35,7 @@ const (
 
 type (
 	Cursor      = draw.Cursor
+	Device      = draw.Device
 	Display     = draw.Display
 	Font        = draw.Font
 	Image       = draw.Image
@@ -43,4 +44,7 @@ type (
 	Mouse       = draw.Mouse
 )
 
-var Init = draw.Init
+var (
+	Init = draw.Init
+	Main = draw.Main
+)

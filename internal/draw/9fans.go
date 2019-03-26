@@ -44,3 +44,13 @@ type (
 )
 
 var Init = draw.Init
+
+func Main(f func(*Device)) {
+	f(new(Device))
+}
+
+type Device struct{}
+
+func (dev *Device) NewDisplay(errch chan<- error, fontname, label, winsize string) (*Display, error) {
+	return Init(errch, fontname, label, winsize)
+}
