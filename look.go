@@ -566,26 +566,6 @@ func lookfile(s string) *Window {
 	return nil
 }
 
-/*
-func lookid (int id, int dump) (Window*) {
-	int i, j;
-	Window *w;
-	Column *c;
-
-	for j=0; j<row.ncol; j++ {
-		c = row.col[j];
-		for i=0; i<c.nw; i++ {
-			w = c.w[i];
-			if dump && w.dumpid == id
-				return w;
-			if !dump && w.id == id
-				return w;
-		}
-	}
-	return nil;
-}
-*/
-
 func openfile(t *Text, e *Expand) *Window {
 	var (
 		r     Range

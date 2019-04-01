@@ -109,7 +109,7 @@ func augmentPathEnv() {
 // startAcme runs an edwood process and 9p mounts it (at acme) in the
 // namespace so that a test may exercise IPC to the subordinate edwood
 // process.
-func startAcme(t *testing.T) *Acme {
+func startAcme(t *testing.T, args ...string) *Acme {
 	// If $USER is not set (i.e. running in a Docker container)
 	// MountService will fail. Detect this and give up if this is so.
 	if _, hzuser := os.LookupEnv("USER"); !hzuser {
@@ -123,7 +123,7 @@ func startAcme(t *testing.T) *Acme {
 	os.Setenv("NAMESPACE", ns)
 	augmentPathEnv()
 
-	acmd := exec.Command(os.Args[0])
+	acmd := exec.Command(os.Args[0], args...)
 	acmd.Env = append(os.Environ(), "TEST_MAIN=edwood")
 
 	acmd.Stdout = os.Stdout
@@ -407,7 +407,7 @@ func TestFSysAddr(t *testing.T) {
 	text := `
 This is a short block
 Of text crafted
-Just for this 
+Just for this
 Occasion
 `
 	reportchan, exitchan := tfs.startlog()

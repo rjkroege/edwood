@@ -1,20 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"image"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/dumpfile"
 )
 
 type Row struct {
@@ -309,23 +306,7 @@ func (row *Row) Clean() bool {
 	return clean
 }
 
-// firstbufline returns the first line of a buffer.
-// TODO(rjk): Why don't we save more than the first line of a tag. I want the whole tag saved.
-func firstbufline(b *Buffer) string {
-	ru := make([]rune, RBUFSIZE)
-	n, _ := b.Read(0, ru)
-
-	su := string(ru[0:n])
-	// TODO(rjk): I presume that we'll eventually use string everywhere.
-	if o := strings.IndexRune(su, '\n'); o > -1 {
-		su = su[0:o]
-	}
-	return su
-}
-
 func (r *Row) Dump(file string) {
-	dumped := false
-
 	if len(r.col) == 0 {
 		return
 	}
@@ -340,29 +321,21 @@ func (r *Row) Dump(file string) {
 		file = filepath.Join(home, "edwood.dump")
 	}
 
-	fd, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		warning(nil, "can't open %s: %v\n", file, err)
-		return
+	dump := dumpfile.Content{
+		CurrentDir: wdir,
+		VarFont:    *varfontflag,
+		FixedFont:  *fixedfontflag,
+		RowTag:     string(r.tag.file.b),
+		Columns:    make([]dumpfile.Column, len(r.col)),
+		Windows:    nil,
 	}
-	defer fd.Close()
-
-	b := bufio.NewWriter(fd)
-
-	fmt.Fprintf(b, "%s\n", wdir)
-	fmt.Fprintf(b, "%s\n", *varfontflag)
-	fmt.Fprintf(b, "%s\n", *fixedfontflag)
 
 	for i, c := range r.col {
-		fmt.Fprintf(b, "%11.7f", 100.0*float64(c.r.Min.X-row.r.Min.X)/float64(r.r.Dx()))
-		if i == len(r.col)-1 {
-			b.WriteRune('\n')
-		} else {
-			b.WriteRune(' ')
+		dump.Columns[i] = dumpfile.Column{
+			Position: 100.0 * float64(c.r.Min.X-row.r.Min.X) / float64(r.r.Dx()),
+			Tag:      string(c.tag.file.b),
 		}
-	}
-
-	for _, c := range r.col {
+		// TODO(fhs): replace File.dumpid with a local variable map[*File]int
 		for _, w := range c.w {
 			w.body.file.dumpid = 0
 			if w.nopen[QWevent] != 0 {
@@ -372,13 +345,8 @@ func (r *Row) Dump(file string) {
 		}
 	}
 
-	fmt.Fprintf(b, "w %s\n", firstbufline(&r.tag.file.b))
 	for i, c := range r.col {
-		fmt.Fprintf(b, "c%11d %s\n", i, firstbufline(&c.tag.file.b))
-	}
-
-	for i, c := range r.col {
-		for j, w := range c.w {
+		for _, w := range c.w {
 			// Do we need to Commit on the other tags?
 			w.Commit(&w.tag)
 			t := &w.body
@@ -398,212 +366,124 @@ func (r *Row) Dump(file string) {
 			// We always include the font name.
 			fontname := t.font
 
-			if t.file.dumpid > 0 {
-				dumped = false
-				fmt.Fprintf(b, "x%11d %11d %11d %11d %11.7f %s\n", i, t.file.dumpid,
-					w.body.q0, w.body.q1,
-					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
-					fontname)
-			} else if w.dumpstr != "" {
-				dumped = false
-				fmt.Fprintf(b, "e%11d %11d %11d %11d %11.7f %s\n", i, t.file.dumpid,
-					0, 0,
-					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
-					fontname)
-			} else if !w.body.file.Dirty() && access(t.file.name) || w.body.file.isdir {
-				dumped = false
+			dump.Windows = append(dump.Windows, dumpfile.Window{
+				ColumnID: i,
+				Q0:       w.body.q0,
+				Q1:       w.body.q1,
+				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
+				Font:     fontname,
+			})
+			dw := &dump.Windows[len(dump.Windows)-1]
+
+			switch {
+			case t.file.dumpid > 0:
+				dw.Type = dumpfile.Zerox
+
+			case w.dumpstr != "":
+				dw.Type = dumpfile.Exec
+				dw.ExecDir = w.dumpdir
+				dw.ExecCommand = w.dumpstr
+
+			case !w.body.file.Dirty() && access(t.file.name) || w.body.file.isdir:
 				t.file.dumpid = w.id
-				fmt.Fprintf(b, "f%11d %11d %11d %11d %11.7f %s\n", i, w.id,
-					w.body.q0, w.body.q1,
-					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
-					fontname)
-			} else {
-				dumped = true
+				dw.Type = dumpfile.Saved
+
+			default:
 				t.file.dumpid = w.id
 				// TODO(rjk): Conceivably this is a bit of a layering violation?
-				fmt.Fprintf(b, "F%11d %11d %11d %11d %11.7f %11d %s\n", i, j,
-					w.body.q0, w.body.q1,
-					100.0*float64(w.r.Min.Y-c.r.Min.Y)/float64(c.r.Dy()),
-					w.body.file.b.Nbyte(), fontname)
+				dw.Type = dumpfile.Unsaved
+				dw.Body = string(t.file.b)
 			}
-			b.WriteString(w.CtlPrint(false))
-			fmt.Fprintf(b, "%s\n", firstbufline(&w.tag.file.b))
-			if dumped {
-				for q0, q1 := 0, t.file.Size(); q0 < q1; {
-					ru := make([]rune, RBUFSIZE)
-					n, _ := t.file.b.Read(q0, ru)
-					su := string(ru[0:n])
-					fmt.Fprintf(b, "%s", su)
-					q0 += n
-				}
-			}
-			if w.dumpstr != "" {
-				if w.dumpdir != "" {
-					fmt.Fprintf(b, "%s\n%s\n", w.dumpdir, w.dumpstr)
-				} else {
-					fmt.Fprintf(b, "\n%s\n", w.dumpstr)
-				}
-			}
+			dw.Dirty = t.file.Dirty()
+			dw.Tag = string(w.tag.file.b)
+
 		}
 	}
 
-	b.Flush()
-}
-
-// LoadFonts gets the font names from the load file so we don't load
-// fonts that we won't use.
-func LoadFonts(file string) []string {
-	f, err := os.Open(file)
+	err := dump.Save(file)
 	if err != nil {
-		return []string{}
+		warning(nil, "dumping to %v failed: %v\n", file, err)
+		return
 	}
-	defer f.Close()
-	b := bufio.NewReader(f)
-
-	// Read first line of dump file (the current directory) and discard.
-	if _, err := b.ReadString('\n'); err != nil {
-		return []string{}
-	}
-
-	// Read names of global fonts
-	fontnames := make([]string, 0, 2)
-	for i := 0; i < 2; i++ {
-		fn, err := readtrim(b)
-		if err != nil || fn == "" {
-			return []string{}
-		}
-		fontnames = append(fontnames, fn)
-	}
-	return fontnames
-}
-
-// readtrim returns a string read from the file or an error.
-func readtrim(rd *bufio.Reader) (string, error) {
-	l, err := rd.ReadString('\n')
-	if err == io.EOF && l == "" {
-		// We've run out of content.
-		return "", nil
-	} else if err != nil {
-		return "", err
-	}
-	l = strings.TrimRight(l, "\n")
-	return l, nil
-}
-
-var splittingregexp *regexp.Regexp
-
-func init() {
-	splittingregexp = regexp.MustCompile("[ \t]+")
-}
-
-// splitline splits the line based on a regexp and returns an array with not more than
-// count elements.
-func splitline(l string, count int) []string {
-	splits := splittingregexp.Split(strings.TrimLeft(l, "\t "), count)
-	// log.Printf("splitting %#v ➜ %#v", l, splits)
-	return splits
 }
 
 // loadhelper breaks out common load file parsing functionality for selected row
 // types.
-func (row *Row) loadhelper(rd *bufio.Reader, subl []string, fontname string, ndumped int64, dumpid int) error {
-	// log.Printf("loadhelper start subl=%#v fontname=%s ndumped=%d dumpid=%d", subl, fontname, ndumped, dumpid)
-	// defer log.Println("loadhelper done")
+func (row *Row) loadhelper(win *dumpfile.Window) error {
 	// Column for this window.
-	oi, err := strconv.ParseInt(subl[1], 10, 64)
-	if err != nil || oi < 0 || oi > 10 {
-		return fmt.Errorf("cant't parse column id %s: %v", subl[1], err)
-	}
-	i := int(oi)
-
-	oj, err := strconv.ParseInt(subl[2], 10, 64)
-	if err != nil {
-		return fmt.Errorf("cant't parse j %s: %v", subl[2], err)
-	}
-	j := int(oj)
-
-	oq0, err := strconv.ParseInt(subl[3], 10, 64)
-	if err != nil {
-		return fmt.Errorf("cant't parse q0 %s because %v", subl[3], err)
-	}
-	q0 := int(oq0)
-
-	oq1, err := strconv.ParseInt(subl[4], 10, 64)
-	if err != nil {
-		return fmt.Errorf("cant't parse q1 %s because %v", subl[4], err)
-	}
-	q1 := int(oq1)
-
-	percent, err := strconv.ParseFloat(subl[5], 64)
-	if err != nil {
-		return fmt.Errorf("cant't parse percent %s because %v", subl[5], err)
-	}
+	i := win.ColumnID
 
 	if i > len(row.col) { // Didn't we already make sure that we have a column?
 		i = len(row.col)
 	}
 	c := row.col[i]
-	y := c.r.Min.Y + int((percent*float64(c.r.Dy()))/100.+0.5)
+	y := c.r.Min.Y + int((win.Position*float64(c.r.Dy()))/100.+0.5)
 	if y < c.r.Min.Y || y >= c.r.Max.Y {
 		y = -1
 	}
 
-	// Consider renaming this? Follow-on line or some such.
-	// Read the follow-on line.
-	nextline, err := readtrim(rd)
-	if err != nil {
-		return err
+	subl := strings.SplitN(win.Tag, " ", 2)
+	if len(subl) != 2 {
+		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
 	}
-	subl = splitline(nextline, 7)
 
 	var w *Window
-	if dumpid == 0 {
+	if win.Type != dumpfile.Zerox {
 		w = c.Add(nil, nil, y)
 	} else {
-		w = c.Add(nil, lookfile(subl[5]), y)
+		w = c.Add(nil, lookfile(subl[0]), y)
 	}
 	if w == nil {
 		// Why is this not an error?
 		return nil
 	}
-	w.dumpid = j
 
-	// My understanding of the Acme code was that subl[5] is the original file name
+	// My understanding of the Acme code was that subl[0] is the original file name
 	// without spaces.
-	if dumpid == 0 {
-		w.SetName(subl[5])
+	if win.Type != dumpfile.Zerox {
+		w.SetName(subl[0])
 	}
 
-	afterbar := strings.SplitN(subl[6], "|", 2)
+	afterbar := strings.SplitN(subl[1], "|", 2)
+	if len(afterbar) != 2 {
+		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
+	}
 	w.ClearTag()
 	w.tag.Insert(len(w.tag.file.b), []rune(afterbar[1]), true)
 
-	if ndumped >= 0 {
+	if win.Type == dumpfile.Unsaved {
 		// Simplest thing is to put it in a file and load that.
+		// TODO(fhs): Remove use of temporary file. Load should take an io.Reader.
 		fd, err := ioutil.TempFile("", "edwoodload")
 		if err != nil {
 			return fmt.Errorf("can't create temp file for reloading contents %v", err)
 		}
-
-		if _, err := io.CopyN(fd, rd, ndumped); err != nil {
+		if _, err := fd.WriteString(win.Body); err != nil {
 			// TODO(rjk): Generate better diagnostics.
 			return err
 		}
+		filename := fd.Name()
+		if err := fd.Close(); err != nil {
+			return err
+		}
 
-		w.body.Load(0, fd.Name(), true)
+		w.body.Load(0, filename, true)
 		w.body.file.Modded()
+		os.Remove(filename)
 
 		// This shows an example where an observer would be useful?
 		w.SetTag()
-	} else if dumpid == 0 && subl[5][0] != '+' && subl[5][0] != '-' {
+	} else if win.Type != dumpfile.Zerox && len(subl[0]) > 0 && subl[0][0] != '+' && subl[0][0] != '-' {
 		// Implementation of the Get command: open the file.
 		get(&w.body, nil, nil, false, false, "")
 	}
 
-	if fontname != "" {
-		fontx(&w.body, nil, nil, false, false, fontname)
+	if win.Font != "" {
+		fontx(&w.body, nil, nil, false, false, win.Font)
 	}
 
+	q0 := win.Q0
+	q1 := win.Q1
 	if q0 > len(w.body.file.b) || q1 > len(w.body.file.b) || q0 > q1 {
 		q0 = 0
 		q1 = 0
@@ -639,60 +519,36 @@ func (row *Row) loadimpl(file string, initing bool) error {
 		file = filepath.Join(home, "edwood.dump")
 	}
 
-	f, err := os.Open(file)
+	dump, err := dumpfile.Load(file)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	b := bufio.NewReader(f)
 
 	// Current directory.
-	l, err := readtrim(b)
-	if err != nil {
-		return err
-	}
-
-	if err := os.Chdir(l); err != nil {
+	if err := os.Chdir(dump.CurrentDir); err != nil {
 		return err
 	}
 
 	// variable width font
-	l, err = readtrim(b)
-	if err != nil {
-		return err
-	}
-	*varfontflag = l
+	*varfontflag = dump.VarFont
 
 	// fixed width font
-	l, err = readtrim(b)
-	if err != nil {
-		return err
-	}
-	*fixedfontflag = l
+	*fixedfontflag = dump.FixedFont
 
 	if initing && len(row.col) == 0 {
 		row.Init(row.display.ScreenImage.R, row.display)
 	}
 
 	// Column widths
-	l, err = readtrim(b)
-	if err != nil {
-		return err
-	}
-	subl := splitline(l, -1)
-
-	if len(subl) > 10 {
-		return fmt.Errorf("Load: bad number of column widths %d in %#v", len(subl), l)
+	if len(dump.Columns) > 10 {
+		return fmt.Errorf("Load: bad number of columns %d", len(dump.Columns))
 	}
 
 	// TODO(rjk): put column width parsing in a separate function.
-	for i, cwidth := range subl {
-		percent, err := strconv.ParseFloat(cwidth, 64)
-		if err != nil {
-			return fmt.Errorf("Load: parsing column width in %#v had error %v", l, err)
-		}
+	for i, col := range dump.Columns {
+		percent := col.Position
 		if percent < 0 || percent >= 100 {
-			return fmt.Errorf("Load: parsing column width in %#v had invalid width %f", l, percent)
+			return fmt.Errorf("Load: column width %f is invalid", percent)
 		}
 
 		x := int(float64(row.r.Min.X) + percent*float64(row.r.Dx())/100.0 + 0.5)
@@ -726,95 +582,40 @@ func (row *Row) loadimpl(file string, initing bool) error {
 		}
 	}
 
-	// Read the window entries. There will be an entry for each Window. A Window may be
-	// 1 or 2 lines except for Window records that correspond to each file. In which case,the
-	// unsaved file contents will also be present.
-	cwblock := true // First segment of file is columns and header.
-	for {
-		l, err = readtrim(b)
-		if err != nil {
-			return err
-		}
+	// Set row tag
+	row.tag.Delete(0, len(row.tag.file.b), true)
+	row.tag.Insert(0, []rune(dump.RowTag), true)
 
-		switch {
-		case l == "" && !cwblock:
-			// We've reached the end.
-			return nil
-		case cwblock && l[0] == 'c':
-			subl := splitline(l, 3)
-			bi, err := strconv.ParseInt(subl[1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("Load: parsing column id in %#v had error %v", l, err)
-			}
+	// Set column tags
+	for i, col := range dump.Columns {
+		// Acme's handling of column headers is perplexing. It is conceivable
+		// that this code does not do the right thing even if it replicates Acme
+		// correctly.
+		row.col[i].tag.Delete(0, len(row.col[i].tag.file.b), true)
+		row.col[i].tag.Insert(0, []rune(col.Tag), true)
+	}
 
-			// Acme's handling of column headers is perplexing. It is conceivable
-			// that this code does not do the right thing even if it replicates Acme
-			// correctly.
-			row.col[int(bi)].tag.Delete(0, len(row.col[int(bi)].tag.file.b), true)
-			row.col[int(bi)].tag.Insert(0, []rune(subl[2]), true)
-		case cwblock && l[0] == 'w':
-			subl := strings.TrimLeft(l[1:], " \t")
-			row.tag.Delete(0, len(row.tag.file.b), true)
-			row.tag.Insert(0, []rune(subl), true)
-		case l[0] == 'e': // command block
-			cwblock = false
-			if len(l) < 1+5*12+1 {
-				return fmt.Errorf("bad line %#v in dumpfile", l)
-			}
-			// We discard a line
-			_, err = readtrim(b) // ctl line; ignored
-			if err != nil {
-				return err
-			}
-			dirline, err := readtrim(b) // directory
-			if err != nil {
-				return err
-			}
-
+	// Load the windows.
+	for _, win := range dump.Windows {
+		switch win.Type {
+		case dumpfile.Exec: // command block
+			dirline := win.ExecDir
 			if dirline == "" {
 				dirline = home
 			}
-			cmdline, err := readtrim(b) // command
-			if err != nil {
-				return err
-			}
 			// log.Println("cmdline", cmdline, "dirline", dirline)
-			run(nil, cmdline, dirline, true, "", "", false)
-		case l[0] == 'f':
-			cwblock = false
-			if len(l) < 1+5*12+1 {
-				return fmt.Errorf("bad line %#v in dumpfile", l)
-			}
-			spl := splitline(l, 7)
-			if err := row.loadhelper(b, spl, spl[6], -1, 0); err != nil {
+			run(nil, win.ExecCommand, dirline, true, "", "", false)
+
+		case dumpfile.Saved, dumpfile.Unsaved, dumpfile.Zerox:
+			if err := row.loadhelper(&win); err != nil {
 				return err
 			}
-		case l[0] == 'F':
-			cwblock = false
-			if len(l) < 1+6*12+1 {
-				return fmt.Errorf("bad line %#v in dumpfile", l)
-			}
-			spl := splitline(l, 8)
-			ndumped, err := strconv.ParseInt(spl[6], 10, 64)
-			if err != nil {
-				return fmt.Errorf("bad count of unsaved text from line %#v in dumpfile", l)
-			}
-			if err := row.loadhelper(b, spl, spl[7], ndumped, 0); err != nil {
-				return err
-			}
-		case l[0] == 'x':
-			cwblock = false
-			if len(l) < 1+5*12+1 {
-				return fmt.Errorf("bad line %#v in dumpfile", l)
-			}
-			spl := splitline(l, 7)
-			if err := row.loadhelper(b, spl, spl[6], -1 /* dumpid */, 1); err != nil {
-				return err
-			}
+
 		default:
-			return fmt.Errorf("default bad line %#v in dumpfile", l)
+			return fmt.Errorf("unknown dump file window type %v", win.Type)
 		}
 	}
+	return nil
 }
 
 func (r *Row) AllWindows(f func(*Window)) {

@@ -16,6 +16,7 @@ import (
 
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/dumpfile"
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
@@ -64,7 +65,7 @@ func main() {
 	}
 
 	if loadfile != "" {
-		fontnames := LoadFonts(loadfile) // Overrides fonts selected up to here.
+		fontnames := dumpfile.LoadFonts(loadfile) // Overrides fonts selected up to here.
 		if len(fontnames) == 2 {
 			*varfontflag = fontnames[0]
 			*fixedfontflag = fontnames[1]
