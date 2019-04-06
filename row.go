@@ -367,7 +367,7 @@ func (r *Row) Dump(file string) {
 			fontname := t.font
 
 			dump.Windows = append(dump.Windows, dumpfile.Window{
-				ColumnID: i,
+				Column:   i,
 				Q0:       w.body.q0,
 				Q1:       w.body.q1,
 				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
@@ -394,7 +394,6 @@ func (r *Row) Dump(file string) {
 				dw.Type = dumpfile.Unsaved
 				dw.Body = string(t.file.b)
 			}
-			dw.Dirty = t.file.Dirty()
 			dw.Tag = string(w.tag.file.b)
 
 		}
@@ -411,7 +410,7 @@ func (r *Row) Dump(file string) {
 // types.
 func (row *Row) loadhelper(win *dumpfile.Window) error {
 	// Column for this window.
-	i := win.ColumnID
+	i := win.Column
 
 	if i > len(row.col) { // Didn't we already make sure that we have a column?
 		i = len(row.col)

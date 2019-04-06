@@ -17,53 +17,48 @@
 	"Windows": [
 		{
 			"Type": 1,
-			"ColumnID": 0,
+			"Column": 0,
 			"Q0": 6,
 			"Q1": 15,
 			"Position": 2.263648468708389,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
-			"Dirty": true,
 			"Tag": "glass Del Snarf Undo Put | Look Edit ",
 			"Body": "I can eat glass and it doesn't hurt me.\nJe peux manger du verre, ça ne me fait pas mal.\n私はガラスを食べられます。それは私を傷つけません。\nআমি কাঁচ খেতে পারি, তাতে আমার কোনো ক্ষতি হয় না।\n"
 		},
 		{
 			"Type": 0,
-			"ColumnID": 0,
+			"Column": 0,
 			"Q0": 8,
 			"Q1": 12,
 			"Position": 12.649800266311585,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
-			"Dirty": false,
 			"Tag": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit "
 		},
 		{
 			"Type": 0,
-			"ColumnID": 1,
+			"Column": 1,
 			"Q0": 29,
 			"Q1": 41,
 			"Position": 2.263648468708389,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
-			"Dirty": true,
 			"Tag": "/home/gopher/go/src/edwood/ Del Snarf Get | Look Edit "
 		},
 		{
 			"Type": 2,
-			"ColumnID": 1,
+			"Column": 1,
 			"Q0": 8,
 			"Q1": 12,
 			"Position": 32.62316910785619,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
-			"Dirty": false,
 			"Tag": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit "
 		},
 		{
 			"Type": 1,
-			"ColumnID": 1,
+			"Column": 1,
 			"Q0": 12,
 			"Q1": 23,
 			"Position": 74.96671105193076,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
-			"Dirty": true,
 			"Tag": " Del Snarf Undo | Look Edit ",
 			"Body": "This window has no name.\n"
 		}
