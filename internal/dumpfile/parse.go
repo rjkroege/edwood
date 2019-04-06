@@ -26,49 +26,49 @@ const (
 
 // Content stores the state of Edwood.
 type Content struct {
-	CurrentDir string
-	VarFont    string // Variable width font
-	FixedFont  string // Fixed width font
-	RowTag     string
-	Columns    []Column
-	Windows    []Window
+	CurrentDir string   // Edwood's current working directory
+	VarFont    string   // Variable width font
+	FixedFont  string   // Fixed width font
+	RowTag     string   // Top-most tag (usually "Newcol ... Exit")
+	Columns    []Column // List of columns
+	Windows    []Window // List of windows across all columns
 }
 
 // Column stores the state of a column in Edwood.
 type Column struct {
 	Position float64 // Position within the row (in percentage)
-	Tag      string
+	Tag      string  // Tag above the column (usually "New ... Delcol")
 }
 
 // Window stores the state of a window in Edwood.
 type Window struct {
-	Type WindowType
+	Type WindowType // Type of window
 
-	ColumnID int
-	Q0       int
-	Q1       int
+	Column   int     // Column index where the window will be placed
+	Q0       int     // Selection starts at the rune at this position
+	Q1       int     // Selection ends before the rune at this position
 	Position float64 // Position within the column (in percentage)
-	Font     string  `json:",omitempty"`
+	Font     string  `json:",omitempty"` // Font name or path
 
 	// ctl line has these but there is no point storing them:
 	//ID	int	// we regenerate window IDs when loading
 	//TagLen	int	// redundant
 	//BodyLen int	// redundant
 	//IsDir bool	// redundant
+	//Dirty bool	// WindowType == Unsaved
 
-	Dirty bool
-	Tag   string
+	Tag string // Tag above this window (usually "/path/to/file Del ...")
 
 	// Used for Type == Unsaved
-	Body string `json:",omitempty"`
+	Body string `json:",omitempty"` // Unsaved text buffer
 
 	// Used for Type == Exec
-	ExecDir     string `json:",omitempty"`
-	ExecCommand string `json:",omitempty"`
+	ExecDir     string `json:",omitempty"` // Execute command in this directory
+	ExecCommand string `json:",omitempty"` // Command to execute
 }
 
 type versionedContent struct {
-	Version int
+	Version int // Dump file format version
 	*Content
 }
 
