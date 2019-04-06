@@ -14,15 +14,21 @@ var testTab = []Content{
 		CurrentDir: "/home/gopher",
 		VarFont:    "/lib/fonts/go-font/regular.font",
 		FixedFont:  "/lib/fonts/go-font/mono.font",
-		RowTag:     "Newcol Kill Putall Dump Exit",
+		RowTag: Text{
+			Buffer: "Newcol Kill Putall Dump Exit",
+		},
 		Columns: []Column{
 			{
 				Position: 0,
-				Tag:      "New Cut Paste Snarf Sort Zerox Delcol",
+				Tag: Text{
+					Buffer: "New Cut Paste Snarf Sort Zerox Delcol",
+				},
 			},
 			{
 				Position: 50,
-				Tag:      "New Cut Paste Snarf Sort Zerox Delcol",
+				Tag: Text{
+					Buffer: "New Cut Paste Snarf Sort Zerox Delcol",
+				},
 			},
 		},
 		Windows: []Window{},

@@ -1,0 +1,84 @@
+{
+	"Version": 1,
+	"CurrentDir": "/home/gopher/go/src/edwood",
+	"VarFont": "/lib/font/bit/lucsans/euro.8.font",
+	"FixedFont": "/lib/font/bit/lucm/unicode.9.font",
+	"RowTag": {
+		"Buffer": "Newcol Kill Putall Dump Exit ",
+		"Q0": 29,
+		"Q1": 29
+	},
+	"Columns": [
+		{
+			"Position": 0,
+			"Tag": {
+				"Buffer": "New Cut Paste Snarf Sort Zerox Delcol ",
+				"Q0": 38,
+				"Q1": 38
+			}
+		}
+	],
+	"Windows": [
+		{
+			"Type": 0,
+			"Column": 0,
+			"Position": 2.263648468708389,
+			"Font": "/lib/font/bit/lucsans/euro.8.font",
+			"Tag": {
+				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
+				"Q0": 93,
+				"Q1": 108
+			},
+			"Body": {
+				"Q0": 57,
+				"Q1": 57
+			}
+		},
+		{
+			"Type": 2,
+			"Column": 0,
+			"Position": 20.63914780292943,
+			"Font": "/lib/font/bit/lucsans/euro.8.font",
+			"Tag": {
+				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
+				"Q0": 93,
+				"Q1": 108
+			},
+			"Body": {
+				"Q0": 57,
+				"Q1": 57
+			}
+		},
+		{
+			"Type": 0,
+			"Column": 0,
+			"Position": 49.00133155792277,
+			"Font": "/lib/font/bit/lucsans/euro.8.font",
+			"Tag": {
+				"Buffer": "/home/gopher/go/src/edwood/ Del Snarf Get | Look Edit The first line\nThe second line\nThe third line",
+				"Q0": 86,
+				"Q1": 101
+			},
+			"Body": {
+				"Q0": 0,
+				"Q1": 0
+			}
+		},
+		{
+			"Type": 1,
+			"Column": 0,
+			"Position": 77.3635153129161,
+			"Font": "/lib/font/bit/lucsans/euro.8.font",
+			"Tag": {
+				"Buffer": "foo Del Snarf Undo Put | Look Edit The first line\nThe second line\nThe third line",
+				"Q0": 50,
+				"Q1": 65
+			},
+			"Body": {
+				"Buffer": "hello\n",
+				"Q0": 6,
+				"Q1": 6
+			}
+		}
+	]
+}

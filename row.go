@@ -325,15 +325,23 @@ func (r *Row) Dump(file string) {
 		CurrentDir: wdir,
 		VarFont:    *varfontflag,
 		FixedFont:  *fixedfontflag,
-		RowTag:     string(r.tag.file.b),
-		Columns:    make([]dumpfile.Column, len(r.col)),
-		Windows:    nil,
+		RowTag: dumpfile.Text{
+			Buffer: string(r.tag.file.b),
+			Q0:     r.tag.q0,
+			Q1:     r.tag.q1,
+		},
+		Columns: make([]dumpfile.Column, len(r.col)),
+		Windows: nil,
 	}
 
 	for i, c := range r.col {
 		dump.Columns[i] = dumpfile.Column{
 			Position: 100.0 * float64(c.r.Min.X-row.r.Min.X) / float64(r.r.Dx()),
-			Tag:      string(c.tag.file.b),
+			Tag: dumpfile.Text{
+				Buffer: string(c.tag.file.b),
+				Q0:     c.tag.q0,
+				Q1:     c.tag.q1,
+			},
 		}
 		// TODO(fhs): replace File.dumpid with a local variable map[*File]int
 		for _, w := range c.w {
@@ -367,9 +375,12 @@ func (r *Row) Dump(file string) {
 			fontname := t.font
 
 			dump.Windows = append(dump.Windows, dumpfile.Window{
-				Column:   i,
-				Q0:       w.body.q0,
-				Q1:       w.body.q1,
+				Column: i,
+				Body: dumpfile.Text{
+					Buffer: "", // filled in later if Unsaved
+					Q0:     w.body.q0,
+					Q1:     w.body.q1,
+				},
 				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
 				Font:     fontname,
 			})
@@ -392,10 +403,13 @@ func (r *Row) Dump(file string) {
 				t.file.dumpid = w.id
 				// TODO(rjk): Conceivably this is a bit of a layering violation?
 				dw.Type = dumpfile.Unsaved
-				dw.Body = string(t.file.b)
+				dw.Body.Buffer = string(t.file.b)
 			}
-			dw.Tag = string(w.tag.file.b)
-
+			dw.Tag = dumpfile.Text{
+				Buffer: string(w.tag.file.b),
+				Q0:     w.tag.q0,
+				Q1:     w.tag.q1,
+			}
 		}
 	}
 
@@ -421,7 +435,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		y = -1
 	}
 
-	subl := strings.SplitN(win.Tag, " ", 2)
+	subl := strings.SplitN(win.Tag.Buffer, " ", 2)
 	if len(subl) != 2 {
 		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
 	}
@@ -449,6 +463,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	}
 	w.ClearTag()
 	w.tag.Insert(len(w.tag.file.b), []rune(afterbar[1]), true)
+	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
 
 	if win.Type == dumpfile.Unsaved {
 		// Simplest thing is to put it in a file and load that.
@@ -457,7 +472,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		if err != nil {
 			return fmt.Errorf("can't create temp file for reloading contents %v", err)
 		}
-		if _, err := fd.WriteString(win.Body); err != nil {
+		if _, err := fd.WriteString(win.Body.Buffer); err != nil {
 			// TODO(rjk): Generate better diagnostics.
 			return err
 		}
@@ -481,8 +496,8 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		fontx(&w.body, nil, nil, false, false, win.Font)
 	}
 
-	q0 := win.Q0
-	q1 := win.Q1
+	q0 := win.Body.Q0
+	q1 := win.Body.Q1
 	if q0 > len(w.body.file.b) || q1 > len(w.body.file.b) || q0 > q1 {
 		q0 = 0
 		q1 = 0
@@ -583,7 +598,8 @@ func (row *Row) loadimpl(file string, initing bool) error {
 
 	// Set row tag
 	row.tag.Delete(0, len(row.tag.file.b), true)
-	row.tag.Insert(0, []rune(dump.RowTag), true)
+	row.tag.Insert(0, []rune(dump.RowTag.Buffer), true)
+	row.tag.Show(dump.RowTag.Q0, dump.RowTag.Q1, true)
 
 	// Set column tags
 	for i, col := range dump.Columns {
@@ -591,7 +607,8 @@ func (row *Row) loadimpl(file string, initing bool) error {
 		// that this code does not do the right thing even if it replicates Acme
 		// correctly.
 		row.col[i].tag.Delete(0, len(row.col[i].tag.file.b), true)
-		row.col[i].tag.Insert(0, []rune(col.Tag), true)
+		row.col[i].tag.Insert(0, []rune(col.Tag.Buffer), true)
+		row.col[i].tag.Show(col.Tag.Q0, col.Tag.Q1, true)
 	}
 
 	// Load the windows.
