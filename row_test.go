@@ -27,6 +27,7 @@ func TestRowLoad(t *testing.T) {
 	}{
 		{"empty-two-cols", "testdata/empty-two-cols.dump"},
 		{"example", "testdata/example.dump"},
+		{"multi-line-tag", "testdata/multi-line-tag.dump"},
 	}
 
 	cwd, err := os.Getwd()
@@ -101,7 +102,7 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 		if dw.Type == dumpfile.Zerox {
 			continue
 		}
-		name := strings.SplitN(dw.Tag, " ", 2)[0]
+		name := strings.SplitN(dw.Tag.Buffer, " ", 2)[0]
 
 		w, ok := winByName[name]
 		if !ok {
@@ -110,7 +111,7 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 		}
 
 		// Unsaved window have "Undo" that doesn't get restored
-		if dw.Type != dumpfile.Unsaved && w.tag != dw.Tag {
+		if dw.Type != dumpfile.Unsaved && w.tag != dw.Tag.Buffer {
 			t.Errorf("tag is %q; expected %q", w.tag, dw.Tag)
 		}
 
@@ -118,12 +119,12 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 			t.Errorf("font for %q is %q; expected %q", w.name, w.font, p)
 		}
 
-		if w.q0 != dw.Q0 || w.q1 != dw.Q1 {
-			t.Errorf("q0,q1 for %v is %v,%v; expected %v,%v", w.name, w.q0, w.q1, dw.Q0, dw.Q1)
+		if w.q0 != dw.Body.Q0 || w.q1 != dw.Body.Q1 {
+			t.Errorf("q0,q1 for %v is %v,%v; expected %v,%v", w.name, w.q0, w.q1, dw.Body.Q0, dw.Body.Q1)
 		}
 
-		if dw.Type == dumpfile.Unsaved && w.body != dw.Body {
-			t.Errorf("body for %q is %q; expected %q", w.name, w.body, dw.Body)
+		if dw.Type == dumpfile.Unsaved && w.body != dw.Body.Buffer {
+			t.Errorf("body for %q is %q; expected %q", w.name, w.body, dw.Body.Buffer)
 		}
 	}
 }

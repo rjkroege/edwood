@@ -29,7 +29,7 @@ type Content struct {
 	CurrentDir string   // Edwood's current working directory
 	VarFont    string   // Variable width font
 	FixedFont  string   // Fixed width font
-	RowTag     string   // Top-most tag (usually "Newcol ... Exit")
+	RowTag     Text     // Top-most tag (usually "Newcol ... Exit")
 	Columns    []Column // List of columns
 	Windows    []Window // List of windows across all columns
 }
@@ -37,7 +37,7 @@ type Content struct {
 // Column stores the state of a column in Edwood.
 type Column struct {
 	Position float64 // Position within the row (in percentage)
-	Tag      string  // Tag above the column (usually "New ... Delcol")
+	Tag      Text    // Tag above the column (usually "New ... Delcol")
 }
 
 // Window stores the state of a window in Edwood.
@@ -45,8 +45,6 @@ type Window struct {
 	Type WindowType // Type of window
 
 	Column   int     // Column index where the window will be placed
-	Q0       int     // Selection starts at the rune at this position
-	Q1       int     // Selection ends before the rune at this position
 	Position float64 // Position within the column (in percentage)
 	Font     string  `json:",omitempty"` // Font name or path
 
@@ -57,14 +55,23 @@ type Window struct {
 	//IsDir bool	// redundant
 	//Dirty bool	// WindowType == Unsaved
 
-	Tag string // Tag above this window (usually "/path/to/file Del ...")
+	Tag Text // Tag above this window (usually "/path/to/file Del ...")
 
-	// Used for Type == Unsaved
-	Body string `json:",omitempty"` // Unsaved text buffer
+	// Text buffer and selection of body.
+	// Body.Buffer is empty if Type == Unsaved.
+	Body Text
 
 	// Used for Type == Exec
 	ExecDir     string `json:",omitempty"` // Execute command in this directory
 	ExecCommand string `json:",omitempty"` // Command to execute
+}
+
+// Text is a UTF-8 encoded text with a substring selected
+// using rune-indexing (instead of byte-indexing).
+type Text struct {
+	Buffer string `json:",omitempty"` // UTF-8 encoded text
+	Q0     int    // Selection starts at this rune position
+	Q1     int    // Selection ends before this rune position
 }
 
 type versionedContent struct {
