@@ -64,11 +64,18 @@ func main() {
 		maxtab = 4
 	}
 
+	var dump *dumpfile.Content
+
 	if loadfile != "" {
-		fontnames := dumpfile.LoadFonts(loadfile) // Overrides fonts selected up to here.
-		if len(fontnames) == 2 {
-			*varfontflag = fontnames[0]
-			*fixedfontflag = fontnames[1]
+		d, err := dumpfile.Load(loadfile) // Overrides fonts selected up to here.
+		if err == nil {
+			if d.VarFont != "" {
+				*varfontflag = d.VarFont
+			}
+			if d.FixedFont != "" {
+				*fixedfontflag = d.FixedFont
+			}
+			dump = d
 		}
 	}
 
@@ -121,7 +128,7 @@ func main() {
 		const WindowsPerCol = 6
 
 		row.Init(display.ScreenImage.R, display)
-		if loadfile == "" || row.Load(loadfile, true) != nil {
+		if loadfile == "" || row.Load(dump, loadfile, true) != nil {
 			// Open the files from the command line, up to WindowsPerCol each
 			files := flag.Args()
 			if ncol < 0 {
