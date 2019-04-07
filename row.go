@@ -342,7 +342,10 @@ func (r *Row) Dump(file string) {
 				Q1:     c.tag.q1,
 			},
 		}
-		// TODO(fhs): replace File.dumpid with a local variable map[*File]int
+		// TODO(fhs): replace File.dumpid with a local variable map[*File]int.
+		// Also, dumpid initialized here depends on the order of windows:
+		// we may be setting dumpid for an external window to -1, and then
+		// resetting it back to 0 for a zerox of that window.
 		for _, w := range c.w {
 			w.body.file.dumpid = 0
 			if w.nopen[QWevent] != 0 {
@@ -450,12 +453,12 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		return nil
 	}
 
-	// My understanding of the Acme code was that subl[0] is the original file name
-	// without spaces.
 	if win.Type != dumpfile.Zerox {
 		w.SetName(subl[0])
 	}
 
+	// TODO(rjk): I feel that the code for managing tags could be extracted and unified.
+	// Maybe later. Window.setTag1 would seem fixable.
 	afterbar := strings.SplitN(subl[1], "|", 2)
 	if len(afterbar) != 2 {
 		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
@@ -600,7 +603,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	}
 
 	// Set row tag
-	row.tag.Delete(0, len(row.tag.file.b), true)
+	row.tag.Delete(0, row.tag.file.Size(), true)
 	row.tag.Insert(0, []rune(dump.RowTag.Buffer), true)
 	row.tag.Show(dump.RowTag.Q0, dump.RowTag.Q1, true)
 
@@ -609,7 +612,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 		// Acme's handling of column headers is perplexing. It is conceivable
 		// that this code does not do the right thing even if it replicates Acme
 		// correctly.
-		row.col[i].tag.Delete(0, len(row.col[i].tag.file.b), true)
+		row.col[i].tag.Delete(0, row.col[i].tag.file.Size(), true)
 		row.col[i].tag.Insert(0, []rune(col.Tag.Buffer), true)
 		row.col[i].tag.Show(col.Tag.Q0, col.Tag.Q1, true)
 	}
