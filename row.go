@@ -312,13 +312,12 @@ func (r *Row) Dump(file string) {
 	}
 
 	if file == "" {
-		if home == "" {
-			warning(nil, "can't find file for dump: $home not defined\n")
+		f, err := defaultDumpFile()
+		if err != nil {
+			warning(nil, "can't find file for dump: %v\n", err)
 			return
 		}
-
-		// Lower risk of simultaneous use of edwood and acme.
-		file = filepath.Join(home, "edwood.dump")
+		file = f
 	}
 
 	dump := dumpfile.Content{
@@ -512,31 +511,35 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	return nil
 }
 
-func (row *Row) Load(file string, initing bool) error {
-	err := row.loadimpl(file, initing)
+// Load restores Edwood's state stored in dump. If dump is nil, it is parsed from file.
+// If initing is true, Row will be initialized.
+func (row *Row) Load(dump *dumpfile.Content, file string, initing bool) error {
+	warn := func(err error) error {
+		warning(nil, "Load failed: %v\n", err)
+		return err
+	}
+	if dump == nil {
+		file, err := defaultDumpFile()
+		if err != nil {
+			return warn(err)
+		}
+		d, err := dumpfile.Load(file)
+		if err != nil {
+			return warn(err)
+		}
+		dump = d
+	}
+	err := row.loadimpl(dump, initing)
 	if err != nil {
-		// log.Printf("Load experienced a problem: %v\n", err)
-		warning(nil, "Load experienced a problem: %v\n", err)
+		return warn(err)
 	}
 	return err
 }
 
 // TODO(rjk): split this apart into smaller functions and files.
-func (row *Row) loadimpl(file string, initing bool) error {
+func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	// log.Println("Load start", file, initing)
 	// defer log.Println("Load ended")
-
-	if file == "" {
-		if home == "" {
-			return fmt.Errorf("can't find file for load: $home not defined")
-		}
-		file = filepath.Join(home, "edwood.dump")
-	}
-
-	dump, err := dumpfile.Load(file)
-	if err != nil {
-		return err
-	}
 
 	// Current directory.
 	if err := os.Chdir(dump.CurrentDir); err != nil {
@@ -654,4 +657,12 @@ func (r *Row) LookupWin(id int, dump bool) *Window {
 		}
 	}
 	return nil
+}
+
+func defaultDumpFile() (string, error) {
+	if home == "" {
+		return "", fmt.Errorf("$HOME not defined")
+	}
+	// Lower risk of simultaneous use of edwood and acme.
+	return filepath.Join(home, "edwood.dump"), nil
 }

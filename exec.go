@@ -1106,6 +1106,6 @@ func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 	if isdump {
 		row.Dump(name)
 	} else {
-		row.Load(name, false)
+		row.Load(nil, name, false)
 	}
 }

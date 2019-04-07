@@ -123,23 +123,3 @@ func (c *Content) encode(w io.Writer) error {
 	enc.SetIndent("", "\t")
 	return enc.Encode(&vc)
 }
-
-// LoadFonts gets the font names from the load file so we don't load
-// fonts that we won't use.
-func LoadFonts(file string) []string {
-	// TODO(fhs): Maybe return two strings instead of a slice,
-	// or remove this function altogether and have Edwood's main call Load
-	// only once at the beginning.
-
-	dump, err := Load(file)
-	if err != nil {
-		return nil
-	}
-	if dump.VarFont == "" || dump.FixedFont == "" {
-		return nil
-	}
-	return []string{
-		dump.VarFont,
-		dump.FixedFont,
-	}
-}
