@@ -51,8 +51,6 @@ type File struct {
 	curtext *Text
 	text    []*Text // [private I think]
 
-	dumpid int // Used to track the identifying name of this File for Dump.
-
 	isscratch bool // Used to track if this File should warn on unsaved deletion.
 	isdir     bool // Used to track if this File is populated from a directory list.
 
@@ -421,7 +419,6 @@ func NewFile(filename string) *File {
 		curtext: nil,
 		text:    []*Text{},
 		//	ntext   int
-		//	dumpid  int
 	}
 }
 
@@ -444,7 +441,6 @@ func NewTagFile() *File {
 		//	curtext *Text
 		//	text    **Text
 		//	ntext   int
-		//	dumpid  int
 	}
 }
 

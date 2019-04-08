@@ -249,3 +249,26 @@ func windows(fsys *client.Fsys) ([]winInfo, error) {
 	}
 	return info, nil
 }
+
+func TestRowLookupWin(t *testing.T) {
+	w42 := &Window{id: 42}
+	row := &Row{
+		col: []*Column{
+			{
+				w: []*Window{w42},
+			},
+		},
+	}
+	for _, tc := range []struct {
+		id int
+		w  *Window
+	}{
+		{42, w42},
+		{100, nil},
+	} {
+		w := row.LookupWin(tc.id)
+		if w != tc.w {
+			t.Errorf("LookupWin returned window %p for id %v; expected %p", w, tc.id, tc.w)
+		}
+	}
+}

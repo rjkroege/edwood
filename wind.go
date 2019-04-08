@@ -47,7 +47,6 @@ type Window struct {
 	ctlfid      uint32
 	dumpstr     string
 	dumpdir     string
-	dumpid      int
 	utflastqid  int
 	utflastboff uint64
 	utflastq    int

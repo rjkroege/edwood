@@ -333,6 +333,8 @@ func (r *Row) Dump(file string) {
 		Windows: nil,
 	}
 
+	dumpid := make(map[*File]int)
+
 	for i, c := range r.col {
 		dump.Columns[i] = dumpfile.Column{
 			Position: 100.0 * float64(c.r.Min.X-row.r.Min.X) / float64(r.r.Dx()),
@@ -342,15 +344,10 @@ func (r *Row) Dump(file string) {
 				Q1:     c.tag.q1,
 			},
 		}
-		// TODO(fhs): replace File.dumpid with a local variable map[*File]int.
-		// Also, dumpid initialized here depends on the order of windows:
-		// we may be setting dumpid for an external window to -1, and then
-		// resetting it back to 0 for a zerox of that window.
 		for _, w := range c.w {
-			w.body.file.dumpid = 0
 			if w.nopen[QWevent] != 0 {
 				// Mark zeroxes of external windows specially.
-				w.body.file.dumpid = -1
+				dumpid[w.body.file] = -1
 			}
 		}
 	}
@@ -369,7 +366,7 @@ func (r *Row) Dump(file string) {
 			}
 
 			// zeroxes of external windows are tossed
-			if w.body.file.dumpid < 0 && w.nopen[QWevent] == 0 {
+			if dumpid[t.file] < 0 && w.nopen[QWevent] == 0 {
 				continue
 			}
 
@@ -389,7 +386,7 @@ func (r *Row) Dump(file string) {
 			dw := &dump.Windows[len(dump.Windows)-1]
 
 			switch {
-			case t.file.dumpid > 0:
+			case dumpid[t.file] > 0:
 				dw.Type = dumpfile.Zerox
 
 			case w.dumpstr != "":
@@ -398,11 +395,11 @@ func (r *Row) Dump(file string) {
 				dw.ExecCommand = w.dumpstr
 
 			case !w.body.file.Dirty() && access(t.file.name) || w.body.file.isdir:
-				t.file.dumpid = w.id
+				dumpid[t.file] = w.id
 				dw.Type = dumpfile.Saved
 
 			default:
-				t.file.dumpid = w.id
+				dumpid[t.file] = w.id
 				// TODO(rjk): Conceivably this is a bit of a layering violation?
 				dw.Type = dumpfile.Unsaved
 				dw.Body.Buffer = string(t.file.b)
@@ -648,13 +645,10 @@ func (r *Row) AllWindows(f func(*Window)) {
 	}
 }
 
-func (r *Row) LookupWin(id int, dump bool) *Window {
+func (r *Row) LookupWin(id int) *Window {
 	for _, c := range r.col {
 		for _, w := range c.w {
-			if dump && w.dumpid == id {
-				return w
-			}
-			if !dump && w.id == id {
+			if w.id == id {
 				return w
 			}
 		}
