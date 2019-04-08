@@ -376,7 +376,7 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 				id = int(id64)
 			}
 			row.lk.Lock()
-			w = row.LookupWin(id, false)
+			w = row.LookupWin(id)
 			if w == nil {
 				row.lk.Unlock()
 				break
