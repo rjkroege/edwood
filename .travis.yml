@@ -32,7 +32,7 @@ script:
   - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then diff -u <(echo -n) <(gofmt -d -s .); fi
   - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
   - go vet .
-  - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then go get -tags duitdraw -t -v ./...; fi
+  - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then go get -tags 'duitdraw mux9p' -t -v ./...; fi
 
 after_success:
   # codecov can't seem to combine reports from multiple OSes correctly

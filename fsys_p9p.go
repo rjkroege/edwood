@@ -1,4 +1,5 @@
 // +build darwin dragonfly freebsd linux netbsd openbsd solaris
+// +build !mux9p
 
 package main
 
@@ -28,8 +29,14 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	if name != "" {
 		addr := name
 		if !strings.Contains(name, "!") {
-			addr = fmt.Sprintf("unix!%s/%s", client.Namespace(), name)
+			ns := client.Namespace()
+			if err := os.MkdirAll(ns, 0700); err != nil {
+				return err
+			}
+			addr = fmt.Sprintf("unix!%s/%s", ns, name)
 		}
+		// TODO(fhs): create /some/dir if name is unix!/some/dir/acme
+
 		if addr == "" {
 			return fmt.Errorf("empty listen address")
 		}

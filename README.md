@@ -11,26 +11,30 @@ Named *edwood* in celebration of the  formative influence of Ed Wood on
 Plan9 and the truth of
 [ed](http://www.dcs.ed.ac.uk/home/jec/texts/ed.html)-iting.
 
-Note that on unix systems, Edwood (as with Acme) requires some infrastructure from
-[plan9port](https://9fans.github.io/plan9port/): in particular
-`devdraw`, `9pserve` and `fontsrv`. So to actually use this, you'll want
-to install [plan9port](https://9fans.github.io/plan9port/) first.
+Note that on unix systems, Edwood (as with Acme) requires by default some
+infrastructure from [plan9port](https://9fans.github.io/plan9port/):
+in particular `devdraw`, `9pserve` and `fontsrv`. So, you'll want to
+install [plan9port](https://9fans.github.io/plan9port/) first, unless
+you choose to use the more experimental pure-Go Edwood described below.
 
 ## Edwood without plan9port
 
-On Windows, plan9port is not required. Work to remove dependency
-on plan9port in unix systems is currently in progress (see [issue
-#205](https://github.com/rjkroege/edwood/issues/205)).  To use
-[duitdraw](https://github.com/ktye/duitdraw) instead of plan9port
-`devdraw`, us the `duitdraw` build tag:
+On Windows, plan9port is never used. On unix systems, plan9port is not
+used only when the `duitdraw` and `mux9p` tags are used:
 
-	go install -tags duitdraw
+	go get -u -tags 'duitdraw mux9p' github.com/rjkroege/edwood
+
+These tags replaces `devdraw` with
+[duitdraw](https://github.com/ktye/duitdraw) and `9pserve` with
+[mux9p](https://github.com/fhs/mux9p). Note that there are several
+outstanding [issues](https://github.com/rjkroege/edwood/issues/205)
+which makes Edwood more unstable and slower when not using plan9port.
 
 Duitdraw can use TTF fonts or compressed Plan 9 bitmap fonts. If the font
 name is empty, the [Go Font](https://blog.golang.org/go-fonts) is used.
 Example usage:
 
-	edwood -f '' -F '' 	# Use Go font
+	edwood	# Use Go font at 10pt
 	edwood -f @12pt -F @12pt	# Go font at 12pt
 	edwood -f /usr/share/fonts/TTF/DejaVuSans.ttf@12pt -F /usr/share/fonts/TTF/DejaVuSansMono.ttf@12pt
 	edwood -f $PLAN9/font/lucsans/euro.8.font -F $PLAN9/font/lucm/unicode.9.font
