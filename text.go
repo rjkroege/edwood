@@ -306,22 +306,11 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			t.file.name = t.file.name + string(filepath.Separator)
 			t.w.SetName(t.file.name)
 		}
-		dirNames, err := fd.Readdirnames(0)
+		dirNames, err := getDirNames(fd)
 		if err != nil {
-			warning(nil, "failed to Readdirnames: %s\n", filename)
-			return 0, fmt.Errorf("failed to Readdirnames: %s", filename)
+			warning(nil, "getDirNames failed: %s\n", err)
+			return 0, fmt.Errorf("getDirNames failed: %v", err)
 		}
-		for i, dn := range dirNames {
-			s, err := os.Stat(filepath.Join(fd.Name(), dn))
-			if err != nil {
-				warning(nil, "can't stat %s: %v\n", dn, err)
-			} else {
-				if s.IsDir() {
-					dirNames[i] = dn + string(filepath.Separator)
-				}
-			}
-		}
-		sort.Strings(dirNames)
 		widths := make([]int, len(dirNames))
 		dft := t.getfont()
 		for i, s := range dirNames {
@@ -353,6 +342,23 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		warning(nil, "%s: NUL bytes elided\n", filename)
 	}
 	return q1 - q0, nil
+}
+
+func getDirNames(f *os.File) ([]string, error) {
+	entries, err := f.Readdir(0)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(entries))
+	for i, fi := range entries {
+		if fi.IsDir() {
+			names[i] = fi.Name() + string(filepath.Separator)
+		} else {
+			names[i] = fi.Name()
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 func (t *Text) Backnl(p int, n int) int {
