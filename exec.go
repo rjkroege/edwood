@@ -17,6 +17,8 @@ import (
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/frame"
+
+	"log"
 )
 
 type Exectab struct {
@@ -560,7 +562,9 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 
 	// Putting to the same file as the one that we originally read from.
 	if name == f.name {
+		log.Println("actually running the put", q0, q1, f.Size())
 		if q0 != 0 || q1 != f.Size() {
+			log.Println("marking the file as modded")
 			// The backing disk file contents now differ from File because
 			// we've over-written the disk file with part of File.
 			f.Modded()
@@ -574,7 +578,8 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 			f.hash.Set(h.Sum(nil))
 			f.Clean()
 		}
-		f.SnapshotSeq()
+		// TODO(rjk): This should be unnecessary (and is even a bug...)
+		// f.SnapshotSeq()
 	}
 	w.SetTag()
 	return nil
@@ -598,14 +603,11 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if w.body.file.isscratch || w.body.file.isdir || w.body.file.name == "" {
-				continue
-			}
 			if w.nopen[QWevent] > 0 {
 				continue
 			}
 			a := w.body.file.name
-			if w.body.file.HasSaveableChanges() {
+			if w.body.file.SaveableAndDirty() {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {

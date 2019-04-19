@@ -56,7 +56,7 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 	}
 
 	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
-		&fileStateSummary{true, true, false, true, true, s1})
+		&fileStateSummary{true, true, false, true, s1})
 }
 
 const s1 = "hi 海老麺"
@@ -72,18 +72,18 @@ func TestFileInsertAt(t *testing.T) {
 
 	// NB: the read code not include the uncommited content.
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&fileStateSummary{true, true, false, true, true, s1})
+		&fileStateSummary{true, true, false, true, s1})
 
 	f.Commit()
 
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&fileStateSummary{false, true, false, true, true, s1})
+		&fileStateSummary{false, true, false, true, s1})
 
 	f.InsertAt(f.Nr(), []rune(s2))
 	f.Commit()
 
 	check(t, "TestFileUndoRedo after InsertAt", f,
-		&fileStateSummary{false, true, false, true, true, s1 + s2})
+		&fileStateSummary{false, true, false, true, s1 + s2})
 }
 
 func readwholefile(t *testing.T, f *File) string {
@@ -114,14 +114,16 @@ func readwholefile(t *testing.T, f *File) string {
 func TestFileUndoRedo(t *testing.T) {
 	f := NewFile("edwood")
 
-	// Force Undo to operate.
-	f.seq = 1
+	// Validate before.
+	check(t, "TestFileUndoRedo on an empty buffer", f,
+		&fileStateSummary{false, false, false, false, ""})
 
+	f.Mark(1)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedo after 2 inserts", f,
-		&fileStateSummary{false, true, false, true, true, s1 + s2})
+		&fileStateSummary{false, true, false, true, s1 + s2})
 
 	// Because of how seq managed the number of Undo actions, this
 	// corresponds to the case of not incrementing seq and undoes every
@@ -129,21 +131,20 @@ func TestFileUndoRedo(t *testing.T) {
 	f.Undo(true)
 
 	check(t, "TestFileUndoRedo after 1 undo", f,
-		&fileStateSummary{false, false, true, false, false, ""})
+		&fileStateSummary{false, false, true, false, ""})
 
 	// Redo
 	f.Undo(false)
 
 	// Validate state: we have s1 + s2 inserted.
 	check(t, "TestFileUndoRedo after 1 Redos", f,
-		&fileStateSummary{false, true, false, true, true, s1 + s2})
+		&fileStateSummary{false, true, false, true, s1 + s2})
 }
 
 type fileStateSummary struct {
 	HasUncommitedChanges bool
 	HasUndoableChanges   bool
 	HasRedoableChanges   bool
-	HasSaveableChanges   bool
 	SaveableAndDirty     bool
 	filecontents         string
 }
@@ -157,9 +158,6 @@ func check(t *testing.T, testname string, f *File, fss *fileStateSummary) {
 	}
 	if got, want := f.HasRedoableChanges(), fss.HasRedoableChanges; got != want {
 		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
-	}
-	if got, want := f.HasSaveableChanges(), fss.HasSaveableChanges; got != want {
-		t.Errorf("%s: HasSaveableChanges failed. got %v want %v", testname, got, want)
 	}
 	if got, want := f.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
 		t.Errorf("%s: SaveableAndDirty failed. got %v want %v", testname, got, want)
@@ -180,18 +178,18 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedoWithMark after 2 inserts", f,
-		&fileStateSummary{false, true, false, true, true, s1 + s2})
+		&fileStateSummary{false, true, false, true, s1 + s2})
 
 	f.Undo(true)
 
 	check(t, "TestFileUndoRedoWithMark after 1 undo", f,
-		&fileStateSummary{false, true, true, true, true, s1})
+		&fileStateSummary{false, true, true, true, s1})
 
 	// Redo
 	f.Undo(false)
 
 	check(t, "TestFileUndoRedoWithMark after 1 redo", f,
-		&fileStateSummary{false, true, false, true, true, s1 + s2})
+		&fileStateSummary{false, true, false, true, s1 + s2})
 
 }
 
@@ -218,7 +216,7 @@ func TestFileLoadNoUndo(t *testing.T) {
 	// TODO(rjk): The file has been modified because of the insert. But
 	// without undo, SaveableAndDirty and HasSaveableChanges diverge.
 	check(t, "TestFileLoadNoUndo after file load", f,
-		&fileStateSummary{false, false, false, false, true, s1[0:2] + s2 + s2 + s1[2:]})
+		&fileStateSummary{false, false, false, true, s1[0:2] + s2 + s2 + s1[2:]})
 
 }
 
@@ -243,24 +241,23 @@ func TestFileLoadUndoHash(t *testing.T) {
 
 	// Having loaded the file and then Clean(),
 	check(t, "TestFileLoadUndoHash after file load", f,
-		&fileStateSummary{false, false, false, false, false, s2 + s2})
+		&fileStateSummary{false, false, false, false, s2 + s2})
 
-	// Enable undo.
+	// Set an undo point (the initial state)
 	f.Mark(1)
 
 	// Enabling Undo will cause HasSaveableChanges to be true.
 	// This is strange and I need to rationalize seq.
 	check(t, "TestFileLoadUndoHash after Mark", f,
-		&fileStateSummary{false, false, false, true, false, s2 + s2})
+		&fileStateSummary{false, false, false, true, s2 + s2})
 
 	// SaveableAndDirty should return true if the File is plausibly writable
-	// to f.name. At this point, we don't know and the value of SaveableAndDirty
-	// is not well defined.
+	// to f.name and has changes that might require writing it out.
 	// TODO(rjk): The API should be clear about what SaveableAndDiry actually
 	// does.
 	f.SetName("plan9")
 	check(t, "TestFileLoadUndoHash after SetName", f,
-		&fileStateSummary{false, true, false, true, false, s2 + s2})
+		&fileStateSummary{false, true, false, true, s2 + s2})
 
 	if got, want := f.name, "plan9"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
@@ -269,7 +266,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// Undo renmaing the file.
 	f.Undo(true)
 	check(t, "TestFileLoadUndoHash after Undo", f,
-		&fileStateSummary{false, false, true, false, false, s2 + s2})
+		&fileStateSummary{false, false, true, false, s2 + s2})
 	if got, want := f.name, "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
@@ -279,8 +276,9 @@ func TestFileLoadUndoHash(t *testing.T) {
 func TestFileInsertDeleteUndo(t *testing.T) {
 	f := NewFile("edwood")
 
-	// Empty File is an Undo point.
+	// Empty File is an Undo point and considered clean.
 	f.Mark(1)
+	f.Clean()
 
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(0, []rune(s2))
@@ -295,30 +293,30 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
 
 	check(t, "TestFileInsertDeleteUndo after setup", f,
-		&fileStateSummary{false, true, false, true, true, "yi 海老hi 海老麺麺"})
+		&fileStateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
 
 	f.Undo(true)
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&fileStateSummary{false, true, true, true, true, "yi 海老麺"})
+		&fileStateSummary{false, true, true, true, "yi 海老麺"})
 
 	f.Undo(true) // 2 deletes should get removed because they have the same sequence.
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
-		&fileStateSummary{false, true, true, true, true, "byehi 海老麺"})
+		&fileStateSummary{false, true, true, true, "byehi 海老麺"})
 
 	f.Undo(false) // 2 deletes should be put back.
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&fileStateSummary{false, true, true, true, true, "yi 海老麺"})
+		&fileStateSummary{false, true, true, true, "yi 海老麺"})
 }
 
 func TestFileRedoSeq(t *testing.T) {
 	f := NewFile("edwood")
+	// Empty File is an Undo point and considered clean
 
-	// Empty File is an Undo point.
 	f.Mark(1)
-
 	f.InsertAt(0, []rune(s1))
+
 	check(t, "TestFileRedoSeq after setup", f,
-		&fileStateSummary{false, true, false, true, true, s1})
+		&fileStateSummary{false, true, false, true, s1})
 
 	if got, want := f.RedoSeq(), 0; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
@@ -326,7 +324,7 @@ func TestFileRedoSeq(t *testing.T) {
 
 	f.Undo(true)
 	check(t, "TestFileRedoSeq after Undo", f,
-		&fileStateSummary{false, false, true, false, false, ""})
+		&fileStateSummary{false, false, true, false, ""})
 
 	if got, want := f.RedoSeq(), 1; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
