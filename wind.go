@@ -491,7 +491,7 @@ func (w *Window) setTag1() {
 		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		if !w.body.file.isdir && w.body.file.HasSaveableChanges() {
+		if !w.body.file.isdir && w.body.file.SaveableAndDirty() {
 			sb.WriteString(Lput)
 		}
 	}

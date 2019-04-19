@@ -13,7 +13,7 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
-// 
+//
 // A File tracks several related concepts. First it is a text buffer with
 // undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
 // an undo point.
@@ -101,15 +101,6 @@ func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
-// HasSaveableChanges returns true if there are changes to the File
-// that can be saved.
-// TODO(rjk): HasUnsavedChanges should be its name
-// TODO(rjk): it's conceivable that mod and SeqDiffer track the same
-// thing.
-func (f *File) HasSaveableChanges() bool {
-	return f.name != "" && (len(f.cache) != 0 || f.Dirty())
-}
-
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
 // Has no analog in buffer.Undo. It will require modification.
@@ -175,14 +166,14 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
+	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.isdir && !f.isscratch
 }
 
-// Commit sets an undo point for the current state of the file.
-// The File observers are not run as part of a Commit. Observers
-// only run on an InsertAt* operation.
-// TODO(rjk): AFAIK. maps to undo.Buffer.Commit() correctly.
+// Commit writes the in-progress edits to the real buffer instead of
+// keeping them in the cache. Does not map to undo.Buffer.Commit (that
+// method is Mark). Remove this method.
 func (f *File) Commit() {
+	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
 	}
@@ -252,14 +243,14 @@ func (f *File) UpdateInfo(filename string, d os.FileInfo) {
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): switching to undo.Buffer will require removing use of seq
-// TODO(rjk): Rename this to Clean.
+// TODO(rjk): This function maps to undo.Buffer.Clean()
 func (f *File) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
-// Dirty reports whether the current state of the File is different from the initial state or from the one in the time of calling Clean.
-// This maps directly onto Buffer.Dirty()
-// 
+// Dirty reports whether the current state of the File is different from
+// the initial state or from the one at the time of calling Clean.
+//
 // TODO(rjk): switching to undo.Buffer will require removing external uses
 // of seq.
 func (f *File) Dirty() bool {
@@ -312,6 +303,7 @@ func (f *File) HasMultipleTexts() bool {
 // to undo.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
+	f.treatasclean = false
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
 	}
@@ -330,7 +322,11 @@ func (f *File) InsertAt(p0 int, s []rune) {
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
 // TODO(rjk): Remove this as a prelude to converting to undo.Buffer
+// But preserve the cache. Every "small" insert should go into the cache.
+// It almost certainly greatly improves performance for a series of single
+// character insertions.
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
+	f.treatasclean = false
 	if p0 > f.b.nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
@@ -371,6 +367,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 // TODO(rjk): DeleteAt has an implied Commit operation
 // that makes it not match with undo.Buffer.Delete
 func (f *File) DeleteAt(p0, p1 int) {
+	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
 		acmeerror("internal error: DeleteAt", nil)
 	}
@@ -551,6 +548,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 		}
 		(*delta) = (*delta)[0 : len(*delta)-1]
 	}
+	// TODO(rjk): Why do we do this?
 	if isundo {
 		f.seq = 0
 	}
@@ -559,8 +557,6 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 
 // Reset removes all Undo records for this File.
 // TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
-// Or is it part of Clean()? I think that undo.Buffer.Clean should
-// reset the buffer.
 // Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
@@ -568,10 +564,15 @@ func (f *File) Reset() {
 	f.seq = 0
 }
 
-// Mark starts a new set of records that can be undone as
-// a unit and discards Redo records. Call this at the beginning
+// Mark sets an Undo point and
+// and discards Redo records. Call this at the beginning
 // of a set of edits that ought to be undo-able as a unit. This
-// should be implemented in terms of undo.Buffer.Commit()
+// is equivalent to undo.Buffer.Commit()
+// NB: current implementation permits calling Mark on an empty
+// file to indicate that one can undo to the file state at the time of
+// calling Mark.
+// TODO(rjk): Consider renaming to SetUndoPoint
+// TODO(rjk): Don't pass in seq. (Remove seq entirely?)
 func (f *File) Mark(seq int) {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
@@ -589,24 +590,17 @@ func (f *File) TreatAsClean() {
 	f.treatasclean = true
 }
 
-// Modded marks the File as having changes that could be written to the
-// File's backing disk file if it exists per SaveableAndDirty.
-// TODO(rjk): File.mod is unneeded?
-// f.mod is true when the File contents do not match the backing file.
+// Modded marks the File if we know that its backing is different from
+// its contents. This is needed to track when Edwood has modified the
+// backing without changing the File (e.g. via the Edit w command.
 func (f *File) Modded() {
 	f.mod = true
 	f.treatasclean = false
 }
 
-// Clean marks File as being non-dirty.
-// TODO(rjk): rename this to better reflect its purpose.
+// Clean marks File as being non-dirty: the backing is the same as File.
 func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
-
-	// TODO(rjk): Remove mod...
 	f.SnapshotSeq()
-	// TODO(rjk): it had occurred to me that I should reset the
-	// the File here. But this is would be definitely wrong.
-	// f.Reset()
 }
