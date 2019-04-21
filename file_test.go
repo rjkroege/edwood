@@ -253,8 +253,6 @@ func TestFileLoadUndoHash(t *testing.T) {
 
 	// SaveableAndDirty should return true if the File is plausibly writable
 	// to f.name and has changes that might require writing it out.
-	// TODO(rjk): The API should be clear about what SaveableAndDiry actually
-	// does.
 	f.SetName("plan9")
 	check(t, "TestFileLoadUndoHash after SetName", f,
 		&fileStateSummary{false, true, false, true, s2 + s2})
@@ -367,5 +365,47 @@ func TestFileUpdateInfo(t *testing.T) {
 	f.UpdateInfo(filename, d)
 	if f.info != d {
 		t.Errorf("File info is %v; want %v", f.info, d)
+	}
+}
+
+func TestFileNameSettingWithScratch(t *testing.T) {
+	f := NewFile("edwood")
+	// Empty File is an Undo point and considered clean
+
+	if got, want := f.name, "edwood"; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
+	}
+	if got, want := f.isscratch, false; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
+	}
+
+	f.Mark(1)
+	f.SetName("/guide")
+
+	f.Mark(2)
+	f.SetName("/hello/+Errors")
+
+	if got, want := f.name, "/hello/+Errors"; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
+	}
+	if got, want := f.isscratch, true; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
+	}
+
+	f.Undo(true)
+
+	if got, want := f.name, "/guide"; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
+	}
+	if got, want := f.isscratch, true; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
+	}
+
+	f.Undo(true)
+	if got, want := f.name, "edwood"; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
+	}
+	if got, want := f.isscratch, false; got != want {
+		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 }

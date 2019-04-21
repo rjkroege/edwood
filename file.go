@@ -13,7 +13,7 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
-// 
+//
 // A File tracks several related concepts. First it is a text buffer with
 // undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
 // an undo point.
@@ -59,7 +59,7 @@ type File struct {
 	curtext *Text
 	text    []*Text // [private I think]
 
-	isscratch bool // Used to track if this File should warn on unsaved deletion.
+	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
 	isdir     bool // Used to track if this File is populated from a directory list.
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded.
@@ -101,7 +101,6 @@ func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
-
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
 // Has no analog in buffer.Undo. It will require modification.
@@ -109,10 +108,11 @@ func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
-// HasNoBacking returns true if the File object does have a backing
-// either onto a disk file or provided via Acme filesystem.
-func (f *File) HasNoBacking() bool {
-	return f.isscratch ||f.isdir
+// IsDirOrScratch returns true if the File has a synthetic backing of
+// a directory listing or has a name pattern that excludes it from
+// being saved under typical circumstances.
+func (f *File) IsDirOrScratch() bool {
+	return f.isscratch || f.isdir
 }
 
 // Size returns the complete size of the buffer including both commited
@@ -173,7 +173,7 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.HasNoBacking()
+	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
@@ -257,7 +257,7 @@ func (f *File) SnapshotSeq() {
 
 // Dirty reports whether the current state of the File is different from
 // the initial state or from the one at the time of calling Clean.
-// 
+//
 // TODO(rjk): switching to undo.Buffer will require removing external uses
 // of seq.
 func (f *File) Dirty() bool {
@@ -411,11 +411,37 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	(*delta) = append(*delta, &u)
 }
 
+// A File can have a spcific name that permit it to be persisted to disk
+// but typically would not be. These two constants are suffixes of File
+// names that have this property.
+const (
+	slashguide = "/guide"
+	plusErrors = "+Errors"
+)
+
+// SetName sets the name of the backing for this file.
+// Some backings that opt them out of typically being persisted.
+// Resetting a file name to a new value does not have any effect.
 func (f *File) SetName(name string) {
+	if f.name == name {
+		return
+	}
+
 	if f.seq > 0 {
 		f.UnsetName(&f.delta)
 	}
+	f.setnameandisscratch(name)
+}
+
+// setnameandisscratch updates the File.name and isscratch bit
+// at the same time.
+func (f *File) setnameandisscratch(name string) {
 	f.name = name
+	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
+		f.isscratch = true
+	} else {
+		f.isscratch = false
+	}
 }
 
 func (f *File) UnsetName(delta *[]*Undo) {
@@ -547,11 +573,8 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.UnsetName(epsilon)
 			f.mod = u.mod
 			f.treatasclean = false
-			if u.n == 0 {
-				f.name = ""
-			} else {
-				f.name = string(u.buf)
-			}
+			newfname := string(u.buf)
+			f.setnameandisscratch(newfname)
 		}
 		(*delta) = (*delta)[0 : len(*delta)-1]
 	}
