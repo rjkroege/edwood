@@ -441,7 +441,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.body.file.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
+
+	isclean := et.w.Clean(true)
+	if  et.w.body.file.Size() > 0 && !isclean {
 		return
 	}
 	w := et.w
@@ -456,9 +458,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
 	}
-	if w.body.file.isdir && !newNameIsdir {
-		w.DirFree()
-	}
+//	if w.body.file.isdir && !newNameIsdir {
+//		w.DirFree()
+//	}
 
 	t.Delete(0, t.file.Nr(), true)
 	samename := name == t.file.name

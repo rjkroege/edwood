@@ -350,7 +350,6 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
 		q1 := t.file.Size()
-		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }
