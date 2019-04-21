@@ -367,7 +367,7 @@ func (w *Window) MouseBut() {
 func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
 		xfidlog(w, "del")
-//		w.DirFree()
+		//		w.DirFree()
 		w.tag.Close()
 		w.body.Close()
 		if activewin == w {
@@ -397,17 +397,7 @@ func (w *Window) Undo(isundo bool) {
 }
 
 func (w *Window) SetName(name string) {
-	Lslashguide := "/guide"
-	LplusErrors := "+Errors"
-
 	t := &w.body
-	if t.file.name == name {
-		return
-	}
-	w.body.file.isscratch = false
-	if strings.HasSuffix(name, Lslashguide) || strings.HasSuffix(name, LplusErrors) {
-		w.body.file.isscratch = true
-	}
 	t.file.SetName(name)
 
 	w.SetTag()
@@ -617,7 +607,7 @@ func (w *Window) AddIncl(r string) {
 // This will modify the File so that the next call to Clean will return true
 // even if this one returned false.
 func (w *Window) Clean(conservative bool) bool {
-	if w.body.file.HasNoBacking() { // don't whine if it's a guide file, error window, etc.
+	if w.body.file.IsDirOrScratch() { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
