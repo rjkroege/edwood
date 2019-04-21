@@ -13,7 +13,7 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
-//
+// 
 // A File tracks several related concepts. First it is a text buffer with
 // undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
 // an undo point.
@@ -101,11 +101,18 @@ func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
+
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
 // Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
+}
+
+// HasNoBacking returns true if the File object does have a backing
+// either onto a disk file or provided via Acme filesystem.
+func (f *File) HasNoBacking() bool {
+	return f.isscratch ||f.isdir
 }
 
 // Size returns the complete size of the buffer including both commited
@@ -166,7 +173,7 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.isdir && !f.isscratch
+	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.HasNoBacking()
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
@@ -250,7 +257,7 @@ func (f *File) SnapshotSeq() {
 
 // Dirty reports whether the current state of the File is different from
 // the initial state or from the one at the time of calling Clean.
-//
+// 
 // TODO(rjk): switching to undo.Buffer will require removing external uses
 // of seq.
 func (f *File) Dirty() bool {

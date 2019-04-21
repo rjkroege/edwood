@@ -1014,7 +1014,7 @@ func alltofile(w *Window, tp *Tofile) {
 	if tp.f != nil {
 		return
 	}
-	if w.body.file.isscratch || w.body.file.isdir {
+	if w.body.file.HasNoBacking() {
 		return
 	}
 	t := &w.body
@@ -1042,7 +1042,7 @@ func tofile(r string) *File {
 }
 
 func allmatchfile(w *Window, tp *Tofile) {
-	if w.body.file.isscratch || w.body.file.isdir {
+	if w.body.file.HasNoBacking() {
 		return
 	}
 	t := &w.body
