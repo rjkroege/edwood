@@ -131,7 +131,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// use no wider than 3-space tabs in a directory
 	maxt := int(maxtab)
 	if t.what == Body {
-		if t.file.isdir {
+		if t.file.IsDir() {
 			maxt = min(TABDIR, int(maxtab))
 		} else {
 			maxt = t.tabstop
@@ -145,7 +145,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 		t.fr.Redraw(enclosing)
 	}
 
-	if t.what == Body && t.file.isdir && odx != t.all.Dx() {
+	if t.what == Body && t.file.IsDir() && odx != t.all.Dx() {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
@@ -270,7 +270,8 @@ func (t *Text) checkSafeToLoad(filename string) error {
 	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
-	if t.file.isdir && t.file.name == "" {
+
+	if t.file.IsDir() && t.file.name == "" {
 		warning(nil, "empty directory name")
 		return fmt.Errorf("empty directory name")
 	}
@@ -282,7 +283,7 @@ func (t *Text) checkSafeToLoad(filename string) error {
 }
 
 func (t *Text) loadReader(q0 int, filename string, rd io.Reader, sethash bool) (nread int, err error) {
-	t.file.isdir = false
+	t.file.SetDir(false)
 	t.w.filemenu = true
 	count, hasNulls, err := t.file.Load(q0, rd, sethash)
 	if err != nil {
@@ -330,7 +331,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
 			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
 		}
-		t.file.isdir = true
+		t.file.SetDir(true)
 		t.w.filemenu = false
 		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, string(filepath.Separator)) {
 			t.file.name = t.file.name + string(filepath.Separator)
@@ -350,6 +351,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
 		q1 := t.file.Size()
+		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }

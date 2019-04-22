@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/rjkroege/edwood/internal/file"
 )
@@ -60,7 +61,7 @@ type File struct {
 	text    []*Text // [private I think]
 
 	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
-	isdir     bool // Used to track if this File is populated from a directory list.
+	isdir     bool // Used to track if this File is populated from a directory list. [private]
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded.
 
@@ -115,10 +116,28 @@ func (f *File) IsDirOrScratch() bool {
 	return f.isscratch || f.isdir
 }
 
+// IsDir returns true if the File has a synthetic backing of
+// a directory.
+// TODO(rjk): File is a facade that subsumes the entire Model
+// of an Edwood MVC. As such, it shoudl look like a text buffer for
+// view/controller code. isdir is true for a specific kind of File innards
+// where we automatically alter the contents in various ways.
+// Automatically altering the contents should be expressed differently.
+// Directory listings should not be special cased throughout.
+func (f *File) IsDir() bool {
+	return f.isdir
+}
+
+// SetDir updates the setting of the isdir flag.
+func (f *File) SetDir(flag bool) {
+	f.isdir = flag
+}
+
 // Size returns the complete size of the buffer including both commited
 // and uncommitted runes.
 // NB: naturally forwards to undo.Buffer.Size()
-// TODO(rjk): needs to return the size in bytes.
+// TODO(rjk): Switch all callers to Nr() as would be the number of
+// bytes when backed by undo.Buffer.
 func (f *File) Size() int {
 	return int(f.b.nc()) + len(f.cache)
 }
@@ -162,12 +181,6 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 //
 // TODO(rjk): figure out how this overlaps with hash. (hash would appear
 // to be used to determine the "if the contents differ")
-//
-// TOOD(rjk): HasSaveableChanges and this overlap. They are almost
-// the same and could perhaps be unified. They differ in the following
-// way: HasSaveableChanges will be the same when seq > 0. I should
-// unify this. I don't think Edwood should be depending on this difference.
-// Also: note overlap with Dirty.
 //
 // Latest thought: there are two separate issues: are we at a point marked
 // as clean and is this File writable to a backing. They are combined in this

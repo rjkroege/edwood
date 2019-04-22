@@ -118,7 +118,7 @@ func xfidopen(x *Xfid) {
 			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
-				if !w.body.file.isdir && w.col != nil {
+				if !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = false
 					w.SetTag()
 				}
@@ -249,7 +249,7 @@ func xfidclose(x *Xfid) {
 				if q == QWdata || q == QWxdata {
 					w.nomark = false
 				}
-				if q == QWevent && !w.body.file.isdir && w.col != nil {
+				if q == QWevent && !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = true
 					w.SetTag()
 				}
