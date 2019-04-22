@@ -651,7 +651,7 @@ func (w *Window) CtlPrint(fonts bool) string {
 		w.body.Nc(), isdir, dirty)
 	if fonts {
 		// fsys exposes the actual physical font name.
-		return fmt.Sprintf("%s%11d %s %11d ", buf, w.body.fr.Rect().Dx(),
+		buf =  fmt.Sprintf("%s%11d %s %11d ", buf, w.body.fr.Rect().Dx(),
 			quote(fontget(w.body.font, w.display).Name), w.body.fr.GetMaxtab())
 	}
 	return buf

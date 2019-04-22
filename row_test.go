@@ -114,9 +114,9 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 		if dw.Type != dumpfile.Unsaved && w.tag != dw.Tag.Buffer {
 			t.Errorf("tag is %q; expected %q", w.tag, dw.Tag)
 		}
-
-		if p := plan9FontPath(dw.Font); w.font != p {
-			t.Errorf("font for %q is %q; expected %q", w.name, w.font, p)
+		
+		if p := plan9FontPath(dw.Font); unscaledFontName(w.font) != p {
+			t.Errorf("font for %q is %q; expected %q", w.name, unscaledFontName(w.font), p)
 		}
 
 		if w.q0 != dw.Body.Q0 || w.q1 != dw.Body.Q1 {
@@ -127,6 +127,17 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 			t.Errorf("body for %q is %q; expected %q", w.name, w.body, dw.Body.Buffer)
 		}
 	}
+}
+
+// unscaledFontName converts the given fname to an unscaled
+// representation without the leading scaling indicator.
+func unscaledFontName(fname string) string {
+	return strings.TrimLeftFunc(fname, func(r rune) bool {
+		if (r >= '0' && r <= '9') || r == '*' {
+			return true
+		}
+		return false
+	})
 }
 
 func plan9FontPath(name string) string {
