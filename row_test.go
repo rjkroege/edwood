@@ -114,7 +114,7 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 		if dw.Type != dumpfile.Unsaved && w.tag != dw.Tag.Buffer {
 			t.Errorf("tag is %q; expected %q", w.tag, dw.Tag)
 		}
-		
+
 		if p := plan9FontPath(dw.Font); unscaledFontName(w.font) != p {
 			t.Errorf("font for %q is %q; expected %q", w.name, unscaledFontName(w.font), p)
 		}
