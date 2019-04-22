@@ -133,7 +133,7 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 // representation without the leading scaling indicator.
 func unscaledFontName(fname string) string {
 	return strings.TrimLeftFunc(fname, func(r rune) bool {
-		return  (r >= '0' && r <= '9') || r == '*' 
+		return (r >= '0' && r <= '9') || r == '*'
 	})
 }
 
