@@ -393,7 +393,7 @@ func (r *Row) Dump(file string) {
 				dw.ExecDir = w.dumpdir
 				dw.ExecCommand = w.dumpstr
 
-			case !w.body.file.Dirty() && access(t.file.name) || w.body.file.isdir:
+			case !w.body.file.Dirty() && access(t.file.name) || w.body.file.IsDir():
 				dumpid[t.file] = w.id
 				dw.Type = dumpfile.Saved
 

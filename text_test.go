@@ -79,7 +79,7 @@ func TestLoadError(t *testing.T) {
 	}
 
 	text = emptyText()
-	text.file.isdir = true
+	text.file.SetDir(true)
 
 	text.file.name = ""
 	wantErr = "empty directory name"

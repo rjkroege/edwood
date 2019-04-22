@@ -486,7 +486,7 @@ func (w *Window) setTag1() {
 			sb.WriteString(Lput)
 		}
 	}
-	if w.body.file.isdir {
+	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
 	olds := string(w.tag.file.b)
@@ -633,7 +633,7 @@ func (w *Window) Clean(conservative bool) bool {
 // Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
-	if w.body.file.isdir {
+	if w.body.file.IsDir() {
 		isdir = 1
 	}
 	dirty := 0

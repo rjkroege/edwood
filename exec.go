@@ -585,7 +585,7 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
-	if et == nil || et.w == nil || et.w.body.file.isdir {
+	if et == nil || et.w == nil || et.w.body.file.IsDir() {
 		return
 	}
 	w := et.w
@@ -779,7 +779,8 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage))
-		if t.w.body.file.isdir {
+
+		if t.w.body.file.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!
 			for i, dir := range t.w.dirnames {
 				t.w.widths[i] = newfont.StringWidth(dir)
@@ -806,7 +807,8 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		return
 	}
 	t = &t.w.body
-	if t.w.body.file.isdir {
+	if t.w.body.file.IsDir() {
+		// TODO(rjk): Why?
 		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
