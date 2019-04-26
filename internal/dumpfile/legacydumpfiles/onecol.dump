@@ -1,0 +1,15 @@
+/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood
+/lib/font/bit/lucsans/euro.8.font
+/lib/font/bit/lucm/unicode.9.font
+  0.0000000
+w win Newcol Kill Putall Dump Exit win
+c          0 New Cut Paste Snarf Sort Zerox Delcol 
+F          0           0           6           6   2.2618232           6 /lib/font/bit/lucsans/euro.8.font
+          3          28           6           0           1  Del Snarf Undo | Look Edit 
+hello
+e          0          -1           0           0  16.9294037 /lib/font/bit/lucsans/euro.8.font
+          4          99         879           0           1 /Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood/-Gubaidulina Del Snarf | Look Edit  Send
+/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood/
+win
+f          0           5           0           0  60.3838245 /lib/font/bit/lucsans/euro.8.font
+          5          91        1660           0           0 /Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood/README.md Del Snarf | Look Edit 

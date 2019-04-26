@@ -68,6 +68,10 @@ func main() {
 
 	if loadfile != "" {
 		d, err := dumpfile.Load(loadfile) // Overrides fonts selected up to here.
+		if err != nil {
+			// Maybe it's in legacy format. Try that too.
+			d, err = dumpfile.LoadLegacy(loadfile, home)
+		}
 		if err == nil {
 			if d.VarFont != "" {
 				*varfontflag = d.VarFont
