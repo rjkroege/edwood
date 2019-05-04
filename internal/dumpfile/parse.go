@@ -26,12 +26,12 @@ const (
 
 // Content stores the state of Edwood.
 type Content struct {
-	CurrentDir string   // Edwood's current working directory
-	VarFont    string   // Variable width font
-	FixedFont  string   // Fixed width font
-	RowTag     Text     // Top-most tag (usually "Newcol ... Exit")
-	Columns    []Column // List of columns
-	Windows    []Window // List of windows across all columns
+	CurrentDir string    // Edwood's current working directory
+	VarFont    string    // Variable width font
+	FixedFont  string    // Fixed width font
+	RowTag     Text      // Top-most tag (usually "Newcol ... Exit")
+	Columns    []Column  // List of columns
+	Windows    []*Window // List of windows across all columns
 }
 
 // Column stores the state of a column in Edwood.

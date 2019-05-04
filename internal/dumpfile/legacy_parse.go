@@ -19,7 +19,7 @@ func readtrim(rd *bufio.Reader) (string, error) {
 	} else if err != nil {
 		return "", err
 	}
-	l = strings.TrimRight(l, "\n")
+	l = strings.TrimRight(l, "\r\n")
 	return l, nil
 }
 
@@ -39,13 +39,13 @@ func splitline(l string, count int) []string {
 
 // loadhelper breaks out common load file parsing functionality for selected row
 // types.
-func loadhelper(rd *bufio.Reader, subl []string, fontname string, numcol, ndumped int, wintype WindowType) (Window, error) {
+func loadhelper(rd *bufio.Reader, subl []string, fontname string, numcol, ndumped int, wintype WindowType) (*Window, error) {
 	// log.Printf("loadhelper start subl=%#v fontname=%s ndumped=%d dumpid=%d", subl, fontname, ndumped, dumpid)
 	// defer log.Println("loadhelper done")
 	// Column for this window.
 	oi, err := strconv.ParseInt(subl[1], 10, 64)
 	if err != nil || oi < 0 || oi > 10 {
-		return Window{}, fmt.Errorf("cant't parse column id %s: %v", subl[1], err)
+		return nil, fmt.Errorf("cant't parse column id %s: %v", subl[1], err)
 	}
 	i := int(oi)
 
@@ -59,27 +59,27 @@ func loadhelper(rd *bufio.Reader, subl []string, fontname string, numcol, ndumpe
 	// Get q0
 	oq0, err := strconv.ParseInt(subl[3], 10, 64)
 	if err != nil {
-		return Window{}, fmt.Errorf("cant't parse q0 %s because %v", subl[3], err)
+		return nil, fmt.Errorf("cant't parse q0 %s because %v", subl[3], err)
 	}
 	q0 := int(oq0)
 
 	// Get q1
 	oq1, err := strconv.ParseInt(subl[4], 10, 64)
 	if err != nil {
-		return Window{}, fmt.Errorf("cant't parse q1 %s because %v", subl[4], err)
+		return nil, fmt.Errorf("cant't parse q1 %s because %v", subl[4], err)
 	}
 	q1 := int(oq1)
 
 	// Row size
 	percent, err := strconv.ParseFloat(subl[5], 64)
 	if err != nil {
-		return Window{}, fmt.Errorf("cant't parse percent %s because %v", subl[5], err)
+		return nil, fmt.Errorf("cant't parse percent %s because %v", subl[5], err)
 	}
 
 	// Read the follow-on line for tag value.
 	nextline, err := readtrim(rd)
 	if err != nil {
-		return Window{}, err
+		return nil, err
 	}
 	subl = splitline(nextline, 6)
 	tag := subl[5]
@@ -89,11 +89,11 @@ func loadhelper(rd *bufio.Reader, subl []string, fontname string, numcol, ndumpe
 	// Read from the file into a string. Any amount missing
 	// is considered a fatal error.
 	if n, err := rd.Read(buffer); err != nil || n != ndumped {
-		return Window{}, fmt.Errorf("can't load dumped file contents %v", err)
+		return nil, fmt.Errorf("can't load dumped file contents %v", err)
 	}
 
 	// TODO(rjk): set from new variable.
-	return Window{
+	return &Window{
 		Type:     wintype,
 		Column:   i,
 		Position: percent,
@@ -119,7 +119,7 @@ func LoadLegacy(file, home string) (*Content, error) {
 
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, fmt.Errorf("Loading old dumpfile file %s failed: %v", file, err)
+		return nil, fmt.Errorf("loading old dumpfile file %s failed: %v", file, err)
 	}
 	defer f.Close()
 	b := bufio.NewReader(f)
@@ -155,19 +155,19 @@ func LoadLegacy(file, home string) (*Content, error) {
 	subl := splitline(l, -1)
 
 	if len(subl) > 10 {
-		return nil, fmt.Errorf("Load: bad number of column widths %d in %#v", len(subl), l)
+		return nil, fmt.Errorf("bad number of column widths %d in %#v", len(subl), l)
 	}
 	dc.Columns = make([]Column, len(subl))
 
 	for i, cwidth := range subl {
 		percent, err := strconv.ParseFloat(cwidth, 64)
 		if err != nil {
-			return nil, fmt.Errorf("Load: parsing column width in %#v had error %v", l, err)
+			return nil, fmt.Errorf("parsing column width in %#v had error %v", l, err)
 		}
 		dc.Columns[i].Position = percent
 	}
 
-	dc.Windows = make([]Window, 0, 10)
+	dc.Windows = make([]*Window, 0, 10)
 
 	// Read the window entries. There will be an entry for each Window. A Window may be
 	// 1 or 2 lines except for Window records that correspond to each file. In which case,the
@@ -190,7 +190,7 @@ func LoadLegacy(file, home string) (*Content, error) {
 			subl := splitline(l, 3)
 			bi, err := strconv.ParseInt(subl[1], 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("Load: parsing column id in %#v had error %v", l, err)
+				return nil, fmt.Errorf("parsing column id in %#v had error %v", l, err)
 			}
 			dc.Columns[bi].Tag = Text{Buffer: subl[2], Q0: 0, Q1: 0}
 		case l[0] == 'w':
@@ -220,7 +220,7 @@ func LoadLegacy(file, home string) (*Content, error) {
 			// TODO(rjk): We don't restore external commands very well.
 			// This is something that I've long been unhappy about. Make it better.
 			// TODO(rjk): Confirm that this will actually work.
-			dc.Windows = append(dc.Windows, Window{
+			dc.Windows = append(dc.Windows, &Window{
 				Type:     Exec,
 				Column:   len(dc.Columns) - 1,
 				Position: 0,

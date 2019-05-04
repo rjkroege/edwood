@@ -30,7 +30,7 @@ var testTab = []Content{
 				},
 			},
 		},
-		Windows: []Window{},
+		Windows: []*Window{},
 	},
 }
 

@@ -372,7 +372,7 @@ func (r *Row) Dump(file string) {
 			// We always include the font name.
 			fontname := t.font
 
-			dump.Windows = append(dump.Windows, dumpfile.Window{
+			dump.Windows = append(dump.Windows, &dumpfile.Window{
 				Column: i,
 				Body: dumpfile.Text{
 					Buffer: "", // filled in later if Unsaved
@@ -382,7 +382,7 @@ func (r *Row) Dump(file string) {
 				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
 				Font:     fontname,
 			})
-			dw := &dump.Windows[len(dump.Windows)-1]
+			dw := dump.Windows[len(dump.Windows)-1]
 
 			switch {
 			case dumpid[t.file] > 0:
@@ -609,7 +609,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 			run(nil, win.ExecCommand, dirline, true, "", "", false)
 
 		case dumpfile.Saved, dumpfile.Unsaved, dumpfile.Zerox:
-			if err := row.loadhelper(&win); err != nil {
+			if err := row.loadhelper(win); err != nil {
 				return err
 			}
 

@@ -28,6 +28,8 @@ github.com/ktye/duitdraw v0.0.0-20190325213621-8726aaefa68b h1:KRNdZ+TwKLodlevAw
 github.com/ktye/duitdraw v0.0.0-20190325213621-8726aaefa68b/go.mod h1:TsTcPGNjOvXTtzBTFZdpRDbSnhDizngqzp0Q6ZipRYk=
 github.com/ktye/duitdraw v0.0.0-20190328070634-a54e9bd5a862 h1:ARGTQFjPom/kz8op6a+KTfKLAcoIDM6vdpjl5u4Cy+Y=
 github.com/ktye/duitdraw v0.0.0-20190328070634-a54e9bd5a862/go.mod h1:TsTcPGNjOvXTtzBTFZdpRDbSnhDizngqzp0Q6ZipRYk=
+github.com/sanity-io/litter v1.1.0 h1:BllcKWa3VbZmOZbDCoszYLk7zCsKHz5Beossi8SUcTc=
+github.com/sanity-io/litter v1.1.0/go.mod h1:CJ0VCw2q4qKU7LaQr3n7UOSHzgEMgcGco7N/SkZQPjw=
 golang.org/x/exp v0.0.0-20190212162250-21964bba6549 h1:lHlZGt5KQ2yKMtuXfrRfOEyKdH94NK3PR9o4Zr+Qn6g=
 golang.org/x/exp v0.0.0-20190212162250-21964bba6549/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/image v0.0.0-20190209060608-ef4a1470e0dc h1:P8UBp9iv2ZY5xjf9rnwI9s/hywlCgyKzpLsfk30IVyw=
