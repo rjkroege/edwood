@@ -507,47 +507,43 @@ func checkhash(name string, f *File, d os.FileInfo) {
 		return
 	}
 	if h.Eq(f.hash) {
-		//	f->dev = d->dev;
-		f.qidpath = d.Name()
-		f.mtime = d.ModTime()
+		f.info = d
 	}
 }
 
-// TODO(flux): dev and qidpath?
-// I haven't spelunked into plan9port to see what it returns for qidpath for regular
-// files.  inode?  For now, use the filename.  Awful.
-// Write this in terms of the various cases.
-func putfile(f *File, q0 int, q1 int, name string) {
+// putfile writes File to disk, if it's safe to do so.
+//
+// TODO(flux): Write this in terms of the various cases.
+func putfile(f *File, q0 int, q1 int, name string) error {
 	w := f.curtext.w
 	d, err := os.Stat(name)
 
 	// Putting to the same file that we already read from.
 	if err == nil && name == f.name {
-		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
+		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
 			checkhash(name, f, d)
 		}
-		if /*f.dev!=d.dev || */ f.qidpath != d.Name() || d.ModTime().Sub(f.mtime) > time.Millisecond {
+		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
+			// By setting File.info here, a subsequent Put will ignore that
+			// the disk file was mutated and will write File to the disk file.
+			f.info = d
+
 			if f.hash == file.EmptyHash {
 				// Edwood created the File but a disk file with the same name exists.
 				warning(nil, "%s not written; file already exists\n", name)
-			} else {
-				// Edwood loaded the disk file to File but the disk file has been modified since.
-				warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.mtime, d.ModTime())
+				return fmt.Errorf("%s not written; file already exists", name)
 			}
-			//	f.dev = d.dev;
-			f.qidpath = d.Name()
 
-			// By setting File.mtime here, a subsequent Put will ignore that
-			// the disk file was mutated and will write File to the disk file.
-			f.mtime = d.ModTime()
-			return
+			// Edwood loaded the disk file to File but the disk file has been modified since.
+			warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.info.ModTime(), d.ModTime())
+			return fmt.Errorf("%s modified since last read\n\twas %v; now %v\n", name, f.info.ModTime(), d.ModTime())
 		}
 	}
 
 	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		warning(nil, "can't create file %s: %v\n", name, err)
-		return
+		return fmt.Errorf("can't create file %s: %v\n", name, err)
 	}
 	defer fd.Close()
 
@@ -557,7 +553,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 	isapp := (err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0)
 	if isapp {
 		warning(nil, "%s not written; file is append only\n", name)
-		return
+		return fmt.Errorf("%s not written; file is append only\n", name)
 	}
 	r := make([]rune, RBUFSIZE)
 	n := 0
@@ -572,7 +568,7 @@ func putfile(f *File, q0 int, q1 int, name string) {
 		nwritten, err := fd.Write([]byte(s))
 		if err != nil || nwritten != len(s) {
 			warning(nil, "can't write file %s: %v\n", name, err)
-			return
+			return fmt.Errorf("can't write file %s: %v\n", name, err)
 		}
 	}
 
@@ -588,15 +584,14 @@ func putfile(f *File, q0 int, q1 int, name string) {
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
-			//f.qidpath = d.qid.path;
-			//f.dev = d.dev;
-			f.mtime = d.ModTime()
+			f.info = d
 			f.hash.Set(h.Sum(nil))
 			f.Clean()
 		}
 		f.SnapshotSeq()
 	}
 	w.SetTag()
+	return nil
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {

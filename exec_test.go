@@ -1,9 +1,13 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 )
 
 func acmeTestingMain() {
@@ -85,5 +89,78 @@ func TestRunproc(t *testing.T) {
 			}
 		}
 		<-done
+	}
+}
+
+func TestPutfile(t *testing.T) {
+	dir, err := ioutil.TempDir("", "edwood.test")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	filename := filepath.Join(dir, "hello.txt")
+	err = ioutil.WriteFile(filename, nil, 0644)
+	if err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	checkFile := func(t *testing.T, content string) {
+		b, err := ioutil.ReadFile(filename)
+		if err != nil {
+			t.Fatalf("ReadAll failed: %v", err)
+		}
+		s := string(b)
+		if s != content {
+			t.Errorf("file content is %q; expected %q", s, content)
+		}
+	}
+
+	want := "Hello, 世界\n"
+	w := &Window{
+		body: Text{
+			file: &File{
+				b:    Buffer(want),
+				name: filename,
+			},
+		},
+	}
+	f := w.body.file
+	f.curtext = &w.body
+	f.curtext.w = w
+	increaseMtime := func(t *testing.T, duration time.Duration) {
+		tm := f.info.ModTime().Add(duration)
+		if err := os.Chtimes(filename, tm, tm); err != nil {
+			t.Fatalf("Chtimes failed: %v", err)
+		}
+	}
+
+	err = putfile(f, 0, f.Size(), filename)
+	if err == nil || !strings.Contains(err.Error(), "file already exists") {
+		t.Fatalf("putfile returned error %v; expected 'file already exists'", err)
+	}
+	err = putfile(f, 0, f.Size(), filename)
+	if err != nil {
+		t.Fatalf("putfile failed: %v", err)
+	}
+	checkFile(t, want)
+
+	// mtime increased but hash is the same
+	increaseMtime(t, time.Second)
+	err = putfile(f, 0, f.Size(), filename)
+	if err != nil {
+		t.Fatalf("putfile failed: %v", err)
+	}
+	checkFile(t, want)
+
+	// mtime increased and hash changed
+	want = "Hello, 世界\nThis line added outside of Edwood.\n"
+	err = ioutil.WriteFile(filename, []byte(""), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	increaseMtime(t, time.Second)
+	err = putfile(f, 0, f.Size(), filename)
+	if err == nil || !strings.Contains(err.Error(), "modified since last read") {
+		t.Fatalf("putfile returned error %v; expected 'modified since last read'", err)
 	}
 }
