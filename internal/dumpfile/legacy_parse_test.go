@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/sanity-io/litter"
 )
 
 type testvector struct {
@@ -12,65 +14,65 @@ type testvector struct {
 	parseerror string
 }
 
-func TestLegacyLoad(t *testing.T) {
+var (
+	missingpth string
+	tests      []testvector
+)
 
-	tests := []testvector{
-		{
-			filename:   filepath.Join("legacydumpfiles", "nothere"),
-			tc:         nil,
-			parseerror: "Loading old dumpfile file legacydumpfiles/nothere failed: open legacydumpfiles/nothere: no such file or directory",
-		},
+func TestLegacyLoad(t *testing.T) {
+	// Open each of the test files
+	tests = append(tests, []testvector{
 		{
 			// short line
-			filename:   filepath.Join("legacydumpfiles", "bad1.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad1.dump"),
 			tc:         nil,
 			parseerror: "EOF",
 		},
 		{
 			// short line
-			filename:   filepath.Join("legacydumpfiles", "bad2.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad2.dump"),
 			tc:         nil,
 			parseerror: "EOF",
 		},
 		{
 			// short line
-			filename:   filepath.Join("legacydumpfiles", "bad3.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad3.dump"),
 			tc:         nil,
 			parseerror: "EOF",
 		},
 		{
 			// short line
-			filename:   filepath.Join("legacydumpfiles", "bad4.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad4.dump"),
 			tc:         nil,
 			parseerror: "EOF",
 		},
 		{
 			// too many columns
-			filename:   filepath.Join("legacydumpfiles", "bad5.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad5.dump"),
 			tc:         nil,
-			parseerror: "Load: bad number of column widths 11 in \"  0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 59.9609375\"",
+			parseerror: "bad number of column widths 11 in \"  0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 0.0000000  59.9609375 59.9609375\"",
 		},
 		{
 			// invalid column width
-			filename:   filepath.Join("legacydumpfiles", "bad6.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad6.dump"),
 			tc:         nil,
-			parseerror: "Load: parsing column width in \"  0.0000000  a\" had error strconv.ParseFloat: parsing \"a\": invalid syntax",
+			parseerror: "parsing column width in \"  0.0000000  a\" had error strconv.ParseFloat: parsing \"a\": invalid syntax",
 		},
 		{
 			// short line, w line
-			filename:   filepath.Join("legacydumpfiles", "bad7.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad7.dump"),
 			tc:         nil,
 			parseerror: "EOF",
 		},
 		{
 			// bad column identifier.
-			filename:   filepath.Join("legacydumpfiles", "bad8.dump"),
+			filename:   filepath.Join("testdata", "legacy", "bad8.dump"),
 			tc:         nil,
-			parseerror: "Load: parsing column id in \"c          a New Cut Paste Snarf Sort Zerox Delcol \" had error strconv.ParseInt: parsing \"a\": invalid syntax",
+			parseerror: "parsing column id in \"c          a New Cut Paste Snarf Sort Zerox Delcol \" had error strconv.ParseInt: parsing \"a\": invalid syntax",
 		},
 
 		{
-			filename: filepath.Join("legacydumpfiles", "nowin.dump"),
+			filename: filepath.Join("testdata", "legacy", "nowin.dump"),
 			tc: &Content{
 				CurrentDir: "/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood",
 				VarFont:    "/lib/font/bit/lucsans/euro.8.font",
@@ -89,11 +91,11 @@ func TestLegacyLoad(t *testing.T) {
 						Tag: Text{
 							Buffer: "New Cut Paste Snarf Sort Zerox Delcol ",
 							Q0:     0, Q1: 0}}},
-				Windows: []Window{}},
+				Windows: []*Window{}},
 			parseerror: "",
 		},
 		{
-			filename: filepath.Join("legacydumpfiles", "basic.dump"),
+			filename: filepath.Join("testdata", "legacy", "basic.dump"),
 			tc: &Content{
 				CurrentDir: "/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood",
 				VarFont:    "/lib/font/bit/lucsans/euro.8.font",
@@ -121,7 +123,7 @@ func TestLegacyLoad(t *testing.T) {
 						},
 					},
 				},
-				Windows: []Window{
+				Windows: []*Window{
 					{
 						Type:     Saved,
 						Column:   1,
@@ -145,7 +147,7 @@ func TestLegacyLoad(t *testing.T) {
 			parseerror: "",
 		},
 		{
-			filename: filepath.Join("legacydumpfiles", "onecol.dump"),
+			filename: filepath.Join("testdata", "legacy", "onecol.dump"),
 			tc: &Content{
 				CurrentDir: "/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood",
 				VarFont:    "/lib/font/bit/lucsans/euro.8.font",
@@ -165,7 +167,7 @@ func TestLegacyLoad(t *testing.T) {
 						},
 					},
 				},
-				Windows: []Window{
+				Windows: []*Window{
 					{
 						Type:     Unsaved,
 						Column:   0,
@@ -226,7 +228,7 @@ func TestLegacyLoad(t *testing.T) {
 		},
 
 		{
-			filename: filepath.Join("legacydumpfiles", "zerox.dump"),
+			filename: filepath.Join("testdata", "legacy", "zerox.dump"),
 			tc: &Content{
 				CurrentDir: "/Users/rjkroege/tools/gopkg/src/github.com/rjkroege/edwood",
 				VarFont:    "/lib/font/bit/lucsans/euro.8.font", FixedFont: "/lib/font/bit/lucm/unicode.9.font",
@@ -238,7 +240,7 @@ func TestLegacyLoad(t *testing.T) {
 						Buffer: "New Cut Paste Snarf Sort Zerox Delcol ", Q0: 0, Q1: 0}},
 					{Position: 59.9609375, Tag: Text{
 						Buffer: "New Cut Paste Snarf Sort Zerox Delcol ", Q0: 0, Q1: 0}}},
-				Windows: []Window{
+				Windows: []*Window{
 					{Type: 0, Column: 0, Position: 2.2618232,
 						Font: "/lib/font/bit/lucsans/euro.8.font",
 						Tag: Text{
@@ -260,9 +262,8 @@ func TestLegacyLoad(t *testing.T) {
 		},
 
 		// TODO(rjk): Insert some error handling test cases.
-	}
 
-	// Open each of the test files
+	}...)
 
 	for _, v := range tests {
 		c, err := LoadLegacy(v.filename, "/home/gopher")
@@ -278,7 +279,7 @@ func TestLegacyLoad(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(v.tc, c) {
-			t.Errorf("%s: content is %#v; expected %#v\n", v.filename, c, v.tc)
+			t.Errorf("%s: content is %s; expected %s\n", v.filename, litter.Sdump(c), litter.Sdump(v.tc))
 		}
 	}
 }
