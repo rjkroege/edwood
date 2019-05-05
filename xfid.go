@@ -760,6 +760,19 @@ forloop:
 func xfideventwrite(x *Xfid, w *Window) {
 	var err error
 
+	// We can't lock row while we have a window locked
+	// because that can create deadlock with mousethread.
+	rowLock := func() {
+		w.Unlock()
+		row.lk.Lock()
+		w.Lock(w.owner)
+	}
+	rowUnlock := func() {
+		w.Unlock()
+		row.lk.Unlock()
+		w.Lock(w.owner)
+	}
+
 	// The messages have a fixed format: a character indicating the
 	// origin or cause of the action, a character indicating
 	// the type of the action, four free-format blank-terminated
@@ -815,18 +828,18 @@ forloop:
 			break
 		}
 
-		row.lk.Lock() // just like mousethread
+		rowLock() // just like mousethread
 		switch c {
 		case 'x', 'X':
 			execute(t, q0, q1, true, nil)
 		case 'l', 'L':
 			look3(t, q0, q1, true)
 		default:
-			row.lk.Unlock()
+			rowUnlock()
 			err = ErrBadEvent
 			break forloop
 		}
-		row.lk.Unlock()
+		rowUnlock()
 	}
 
 	var fc plan9.Fcall
