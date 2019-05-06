@@ -147,6 +147,10 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 			break
 		}
 	}
+	// TODO(fhs): Why is this necessary?
+	if f.sp1 > f.nchars {
+		f.sp1 = f.nchars
+	}
 	return f.sp0, f.sp1
 }
 
