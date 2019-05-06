@@ -332,9 +332,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		q1 = q0 + count
 	}
 	if setqid {
-		//t.file.dev = d.dev;
-		t.file.mtime = d.ModTime()
-		t.file.qidpath = d.Name() // TODO(flux): Gross hack to use filename as unique ID of file.
+		t.file.info = d
 	}
 	fd.Close()
 

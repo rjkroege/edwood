@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"time"
+	"os"
 
 	"github.com/rjkroege/edwood/internal/file"
 )
@@ -28,10 +28,7 @@ type File struct {
 	epsilon []*Undo // [private]
 	elog    Elog
 	name    string
-	qidpath string // TODO(flux): Gross hack to use filename instead of qidpath for file uniqueness
-	mtime   time.Time
-	// dev       int
-	// unread bool
+	info    os.FileInfo
 
 	// TODO(rjk): Remove this when I've inserted undo.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
@@ -404,14 +401,11 @@ func (f *File) UnsetName(delta *[]*Undo) {
 
 func NewFile(filename string) *File {
 	return &File{
-		b:       NewBuffer(),
-		delta:   []*Undo{},
-		epsilon: []*Undo{},
-		elog:    MakeElog(),
-		name:    filename,
-		//	qidpath   uint64
-		//	mtime     uint64
-		//	dev       int
+		b:         NewBuffer(),
+		delta:     []*Undo{},
+		epsilon:   []*Undo{},
+		elog:      MakeElog(),
+		name:      filename,
 		editclean: true,
 		//	seq       int
 		mod: false,
