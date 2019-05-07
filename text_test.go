@@ -6,8 +6,107 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func emptyText() *Text {
+	w := &Window{
+		body: Text{
+			file: &File{},
+		},
+	}
+	t := &w.body
+	t.w = w
+	return t
+}
+
+func TestLoadReader(t *testing.T) {
+	for _, tc := range []struct {
+		in, out string
+	}{
+		{"temporary file's content\n", "temporary file's content\n"},
+		{"temporary file's \x00content\n", "temporary file's content\n"},
+	} {
+		text := emptyText()
+		_, err := text.LoadReader(0, "/home/gopher/test/main.go", strings.NewReader(tc.in), true)
+		if err != nil {
+			t.Fatalf("LoadReader failed: %v", err)
+		}
+		out := string(text.file.b)
+		if out != tc.out {
+			t.Errorf("loaded text %q; expected %q", out, tc.out)
+		}
+	}
+}
+
+func TestLoad(t *testing.T) {
+	dir, err := ioutil.TempDir("", "edwood.test")
+	if err != nil {
+		t.Fatalf("failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	for _, tc := range []struct {
+		in, out string
+	}{
+		{"temporary file's content\n", "temporary file's content\n"},
+		{"temporary file's \x00content\n", "temporary file's content\n"},
+	} {
+		text := emptyText()
+		filename := filepath.Join(dir, "tmpfile")
+		if err = ioutil.WriteFile(filename, []byte(tc.in), 0644); err != nil {
+			t.Fatalf("WriteFile failed: %v", err)
+		}
+
+		_, err = text.Load(0, filename, true)
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+		out := string(text.file.b)
+		if out != tc.out {
+			t.Errorf("loaded text %q; expected %q", out, tc.out)
+		}
+	}
+}
+
+func TestLoadError(t *testing.T) {
+	text := emptyText()
+	wantErr := "can't open /non-existant-filename:"
+	_, err := text.Load(0, "/non-existant-filename", true)
+	if err == nil || !strings.HasPrefix(err.Error(), wantErr) {
+		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
+	}
+
+	text = emptyText()
+	text.file.isdir = true
+
+	text.file.name = ""
+	wantErr = "empty directory name"
+	_, err = text.Load(0, "/", true)
+	if err == nil || err.Error() != wantErr {
+		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
+	}
+	_, err = text.LoadReader(0, "/", nil, true)
+	if err == nil || err.Error() != wantErr {
+		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
+	}
+
+	mtpt = "/mnt/acme"
+	defer func() {
+		mtpt = ""
+	}()
+	text.file.name = mtpt
+	wantErr = "will not open self mount point /mnt/acme"
+	_, err = text.Load(0, mtpt, true)
+	if err == nil || err.Error() != wantErr {
+		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
+	}
+	_, err = text.LoadReader(0, mtpt, nil, true)
+	if err == nil || err.Error() != wantErr {
+		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
+	}
+}
 
 func TestClickHTMLMatch(t *testing.T) {
 	tt := []struct {

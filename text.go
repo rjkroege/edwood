@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -267,18 +268,48 @@ func (t *Text) Columnate(names []string, widths []int) {
 	}
 }
 
-// Load loads filename into the Text.file. Text must be of type body.
-func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
+func (t *Text) checkSafeToLoad(filename string) error {
 	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 	if t.file.isdir && t.file.name == "" {
 		warning(nil, "empty directory name")
-		return 0, fmt.Errorf("empty directory name")
+		return fmt.Errorf("empty directory name")
 	}
 	if ismtpt(filename) {
 		warning(nil, "will not open self mount point %s\n", filename)
-		return 0, fmt.Errorf("will not open self mount point %s", filename)
+		return fmt.Errorf("will not open self mount point %s", filename)
+	}
+	return nil
+}
+
+func (t *Text) loadReader(q0 int, filename string, rd io.Reader, sethash bool) (nread int, err error) {
+	t.file.isdir = false
+	t.w.filemenu = true
+	count, hasNulls, err := t.file.Load(q0, rd, sethash)
+	if err != nil {
+		warning(nil, "Error reading file %s: %v", filename, err)
+		return 0, fmt.Errorf("error reading file %s: %v", filename, err)
+	}
+	if hasNulls {
+		warning(nil, "%s: NUL bytes elided\n", filename)
+	}
+	return count, nil
+}
+
+// LoadReader loads an io.Reader into the Text.file. Text must be of type body.
+// Filename is only used for error reporting, not for access to the on-disk file.
+func (t *Text) LoadReader(q0 int, filename string, rd io.Reader, sethash bool) (nread int, err error) {
+	if err := t.checkSafeToLoad(filename); err != nil {
+		return 0, err
+	}
+	return t.loadReader(q0, filename, rd, sethash)
+}
+
+// Load loads filename into the Text.file. Text must be of type body.
+func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
+	if err := t.checkSafeToLoad(filename); err != nil {
+		return 0, err
 	}
 	fd, err := os.Open(filename)
 	if err != nil {
@@ -291,9 +322,10 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		warning(nil, "can't fstat %s: %v\n", filename, err)
 		return 0, fmt.Errorf("can't fstat %s: %v", filename, err)
 	}
+	if setqid {
+		t.file.info = d
+	}
 
-	q1 := 0
-	hasNulls := false
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
 		if t.file.HasMultipleTexts() {
@@ -319,27 +351,10 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 = t.file.Size()
-	} else {
-		t.file.isdir = false
-		t.w.filemenu = true
-		var count int
-		count, hasNulls, err = t.file.Load(q0, fd, setqid && q0 == 0)
-		if err != nil {
-			warning(nil, "Error reading file %s: %v", filename, err)
-			return 0, fmt.Errorf("error reading file %s: %v", filename, err)
-		}
-		q1 = q0 + count
+		q1 := t.file.Size()
+		return q1 - q0, nil
 	}
-	if setqid {
-		t.file.info = d
-	}
-	fd.Close()
-
-	if hasNulls {
-		warning(nil, "%s: NUL bytes elided\n", filename)
-	}
-	return q1 - q0, nil
+	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }
 
 func getDirNames(f *os.File) ([]string, error) {
