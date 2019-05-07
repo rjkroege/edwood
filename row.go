@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -465,24 +464,8 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
 
 	if win.Type == dumpfile.Unsaved {
-		// Simplest thing is to put it in a file and load that.
-		// TODO(fhs): Remove use of temporary file. Load should take an io.Reader.
-		fd, err := ioutil.TempFile("", "edwoodload")
-		if err != nil {
-			return fmt.Errorf("can't create temp file for reloading contents %v", err)
-		}
-		if _, err := fd.WriteString(win.Body.Buffer); err != nil {
-			// TODO(rjk): Generate better diagnostics.
-			return err
-		}
-		filename := fd.Name()
-		if err := fd.Close(); err != nil {
-			return err
-		}
-
-		w.body.Load(0, filename, true)
+		w.body.LoadReader(0, subl[0], strings.NewReader(win.Body.Buffer), true)
 		w.body.file.Modded()
-		os.Remove(filename)
 
 		// This shows an example where an observer would be useful?
 		w.SetTag()
