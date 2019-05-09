@@ -306,7 +306,7 @@ func flushwarnings() {
 		w.Unlock()
 		// warn.buf.Close()
 		if warn.md != nil {
-			fsysdelid(warn.md)
+			mnt.DecRef(warn.md) // IncRef in addwarningtext
 		}
 	}
 	warnings = warnings[0:0]
@@ -327,7 +327,7 @@ func addwarningtext(md *MntDir, r []rune) {
 	warn := Warning{}
 	warn.md = md
 	if md != nil {
-		fsysincid(md)
+		mnt.IncRef(md) // DecRef in flushwarnings
 	}
 	warn.buf.Insert(0, r)
 	warnings = append(warnings, &warn)

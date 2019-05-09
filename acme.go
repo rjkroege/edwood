@@ -509,7 +509,7 @@ func waitthread() {
 			if c.iseditcommand {
 				cedit <- 0
 			}
-			fsysdelid(c.md)
+			mnt.DecRef(c.md) // mnt.Add in fsysmount
 		}
 	}
 	for {

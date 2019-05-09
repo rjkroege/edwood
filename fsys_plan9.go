@@ -66,7 +66,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 
 // Called only in exec.c:/^run(), from a different FD group
 func fsysmount(dir string, incl []string) (*MntDir, *client.Fsys, error) {
-	md := fsysaddid(dir, incl)
+	md := mnt.Add(dir, incl) // DecRef in waitthread
 	if md == nil {
 		return nil, nil, fmt.Errorf("child: can't allocate mntdir")
 	}
