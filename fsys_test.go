@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -508,5 +509,84 @@ func (tfs tFsys) Write(file, s string) {
 func TestGetuser(t *testing.T) {
 	if getuser() == "" {
 		t.Errorf("Didn't get a username")
+	}
+}
+
+func TestMnt(t *testing.T) {
+	var mnt Mnt
+
+	md := mnt.GetFromID(1)
+	if md != nil {
+		t.Errorf("mnt.Find(1) returned %v; expected nil", md)
+	}
+
+	md = mnt.Add("/home/gopher", nil)
+	want := &MntDir{
+		id:   1,
+		ref:  1,
+		next: nil,
+		dir:  "/home/gopher",
+		incl: nil,
+	}
+	if !reflect.DeepEqual(md, want) {
+		t.Fatalf("mnt.Add returned %v; expected %v", md, want)
+	}
+
+	mnt.IncRef(md)
+	if got, want := md.ref, 2; got != want {
+		t.Fatalf("mnt.IncRef increased ref to %v; expected %v", got, want)
+	}
+
+	mnt.DecRef(md)
+	if got, want := md.ref, 1; got != want {
+		t.Fatalf("mnt.DecRef decreased ref to %v; expected %v", got, want)
+	}
+
+	if got, want := mnt.GetFromID(1), md; got != want {
+		t.Fatalf("mnt.Find returned %v; expected %v", got, want)
+	}
+	if got, want := md.ref, 2; got != want {
+		t.Fatalf("Find increased ref to %v; expected %v", got, want)
+	}
+
+	mnt.DecRef(md)
+	if got, want := md.ref, 1; got != want {
+		t.Fatalf("mnt.DecRef decreased ref to %v; expected %v", got, want)
+	}
+
+	mnt.DecRef(md)
+	if got, want := md.ref, 0; got != want {
+		t.Fatalf("mnt.DecRef decreased ref to %v; expected %v", got, want)
+	}
+	if mnt.md != nil {
+		t.Fatalf("mnt.md is %v; expected nil", mnt.md)
+	}
+}
+
+func TestMntDecRef(t *testing.T) {
+	var mnt Mnt
+	mnt.DecRef(nil) // no-op
+
+	md := &MntDir{id: 42}
+	cerr = make(chan error)
+	go mnt.DecRef(md)
+	err := <-cerr
+	wantErr := fmt.Sprintf("Mnt.DecRef: can't find id %d", md.id)
+	if err == nil || err.Error() != wantErr {
+		t.Errorf("mnt.DecRef invalid id %d generated error %v; expected %q", md.id, err, wantErr)
+	}
+
+	md1 := mnt.Add("/home/gopher1", nil)
+	md2 := mnt.Add("/home/gopher2", nil)
+	if mnt.md != md2 || md2.next != md1 || md1.next != nil {
+		t.Fatalf("linked list (got/want): %p/%p > %p/%p > %p/nil", mnt.md, md2, md2.next, md1, md1.next)
+	}
+	mnt.DecRef(md1)
+	if mnt.md != md2 || md2.next != nil {
+		t.Fatalf("linked list (got/want): %p/%p > %p/nil", mnt.md, md2, md2.next)
+	}
+	mnt.DecRef(md2)
+	if mnt.md != nil {
+		t.Fatalf("mnt.md is %v; expected nil", mnt.md)
 	}
 }

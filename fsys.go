@@ -82,10 +82,13 @@ var dirtabw = []*DirTab{
 	//	{ nil, }
 }
 
+// Mnt is a collection of reference counted MntDir.
+// It is used to pass information from Edwood's 9p client to
+// Edwood's 9p file server.
 type Mnt struct {
 	lk sync.Mutex
-	id int
-	md *MntDir
+	id int     // Used to generate MntDir identifier.
+	md *MntDir // Linked list of MntDir.
 }
 
 var mnt Mnt
@@ -151,32 +154,31 @@ func (fs *fileServer) fsysproc() {
 	}
 }
 
-func fsysaddid(dir string, incl []string) *MntDir {
+// Add creates a new MntDir and returns a new reference to it.
+func (mnt *Mnt) Add(dir string, incl []string) *MntDir {
 	mnt.lk.Lock()
 	mnt.id++
-	id := mnt.id
-	m := &MntDir{}
-	m.id = int64(id)
-	m.dir = dir
-	m.ref = 1 // one for Command, one will be incremented in attach
-	m.next = mnt.md
-	m.incl = incl
+	m := &MntDir{
+		id:   int64(mnt.id),
+		ref:  1, // One for Command. Incremented in attach, walk, etc.
+		next: mnt.md,
+		dir:  dir,
+		incl: incl,
+	}
 	mnt.md = m
 	mnt.lk.Unlock()
 	return m
 }
 
-func fsysincid(m *MntDir) {
+// IncRef increments reference to given MntDir.
+func (mnt *Mnt) IncRef(m *MntDir) {
 	mnt.lk.Lock()
 	m.ref++
 	mnt.lk.Unlock()
 }
 
-func fsysdelid(idm *MntDir) {
-	var (
-		m, prev *MntDir
-	)
-
+// DecRef decrements reference to given MntDir.
+func (mnt *Mnt) DecRef(idm *MntDir) {
 	if idm == nil {
 		return
 	}
@@ -186,8 +188,8 @@ func fsysdelid(idm *MntDir) {
 	if idm.ref > 0 {
 		return
 	}
-	prev = nil
-	for m = mnt.md; m != nil; m = m.next {
+	var prev *MntDir
+	for m := mnt.md; m != nil; m = m.next {
 		if m == idm {
 			if prev != nil {
 				prev.next = m.next
@@ -199,7 +201,21 @@ func fsysdelid(idm *MntDir) {
 		prev = m
 	}
 
-	cerr <- fmt.Errorf("fsysdelid: can't find id %d", idm.id)
+	cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
+}
+
+// GetFromID finds the MntDir with given id and returns a new reference to it.
+func (mnt *Mnt) GetFromID(id int64) *MntDir {
+	mnt.lk.Lock()
+	defer mnt.lk.Unlock()
+
+	for m := mnt.md; m != nil; m = m.next {
+		if m.id == id {
+			m.ref++
+			return m
+		}
+	}
+	return nil
 }
 
 func (fs *fileServer) close() {
@@ -276,19 +292,10 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
 		}
 	}
-	mnt.lk.Lock()
-	var m *MntDir
-	for m = mnt.md; m != nil; m = m.next {
-		if m.id == id {
-			f.mntdir = m
-			m.ref++
-			break
-		}
-	}
+	m := mnt.GetFromID(id) // DecRef in clunk
 	if m == nil && x.fcall.Aname != "" {
 		cerr <- fmt.Errorf("unknown id '%s' in attach", x.fcall.Aname)
 	}
-	mnt.lk.Unlock()
 	return fs.respond(x, &t, nil)
 }
 
@@ -316,7 +323,7 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 		nf.open = false
 		nf.mntdir = f.mntdir
 		if f.mntdir != nil {
-			f.mntdir.ref++
+			mnt.IncRef(f.mntdir) // DecRef in clunk
 		}
 		nf.dir = f.dir
 		nf.qid = f.qid
@@ -447,7 +454,7 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 	if err != nil || len(t.Wqid) < len(x.fcall.Wname) {
 		if nf != nil {
 			nf.busy = false
-			fsysdelid(nf.mntdir)
+			mnt.DecRef(nf.mntdir)
 		}
 	} else {
 		if len(t.Wqid) == len(x.fcall.Wname) {
@@ -592,7 +599,7 @@ func (fs *fileServer) write(x *Xfid, f *Fid) *Xfid {
 }
 
 func (fs *fileServer) clunk(x *Xfid, f *Fid) *Xfid {
-	fsysdelid(f.mntdir)
+	mnt.DecRef(f.mntdir) // IncRef in attach/walk
 	x.c <- xfidclose
 	return nil
 }

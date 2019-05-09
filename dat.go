@@ -150,11 +150,18 @@ type DirTab struct {
 	perm uint
 }
 
+// MntDir contains context of where an external command was run.
 type MntDir struct {
-	id   int64
-	ref  int
-	dir  string
-	next *MntDir
+	id   int64   // Unique identifier used as Aname in Tattach.
+	ref  int     // Used for reference counting.
+	next *MntDir // Next in linked list.
+
+	// Directory where the command was run.
+	// Writes to cons file go to window named dir+"/+Errors".
+	dir string
+
+	// Additional search paths for C #include inherited from the window
+	// where the command was run.
 	incl []string
 }
 
