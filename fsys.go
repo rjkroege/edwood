@@ -87,8 +87,8 @@ var dirtabw = []*DirTab{
 // Edwood's 9p file server.
 type Mnt struct {
 	lk sync.Mutex
-	id int     // Used to generate MntDir identifier.
-	md *MntDir // Linked list of MntDir.
+	id uint64 // Used to generate MntDir identifier.
+	md map[uint64]*MntDir
 }
 
 var mnt Mnt
@@ -159,13 +159,15 @@ func (mnt *Mnt) Add(dir string, incl []string) *MntDir {
 	mnt.lk.Lock()
 	mnt.id++
 	m := &MntDir{
-		id:   int64(mnt.id),
+		id:   mnt.id,
 		ref:  1, // One for Command. Incremented in attach, walk, etc.
-		next: mnt.md,
 		dir:  dir,
 		incl: incl,
 	}
-	mnt.md = m
+	if mnt.md == nil {
+		mnt.md = make(map[uint64]*MntDir)
+	}
+	mnt.md[m.id] = m
 	mnt.lk.Unlock()
 	return m
 }
@@ -188,34 +190,24 @@ func (mnt *Mnt) DecRef(idm *MntDir) {
 	if idm.ref > 0 {
 		return
 	}
-	var prev *MntDir
-	for m := mnt.md; m != nil; m = m.next {
-		if m == idm {
-			if prev != nil {
-				prev.next = m.next
-			} else {
-				mnt.md = m.next
-			}
-			return
-		}
-		prev = m
+	if _, ok := mnt.md[idm.id]; !ok {
+		cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
+		return
 	}
-
-	cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
+	delete(mnt.md, idm.id)
 }
 
 // GetFromID finds the MntDir with given id and returns a new reference to it.
-func (mnt *Mnt) GetFromID(id int64) *MntDir {
+func (mnt *Mnt) GetFromID(id uint64) *MntDir {
 	mnt.lk.Lock()
 	defer mnt.lk.Unlock()
 
-	for m := mnt.md; m != nil; m = m.next {
-		if m.id == id {
-			m.ref++
-			return m
-		}
+	m, ok := mnt.md[id]
+	if !ok {
+		return nil
 	}
-	return nil
+	m.ref++
+	return m
 }
 
 func (fs *fileServer) close() {
@@ -284,10 +276,10 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 	t.Qid = f.qid
 	f.mntdir = nil
-	var id int64
+	var id uint64
 	if x.fcall.Aname != "" {
 		var err error
-		id, err = strconv.ParseInt(x.fcall.Aname, 10, 32)
+		id, err = strconv.ParseUint(x.fcall.Aname, 10, 32)
 		if err != nil {
 			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
 		}

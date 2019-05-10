@@ -517,14 +517,13 @@ func TestMnt(t *testing.T) {
 
 	md := mnt.GetFromID(1)
 	if md != nil {
-		t.Errorf("mnt.Find(1) returned %v; expected nil", md)
+		t.Errorf("mnt.GetFromID(1) returned %v; expected nil", md)
 	}
 
 	md = mnt.Add("/home/gopher", nil)
 	want := &MntDir{
 		id:   1,
 		ref:  1,
-		next: nil,
 		dir:  "/home/gopher",
 		incl: nil,
 	}
@@ -543,10 +542,10 @@ func TestMnt(t *testing.T) {
 	}
 
 	if got, want := mnt.GetFromID(1), md; got != want {
-		t.Fatalf("mnt.Find returned %v; expected %v", got, want)
+		t.Fatalf("mnt.GetFromID returned %v; expected %v", got, want)
 	}
 	if got, want := md.ref, 2; got != want {
-		t.Fatalf("Find increased ref to %v; expected %v", got, want)
+		t.Fatalf("mnt.GetFromID increased ref to %v; expected %v", got, want)
 	}
 
 	mnt.DecRef(md)
@@ -558,8 +557,8 @@ func TestMnt(t *testing.T) {
 	if got, want := md.ref, 0; got != want {
 		t.Fatalf("mnt.DecRef decreased ref to %v; expected %v", got, want)
 	}
-	if mnt.md != nil {
-		t.Fatalf("mnt.md is %v; expected nil", mnt.md)
+	if len(mnt.md) != 0 {
+		t.Fatalf("len(mnt.md) is %v; expected 0", len(mnt.md))
 	}
 }
 
@@ -574,19 +573,5 @@ func TestMntDecRef(t *testing.T) {
 	wantErr := fmt.Sprintf("Mnt.DecRef: can't find id %d", md.id)
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("mnt.DecRef invalid id %d generated error %v; expected %q", md.id, err, wantErr)
-	}
-
-	md1 := mnt.Add("/home/gopher1", nil)
-	md2 := mnt.Add("/home/gopher2", nil)
-	if mnt.md != md2 || md2.next != md1 || md1.next != nil {
-		t.Fatalf("linked list (got/want): %p/%p > %p/%p > %p/nil", mnt.md, md2, md2.next, md1, md1.next)
-	}
-	mnt.DecRef(md1)
-	if mnt.md != md2 || md2.next != nil {
-		t.Fatalf("linked list (got/want): %p/%p > %p/nil", mnt.md, md2, md2.next)
-	}
-	mnt.DecRef(md2)
-	if mnt.md != nil {
-		t.Fatalf("mnt.md is %v; expected nil", mnt.md)
 	}
 }
