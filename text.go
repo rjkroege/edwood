@@ -16,8 +16,6 @@ import (
 	"github.com/rjkroege/edwood/internal/draw/drawutil"
 	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/rjkroege/edwood/internal/runes"
-
-	"log"
 )
 
 const (
@@ -991,7 +989,6 @@ func (t *Text) Type(r rune) {
 			return
 		}
 
-		log.Println("erasing!")
 		nnb = t.BsWidth(r)
 		q1 = t.q0
 		q0 = q1 - nnb
@@ -1110,7 +1107,6 @@ func (t *Text) Select() {
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
 	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0, q1)
-		fmt.Printf("Text.Select: DoubleClick returned %d, %d\n", q0, q1)
 		t.SetSelect(q0, q1)
 		t.display.Flush()
 		x := mouse.Point.X

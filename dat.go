@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"os"
-	"runtime/debug"
-	"strings"
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
@@ -216,26 +213,6 @@ func (r *Ref) Inc() {
 func (r *Ref) Dec() int {
 	*r--
 	return int(*r)
-}
-func Untested() {
-	stack := strings.Split(string(debug.Stack()), "\n")
-	for i, l := range stack {
-		if l == "main.Untested()" {
-			fmt.Printf("Untested: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
-			//	runtime.Breakpoint()
-			break
-		}
-	}
-}
-func Unimpl() {
-	stack := strings.Split(string(debug.Stack()), "\n")
-	for i, l := range stack {
-		if l == "main.Unimpl()" {
-			fmt.Printf("Unimplemented: %v: %v\n", stack[i+2], strings.TrimLeft(stack[i+3], " \t"))
-			//	runtime.Breakpoint()
-			break
-		}
-	}
 }
 
 func WIN(q plan9.Qid) int {
