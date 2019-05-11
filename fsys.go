@@ -288,6 +288,9 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	if m == nil && x.fcall.Aname != "" {
 		cerr <- fmt.Errorf("unknown id '%s' in attach", x.fcall.Aname)
 	}
+	if m != nil {
+		f.mntdir = m
+	}
 	return fs.respond(x, &t, nil)
 }
 
