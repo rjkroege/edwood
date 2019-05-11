@@ -227,6 +227,18 @@ func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, e
 	return len(runes), hasNulls, err
 }
 
+// UpdateInfo updates File's info to d if file hash hasn't changed.
+func (f *File) UpdateInfo(filename string, d os.FileInfo) {
+	h, err := file.HashFor(filename)
+	if err != nil {
+		warning(nil, "failed to open %v to compute hash", filename)
+		return
+	}
+	if h.Eq(f.hash) {
+		f.info = d
+	}
+}
+
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): switching to undo.Buffer will require removing use of seq
 func (f *File) SnapshotSeq() {

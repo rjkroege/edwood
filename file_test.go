@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -328,5 +330,44 @@ func TestFileRedoSeq(t *testing.T) {
 
 	if got, want := f.RedoSeq(), 1; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
+	}
+}
+
+func TestFileUpdateInfo(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "edwood_test")
+	if err != nil {
+		t.Fatalf("failed to create temporary file: %v", err)
+	}
+	filename := tmp.Name()
+	defer os.Remove(filename)
+
+	if _, err := tmp.WriteString("Hello, 世界\n"); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	if err := tmp.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+
+	d, err := os.Stat(filename)
+	if err != nil {
+		t.Fatalf("stat failed: %v", err)
+	}
+	f := NewFile(filename)
+	f.hash = file.EmptyHash
+	f.info = nil
+	f.UpdateInfo(filename, d)
+	if f.info != nil {
+		t.Errorf("File info is %v; want nil", f.info)
+	}
+
+	h, err := file.HashFor(filename)
+	if err != nil {
+		t.Fatalf("HashFor(%v) failed: %v", filename, err)
+	}
+	f.hash = h
+	f.info = nil
+	f.UpdateInfo(filename, d)
+	if f.info != d {
+		t.Errorf("File info is %v; want %v", f.info, d)
 	}
 }

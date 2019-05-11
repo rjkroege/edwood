@@ -552,16 +552,7 @@ func waitthread() {
 			t := &row.tag
 			t.Commit()
 			if c == nil {
-				// helper processes use this exit status
-				// TODO(flux): I don't understand what this libthread code is doing
-				Untested()
-				if strings.HasPrefix(w.String(), "libthread") {
-					p := &Pid{}
-					p.pid = pid
-					p.msg = w.String()
-					p.next = pids
-					pids = p
-				}
+				warning(nil, "unknown command (pid %v) exited: %v\n", pid, w.String())
 			} else {
 				if search(t, []rune(c.name)) {
 					t.Delete(t.q0, t.q1, true)

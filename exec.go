@@ -497,20 +497,6 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 	run(nil, arg, string(dir), false, aa, a, false)
 }
 
-// TODO(rjk): move this into File.
-func checkhash(name string, f *File, d os.FileInfo) {
-	Untested()
-
-	h, err := file.HashFor(name)
-	if err != nil {
-		warning(nil, "Failed to open %v to compute hash", name)
-		return
-	}
-	if h.Eq(f.hash) {
-		f.info = d
-	}
-}
-
 // putfile writes File to disk, if it's safe to do so.
 //
 // TODO(flux): Write this in terms of the various cases.
@@ -521,7 +507,7 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	// Putting to the same file that we already read from.
 	if err == nil && name == f.name {
 		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
-			checkhash(name, f, d)
+			f.UpdateInfo(name, d)
 		}
 		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
@@ -672,18 +658,12 @@ func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 }
 
 func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg string, iseditcmd bool) {
-	Untested()
-	var (
-		c    *Command
-		cpid chan *os.Process
-	)
-
 	if len(s) == 0 {
 		return
 	}
 
-	c = &Command{}
-	cpid = make(chan *os.Process)
+	c := &Command{}
+	cpid := make(chan *os.Process)
 	go func() {
 		err := runproc(win, s, rdir, newns, argaddr, xarg, c, cpid, iseditcmd)
 		if err != nil && err != errEmptyCmd {
