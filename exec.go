@@ -559,9 +559,7 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 
 	// Putting to the same file as the one that we originally read from.
 	if name == f.name {
-		log.Println("actually running the put", q0, q1, f.Size())
 		if q0 != 0 || q1 != f.Size() {
-			log.Println("marking the file as modded")
 			// The backing disk file contents now differ from File because
 			// we've over-written the disk file with part of File.
 			f.Modded()
