@@ -176,8 +176,7 @@ func allupdate(w *Window) {
 		if owner == 0 {
 			t.w.owner = 'E'
 		}
-		// TODO(rjk): This code exists to permit work around the fact that
-		// InsertAt and DeleteAt are both implicitly Commit-ing.
+		// Set an undo point before applying accumulated Edit actions.
 		f.Mark(seq)
 		f.elog.Apply(t)
 		if f.editclean {
