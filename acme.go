@@ -53,6 +53,8 @@ func main() {
 	bartflag = *bartflagflag
 	swapscrollbuttons = *swapscrollbuttonsflag
 
+	// TODO(fhs): This is not very portable.
+	// See https://github.com/rjkroege/edwood/issues/222
 	home = os.Getenv("HOME")
 	acmeshell = os.Getenv("acmeshell")
 	p := os.Getenv("tabstop")
