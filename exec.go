@@ -17,8 +17,6 @@ import (
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/frame"
-
-	"log"
 )
 
 type Exectab struct {
@@ -627,12 +625,13 @@ func sortx(et, _, _ *Text, _, _ bool, _ string) {
 func seqof(w *Window, isundo bool) int {
 	// if it's undo, see who changed with us
 	if isundo {
-		return w.body.file.seq
+		return w.body.file.Seq()
 	}
 	// if it's redo, see who we'll be sync'ed up with
 	return w.body.file.RedoSeq()
 }
 
+// TODO(rjk): Why does this work this way?
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	if et == nil || et.w == nil {
 		return
