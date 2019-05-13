@@ -426,9 +426,9 @@ func u_cmd(t *Text, cp *Cmd) bool {
 		flag = false
 	}
 	oseq := -1
-	for n > 0 && t.file.seq != oseq {
+	for n > 0 && t.file.Seq() != oseq {
 		n--
-		oseq = t.file.seq
+		oseq = t.file.Seq()
 		undo(t, nil, nil, flag, false, "")
 	}
 	return true
@@ -436,7 +436,7 @@ func u_cmd(t *Text, cp *Cmd) bool {
 
 func w_cmd(t *Text, cp *Cmd) bool {
 	f := t.file
-	if f.seq == seq {
+	if f.Seq() == seq {
 		editerror("can't write file with pending modifications")
 	}
 	r := cmdname(f, cp.text, false)

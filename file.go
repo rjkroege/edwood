@@ -51,7 +51,7 @@ type File struct {
 	editclean bool
 
 	// Tracks the Edit sequence.
-	seq          int
+	seq          int // undo sequencing [private]
 	putseq       int  // seq on last put [private]
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
@@ -508,8 +508,11 @@ func NewTagFile() *File {
 	}
 }
 
-// RedoSeq finds the seq of the last redo record.
-// TODO(rjk): Make sure that this is true.
+// RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
+// analog in undo.Buffer. The value of seq is used to track intra and
+// inter File edit actions so that cross-File changes via Edit X can be
+// undone with a single action. An implementation of File that wraps
+// undo.Buffer will need to to preserve seq tracking.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
@@ -519,10 +522,17 @@ func (f *File) RedoSeq() int {
 	return u.seq
 }
 
+// Seq returns the current value of seq.
+func (f *File) Seq() int {
+	return f.seq
+}
+
 // TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
 // The number actually processed is controlled by mutations to File.seq.
 // This does not align with the semantics of undo.Buffer.
+// Each "Mark" needs to have a seq value provided.
+// TODO(rjk): Consider providing the target seq value as an argument.
 func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	var (
 		stop           int
