@@ -271,12 +271,10 @@ func (t *Text) checkSafeToLoad(filename string) error {
 		panic("text.load")
 	}
 	if t.file.isdir && t.file.name == "" {
-		warning(nil, "empty directory name")
-		return fmt.Errorf("empty directory name")
+		return warnError(nil, "empty directory name")
 	}
 	if ismtpt(filename) {
-		warning(nil, "will not open self mount point %s\n", filename)
-		return fmt.Errorf("will not open self mount point %s", filename)
+		return warnError(nil, "will not open self mount point %s", filename)
 	}
 	return nil
 }
@@ -286,8 +284,7 @@ func (t *Text) loadReader(q0 int, filename string, rd io.Reader, sethash bool) (
 	t.w.filemenu = true
 	count, hasNulls, err := t.file.Load(q0, rd, sethash)
 	if err != nil {
-		warning(nil, "Error reading file %s: %v", filename, err)
-		return 0, fmt.Errorf("error reading file %s: %v", filename, err)
+		return 0, warnError(nil, "error reading file %s: %v", filename, err)
 	}
 	if hasNulls {
 		warning(nil, "%s: NUL bytes elided\n", filename)
@@ -311,14 +308,12 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	}
 	fd, err := os.Open(filename)
 	if err != nil {
-		warning(nil, "can't open %s: %v\n", filename, err)
-		return 0, fmt.Errorf("can't open %s: %v", filename, err)
+		return 0, warnError(nil, "can't open %s: %v", filename, err)
 	}
 	defer fd.Close()
 	d, err := fd.Stat()
 	if err != nil {
-		warning(nil, "can't fstat %s: %v\n", filename, err)
-		return 0, fmt.Errorf("can't fstat %s: %v", filename, err)
+		return 0, warnError(nil, "can't fstat %s: %v", filename, err)
 	}
 	if setqid {
 		t.file.info = d
@@ -327,8 +322,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
 		if t.file.HasMultipleTexts() {
-			warning(nil, "%s is a directory; can't read with multiple windows on it\n", filename)
-			return 0, fmt.Errorf("%s is a directory; can't read with multiple windows on it", filename)
+			return 0, warnError(nil, "%s is a directory; can't read with multiple windows on it", filename)
 		}
 		t.file.isdir = true
 		t.w.filemenu = false
@@ -338,8 +332,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		}
 		dirNames, err := getDirNames(fd)
 		if err != nil {
-			warning(nil, "getDirNames failed: %s\n", err)
-			return 0, fmt.Errorf("getDirNames failed: %v", err)
+			return 0, warnError(nil, "getDirNames failed: %v", err)
 		}
 		widths := make([]int, len(dirNames))
 		dft := t.getfont()

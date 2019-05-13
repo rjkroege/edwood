@@ -371,3 +371,13 @@ func TestFileUpdateInfo(t *testing.T) {
 		t.Errorf("File info is %v; want %v", f.info, d)
 	}
 }
+
+func TestFileUpdateInfoError(t *testing.T) {
+	filename := "/non-existant-file"
+	f := NewFile(filename)
+	err := f.UpdateInfo(filename, nil)
+	want := "failed to compute hash for"
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
+	}
+}
