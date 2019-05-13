@@ -51,7 +51,7 @@ type File struct {
 	editclean bool
 
 	// Tracks the Edit sequence.
-	seq          int // undo sequencing [private]
+	seq          int  // undo sequencing [private]
 	putseq       int  // seq on last put [private]
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
