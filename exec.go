@@ -568,8 +568,6 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 			f.hash.Set(h.Sum(nil))
 			f.Clean()
 		}
-		// TODO(rjk): This should be unnecessary (and is even a bug...)
-		// f.SnapshotSeq()
 	}
 	w.SetTag()
 	return nil
