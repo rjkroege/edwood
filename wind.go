@@ -358,15 +358,16 @@ func (w *Window) MouseBut() {
 	}
 }
 
-func (w *Window) DirFree() {
-	w.dirnames = w.dirnames[0:0]
-	w.widths = w.widths[0:0]
-}
+//func (w *Window) DirFree() {
+//	// TODO(rjk): This doesn't actually free the memory
+//	w.dirnames = w.dirnames[0:0]
+//	w.widths = w.widths[0:0]
+//}
 
 func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
 		xfidlog(w, "del")
-		w.DirFree()
+		//		w.DirFree()
 		w.tag.Close()
 		w.body.Close()
 		if activewin == w {
@@ -396,17 +397,7 @@ func (w *Window) Undo(isundo bool) {
 }
 
 func (w *Window) SetName(name string) {
-	Lslashguide := "/guide"
-	LplusErrors := "+Errors"
-
 	t := &w.body
-	if t.file.name == name {
-		return
-	}
-	w.body.file.isscratch = false
-	if strings.HasSuffix(name, Lslashguide) || strings.HasSuffix(name, LplusErrors) {
-		w.body.file.isscratch = true
-	}
 	t.file.SetName(name)
 
 	w.SetTag()
@@ -491,11 +482,11 @@ func (w *Window) setTag1() {
 		if w.body.file.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		if !w.body.file.isdir && w.body.file.HasSaveableChanges() {
+		if w.body.file.SaveableAndDirty() {
 			sb.WriteString(Lput)
 		}
 	}
-	if w.body.file.isdir {
+	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
 	olds := string(w.tag.file.b)
@@ -613,14 +604,16 @@ func (w *Window) AddIncl(r string) {
 }
 
 // Clean returns true iff w can be treated as unmodified.
+// This will modify the File so that the next call to Clean will return true
+// even if this one returned false.
 func (w *Window) Clean(conservative bool) bool {
-	if w.body.file.isscratch || w.body.file.isdir { // don't whine if it's a guide file, error window, etc.
+	if w.body.file.IsDirOrScratch() { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
 		return true
 	}
-	if w.body.file.Dirty() {
+	if w.body.file.TreatAsDirty() {
 		if len(w.body.file.name) != 0 {
 			warning(nil, "%v modified\n", w.body.file.name)
 		} else {
@@ -640,7 +633,7 @@ func (w *Window) Clean(conservative bool) bool {
 // Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
-	if w.body.file.isdir {
+	if w.body.file.IsDir() {
 		isdir = 1
 	}
 	dirty := 0

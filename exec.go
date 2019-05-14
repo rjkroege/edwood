@@ -439,7 +439,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 			return
 		}
 	}
-	if !et.w.body.file.isdir && (et.w.body.file.Size() > 0 && !et.w.Clean(true)) {
+
+	isclean := et.w.Clean(true)
+	if et.w.body.file.Size() > 0 && !isclean {
 		return
 	}
 	w := et.w
@@ -453,9 +455,6 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	if t.file.HasMultipleTexts() && newNameIsdir {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
-	}
-	if w.body.file.isdir && !newNameIsdir {
-		w.DirFree()
 	}
 
 	t.Delete(0, t.file.Nr(), true)
@@ -569,14 +568,15 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 			f.hash.Set(h.Sum(nil))
 			f.Clean()
 		}
-		f.SnapshotSeq()
+		// TODO(rjk): This should be unnecessary (and is even a bug...)
+		// f.SnapshotSeq()
 	}
 	w.SetTag()
 	return nil
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
-	if et == nil || et.w == nil || et.w.body.file.isdir {
+	if et == nil || et.w == nil || et.w.body.file.IsDir() {
 		return
 	}
 	w := et.w
@@ -593,14 +593,11 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 func putall(et, _, _ *Text, _, _ bool, arg string) {
 	for _, col := range row.col {
 		for _, w := range col.w {
-			if w.body.file.isscratch || w.body.file.isdir || w.body.file.name == "" {
-				continue
-			}
 			if w.nopen[QWevent] > 0 {
 				continue
 			}
 			a := w.body.file.name
-			if w.body.file.HasSaveableChanges() {
+			if w.body.file.SaveableAndDirty() {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {
@@ -621,12 +618,13 @@ func sortx(et, _, _ *Text, _, _ bool, _ string) {
 func seqof(w *Window, isundo bool) int {
 	// if it's undo, see who changed with us
 	if isundo {
-		return w.body.file.seq
+		return w.body.file.Seq()
 	}
 	// if it's redo, see who we'll be sync'ed up with
 	return w.body.file.RedoSeq()
 }
 
+// TODO(rjk): Why does this work this way?
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	if et == nil || et.w == nil {
 		return
@@ -773,7 +771,8 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage))
-		if t.w.body.file.isdir {
+
+		if t.w.body.file.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!
 			for i, dir := range t.w.dirnames {
 				t.w.widths[i] = newfont.StringWidth(dir)
@@ -800,7 +799,8 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		return
 	}
 	t = &t.w.body
-	if t.w.body.file.isdir {
+	if t.w.body.file.IsDir() {
+		// TODO(rjk): Why?
 		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)

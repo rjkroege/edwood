@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/rjkroege/edwood/internal/file"
 )
@@ -13,6 +14,17 @@ import (
 // File (to implement Zerox). The File is responsible for updating the
 // Text instances. File is a model in MVC parlance while Text is a
 // View-Controller.
+//
+// A File tracks several related concepts. First it is a text buffer with
+// undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
+// an undo point.
+//
+// Next, a File might have a backing to a disk file.
+//
+// Lastly the text buffer might be clean/dirty. A clean buffer is possibly
+// the same as its disk backing. A specific point in the undo record is
+// considered clean.
+//
 // TODO(rjk): File will be a facade pattern composing an undo.Buffer
 // and a wrapping utf8string.String indexing wrapper.
 // TODO(rjk): my version of undo.Buffer  will implement Reader, Writer,
@@ -39,7 +51,7 @@ type File struct {
 	editclean bool
 
 	// Tracks the Edit sequence.
-	seq          int
+	seq          int  // undo sequencing [private]
 	putseq       int  // seq on last put [private]
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
@@ -48,8 +60,8 @@ type File struct {
 	curtext *Text
 	text    []*Text // [private I think]
 
-	isscratch bool // Used to track if this File should warn on unsaved deletion.
-	isdir     bool // Used to track if this File is populated from a directory list.
+	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
+	isdir     bool // Used to track if this File is populated from a directory list. [private]
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded.
 
@@ -90,15 +102,6 @@ func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
-// HasSaveableChanges returns true if there are changes to the File
-// that can be saved.
-// TODO(rjk): HasUnsavedChanges should be its name
-// TODO(rjk): it's conceivable that mod and SeqDiffer track the same
-// thing.
-func (f *File) HasSaveableChanges() bool {
-	return f.name != "" && (len(f.cache) != 0 || f.SeqDiffer())
-}
-
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
 // Has no analog in buffer.Undo. It will require modification.
@@ -106,10 +109,35 @@ func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
+// IsDirOrScratch returns true if the File has a synthetic backing of
+// a directory listing or has a name pattern that excludes it from
+// being saved under typical circumstances.
+func (f *File) IsDirOrScratch() bool {
+	return f.isscratch || f.isdir
+}
+
+// IsDir returns true if the File has a synthetic backing of
+// a directory.
+// TODO(rjk): File is a facade that subsumes the entire Model
+// of an Edwood MVC. As such, it shoudl look like a text buffer for
+// view/controller code. isdir is true for a specific kind of File innards
+// where we automatically alter the contents in various ways.
+// Automatically altering the contents should be expressed differently.
+// Directory listings should not be special cased throughout.
+func (f *File) IsDir() bool {
+	return f.isdir
+}
+
+// SetDir updates the setting of the isdir flag.
+func (f *File) SetDir(flag bool) {
+	f.isdir = flag
+}
+
 // Size returns the complete size of the buffer including both commited
 // and uncommitted runes.
 // NB: naturally forwards to undo.Buffer.Size()
-// TODO(rjk): needs to return the size in bytes.
+// TODO(rjk): Switch all callers to Nr() as would be the number of
+// bytes when backed by undo.Buffer.
 func (f *File) Size() int {
 	return int(f.b.nc()) + len(f.cache)
 }
@@ -154,24 +182,18 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // TODO(rjk): figure out how this overlaps with hash. (hash would appear
 // to be used to determine the "if the contents differ")
 //
-// TOOD(rjk): HasSaveableChanges and this overlap. They are almost
-// the same and could perhaps be unified. They differ in the following
-// way: HasSaveableChanges will be the same when seq > 0. I should
-// unify this. I don't think Edwood should be depending on this difference.
-// Also: note overlap with Dirty.
-//
 // Latest thought: there are two separate issues: are we at a point marked
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return (f.mod || len(f.cache) > 0) && !f.isdir && !f.isscratch
+	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
 }
 
-// Commit sets an undo point for the current state of the file.
-// The File observers are not run as part of a Commit. Observers
-// only run on an InsertAt* operation.
-// TODO(rjk): AFAIK. maps to undo.Buffer.Commit() correctly.
+// Commit writes the in-progress edits to the real buffer instead of
+// keeping them in the cache. Does not map to undo.Buffer.Commit (that
+// method is Mark). Remove this method.
 func (f *File) Commit() {
+	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
 	}
@@ -241,13 +263,17 @@ func (f *File) UpdateInfo(filename string, d os.FileInfo) error {
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): switching to undo.Buffer will require removing use of seq
+// TODO(rjk): This function maps to undo.Buffer.Clean()
 func (f *File) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
-// SeqDiffer returns true if the current seq differs from a previously snapshot.
-// TODO(rjk): switching to undo.Buffer will require removing use of seq
-func (f *File) SeqDiffer() bool {
+// Dirty reports whether the current state of the File is different from
+// the initial state or from the one at the time of calling Clean.
+//
+// TODO(rjk): switching to undo.Buffer will require removing external uses
+// of seq.
+func (f *File) Dirty() bool {
 	return f.seq != f.putseq
 }
 
@@ -297,6 +323,7 @@ func (f *File) HasMultipleTexts() bool {
 // to undo.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
+	f.treatasclean = false
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
 	}
@@ -315,7 +342,11 @@ func (f *File) InsertAt(p0 int, s []rune) {
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
 // TODO(rjk): Remove this as a prelude to converting to undo.Buffer
+// But preserve the cache. Every "small" insert should go into the cache.
+// It almost certainly greatly improves performance for a series of single
+// character insertions.
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
+	f.treatasclean = false
 	if p0 > f.b.nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
@@ -356,6 +387,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 // TODO(rjk): DeleteAt has an implied Commit operation
 // that makes it not match with undo.Buffer.Delete
 func (f *File) DeleteAt(p0, p1 int) {
+	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
 		acmeerror("internal error: DeleteAt", nil)
 	}
@@ -392,11 +424,37 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	(*delta) = append(*delta, &u)
 }
 
+// A File can have a spcific name that permit it to be persisted to disk
+// but typically would not be. These two constants are suffixes of File
+// names that have this property.
+const (
+	slashguide = "/guide"
+	plusErrors = "+Errors"
+)
+
+// SetName sets the name of the backing for this file.
+// Some backings that opt them out of typically being persisted.
+// Resetting a file name to a new value does not have any effect.
 func (f *File) SetName(name string) {
+	if f.name == name {
+		return
+	}
+
 	if f.seq > 0 {
 		f.UnsetName(&f.delta)
 	}
+	f.setnameandisscratch(name)
+}
+
+// setnameandisscratch updates the File.name and isscratch bit
+// at the same time.
+func (f *File) setnameandisscratch(name string) {
 	f.name = name
+	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
+		f.isscratch = true
+	} else {
+		f.isscratch = false
+	}
 }
 
 func (f *File) UnsetName(delta *[]*Undo) {
@@ -450,8 +508,11 @@ func NewTagFile() *File {
 	}
 }
 
-// RedoSeq finds the seq of the last redo record.
-// TODO(rjk): Make sure that this is true.
+// RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
+// analog in undo.Buffer. The value of seq is used to track intra and
+// inter File edit actions so that cross-File changes via Edit X can be
+// undone with a single action. An implementation of File that wraps
+// undo.Buffer will need to to preserve seq tracking.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
@@ -461,10 +522,17 @@ func (f *File) RedoSeq() int {
 	return u.seq
 }
 
+// Seq returns the current value of seq.
+func (f *File) Seq() int {
+	return f.seq
+}
+
 // TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
 // The number actually processed is controlled by mutations to File.seq.
 // This does not align with the semantics of undo.Buffer.
+// Each "Mark" needs to have a seq value provided.
+// TODO(rjk): Consider providing the target seq value as an argument.
 func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	var (
 		stop           int
@@ -528,14 +596,12 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			f.UnsetName(epsilon)
 			f.mod = u.mod
 			f.treatasclean = false
-			if u.n == 0 {
-				f.name = ""
-			} else {
-				f.name = string(u.buf)
-			}
+			newfname := string(u.buf)
+			f.setnameandisscratch(newfname)
 		}
 		(*delta) = (*delta)[0 : len(*delta)-1]
 	}
+	// TODO(rjk): Why do we do this?
 	if isundo {
 		f.seq = 0
 	}
@@ -544,8 +610,6 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 
 // Reset removes all Undo records for this File.
 // TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
-// Or is it part of Clean()? I think that undo.Buffer.Clean should
-// reset the buffer.
 // Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
@@ -553,19 +617,24 @@ func (f *File) Reset() {
 	f.seq = 0
 }
 
-// Mark starts a new set of records that can be undone as
-// a unit and discards Redo records. Call this at the beginning
+// Mark sets an Undo point and
+// and discards Redo records. Call this at the beginning
 // of a set of edits that ought to be undo-able as a unit. This
-// should be implemented in terms of undo.Buffer.Commit()
+// is equivalent to undo.Buffer.Commit()
+// NB: current implementation permits calling Mark on an empty
+// file to indicate that one can undo to the file state at the time of
+// calling Mark.
+// TODO(rjk): Consider renaming to SetUndoPoint
+// TODO(rjk): Don't pass in seq. (Remove seq entirely?)
 func (f *File) Mark(seq int) {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
 }
 
-// Dirty returns true if the File should be considered modified.
-// TODO(rjk): This method's purpose is unclear.
-func (f *File) Dirty() bool {
-	return !f.treatasclean && f.mod
+// TreatAsDirty returns true if the File should be considered modified
+// for the purpose of warning the user if Del-ing a Dirty() file.
+func (f *File) TreatAsDirty() bool {
+	return !f.treatasclean && f.Dirty()
 }
 
 // TreatAsClean notes that the File should be considered as not Dirty
@@ -574,21 +643,17 @@ func (f *File) TreatAsClean() {
 	f.treatasclean = true
 }
 
-// Modded marks the File as having changes that could be written to the
-// File's backing disk file if it exists per SaveableAndDirty.
-// TODO(rjk): File.mod is unneeded?
-// f.mod is true when the File contents do not match the backing file.
+// Modded marks the File if we know that its backing is different from
+// its contents. This is needed to track when Edwood has modified the
+// backing without changing the File (e.g. via the Edit w command.
 func (f *File) Modded() {
 	f.mod = true
 	f.treatasclean = false
 }
 
-// Clean marks f as being identical to f's backing disk file.
-// TODO(rjk): rename this to better reflect its purpose.
+// Clean marks File as being non-dirty: the backing is the same as File.
 func (f *File) Clean() {
 	f.mod = false
 	f.treatasclean = false
-	// TODO(rjk): it had occurred to me that I should reset the
-	// the File here. But this is would be definitely wrong.
-	// f.Reset()
+	f.SnapshotSeq()
 }
