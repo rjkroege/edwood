@@ -129,6 +129,61 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 	}
 }
 
+func TestRowDumpError(t *testing.T) {
+	var r Row
+
+	err := r.Dump("")
+	if err != nil {
+		t.Errorf("Row.Dump returned error %v; want nil", err)
+	}
+
+	home = ""
+	r = Row{
+		col: make([]*Column, 2),
+	}
+	err = r.Dump("")
+	want := "can't find file for dump: can't find home directory"
+	if err == nil || err.Error() != want {
+		t.Errorf("Row.Dump returned error %q; want %q", err, want)
+	}
+}
+
+func TestRowLoadError(t *testing.T) {
+	var r Row
+
+	err := r.Load(nil, "/non-existant-file", true)
+	want := "can't load dump file: open /non-existant-file:"
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("Row.Load returned error %q; want prefix %q", err, want)
+	}
+
+	home = ""
+	err = r.Load(nil, "", true)
+	want = "can't find file for load: can't find home directory"
+	if err == nil || err.Error() != want {
+		t.Errorf("Row.Load returned error %q; want %q", err, want)
+	}
+}
+
+func TestDefaultDumpFile(t *testing.T) {
+	home = ""
+	_, err := defaultDumpFile()
+	if err == nil {
+		t.Errorf("defaultDumpFile returned nil error for unknown home directory")
+	}
+
+	home = "/home/gopher"
+	got, err := defaultDumpFile()
+	if err != nil {
+		t.Fatalf("defaultDumpFile failed: %v", err)
+	}
+	got = filepath.ToSlash(got)
+	want := "/home/gopher/edwood.dump"
+	if got != want {
+		t.Errorf("default dump file is %q; want %q", got, want)
+	}
+}
+
 // unscaledFontName converts the given fname to an unscaled
 // representation without the leading scaling indicator.
 func unscaledFontName(fname string) string {

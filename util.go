@@ -317,6 +317,12 @@ func warning(md *MntDir, s string, args ...interface{}) {
 	addwarningtext(md, r)
 }
 
+func warnError(md *MntDir, s string, args ...interface{}) error {
+	err := fmt.Errorf(s, args...)
+	addwarningtext(md, []rune(err.Error()+"\n"))
+	return err
+}
+
 func addwarningtext(md *MntDir, r []rune) {
 	for _, warn := range warnings {
 		if warn.md == md {

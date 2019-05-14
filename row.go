@@ -305,16 +305,15 @@ func (row *Row) Clean() bool {
 	return clean
 }
 
-func (r *Row) Dump(file string) {
+func (r *Row) Dump(file string) error {
 	if len(r.col) == 0 {
-		return
+		return nil
 	}
 
 	if file == "" {
 		f, err := defaultDumpFile()
 		if err != nil {
-			warning(nil, "can't find file for dump: %v\n", err)
-			return
+			return warnError(nil, "can't find file for dump: %v", err)
 		}
 		file = f
 	}
@@ -413,9 +412,9 @@ func (r *Row) Dump(file string) {
 
 	err := dump.Save(file)
 	if err != nil {
-		warning(nil, "dumping to %v failed: %v\n", file, err)
-		return
+		return warnError(nil, "dumping to %v failed: %v", file, err)
 	}
+	return nil
 }
 
 // loadhelper breaks out common load file parsing functionality for selected row
@@ -497,24 +496,23 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 // Load restores Edwood's state stored in dump. If dump is nil, it is parsed from file.
 // If initing is true, Row will be initialized.
 func (row *Row) Load(dump *dumpfile.Content, file string, initing bool) error {
-	warn := func(err error) error {
-		warning(nil, "Load failed: %v\n", err)
-		return err
-	}
 	if dump == nil {
-		file, err := defaultDumpFile()
-		if err != nil {
-			return warn(err)
+		if file == "" {
+			f, err := defaultDumpFile()
+			if err != nil {
+				return warnError(nil, "can't find file for load: %v", err)
+			}
+			file = f
 		}
 		d, err := dumpfile.Load(file)
 		if err != nil {
-			return warn(err)
+			return warnError(nil, "can't load dump file: %v", err)
 		}
 		dump = d
 	}
 	err := row.loadimpl(dump, initing)
 	if err != nil {
-		return warn(err)
+		return warnError(nil, "can't load row: %v", err)
 	}
 	return err
 }
@@ -641,7 +639,7 @@ func (r *Row) LookupWin(id int) *Window {
 
 func defaultDumpFile() (string, error) {
 	if home == "" {
-		return "", fmt.Errorf("$HOME not defined")
+		return "", fmt.Errorf("can't find home directory")
 	}
 	// Lower risk of simultaneous use of edwood and acme.
 	return filepath.Join(home, "edwood.dump"), nil

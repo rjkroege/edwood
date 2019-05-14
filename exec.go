@@ -515,20 +515,17 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 
 			if f.hash == file.EmptyHash {
 				// Edwood created the File but a disk file with the same name exists.
-				warning(nil, "%s not written; file already exists\n", name)
-				return fmt.Errorf("%s not written; file already exists", name)
+				return warnError(nil, "%s not written; file already exists", name)
 			}
 
 			// Edwood loaded the disk file to File but the disk file has been modified since.
-			warning(nil, "%s modified since last read\n\twas %v; now %v\n", name, f.info.ModTime(), d.ModTime())
-			return fmt.Errorf("%s modified since last read\n\twas %v; now %v\n", name, f.info.ModTime(), d.ModTime())
+			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, f.info.ModTime(), d.ModTime())
 		}
 	}
 
 	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
-		warning(nil, "can't create file %s: %v\n", name, err)
-		return fmt.Errorf("can't create file %s: %v\n", name, err)
+		return warnError(nil, "can't create file %s: %v", name, err)
 	}
 	defer fd.Close()
 
@@ -537,8 +534,7 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	d, err = fd.Stat()
 	isapp := (err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0)
 	if isapp {
-		warning(nil, "%s not written; file is append only\n", name)
-		return fmt.Errorf("%s not written; file is append only\n", name)
+		return warnError(nil, "%s not written; file is append only", name)
 	}
 	r := make([]rune, RBUFSIZE)
 	n := 0
@@ -552,8 +548,7 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 		io.WriteString(h, s)
 		nwritten, err := fd.Write([]byte(s))
 		if err != nil || nwritten != len(s) {
-			warning(nil, "can't write file %s: %v\n", name, err)
-			return fmt.Errorf("can't write file %s: %v\n", name, err)
+			return warnError(nil, "can't write file %s: %v", name, err)
 		}
 	}
 

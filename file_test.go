@@ -368,6 +368,16 @@ func TestFileUpdateInfo(t *testing.T) {
 	}
 }
 
+func TestFileUpdateInfoError(t *testing.T) {
+	filename := "/non-existant-file"
+	f := NewFile(filename)
+	err := f.UpdateInfo(filename, nil)
+	want := "failed to compute hash for"
+	if err == nil || !strings.HasPrefix(err.Error(), want) {
+		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
+	}
+}
+
 func TestFileNameSettingWithScratch(t *testing.T) {
 	f := NewFile("edwood")
 	// Empty File is an Undo point and considered clean
