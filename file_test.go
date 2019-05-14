@@ -375,7 +375,7 @@ func TestFileUpdateInfoError(t *testing.T) {
 	want := "failed to compute hash for"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
-  }
+	}
 }
 
 func TestFileNameSettingWithScratch(t *testing.T) {

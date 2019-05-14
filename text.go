@@ -271,7 +271,7 @@ func (t *Text) checkSafeToLoad(filename string) error {
 		panic("text.load")
 	}
 
-  if t.file.IsDir() && t.file.name == "" {
+	if t.file.IsDir() && t.file.name == "" {
 		return warnError(nil, "empty directory name")
 	}
 	if ismtpt(filename) {
