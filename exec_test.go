@@ -184,4 +184,32 @@ func TestExpandtabToggle(t *testing.T) {
 	if te != want {
 		t.Errorf("tabexpand is set to %v; expected %v", te, want)
 	}
+
+func TestCut(t *testing.T) {
+	prefix := "Hello "
+	suffix  := "世界\n"
+	w := &Window{
+		body: Text{
+			file: &File{
+				b:    Buffer(prefix + suffix),
+				name: "cuttest",
+			},
+		},
+	}
+
+	f := w.body.file
+	f.curtext = &w.body
+	f.curtext.w = w
+
+	w.body.q0 = 0
+	w.body.q1 = len(prefix)
+
+	cut(&w.body, nil, nil, true, true, "")
+
+	// TODO(rjk): vector of tests
+	// stimulate this more aggressively.
+	if got, want := string(w.body.file.b), suffix; got != want {
+		t.Errorf("buffer not cut got %v, want %v", got, want)
+	}
+
 }
