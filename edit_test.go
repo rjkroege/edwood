@@ -10,13 +10,15 @@ import (
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
+type teststimulus struct {
+	dot      Range
+	filename string
+	expr     string
+	expected string
+}
+
 func TestEdit(t *testing.T) {
-	testtab := []struct {
-		dot      Range
-		filename string
-		expr     string
-		expected string
-	}{
+	testtab := []teststimulus{
 
 		// 0
 		{Range{0, 0}, "test", "a/junk", "junkThis is a\nshort text\nto try addressing\n"},
@@ -63,25 +65,7 @@ func TestEdit(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
-		w := NewWindow().initHeadless(nil)
-		w.body.fr = &MockFrame{}
-		w.tag.fr = &MockFrame{}
-		w.body.Insert(0, []rune("This is a\nshort text\nto try addressing\n"), true)
-		w.body.SetQ0(test.dot.q0)
-		w.body.SetQ1(test.dot.q1)
-
-		// Construct the global window machinery.
-		row = Row{
-			col: []*Column{
-				{
-					w: []*Window{
-						w,
-					},
-				},
-			},
-		}
-		w.col = row.col[0]
-
+		w := makeSkeletonWindowModel(&test)
 		editcmd(&w.body, []rune(test.expr))
 
 		n, _ := w.body.ReadB(0, buf[:])
@@ -89,6 +73,34 @@ func TestEdit(t *testing.T) {
 			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
 		}
 	}
+}
+
+func makeSkeletonWindowModel(test *teststimulus) *Window {
+	w := NewWindow().initHeadless(nil)
+	w.body.fr = &MockFrame{}
+	w.tag.fr = &MockFrame{}
+	w.body.Insert(0, []rune("This is a\nshort text\nto try addressing\n"), true)
+
+	// Set up Undo to make sure that we see the
+	seq = 1
+	w.body.file.Mark(seq)
+
+	w.body.SetQ0(test.dot.q0)
+	w.body.SetQ1(test.dot.q1)
+	w.body.file.SetName(test.filename)
+
+	// Construct the global window machinery.
+	row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					w,
+				},
+			},
+		},
+	}
+	w.col = row.col[0]
+	return w
 }
 
 func TestParsecmd(t *testing.T) {
