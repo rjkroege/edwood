@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 func TestEdit(t *testing.T) {
@@ -60,13 +64,26 @@ func TestEdit(t *testing.T) {
 
 	for i, test := range testtab {
 		w := NewWindow().initHeadless(nil)
+		w.body.fr = &MockFrame{}
+		w.tag.fr = &MockFrame{}
 		w.body.Insert(0, []rune("This is a\nshort text\nto try addressing\n"), true)
 		w.body.SetQ0(test.dot.q0)
 		w.body.SetQ1(test.dot.q1)
+
+		// Construct the global window machinery.
+		row = Row{
+			col: []*Column{
+				{
+					w: []*Window{
+						w,
+					},
+				},
+			},
+		}
+		w.col = row.col[0]
+
 		editcmd(&w.body, []rune(test.expr))
-		// Normally the edit log is applied in allupdate, but we don't have
-		// all the window machinery, so we apply it by hand.
-		w.body.file.elog.Apply(&w.body)
+
 		n, _ := w.body.ReadB(0, buf[:])
 		if string(buf[:n]) != test.expected {
 			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
@@ -306,3 +323,36 @@ func TestBadDelimiterError(t *testing.T) {
 		t.Errorf("badDelimiterError is %v; expected %v", got, want)
 	}
 }
+
+// MockFrame is a mock implementation of a frame.Frame that does nothing.
+type MockFrame struct{}
+
+func (mf *MockFrame) GetFrameFillStatus() frame.FrameFillStatus {
+	return frame.FrameFillStatus{
+		Nchars:         0,
+		Nlines:         0,
+		Maxlines:       0,
+		MaxPixelHeight: 0,
+	}
+}
+func (mf *MockFrame) Charofpt(pt image.Point) int                  { return 0 }
+func (mf *MockFrame) DefaultFontHeight() int                       { return 0 }
+func (mf *MockFrame) Delete(int, int) int                          { return 0 }
+func (mf *MockFrame) Insert([]rune, int) bool                      { return false }
+func (mf *MockFrame) IsLastLineFull() bool                         { return false }
+func (mf *MockFrame) Rect() image.Rectangle                        { return image.Rect(0, 0, 0, 0) }
+func (mf *MockFrame) TextOccupiedHeight(r image.Rectangle) int     { return 0 }
+func (mf *MockFrame) Maxtab(_ int)                                 {}
+func (mf *MockFrame) GetMaxtab() int                               { return 0 }
+func (mf *MockFrame) Init(image.Rectangle, ...frame.OptionClosure) {}
+func (mf *MockFrame) Clear(bool)                                   {}
+func (mf *MockFrame) Ptofchar(int) image.Point                     { return image.Point{0, 0} }
+func (mf *MockFrame) Redraw(enclosing image.Rectangle)             {}
+func (mf *MockFrame) GetSelectionExtent() (int, int)               { return 0, 0 }
+func (mf *MockFrame) Select(*draw.Mousectl, *draw.Mouse, func(frame.SelectScrollUpdater, int)) (int, int) {
+	return 0, 0
+}
+func (mf *MockFrame) SelectOpt(*draw.Mousectl, *draw.Mouse, func(frame.SelectScrollUpdater, int), *draw.Image, *draw.Image) (int, int) {
+	return 0, 0
+}
+func (mf *MockFrame) DrawSel(image.Point, int, int, bool) {}
