@@ -82,7 +82,7 @@ type Frame interface {
 	//
 	// Changing the background or font will force the tick to be
 	// recreated.
-	Init(image.Rectangle, ...option)
+	Init(image.Rectangle, ...OptionClosure)
 
 	// Clear frees the internal structures associated with f, permitting
 	// another Init or SetRects on the Frame. It does not clear the
@@ -302,7 +302,7 @@ func (f *frameimpl) DefaultFontHeight() int {
 
 // TODO(rjk): This may do unnecessary work for some option settings.
 // At some point, consider the code carefully.
-func (f *frameimpl) Init(r image.Rectangle, opts ...option) {
+func (f *frameimpl) Init(r image.Rectangle, opts ...OptionClosure) {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	f.nchars = 0
