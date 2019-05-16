@@ -465,7 +465,7 @@ func (t *Text) inserted(q0 int, r []rune) {
 
 	t.logInsert(q0, r)
 	t.SetSelect(t.q0, t.q1)
-	if t.fr != nil {
+	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
 
@@ -616,7 +616,7 @@ func (t *Text) deleted(q0, q1 int) {
 	t.logInsertDelete(q0, q1)
 
 	t.SetSelect(t.q0, t.q1)
-	if t.fr != nil {
+	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
 }
