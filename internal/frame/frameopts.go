@@ -18,11 +18,11 @@ type optioncontext struct {
 // Returns true if the option requires resetting the tick.
 // TODO(rjk): It is possible to generalize this as needed with a more
 // complex state object. One might imagine a set of updater functions?
-type option func(*frameimpl, *optioncontext)
+type OptionClosure func(*frameimpl, *optioncontext)
 
 // Option sets the options specified and returns true if
 // we need to init the tick.
-func (f *frameimpl) Option(opts ...option) *optioncontext {
+func (f *frameimpl) Option(opts ...OptionClosure) *optioncontext {
 	ctx := &optioncontext{
 		updatetick:  false,
 		maxtabchars: -1,
@@ -35,7 +35,7 @@ func (f *frameimpl) Option(opts ...option) *optioncontext {
 }
 
 // OptColors sets the default colours.
-func OptColors(cols [NumColours]*draw.Image) option {
+func OptColors(cols [NumColours]*draw.Image) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.cols = cols
 		// TODO(rjk): I think so. Make sure that this is required.
@@ -44,7 +44,7 @@ func OptColors(cols [NumColours]*draw.Image) option {
 }
 
 // OptBackground sets the background screen image.
-func OptBackground(b *draw.Image) option {
+func OptBackground(b *draw.Image) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.background = b
 		// TODO(rjk): This is safe but is it necessary? I think so.
@@ -53,7 +53,7 @@ func OptBackground(b *draw.Image) option {
 }
 
 // OptFont sets the default font.
-func OptFont(ft *draw.Font) option {
+func OptFont(ft *draw.Font) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = &frfont{ft}
 		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
@@ -61,7 +61,7 @@ func OptFont(ft *draw.Font) option {
 }
 
 // OptFontMetrics sets the default font metrics object.
-func OptFontMetrics(ft Fontmetrics) option {
+func OptFontMetrics(ft Fontmetrics) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = ft
 		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
@@ -69,7 +69,7 @@ func OptFontMetrics(ft Fontmetrics) option {
 }
 
 // OptMaxTab sets the default tabwidth in `0` characters.
-func OptMaxTab(maxtabchars int) option {
+func OptMaxTab(maxtabchars int) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		ctx.maxtabchars = maxtabchars
 	}
