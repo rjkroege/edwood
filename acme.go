@@ -101,7 +101,7 @@ func main() {
 		if err := display.Attach(draw.Refnone); err != nil {
 			panic("failed to attach to window")
 		}
-		display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
 
 		mousectl = display.InitMouse()
 		keyboardctl = display.InitKeyboard()
@@ -133,7 +133,7 @@ func main() {
 
 		const WindowsPerCol = 6
 
-		row.Init(display.ScreenImage.R, display)
+		row.Init(display.ScreenImage().R(), display)
 		if loadfile == "" || row.Load(dump, loadfile, true) != nil {
 			// Open the files from the command line, up to WindowsPerCol each
 			files := flag.Args()
@@ -205,7 +205,7 @@ func readfile(c *Column, filename string) {
 
 var fontCache = make(map[string]*draw.Font)
 
-func fontget(name string, display *draw.Display) *draw.Font {
+func fontget(name string, display draw.Display) *draw.Font {
 	var font *draw.Font
 	var ok bool
 	if font, ok = fontCache[name]; !ok {
@@ -232,42 +232,42 @@ var boxcursor = draw.Cursor{
 		0x7F, 0xFE, 0x7F, 0xFE, 0x7F, 0xFE, 0x00, 0x00},
 }
 
-func iconinit(display *draw.Display) {
+func iconinit(display draw.Display) {
 	//TODO(flux): Probably should de-globalize colors.
 	if tagcolors[frame.ColBack] == nil {
 		tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
-		tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Palegreygreen)
-		tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Purpleblue)
-		tagcolors[frame.ColText] = display.Black
-		tagcolors[frame.ColHText] = display.Black
+		tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palegreygreen)
+		tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Purpleblue)
+		tagcolors[frame.ColText] = display.Black()
+		tagcolors[frame.ColHText] = display.Black()
 		textcolors[frame.ColBack] = display.AllocImageMix(draw.Paleyellow, draw.White)
-		textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Darkyellow)
-		textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Yellowgreen)
-		textcolors[frame.ColText] = display.Black
-		textcolors[frame.ColHText] = display.Black
+		textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Darkyellow)
+		textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Yellowgreen)
+		textcolors[frame.ColText] = display.Black()
+		textcolors[frame.ColHText] = display.Black()
 	}
 
 	// ...
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(tagfont, display).Height+1)
-	button, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Notacolor)
+	button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	button.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
 
-	r = button.R
-	modbutton, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Notacolor)
+	r = button.R()
+	modbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	modbutton.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, draw.Medblue)
+	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 	modbutton.Draw(r, tmp, nil, image.ZP)
 
-	r = button.R
-	colbutton, _ = display.AllocImage(r, display.ScreenImage.Pix, false, draw.Purpleblue)
+	r = button.R()
+	colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Purpleblue)
 
-	but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, 0xAA0000FF)
-	but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage.Pix, true, 0x006600FF)
+	but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
+	but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
 
 }
 
@@ -279,7 +279,7 @@ func ismtpt(filename string) bool {
 	return strings.HasPrefix(s, mtpt) && (mtpt[len(mtpt)-1] == '/' || len(s) == len(mtpt) || s[len(mtpt)] == '/')
 }
 
-func mousethread(display *draw.Display) {
+func mousethread(display draw.Display) {
 	// TODO(rjk): Do we need this?
 	runtime.LockOSThread()
 
@@ -293,10 +293,10 @@ func mousethread(display *draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			display.ScreenImage.Draw(display.ScreenImage.R, display.White, nil, image.ZP)
+			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
 			iconinit(display)
 			ScrlResize(display)
-			row.Resize(display.ScreenImage.R)
+			row.Resize(display.ScreenImage().R())
 		case mousectl.Mouse = <-mousectl.C:
 			MovedMouse(mousectl.Mouse)
 		case <-cwarn:
@@ -444,7 +444,7 @@ func MovedMouse(m draw.Mouse) {
 	}
 }
 
-func keyboardthread(display *draw.Display) {
+func keyboardthread(display draw.Display) {
 	var (
 		timer *time.Timer
 		t     *Text
@@ -604,7 +604,7 @@ func waitthread() {
 // it instead of using a send and a receive to get one.
 // Frankly, it would be more idiomatic to let the GC take care of them,
 // though that would require an exit signal in xfidctl.
-func xfidallocthread(d *draw.Display) {
+func xfidallocthread(d draw.Display) {
 	xfree := (*Xfid)(nil)
 	for {
 		select {

@@ -9,7 +9,7 @@ import (
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
-var scrtmp *draw.Image
+var scrtmp draw.Image
 
 func ScrSleep(dt int) {
 	timer := time.NewTimer(time.Duration(dt) * time.Millisecond)
@@ -55,9 +55,9 @@ func scrpos(r image.Rectangle, p0, p1 int, tot int) image.Rectangle {
 	return q
 }
 
-func ScrlResize(display *draw.Display) {
+func ScrlResize(display draw.Display) {
 	var err error
-	scrtmp, err = display.AllocImage(image.Rect(0, 0, 32, display.ScreenImage.R.Max.Y), display.ScreenImage.Pix, false, draw.Nofill)
+	scrtmp, err = display.AllocImage(image.Rect(0, 0, 32, display.ScreenImage().R().Max.Y), display.ScreenImage().Pix(), false, draw.Nofill)
 	if err != nil {
 		panic(fmt.Sprintf("scroll alloc: %v", err))
 	}
@@ -66,7 +66,7 @@ func ScrlResize(display *draw.Display) {
 func (t *Text) ScrDraw(nchars int) {
 	var (
 		r, r1, r2 image.Rectangle
-		b         *draw.Image
+		b         draw.Image
 	)
 
 	if t.w == nil || t != &t.w.body {
@@ -88,7 +88,7 @@ func (t *Text) ScrDraw(nchars int) {
 		b.Draw(r2, textcolors[frame.ColBack], nil, image.ZP)
 		r2.Min.X = r2.Max.X - 1
 		b.Draw(r2, textcolors[frame.ColBord], nil, image.ZP)
-		row.display.ScreenImage.Draw(r, b, nil, image.Pt(0, r1.Min.Y))
+		row.display.ScreenImage().Draw(r, b, nil, image.Pt(0, r1.Min.Y))
 		// flushimage(display, 1); // BUG?
 	}
 }

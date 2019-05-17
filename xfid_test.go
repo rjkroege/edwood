@@ -15,7 +15,7 @@ func TestXfidAlloc(t *testing.T) {
 	cxfidalloc = make(chan *Xfid)
 	cxfidfree = make(chan *Xfid)
 
-	d := (*draw.Display)(nil)
+	d := (draw.Display)(nil)
 	go xfidallocthread(d)
 
 	cxfidalloc <- (*Xfid)(nil) // Request an xfid

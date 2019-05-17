@@ -14,19 +14,19 @@ import (
 )
 
 type Row struct {
-	display *draw.Display
+	display draw.Display
 	lk      sync.Mutex
 	r       image.Rectangle
 	tag     Text
 	col     []*Column
 }
 
-func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
+func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	if row == nil {
 		row = &Row{}
 	}
 	row.display = dis
-	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+	row.display.ScreenImage().Draw(r, row.display.White(), nil, image.ZP)
 	row.col = []*Column{}
 	row.r = r
 	r1 := r
@@ -41,7 +41,7 @@ func (row *Row) Init(r image.Rectangle, dis *draw.Display) *Row {
 	t.col = nil
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
-	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
+	row.display.ScreenImage().Draw(r1, row.display.Black(), nil, image.ZP)
 	t.Insert(0, []rune("Newcol Kill Putall Dump Exit "), true)
 	t.SetSelect(t.file.Size(), t.file.Size())
 	return row
@@ -72,7 +72,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 		if r.Dx() < 100 {
 			return nil // Refuse columns too narrow
 		}
-		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+		row.display.ScreenImage().Draw(r, row.display.White(), nil, image.ZP)
 		r1 := r
 		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
 		if r1.Dx() < row.display.ScaleSize(50) {
@@ -81,7 +81,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 		d.Resize(r1)
 		r1.Min.X = r1.Max.X
 		r1.Max.X = r1.Min.X + row.display.ScaleSize(Border)
-		row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
+		row.display.ScreenImage().Draw(r1, row.display.Black(), nil, image.ZP)
 		r.Min.X = r1.Max.X
 	}
 	if c == nil {
@@ -107,7 +107,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	row.tag.Resize(r1, true, false)
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
-	row.display.ScreenImage.Draw(r1, row.display.Black, nil, image.ZP)
+	row.display.ScreenImage().Draw(r1, row.display.Black(), nil, image.ZP)
 	rect.Min.Y = r1.Max.Y
 	r1 = rect
 	r1.Max.X = r1.Min.X
@@ -123,7 +123,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 		if i > 0 {
 			r2 := r1
 			r2.Max.X = r2.Min.X + row.display.ScaleSize(Border)
-			row.display.ScreenImage.Draw(r2, row.display.Black, nil, image.ZP)
+			row.display.ScreenImage().Draw(r2, row.display.Black(), nil, image.ZP)
 			r1.Min.X = r2.Max.X
 		}
 		c.Resize(r1)
@@ -189,14 +189,14 @@ Found:
 	}
 	r = d.r
 	r.Max.X = c.r.Max.X
-	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+	row.display.ScreenImage().Draw(r, row.display.White(), nil, image.ZP)
 	r.Max.X = p.X
 	d.Resize(r)
 	r = c.r
 	r.Min.X = p.X
 	r.Max.X = r.Min.X
 	r.Max.X += row.display.ScaleSize(Border)
-	row.display.ScreenImage.Draw(r, row.display.Black, nil, image.ZP)
+	row.display.ScreenImage().Draw(r, row.display.Black(), nil, image.ZP)
 	r.Min.X = r.Max.X
 	r.Max.X = c.r.Max.X
 	c.Resize(r)
@@ -222,7 +222,7 @@ Found:
 	}
 	row.col = append(row.col[:i], row.col[i+1:]...)
 	if len(row.col) == 0 {
-		row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+		row.display.ScreenImage().Draw(r, row.display.White(), nil, image.ZP)
 		return
 	}
 	if i == len(row.col) { // extend last column right
@@ -233,7 +233,7 @@ Found:
 		c = row.col[i]
 		r.Max.X = c.r.Max.X
 	}
-	row.display.ScreenImage.Draw(r, row.display.White, nil, image.ZP)
+	row.display.ScreenImage().Draw(r, row.display.White(), nil, image.ZP)
 	c.Resize(r)
 }
 
@@ -534,7 +534,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	*fixedfontflag = dump.FixedFont
 
 	if initing && len(row.col) == 0 {
-		row.Init(row.display.ScreenImage.R, row.display)
+		row.Init(row.display.ScreenImage().R(), row.display)
 	}
 
 	// Column widths
@@ -568,12 +568,12 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 			if r1.Dx() < 50 || r2.Dx() < 50 {
 				continue
 			}
-			row.display.ScreenImage.Draw(image.Rectangle{r1.Min, r2.Max}, row.display.White, nil, image.ZP)
+			row.display.ScreenImage().Draw(image.Rectangle{r1.Min, r2.Max}, row.display.White(), nil, image.ZP)
 			c1.Resize(r1)
 			c2.Resize(r2)
 			r2.Min.X = x - Border
 			r2.Max.X = x
-			row.display.ScreenImage.Draw(r2, row.display.Black, nil, image.ZP)
+			row.display.ScreenImage().Draw(r2, row.display.Black(), nil, image.ZP)
 		}
 		if i >= len(row.col) {
 			row.Add(nil, x)

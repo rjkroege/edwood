@@ -14,7 +14,7 @@ func (f *frameimpl) InitTick() {
 	}
 
 	f.tickscale = f.display.ScaleSize(1)
-	b := f.display.ScreenImage
+	b := f.display.ScreenImage()
 	ft := f.font
 
 	if f.tickimage != nil {
@@ -24,23 +24,23 @@ func (f *frameimpl) InitTick() {
 	height := ft.DefaultHeight()
 
 	var err error
-	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix, false, draw.Transparent)
+	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix(), false, draw.Transparent)
 	if err != nil {
 		return
 	}
 
-	f.tickback, err = f.display.AllocImage(f.tickimage.R, b.Pix, false, draw.White)
+	f.tickback, err = f.display.AllocImage(f.tickimage.R(), b.Pix(), false, draw.White)
 	if err != nil {
 		f.tickimage.Free()
 		f.tickimage = nil
 		return
 	}
-	f.tickback.Draw(f.tickback.R, f.cols[ColBack], nil, image.ZP)
+	f.tickback.Draw(f.tickback.R(), f.cols[ColBack], nil, image.ZP)
 
-	f.tickimage.Draw(f.tickimage.R, f.display.Transparent, nil, image.Pt(0, 0))
+	f.tickimage.Draw(f.tickimage.R(), f.display.Transparent(), nil, image.Pt(0, 0))
 	// vertical line
-	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(f.tickscale*(frtickw/2), 0, f.tickscale*(frtickw/2+1), height), f.display.Opaque(), nil, image.Pt(0, 0))
 	// box on each end
-	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.display.Opaque, nil, image.Pt(0, 0))
-	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.display.Opaque, nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.display.Opaque(), nil, image.Pt(0, 0))
+	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.display.Opaque(), nil, image.Pt(0, 0))
 }

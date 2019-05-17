@@ -78,11 +78,11 @@ var (
 	mousectl    *draw.Mousectl
 	keyboardctl *draw.Keyboardctl
 
-	modbutton *draw.Image
-	colbutton *draw.Image
-	button    *draw.Image
-	but2col   *draw.Image
-	but3col   *draw.Image
+	modbutton draw.Image
+	colbutton draw.Image
+	button    draw.Image
+	but2col   draw.Image
+	but3col   draw.Image
 
 	//	boxcursor Cursor
 	row Row
@@ -100,8 +100,8 @@ var (
 	snarfbuf          Buffer
 	home              string
 	acmeshell         string
-	tagcolors         [frame.NumColours]*draw.Image
-	textcolors        [frame.NumColours]*draw.Image
+	tagcolors         [frame.NumColours]draw.Image
+	textcolors        [frame.NumColours]draw.Image
 	wdir              string
 	editing           = Inactive
 	globalautoindent  bool

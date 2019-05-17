@@ -6,7 +6,7 @@ import (
 	"github.com/rjkroege/edwood/internal/draw"
 )
 
-func (f *frameimpl) drawtext(pt image.Point, text *draw.Image, back *draw.Image) {
+func (f *frameimpl) drawtext(pt image.Point, text draw.Image, back draw.Image) {
 	// log.Println("DrawText at", pt, "NoRedraw", f.NoRedraw, text)
 	for _, b := range f.box {
 		pt = f.cklinewrap(pt, b)
@@ -21,7 +21,7 @@ func (f *frameimpl) drawtext(pt image.Point, text *draw.Image, back *draw.Image)
 
 // drawBox is a helpful debugging utility that wraps each box with a
 // rectangle to show its extent.
-func (f *frameimpl) drawBox(r image.Rectangle, col, back *draw.Image, qt image.Point) {
+func (f *frameimpl) drawBox(r image.Rectangle, col, back draw.Image, qt image.Point) {
 	f.background.Draw(r, col, nil, qt)
 	r = r.Inset(1)
 	f.background.Draw(r, back, nil, qt)
@@ -98,7 +98,7 @@ func (f *frameimpl) drawselimpl(pt image.Point, p0, p1 int, highlighted bool) {
 //
 // TODO(rjk): Figure out if this is a true or false statement.
 // Function does not mutate f.p0, f.p1 (well... actually, it does.)
-func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back *draw.Image, text *draw.Image) image.Point {
+func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back draw.Image, text draw.Image) image.Point {
 	// log.Println("Frame Drawsel0 Start", p0, p1,  f.P0, f.P1)
 	// defer log.Println("Frame Drawsel0 End", f.P0, f.P1 )
 	p := 0
@@ -211,8 +211,8 @@ func (f *frameimpl) tick(pt image.Point, ticked bool) {
 	}
 
 	if ticked {
-		f.tickback.Draw(f.tickback.R, f.background, nil, pt)
-		f.background.Draw(r, f.display.Black, f.tickimage, image.ZP) // draws an alpha-blended box
+		f.tickback.Draw(f.tickback.R(), f.background, nil, pt)
+		f.background.Draw(r, f.display.Black(), f.tickimage, image.ZP) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
 		f.background.Draw(r, f.tickback, nil, image.ZP)
