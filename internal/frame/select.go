@@ -22,7 +22,7 @@ func region(a, b int) int {
 	return 1
 }
 
-func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int), fg, bg *draw.Image) (int, int) {
+func (f *frameimpl) SelectOpt(mc *draw.Mousectl, downevent *draw.Mouse, getmorelines func(SelectScrollUpdater, int), fg, bg draw.Image) (int, int) {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	oback := f.cols[ColHigh]
@@ -156,7 +156,7 @@ func (f *frameimpl) selectimpl(mc *draw.Mousectl, downevent *draw.Mouse, getmore
 
 // SelectPaint draws the regions that need to be blank in col.
 // TODO(rjk): This function is mis-named and should not be public.
-func (f *frameimpl) SelectPaint(p0, p1 image.Point, col *draw.Image) {
+func (f *frameimpl) SelectPaint(p0, p1 image.Point, col draw.Image) {
 	q0 := p0
 	q1 := p1
 

@@ -766,9 +766,9 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 
 	if newfont := fontget(file, row.display); newfont != nil {
 		// TODO(rjk): maybe Frame should know how to clear itself on init?
-		row.display.ScreenImage.Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
+		row.display.ScreenImage().Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
 		t.font = file
-		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage))
+		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage()))
 
 		if t.w.body.file.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!

@@ -35,7 +35,7 @@ func (f *frameimpl) Option(opts ...OptionClosure) *optioncontext {
 }
 
 // OptColors sets the default colours.
-func OptColors(cols [NumColours]*draw.Image) OptionClosure {
+func OptColors(cols [NumColours]draw.Image) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.cols = cols
 		// TODO(rjk): I think so. Make sure that this is required.
@@ -44,7 +44,7 @@ func OptColors(cols [NumColours]*draw.Image) OptionClosure {
 }
 
 // OptBackground sets the background screen image.
-func OptBackground(b *draw.Image) OptionClosure {
+func OptBackground(b draw.Image) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.background = b
 		// TODO(rjk): This is safe but is it necessary? I think so.

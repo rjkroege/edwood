@@ -54,7 +54,7 @@ const (
 // Text is a view onto a buffer, managing a frame.
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
-	display *draw.Display
+	display draw.Display
 	file    *File
 	fr      frame.Frame
 	font    string
@@ -86,7 +86,7 @@ func (t *Text) getfont() *draw.Font {
 	return fontget(t.font, t.display)
 }
 
-func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.Image, dis *draw.Display) *Text {
+func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Image, dis draw.Display) *Text {
 	// log.Println("Text.Init start")
 	// defer log.Println("Text.Init end")
 	if t == nil {
@@ -101,7 +101,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]*draw.I
 	t.eq0 = ^0
 	t.font = rf
 	t.tabstop = int(maxtab)
-	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage, cols)
+	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage(), cols)
 	t.Redraw(r, -1, false /* noredraw */)
 	return t
 }
@@ -1293,8 +1293,8 @@ func (t *Text) SetSelect(q0, q1 int) {
 
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
-func (t *Text) Select23(high *draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White, high)
+func (t *Text) Select23(high draw.Image, mask uint) (q0, q1 int, buts uint) {
+	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White(), high)
 
 	buts = uint(mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {

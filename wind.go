@@ -13,7 +13,7 @@ import (
 )
 
 type Window struct {
-	display *draw.Display
+	display draw.Display
 	lk      sync.Mutex
 	ref     Ref
 	tag     Text
@@ -101,7 +101,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	return w
 }
 
-func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
+func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	w.initHeadless(clone)
 	w.display = dis
 	r1 := r
@@ -137,16 +137,16 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis *draw.Display) {
 	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
-		w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
 	}
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
-	br.Max.X = br.Min.X + button.R.Dx()
-	br.Max.Y = br.Min.Y + button.R.Dy()
+	br.Max.X = br.Min.X + button.R().Dx()
+	br.Max.Y = br.Min.Y + button.R().Dy()
 	if w.display != nil {
-		w.display.ScreenImage.Draw(br, button, nil, button.R.Min)
+		w.display.ScreenImage().Draw(br, button, nil, button.R().Min)
 	}
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	if clone != nil {
@@ -162,10 +162,10 @@ func (w *Window) DrawButton() {
 	}
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
-	br.Max.X = br.Min.X + b.R.Dx()
-	br.Max.Y = br.Min.Y + b.R.Dy()
+	br.Max.X = br.Min.X + b.R().Dx()
+	br.Max.Y = br.Min.Y + b.R().Dy()
 	if w.display != nil {
-		w.display.ScreenImage.Draw(br, b, nil, b.R.Min)
+		w.display.ScreenImage().Draw(br, b, nil, b.R().Min)
 	}
 }
 
@@ -292,7 +292,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
-				w.display.ScreenImage.Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
 			}
 			y++
 			r1.Min.Y = min(y, r.Max.Y)

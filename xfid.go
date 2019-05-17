@@ -45,7 +45,7 @@ func (x *Xfid) respond(t *plan9.Fcall, err error) *Xfid {
 	return x.fs.respond(x, t, err)
 }
 
-func xfidctl(x *Xfid, d *draw.Display) {
+func xfidctl(x *Xfid, d draw.Display) {
 	// log.Println("xfidctl", x)
 	// defer log.Println("done xfidctl")
 	for f := range x.c {

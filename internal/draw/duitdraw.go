@@ -34,17 +34,34 @@ const (
 )
 
 type (
+	Color       = draw.Color
 	Cursor      = draw.Cursor
-	Device      = draw.Device
-	Display     = draw.Display
+	drawDevice  = draw.Device
+	drawDisplay = draw.Display
 	Font        = draw.Font
-	Image       = draw.Image
+	drawImage   = draw.Image
 	Keyboardctl = draw.Keyboardctl
 	Mousectl    = draw.Mousectl
 	Mouse       = draw.Mouse
+	Pix         = draw.Pix
 )
 
-var (
-	Init = draw.Init
-	Main = draw.Main
-)
+var Init = draw.Init
+
+func Main(f func(dev *Device)) {
+	draw.Main(func(dd *drawDevice) {
+		f(&Device{dd})
+	})
+}
+
+type Device struct {
+	*drawDevice
+}
+
+func (dev *Device) NewDisplay(errch chan<- error, fontname, label, winsize string) (Display, error) {
+	d, err := dev.drawDevice.NewDisplay(errch, fontname, label, winsize)
+	if err != nil {
+		return nil, err
+	}
+	return &displayImpl{d}, nil
+}

@@ -13,7 +13,7 @@ var (
 )
 
 type Column struct {
-	display *draw.Display
+	display draw.Display
 	Border  int
 	r       image.Rectangle
 	tag     Text
@@ -32,7 +32,7 @@ func (c *Column) nw() int {
 // display dis.
 // TODO(rjk): Why does this need to handle the case where c is nil?
 // TODO(rjk): Do we (re)initialize a Column object? It would seem likely.
-func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
+func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	if c == nil {
 		c = &Column{}
 	}
@@ -40,7 +40,7 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	c.w = []*Window{}
 	c.Border = c.display.ScaleSize(Border)
 	if c.display != nil {
-		c.display.ScreenImage.Draw(r, c.display.White, nil, image.ZP)
+		c.display.ScreenImage().Draw(r, c.display.White(), nil, image.ZP)
 		c.Border = c.display.ScaleSize(Border)
 	}
 	c.r = r
@@ -56,12 +56,12 @@ func (c *Column) Init(r image.Rectangle, dis *draw.Display) *Column {
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
 	if c.display != nil {
-		c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
+		c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.ZP)
 	}
 	c.tag.Insert(0, Lheader, true)
 	c.tag.SetSelect(c.tag.file.Size(), c.tag.file.Size())
 	if c.display != nil {
-		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
 		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
 		// perf.
 		c.display.Flush()
@@ -157,7 +157,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r = v.r
 		r.Max.Y = ymax
 		if c.display != nil {
-			c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 		}
 		r1 := r
 		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
@@ -166,7 +166,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
 		if c.display != nil {
-			c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
+			c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.ZP)
 		}
 		//
 		// leave r with w's coordinates
@@ -177,7 +177,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		w = NewWindow()
 		w.col = c
 		if c.display != nil {
-			c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 		}
 		w.Init(clone, r, c.display)
 	} else {
@@ -232,7 +232,7 @@ Found:
 	c.w = append(c.w[:i], c.w[i+1:]...)
 	if len(c.w) == 0 {
 		if c.display != nil {
-			c.display.ScreenImage.Draw(r, c.display.White, nil, image.ZP)
+			c.display.ScreenImage().Draw(r, c.display.White(), nil, image.ZP)
 		}
 		return
 	}
@@ -247,7 +247,7 @@ Found:
 		r.Max.Y = w.r.Max.Y
 	}
 	if c.display != nil {
-		c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+		c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 	}
 	if c.safe {
 		if !didmouse && up {
@@ -283,11 +283,11 @@ func (c *Column) Resize(r image.Rectangle) {
 	r1.Max.Y = r1.Min.Y + c.tag.fr.DefaultFontHeight()
 	c.tag.Resize(r1, true, false)
 	if c.display != nil {
-		c.display.ScreenImage.Draw(c.tag.scrollr, colbutton, nil, colbutton.R.Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
 	}
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
-	c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
+	c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.ZP)
 	r1.Max.Y = r.Max.Y
 	for i := 0; i < c.nw(); i++ {
 		w := c.w[i]
@@ -303,7 +303,7 @@ func (c *Column) Resize(r image.Rectangle) {
 		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height)
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
-		c.display.ScreenImage.Draw(r2, c.display.Black, nil, image.ZP)
+		c.display.ScreenImage().Draw(r2, c.display.Black(), nil, image.ZP)
 		r1.Min.Y = r2.Max.Y
 		r1.Min.Y = w.Resize(r1, false, i == c.nw()-1)
 	}
@@ -315,7 +315,7 @@ func (c *Column) Sort() {
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
-	c.display.ScreenImage.Draw(r, textcolors[frame.ColBack], nil, image.ZP)
+	c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 	y := r.Min.Y
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
@@ -327,7 +327,7 @@ func (c *Column) Sort() {
 		}
 		r1 := r
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
-		c.display.ScreenImage.Draw(r1, c.display.Black, nil, image.ZP)
+		c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.ZP)
 		r.Min.Y = r1.Max.Y
 		y = w.Resize(r, false, i == len(c.w)-1)
 	}
@@ -367,7 +367,7 @@ func (c *Column) Grow(w *Window, but int) {
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		c.display.ScreenImage.Draw(cr, textcolors[frame.ColBack], nil, image.ZP)
+		c.display.ScreenImage().Draw(cr, textcolors[frame.ColBack], nil, image.ZP)
 		w.Resize(cr, false, true)
 		for i := 1; i < c.nw(); i++ {
 			ffs := c.w[i].body.fr.GetFrameFillStatus()
@@ -443,7 +443,7 @@ Pack:
 		}
 		r.Min.Y = v.Resize(r, false, false)
 		r.Max.Y += c.display.ScaleSize(Border)
-		c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
+		c.display.ScreenImage().Draw(r, c.display.Black(), nil, image.ZP)
 		y1 = r.Max.Y
 	}
 	// scan to see new size of everyone below
@@ -472,7 +472,7 @@ Pack:
 	if windex < c.nw()-1 {
 		r.Min.Y = r.Max.Y
 		r.Max.Y += c.display.ScaleSize(Border)
-		c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
+		c.display.ScreenImage().Draw(r, c.display.Black(), nil, image.ZP)
 		for j := windex + 1; j < c.nw(); j++ {
 			ny[j] -= (y2 - r.Max.Y)
 		}
@@ -491,7 +491,7 @@ Pack:
 		if j < c.nw()-1 { // no border on last window
 			r.Min.Y = y1
 			r.Max.Y += c.display.ScaleSize(Border)
-			c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
+			c.display.ScreenImage().Draw(r, c.display.Black(), nil, image.ZP)
 			y1 = r.Max.Y
 		}
 	}
@@ -581,7 +581,7 @@ Found:
 	}
 	r.Min.Y = v.Resize(r, c.safe, false)
 	r.Max.Y = r.Min.Y + c.row.display.ScaleSize(Border)
-	c.display.ScreenImage.Draw(r, c.display.Black, nil, image.ZP)
+	c.display.ScreenImage().Draw(r, c.display.Black(), nil, image.ZP)
 	r.Min.Y = r.Max.Y
 	if i == len(c.w)-1 {
 		r.Max.Y = c.r.Max.Y

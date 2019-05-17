@@ -474,7 +474,7 @@ func (mf *MockFrame) GetSelectionExtent() (int, int)               { return 0, 0
 func (mf *MockFrame) Select(*draw.Mousectl, *draw.Mouse, func(frame.SelectScrollUpdater, int)) (int, int) {
 	return 0, 0
 }
-func (mf *MockFrame) SelectOpt(*draw.Mousectl, *draw.Mouse, func(frame.SelectScrollUpdater, int), *draw.Image, *draw.Image) (int, int) {
+func (mf *MockFrame) SelectOpt(*draw.Mousectl, *draw.Mouse, func(frame.SelectScrollUpdater, int), draw.Image, draw.Image) (int, int) {
 	return 0, 0
 }
 func (mf *MockFrame) DrawSel(image.Point, int, int, bool) {}

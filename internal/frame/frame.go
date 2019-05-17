@@ -136,7 +136,7 @@ type Frame interface {
 
 	// SelectOpt makes a selection in the same fashion as Select but does it in a
 	// temporary way with the specified text colours fg, bg.
-	SelectOpt(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int), *draw.Image, *draw.Image) (int, int)
+	SelectOpt(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int), draw.Image, draw.Image) (int, int)
 
 	// DrawSel repaints a section of the frame, delimited by rune
 	// positions p0 and p1, either with plain background or entirely
@@ -256,10 +256,10 @@ type frameimpl struct {
 	// lk debugginglock
 
 	font       Fontmetrics
-	display    *draw.Display           // on which the frame is displayed
-	background *draw.Image             // on which the frame appears
-	cols       [NumColours]*draw.Image // background and text colours
-	rect       image.Rectangle         // in which the text appears
+	display    draw.Display           // on which the frame is displayed
+	background draw.Image             // on which the frame appears
+	cols       [NumColours]draw.Image // background and text colours
+	rect       image.Rectangle        // in which the text appears
 
 	defaultfontheight int // height of default font
 
@@ -275,10 +275,10 @@ type frameimpl struct {
 	lastlinefull bool
 	modified     bool
 
-	tickimage   *draw.Image // typing tick
-	tickback    *draw.Image // image under tick
-	ticked      bool        // Is the tick on.
-	highlighton bool        // True if the highlight is painted.
+	tickimage   draw.Image // typing tick
+	tickback    draw.Image // image under tick
+	ticked      bool       // Is the tick on.
+	highlighton bool       // True if the highlight is painted.
 
 	// Set this to true to indicate that the Frame should not emit drawing ops.
 	// Use this if the Frame is being used "headless" to measure some text.
@@ -288,7 +288,7 @@ type frameimpl struct {
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft *draw.Font, b *draw.Image, cols [NumColours]*draw.Image) Frame {
+func NewFrame(r image.Rectangle, ft *draw.Font, b draw.Image, cols [NumColours]draw.Image) Frame {
 	f := new(frameimpl)
 	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8))
 	return f
@@ -317,7 +317,7 @@ func (f *frameimpl) Init(r image.Rectangle, opts ...OptionClosure) {
 	ctx := f.Option(opts...)
 
 	f.defaultfontheight = f.font.DefaultHeight()
-	f.display = f.background.Display
+	f.display = f.background.Display()
 	f.maxtab = ctx.computemaxtab(f.maxtab, f.font.StringWidth("0"))
 	f.setrects(r)
 
