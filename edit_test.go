@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 	"image"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/sanity-io/litter"
 )
 
 type teststimulus struct {
@@ -81,9 +84,9 @@ func makeSkeletonWindowModel(test *teststimulus) *Window {
 	w.tag.fr = &MockFrame{}
 	w.body.Insert(0, []rune("This is a\nshort text\nto try addressing\n"), true)
 
-	// Set up Undo to make sure that we see the
+	// Set up Undo to make sure that we see undoable results.
+	// By default, post-load, file.seq, file.putse = 0, 0.
 	seq = 1
-	w.body.file.Mark(seq)
 
 	w.body.SetQ0(test.dot.q0)
 	w.body.SetQ1(test.dot.q1)
@@ -101,6 +104,68 @@ func makeSkeletonWindowModel(test *teststimulus) *Window {
 	}
 	w.col = row.col[0]
 	return w
+}
+
+const contents = "This is a\nshort text\nto try addressing\n"
+
+func TestEditCmdWithFile(t *testing.T) {
+	// Make a temporary file.
+	tfd, err := ioutil.TempFile("", "example")
+	if err != nil {
+		t.Fatalf("can't make a temp file %s because %v\n", tfd.Name(), err)
+	}
+	defer os.Remove(tfd.Name()) // clean up
+	if _, err := tfd.WriteString(contents); err != nil {
+		t.Fatalf("can't write tmpfile %v", err)
+	}
+	if err := tfd.Close(); err != nil {
+		t.Fatalf("can't close tmpfile %v", err)
+	}
+
+	testtab := []teststimulus{
+		// e
+		{Range{0, 0}, tfd.Name(), "e " + tfd.Name(), contents},
+
+		// r
+		{Range{0, 0}, tfd.Name(), "r " + tfd.Name(), contents + contents},
+		{Range{0, len(contents)}, tfd.Name(), "r " + tfd.Name(), contents},
+
+		// a (for confirmation of test rationality)
+		{Range{0, 0}, tfd.Name(), "a/junk", "junkThis is a\nshort text\nto try addressing\n"},
+	}
+
+	filedirtystates := []struct {
+		Dirty            bool
+		SaveableAndDirty bool
+	}{
+		{false, false},
+		{true, true},
+		{false, false},
+		{true, true},
+	}
+
+	buf := make([]rune, 8192)
+
+	for i, test := range testtab {
+		w := makeSkeletonWindowModel(&test)
+
+		editcmd(&w.body, []rune(test.expr))
+
+		n, _ := w.body.ReadB(0, buf[:])
+		if string(buf[:n]) != test.expected {
+			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
+		}
+
+		litter.Config.HidePrivateFields = false
+
+		// For e identical.
+		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
+			t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+		}
+		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
+			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+		}
+	}
 }
 
 func TestParsecmd(t *testing.T) {

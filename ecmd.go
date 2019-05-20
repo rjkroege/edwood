@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -246,13 +247,14 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	if err == nil && fi.IsDir() {
 		editerror("%v is a directory", name)
 	}
-	f.elog.Delete(q0, q1)
-	// TODO(rjk): Prove that this should be false.
-	_, nulls, err := f.Load(q1, fd, false)
+
+	d, err := ioutil.ReadAll(fd)
 	if err != nil {
-		warning(nil, "Error reading file %v: %v", name, err)
-		return false
+		editerror("%v unreadable", name)
 	}
+	runes, _, nulls := cvttorunes(d, len(d))
+	f.elog.Replace(q0, q1, runes)
+
 	if nulls {
 		warning(nil, "%v: NUL bytes elided\n", name)
 	} else if allreplaced && samename {
