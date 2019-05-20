@@ -53,7 +53,7 @@ func OptBackground(b draw.Image) OptionClosure {
 }
 
 // OptFont sets the default font.
-func OptFont(ft *draw.Font) OptionClosure {
+func OptFont(ft draw.Font) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = &frfont{ft}
 		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()

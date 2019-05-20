@@ -203,10 +203,10 @@ func readfile(c *Column, filename string) {
 	xfidlog(w, "new")
 }
 
-var fontCache = make(map[string]*draw.Font)
+var fontCache = make(map[string]draw.Font)
 
-func fontget(name string, display draw.Display) *draw.Font {
-	var font *draw.Font
+func fontget(name string, display draw.Display) draw.Font {
+	var font draw.Font
 	var ok bool
 	if font, ok = fontCache[name]; !ok {
 		f, err := display.OpenFont(name)
@@ -248,7 +248,7 @@ func iconinit(display draw.Display) {
 	}
 
 	// ...
-	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(tagfont, display).Height+1)
+	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(tagfont, display).Height()+1)
 	button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	button.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)

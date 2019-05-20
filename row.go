@@ -30,7 +30,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	row.col = []*Column{}
 	row.r = r
 	r1 := r
-	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height()
 	t := &row.tag
 	f := new(File)
 	t.file = f.AddText(t)
@@ -103,7 +103,7 @@ func (r *Row) Resize(rect image.Rectangle) {
 	or := row.r
 	row.r = rect
 	r1 := rect
-	r1.Max.Y = r1.Min.Y + fontget(tagfont, r.display).Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, r.display).Height()
 	row.tag.Resize(r1, true, false)
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)

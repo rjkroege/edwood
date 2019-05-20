@@ -12,19 +12,19 @@ import (
 type Fontmetrics interface {
 	BytesWidth([]byte) int
 	DefaultHeight() int
-	Impl() *draw.Font
+	Impl() draw.Font
 	StringWidth(string) int
 	RunesWidth([]rune) int
 }
 
 type frfont struct {
-	*draw.Font
+	draw.Font
 }
 
 func (ff *frfont) DefaultHeight() int {
-	return ff.Font.Height
+	return ff.Font.Height()
 }
 
-func (ff *frfont) Impl() *draw.Font {
+func (ff *frfont) Impl() draw.Font {
 	return ff.Font
 }

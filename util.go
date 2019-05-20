@@ -244,7 +244,7 @@ func makenewwindow(t *Text) *Window {
 	el = emptyb.fr.GetFrameFillStatus().Maxlines - emptyb.fr.GetFrameFillStatus().Nlines
 	// if empty space is big, use it
 	if el > 15 || (el > 3 && el > (bigw.body.fr.GetFrameFillStatus().Maxlines-1)/2) {
-		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(tagfont, t.display).Height
+		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(tagfont, t.display).Height()
 	} else {
 		// if this window is in column and isn't much smaller, split it
 		if t.col == c && t.w.r.Dy() > 2*bigw.r.Dy()/3 {
