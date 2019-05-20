@@ -184,7 +184,6 @@ func allupdate(w *Window) {
 		}
 		t.w.owner = owner
 	}
-
 	w.SetTag()
 }
 
