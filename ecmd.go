@@ -574,24 +574,6 @@ func printposn(t *Text, mode int) {
 			warning(nil, ",#%d", addr.r.q1)
 		}
 		warning(nil, "\n")
-		return
-
-	case PosnLine:
-		l1, _ = nlcount(t, 0, addr.r.q0)
-		l1++
-		l2, _ = nlcount(t, addr.r.q0, addr.r.q1)
-		l2 += l1
-		// check if addr ends with '\n'
-		if addr.r.q1 > 0 && addr.r.q1 > addr.r.q0 && t.ReadC(addr.r.q1-1) == '\n' {
-			l2--
-		}
-		warning(nil, "%d", l1)
-		if l2 != l1 {
-			warning(nil, ",%d", l2)
-		}
-		warning(nil, "\n")
-		return
-
 	case PosnLineChars:
 		l1, r1 := nlcount(t, 0, addr.r.q0)
 		l1++
@@ -605,7 +587,6 @@ func printposn(t *Text, mode int) {
 			warning(nil, ",%d+#%d", l2, r2)
 		}
 		warning(nil, "\n")
-		return
 	default: // PosnLine
 		l1, _ = nlcount(t, 0, addr.r.q0)
 		l1++
@@ -620,7 +601,6 @@ func printposn(t *Text, mode int) {
 			warning(nil, ",%d", l2)
 		}
 		warning(nil, "\n")
-		return
 	}
 }
 

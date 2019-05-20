@@ -14,67 +14,99 @@ import (
 )
 
 type teststimulus struct {
-	dot      Range
-	filename string
-	expr     string
-	expected string
+	dot           Range
+	filename      string
+	expr          string
+	expected      string
+	expectedwarns []string
 }
 
 func TestEdit(t *testing.T) {
 	testtab := []teststimulus{
 
 		// 0
-		{Range{0, 0}, "test", "a/junk", "junkThis is a\nshort text\nto try addressing\n"},
-		{Range{7, 12}, "test", "a/junk", "This is a\nshjunkort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/This/a/junk", "Thisjunk is a\nshort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/^/a/junk", "This is a\njunkshort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/$/a/junk", "This is ajunk\nshort text\nto try addressing\n"},
+		{Range{0, 0}, "test", "a/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
+		{Range{7, 12}, "test", "a/junk", "This is a\nshjunkort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/This/a/junk", "Thisjunk is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/^/a/junk", "This is a\njunkshort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/$/a/junk", "This is ajunk\nshort text\nto try addressing\n", []string{}},
 
 		// 4
-		{Range{0, 0}, "test", "i/junk", "junkThis is a\nshort text\nto try addressing\n"},
-		{Range{2, 6}, "test", "i/junk", "Thjunkis is a\nshort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/text/i/junk", "This is a\nshort junktext\nto try addressing\n"},
+		{Range{0, 0}, "test", "i/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
+		{Range{2, 6}, "test", "i/junk", "Thjunkis is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/text/i/junk", "This is a\nshort junktext\nto try addressing\n", []string{}},
 
 		// Don't know how to automate testing of 'b'
 
 		// c
 		// 7
-		{Range{0, 0}, "test", "c/junk", "junkThis is a\nshort text\nto try addressing\n"},
-		{Range{2, 6}, "test", "c/junk", "Thjunks a\nshort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/text/c/junk", "This is a\nshort junk\nto try addressing\n"},
+		{Range{0, 0}, "test", "c/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
+		{Range{2, 6}, "test", "c/junk", "Thjunks a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/text/c/junk", "This is a\nshort junk\nto try addressing\n", []string{}},
 
 		// d
 		// 10
-		{Range{0, 0}, "test", "d", "This is a\nshort text\nto try addressing\n"},
-		{Range{2, 6}, "test", "d", "Ths a\nshort text\nto try addressing\n"},
-		{Range{0, 0}, "test", "/text/d", "This is a\nshort \nto try addressing\n"},
-
-		// e - Don't know how to test e
+		{Range{0, 0}, "test", "d", "This is a\nshort text\nto try addressing\n", []string{}},
+		{Range{2, 6}, "test", "d", "Ths a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 0}, "test", "/text/d", "This is a\nshort \nto try addressing\n", []string{}},
 
 		// f - Don't know how to test f
 
 		// g/v
-		{Range{0, 0}, "test", "g/This/d", "This is a\nshort text\nto try addressing\n"},
-		{Range{0, 12}, "test", "g/This/d", "ort text\nto try addressing\n"},
-		{Range{0, 3}, "test", "v/This/d", "s is a\nshort text\nto try addressing\n"},
-		{Range{0, 12}, "test", "v/This/d", "This is a\nshort text\nto try addressing\n"},
+		{Range{0, 0}, "test", "g/This/d", "This is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 12}, "test", "g/This/d", "ort text\nto try addressing\n", []string{}},
+		{Range{0, 3}, "test", "v/This/d", "s is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 12}, "test", "v/This/d", "This is a\nshort text\nto try addressing\n", []string{}},
 
 		// m/t
 		// 17
-		{Range{0, 4}, "test", "m/try", " is a\nshort text\nto tryThis addressing\n"},
-		{Range{0, 3}, "test", "t/try", "This is a\nshort text\nto tryThi addressing\n"},
+		{Range{0, 4}, "test", "m/try", " is a\nshort text\nto tryThis addressing\n", []string{}},
+		{Range{0, 3}, "test", "t/try", "This is a\nshort text\nto tryThi addressing\n", []string{}},
+		{Range{1, 3}, "test", "m0", "hiTs is a\nshort text\nto try addressing\n", []string{}},
+		{Range{4, 8}, "test", "m.", "This is a\nshort text\nto try addressing\n", []string{}},
+
+		// s
+		{Range{0, len(contents)}, "test", "s/short/long/", "This is a\nlong text\nto try addressing\n", []string{}},
+		{Range{0, len(contents)}, "test", "s/(i.)/!\\1!/g", "Th!is! !is! a\nshort text\nto try address!in!g\n", []string{}},
+
+		// =
+		{Range{1, 3}, "test", "=", "This is a\nshort text\nto try addressing\n", []string{"test:1\n"}},
+		{Range{1, 3}, "test", "=+", "This is a\nshort text\nto try addressing\n", []string{"test:1+#1\n"}},
+		{Range{1, 3}, "test", "=#", "This is a\nshort text\nto try addressing\n", []string{"test:#1,#3\n"}},
+
+		// p
+		{Range{0, 4}, "test", "p", "This is a\nshort text\nto try addressing\n", []string{"This"}},
+
+		// x
+		{Range{0, 4}, "test", ",x/$/ a/@/", "This is a@\nshort text@\nto try addressing@\n@", []string{}},
+		{Range{0, 4}, "test", ",x a/@/", "This is a@\nshort text@\nto try addressing@\n", []string{}},
 	}
 
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
+		warnings = []*Warning{}
 		w := makeSkeletonWindowModel(&test)
 		editcmd(&w.body, []rune(test.expr))
 
 		n, _ := w.body.ReadB(0, buf[:])
 		if string(buf[:n]) != test.expected {
-			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
+			t.Errorf("test %d: File.b contents expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
 		}
+
+		if got, want := len(warnings), len(test.expectedwarns); got != want {
+			t.Errorf("text %d: expected %d warnings but got %d warnings", i, want, got)
+			break
+		}
+
+		for j, tw := range test.expectedwarns {
+			n, _ := warnings[j].buf.Read(0, buf[:])
+			if string(buf[:n]) != tw {
+				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			}
+
+		}
+
 	}
 }
 
@@ -124,14 +156,14 @@ func TestEditCmdWithFile(t *testing.T) {
 
 	testtab := []teststimulus{
 		// e
-		{Range{0, 0}, tfd.Name(), "e " + tfd.Name(), contents},
+		{Range{0, 0}, tfd.Name(), "e " + tfd.Name(), contents, []string{}},
 
 		// r
-		{Range{0, 0}, tfd.Name(), "r " + tfd.Name(), contents + contents},
-		{Range{0, len(contents)}, tfd.Name(), "r " + tfd.Name(), contents},
+		{Range{0, 0}, tfd.Name(), "r " + tfd.Name(), contents + contents, []string{}},
+		{Range{0, len(contents)}, tfd.Name(), "r " + tfd.Name(), contents, []string{}},
 
 		// a (for confirmation of test rationality)
-		{Range{0, 0}, tfd.Name(), "a/junk", "junkThis is a\nshort text\nto try addressing\n"},
+		{Range{0, 0}, tfd.Name(), "a/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
 	}
 
 	filedirtystates := []struct {
@@ -147,6 +179,7 @@ func TestEditCmdWithFile(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
+		warnings = []*Warning{}
 		w := makeSkeletonWindowModel(&test)
 
 		editcmd(&w.body, []rune(test.expr))
@@ -164,6 +197,18 @@ func TestEditCmdWithFile(t *testing.T) {
 		}
 		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
 			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+		}
+
+		if got, want := len(warnings), len(test.expectedwarns); got != want {
+			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
+			break
+		}
+
+		for j, tw := range test.expectedwarns {
+			n, _ := warnings[j].buf.Read(0, buf[:])
+			if string(buf[:n]) != tw {
+				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			}
 		}
 	}
 }
