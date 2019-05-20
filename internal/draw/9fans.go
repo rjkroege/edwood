@@ -37,7 +37,7 @@ type (
 	Color       = draw.Color
 	Cursor      = draw.Cursor
 	drawDisplay = draw.Display
-	Font        = draw.Font
+	drawFont    = draw.Font
 	drawImage   = draw.Image
 	Keyboardctl = draw.Keyboardctl
 	Mousectl    = draw.Mousectl

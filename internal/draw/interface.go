@@ -1,8 +1,6 @@
 package draw
 
-import (
-	"image"
-)
+import "image"
 
 type Display interface {
 	ScreenImage() Image
@@ -13,7 +11,7 @@ type Display interface {
 
 	InitKeyboard() *Keyboardctl
 	InitMouse() *Mousectl
-	OpenFont(name string) (*Font, error)
+	OpenFont(name string) (Font, error)
 	AllocImage(r image.Rectangle, pix Pix, repl bool, val Color) (Image, error)
 	AllocImageMix(color1, color3 Color) Image
 	Attach(ref int) error
@@ -32,8 +30,16 @@ type Image interface {
 
 	Draw(r image.Rectangle, src, mask Image, p1 image.Point)
 	Border(r image.Rectangle, n int, color Image, sp image.Point)
-	Bytes(pt image.Point, src Image, sp image.Point, f *Font, b []byte) image.Point
+	Bytes(pt image.Point, src Image, sp image.Point, f Font, b []byte) image.Point
 	Free() error
+}
+
+type Font interface {
+	Name() string
+	Height() int
+	BytesWidth(b []byte) int
+	RunesWidth(r []rune) int
+	StringWidth(s string) int
 }
 
 // displayImpl implements the Display interface.
@@ -48,6 +54,14 @@ func (d *displayImpl) White() Image       { return &imageImpl{d.drawDisplay.Whit
 func (d *displayImpl) Black() Image       { return &imageImpl{d.drawDisplay.Black} }
 func (d *displayImpl) Opaque() Image      { return &imageImpl{d.drawDisplay.Opaque} }
 func (d *displayImpl) Transparent() Image { return &imageImpl{d.drawDisplay.Transparent} }
+
+func (d *displayImpl) OpenFont(name string) (Font, error) {
+	f, err := d.drawDisplay.OpenFont(name)
+	if err != nil {
+		return nil, err
+	}
+	return &fontImpl{f}, nil
+}
 
 func (d *displayImpl) AllocImage(r image.Rectangle, pix Pix, repl bool, val Color) (Image, error) {
 	i, err := d.drawDisplay.AllocImage(r, pix, repl, val)
@@ -80,8 +94,8 @@ func (dst *imageImpl) Border(r image.Rectangle, n int, color Image, sp image.Poi
 	dst.drawImage.Border(r, n, toDrawImage(color), sp)
 }
 
-func (dst *imageImpl) Bytes(pt image.Point, src Image, sp image.Point, f *Font, b []byte) image.Point {
-	return dst.drawImage.Bytes(pt, toDrawImage(src), sp, f, b)
+func (dst *imageImpl) Bytes(pt image.Point, src Image, sp image.Point, f Font, b []byte) image.Point {
+	return dst.drawImage.Bytes(pt, toDrawImage(src), sp, f.(*fontImpl).drawFont, b)
 }
 
 func toDrawImage(i Image) *drawImage {
@@ -90,3 +104,10 @@ func toDrawImage(i Image) *drawImage {
 	}
 	return i.(*imageImpl).drawImage
 }
+
+type fontImpl struct {
+	*drawFont
+}
+
+func (f *fontImpl) Name() string { return f.drawFont.Name }
+func (f *fontImpl) Height() int  { return f.drawFont.Height }

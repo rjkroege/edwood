@@ -82,7 +82,7 @@ type Text struct {
 
 // getfont is a convenience accessor that gets the draw.Font from the font
 // used in this text.
-func (t *Text) getfont() *draw.Font {
+func (t *Text) getfont() draw.Font {
 	return fontget(t.font, t.display)
 }
 

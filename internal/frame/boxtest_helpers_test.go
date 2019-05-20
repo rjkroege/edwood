@@ -53,7 +53,7 @@ func (w Fakemetrics) BytesWidth(s []byte) int {
 
 func (w Fakemetrics) DefaultHeight() int { return 13 }
 
-func (w Fakemetrics) Impl() *draw.Font { return nil }
+func (w Fakemetrics) Impl() draw.Font { return nil }
 
 func (w Fakemetrics) StringWidth(s string) int {
 	return int(w) * (strings.Count(s, "") - 1)

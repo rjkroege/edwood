@@ -46,7 +46,7 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	c.r = r
 	c.tag.col = c
 	r1 := r
-	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height
+	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
 	tagfile := NewFile("")
@@ -300,7 +300,7 @@ func (c *Column) Resize(r image.Rectangle) {
 				r1.Max.Y += (w.r.Dy() + c.display.ScaleSize(Border)) * r.Dy() / c.r.Dy()
 			}
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height)
+		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height())
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
 		c.display.ScreenImage().Draw(r2, c.display.Black(), nil, image.ZP)
