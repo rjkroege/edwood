@@ -59,7 +59,7 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion into empty",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
@@ -76,7 +76,7 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion fits at end of line",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
@@ -93,7 +93,7 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"1 rune insertion wraps at end of line",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
@@ -110,7 +110,7 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"splittable 2 rune insertion at end of line",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
@@ -127,7 +127,7 @@ func TestBxscan(t *testing.T) {
 		InsertTest{
 			"splittable multi-rune rune insertion at start of line",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},

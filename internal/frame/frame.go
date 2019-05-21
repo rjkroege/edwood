@@ -71,10 +71,10 @@ type Frame interface {
 	GetMaxtab() int
 
 	// Init prepares the Frame for the display of text in rectangle r.
-	// Frame f will reuse previously set FontMetrics, colours, tab width and
+	// Frame f will reuse previously set font, colours, tab width and
 	// destination image for drawing unless these are overridden with
 	// one or more instances of the OptColors, OptBackground
-	// OptFont or OptFontMetrics OptMaxTab option settings.
+	// OptFont or OptMaxTab option settings.
 	//
 	// The background (OptBackground setter) may be null to allow
 	// calling the other routines to maintain the model in, for example,
@@ -255,7 +255,7 @@ type frameimpl struct {
 	lk sync.Mutex
 	// lk debugginglock
 
-	font       Fontmetrics
+	font       draw.Font
 	display    draw.Display           // on which the frame is displayed
 	background draw.Image             // on which the frame appears
 	cols       [NumColours]draw.Image // background and text colours
@@ -316,7 +316,7 @@ func (f *frameimpl) Init(r image.Rectangle, opts ...OptionClosure) {
 	// will re-use the existing values if new ones are not provided.
 	ctx := f.Option(opts...)
 
-	f.defaultfontheight = f.font.DefaultHeight()
+	f.defaultfontheight = f.font.Height()
 	f.display = f.background.Display()
 	f.maxtab = ctx.computemaxtab(f.maxtab, f.font.StringWidth("0"))
 	f.setrects(r)

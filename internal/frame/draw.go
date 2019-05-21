@@ -13,7 +13,7 @@ func (f *frameimpl) drawtext(pt image.Point, text draw.Image, back draw.Image) {
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.font.Impl(), b.Ptr)
+			f.background.Bytes(pt, text, image.ZP, f.font, b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -158,7 +158,7 @@ func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back draw.Image, text d
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
 		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.defaultfontheight), back, nil, pt)
 		if b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.font.Impl(), ptr[0:runeindex(ptr, nr)])
+			f.background.Bytes(pt, text, image.ZP, f.font, ptr[0:runeindex(ptr, nr)])
 		}
 		pt.X += w
 		p += nr

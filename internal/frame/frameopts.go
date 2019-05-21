@@ -55,16 +55,8 @@ func OptBackground(b draw.Image) OptionClosure {
 // OptFont sets the default font.
 func OptFont(ft draw.Font) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
-		f.font = &frfont{ft}
-		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
-	}
-}
-
-// OptFontMetrics sets the default font metrics object.
-func OptFontMetrics(ft Fontmetrics) OptionClosure {
-	return func(f *frameimpl, ctx *optioncontext) {
 		f.font = ft
-		ctx.updatetick = f.defaultfontheight != f.font.DefaultHeight()
+		ctx.updatetick = f.defaultfontheight != f.font.Height()
 	}
 }
 

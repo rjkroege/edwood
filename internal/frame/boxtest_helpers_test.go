@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/edwoodtest"
 )
 
 const fixedwidth = 10
@@ -44,23 +45,9 @@ func makeBox(s string) *frbox {
 	}
 }
 
-// Fakemetrics mocks Fontmetrics as a fixed width 13px high 10px wide font.
-type Fakemetrics int
-
-func (w Fakemetrics) BytesWidth(s []byte) int {
-	return int(w) * (strings.Count(string(s), "") - 1)
-}
-
-func (w Fakemetrics) DefaultHeight() int { return 13 }
-
-func (w Fakemetrics) Impl() draw.Font { return nil }
-
-func (w Fakemetrics) StringWidth(s string) int {
-	return int(w) * (strings.Count(s, "") - 1)
-}
-
-func (w Fakemetrics) RunesWidth(r []rune) int {
-	return len(r) * int(w)
+// mockFont returns a mock of a fixed width 13px high 10px wide font.
+func mockFont() draw.Font {
+	return edwoodtest.NewFont(fixedwidth, 13)
 }
 
 // BoxTester specifies an abstract interface to each specific test.

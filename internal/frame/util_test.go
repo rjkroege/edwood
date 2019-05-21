@@ -49,7 +49,7 @@ func TestCanfit(t *testing.T) {
 		BoxModelTest{
 			"multi-glyph box doesn't fit",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123456789")},
 			},
@@ -66,7 +66,7 @@ func TestCanfit(t *testing.T) {
 		BoxModelTest{
 			"multi-glyph box, fits",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("0123")},
 			},
@@ -83,7 +83,7 @@ func TestCanfit(t *testing.T) {
 		BoxModelTest{
 			"newline box",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{newlinebox},
 			},
@@ -100,7 +100,7 @@ func TestCanfit(t *testing.T) {
 		BoxModelTest{
 			"tab box",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{tabbox},
 			},
@@ -117,7 +117,7 @@ func TestCanfit(t *testing.T) {
 		BoxModelTest{
 			"multi-glyph box, doesn't fit",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{makeBox("本a")},
 			},
@@ -145,7 +145,7 @@ func TestClean(t *testing.T) {
 		SimpleBoxModelTest{
 			"empty frame",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{},
 			},
@@ -156,7 +156,7 @@ func TestClean(t *testing.T) {
 		SimpleBoxModelTest{
 			"one frame, 0,1",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
@@ -167,7 +167,7 @@ func TestClean(t *testing.T) {
 		SimpleBoxModelTest{
 			"one frame, 1,1",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{worldbox},
 			},
@@ -178,7 +178,7 @@ func TestClean(t *testing.T) {
 		SimpleBoxModelTest{
 			"two frame, 0,2",
 			&frameimpl{
-				font: Fakemetrics(fixedwidth),
+				font: mockFont(),
 				rect: image.Rect(10, 15, 10+57, 15+57),
 				box:  []*frbox{hellobox, worldbox},
 			},
@@ -191,7 +191,7 @@ func TestClean(t *testing.T) {
 				SimpleBoxModelTest{
 					"three frame, 0,4",
 					&Frame{
-						Font:   Fakemetrics(fixedwidth),
+						Font:   mockFont(),
 						Rect:   image.Rect(10, 15, 10+57, 15+57),
 						box:    []*frbox{hellobox, worldbox, makeBox("r"), makeBox("ld")},
 					},
