@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,10 +15,13 @@ import (
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/dumpfile"
+	"github.com/rjkroege/edwood/internal/edwoodtest"
 )
 
-func TestRowLoad(t *testing.T) {
+func TestRowLoadFsys(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
@@ -43,7 +48,7 @@ func TestRowLoad(t *testing.T) {
 			}
 			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood"), []byte(cwd), -1)
 
-			f, err := ioutil.TempFile("", "edwood-*.dump")
+			f, err := ioutil.TempFile("", "edwood_test")
 			if err != nil {
 				t.Fatalf("failed to create temporary file: %v", err)
 			}
@@ -61,14 +66,14 @@ func TestRowLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to load dump file %v: %v", tc, err)
 			}
-			checkDump(t, dump, a.fsys)
+			checkDumpFsys(t, dump, a.fsys)
 		})
 	}
 }
 
-// checkDump checks Edwood's current state matches dump file.
+// checkDumpFsys checks Edwood's current state matches dump file.
 // It checks that window's Tag, Font, Q0, Q1, and Body matches.
-func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
+func checkDumpFsys(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 	wins, err := windows(fsys)
 	if err != nil {
 		t.Fatalf("failed to get list of windows: %v", err)
@@ -126,6 +131,116 @@ func checkDump(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 		if dw.Type == dumpfile.Unsaved && w.body != dw.Body.Buffer {
 			t.Errorf("body for %q is %q; expected %q", w.name, w.body, dw.Body.Buffer)
 		}
+	}
+}
+
+func TestRowLoad(t *testing.T) {
+	tt := []struct {
+		name     string
+		filename string
+	}{
+		{"empty-two-cols", "testdata/empty-two-cols.dump"},
+		{"example", "testdata/example.dump"},
+		{"multi-line-tag", "testdata/multi-line-tag.dump"},
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := ioutil.ReadFile(tc.filename)
+			if err != nil {
+				t.Fatalf("ReadFile failed: %v", err)
+			}
+			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood/"),
+				[]byte(jsonEscapePath(cwd+string(filepath.Separator))), -1)
+			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood"),
+				[]byte(jsonEscapePath(cwd)), -1)
+
+			f, err := ioutil.TempFile("", "edwood_test")
+			if err != nil {
+				t.Fatalf("failed to create temporary file: %v", err)
+			}
+			defer os.Remove(f.Name())
+			_, err = f.Write(b)
+			if err != nil {
+				t.Fatalf("write failed: %v", err)
+			}
+			f.Close()
+
+			colbutton = edwoodtest.NewImage(image.Rectangle{})
+			button = edwoodtest.NewImage(image.Rectangle{})
+			modbutton = edwoodtest.NewImage(image.Rectangle{})
+			mouse = &draw.Mouse{}
+			maxtab = 4
+
+			display := edwoodtest.NewDisplay()
+			row = Row{} // reset
+			row.Init(display.ScreenImage().R(), display)
+
+			err = row.Load(nil, f.Name(), true)
+			if err != nil {
+				t.Fatalf("Row.Load failed: %v", err)
+			}
+			dump, err := dumpfile.Load(f.Name())
+			if err != nil {
+				t.Fatalf("failed to load dump file %v: %v", tc, err)
+			}
+			checkDump(t, f.Name(), dump)
+		})
+	}
+}
+
+// checkDump checks Edwood's current state matches loaded dump file content.
+func checkDump(t *testing.T, filename string, want *dumpfile.Content) {
+	got, err := row.dump()
+	if err != nil {
+		t.Fatalf("dump failed: %v", err)
+	}
+
+	// Ignore some mismatch. Positions may not match exactly.
+	// Window tags may get "Put" added or "Undo" removed, and
+	// because of the change in the tag, selection within the tag may not match.
+	//
+	// TODO(fhs): We should do better job of preserving exact positions, tags, etc.
+	for i, c := range want.Columns {
+		if math.Abs(got.Columns[i].Position-c.Position) < 1 {
+			got.Columns[i].Position = c.Position
+		}
+	}
+	for i, w := range want.Windows {
+		g := got.Windows[i]
+		if math.Abs(g.Position-w.Position) < 10 {
+			g.Position = w.Position
+		}
+		const (
+			put  = " Put "
+			undo = " Undo "
+		)
+		if strings.Contains(g.Tag.Buffer, put) && !strings.Contains(w.Tag.Buffer, put) {
+			g.Tag.Buffer = w.Tag.Buffer
+		}
+		if !strings.Contains(g.Tag.Buffer, undo) && strings.Contains(w.Tag.Buffer, undo) {
+			g.Tag = w.Tag
+		}
+
+		// For directory listing, ignore selection changes in the tag since
+		// we rewrite the directory name in the dump file during testing.
+		name := ""
+		if w := strings.Fields(g.Tag.Buffer); len(w) > 0 {
+			name = w[0]
+		}
+		if n := len(name); n > 0 && name[n-1] == filepath.Separator { // is directory
+			g.Tag.Q0 = w.Tag.Q0
+			g.Tag.Q1 = w.Tag.Q1
+		}
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("dump mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -334,4 +449,9 @@ func TestRowLookupWin(t *testing.T) {
 			t.Errorf("LookupWin returned window %p for id %v; expected %p", w, tc.id, tc.w)
 		}
 	}
+}
+
+// jsonEscapePath escapes blackslashes in Windows path.
+func jsonEscapePath(s string) string {
+	return strings.Replace(s, "\\", "\\\\", -1)
 }

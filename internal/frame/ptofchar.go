@@ -2,6 +2,7 @@ package frame
 
 import (
 	"image"
+	"log"
 	"unicode/utf8"
 )
 
@@ -19,7 +20,7 @@ func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 					r, w = utf8.DecodeRune(b.Ptr[s:])
 					pt.X += f.font.BytesWidth(b.Ptr[s : s+w])
 					if r == 0 || pt.X > f.rect.Max.X {
-						panic("frptofchar")
+						log.Panicf("frptofchar: r=%v pt.X=%v f.rect.Max.X=%v\n", r, pt.X, f.rect.Max.X)
 					}
 				}
 			}

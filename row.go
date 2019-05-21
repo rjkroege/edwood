@@ -317,8 +317,19 @@ func (r *Row) Dump(file string) error {
 		}
 		file = f
 	}
+	dump, err := r.dump()
+	if err != nil {
+		return err
+	}
 
-	dump := dumpfile.Content{
+	if err := dump.Save(file); err != nil {
+		return warnError(nil, "dumping to %v failed: %v", file, err)
+	}
+	return nil
+}
+
+func (r *Row) dump() (*dumpfile.Content, error) {
+	dump := &dumpfile.Content{
 		CurrentDir: wdir,
 		VarFont:    *varfontflag,
 		FixedFont:  *fixedfontflag,
@@ -409,12 +420,7 @@ func (r *Row) Dump(file string) error {
 			}
 		}
 	}
-
-	err := dump.Save(file)
-	if err != nil {
-		return warnError(nil, "dumping to %v failed: %v", file, err)
-	}
-	return nil
+	return dump, nil
 }
 
 // loadhelper breaks out common load file parsing functionality for selected row
@@ -526,6 +532,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	if err := os.Chdir(dump.CurrentDir); err != nil {
 		return err
 	}
+	wdir = dump.CurrentDir
 
 	// variable width font
 	*varfontflag = dump.VarFont
