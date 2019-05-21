@@ -18,7 +18,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"empty",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
@@ -28,7 +28,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"one box",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("本"),
@@ -41,7 +41,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"one box, target first pixel of an invalid rune",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("\xef\xbf\xbd"),
@@ -54,7 +54,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"two boxes, target first pixel of first char",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -68,7 +68,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"two boxes, last pixel in first char",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -82,7 +82,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"two boxes, bottom edge of second char",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -96,7 +96,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"two boxes, top edge of second box",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -110,7 +110,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"two boxes, top edge of second box",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -124,7 +124,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"three boxes, top edge of second box",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),
@@ -139,7 +139,7 @@ func TestCharofpt(t *testing.T) {
 		{
 			"three boxes, top edge of second box",
 			&frameimpl{
-				font:              Fakemetrics(fixedwidth),
+				font:              mockFont(),
 				defaultfontheight: 13,
 				box: []*frbox{
 					makeBox("12345"),

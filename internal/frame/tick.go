@@ -21,7 +21,7 @@ func (f *frameimpl) InitTick() {
 		f.tickimage.Free()
 	}
 
-	height := ft.DefaultHeight()
+	height := ft.Height()
 
 	var err error
 	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix(), false, draw.Transparent)

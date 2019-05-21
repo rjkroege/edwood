@@ -1,13 +1,19 @@
+// Package edwoodtest contains utility functions that help with testing Edwood.
 package edwoodtest
 
 import (
 	"image"
+	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/draw"
 )
 
+var _ = draw.Display((*mockDisplay)(nil))
+
+// mockDisplay implements draw.Display.
 type mockDisplay struct{}
 
+// NewDisplay returns a mock draw.Display.
 func NewDisplay() draw.Display {
 	return &mockDisplay{}
 }
@@ -18,7 +24,7 @@ func (d *mockDisplay) Opaque() draw.Image                      { return NewImage
 func (d *mockDisplay) Transparent() draw.Image                 { return NewImage(image.Rectangle{}) }
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl         { return nil }
 func (d *mockDisplay) InitMouse() *draw.Mousectl               { return nil }
-func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return newFont(), nil }
+func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(13, 10), nil }
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
 	return &mockImage{r: r}, nil
 }
@@ -33,10 +39,14 @@ func (d *mockDisplay) WriteSnarf(data []byte) error           { return nil }
 func (d *mockDisplay) MoveTo(pt image.Point) error            { return nil }
 func (d *mockDisplay) SetCursor(c *draw.Cursor) error         { return nil }
 
+var _ = draw.Image((*mockImage)(nil))
+
+// mockImage implements draw.Image.
 type mockImage struct {
 	r image.Rectangle
 }
 
+// NewImage returns a mock draw.Image with the given bounds.
 func NewImage(r image.Rectangle) draw.Image {
 	return &mockImage{r: r}
 }
@@ -50,12 +60,23 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 }
 func (i *mockImage) Free() error { return nil }
 
-type mockFont struct{}
+var _ = draw.Font((*mockFont)(nil))
 
-func newFont() draw.Font { return &mockFont{} }
+// mockFont implements draw.Font and mocks as a fixed width font.
+type mockFont struct {
+	width, height int
+}
+
+// NewFont returns a draw.Font that mocks a fixed-width font.
+func NewFont(width, height int) draw.Font {
+	return &mockFont{
+		width:  width,
+		height: height,
+	}
+}
 
 func (f *mockFont) Name() string             { return "" }
-func (f *mockFont) Height() int              { return 16 }
-func (f *mockFont) BytesWidth(b []byte) int  { return f.RunesWidth([]rune(string(b))) }
-func (f *mockFont) RunesWidth(r []rune) int  { return 10 * len(r) }
-func (f *mockFont) StringWidth(s string) int { return f.RunesWidth([]rune(s)) }
+func (f *mockFont) Height() int              { return f.height }
+func (f *mockFont) BytesWidth(b []byte) int  { return f.width * utf8.RuneCount(b) }
+func (f *mockFont) RunesWidth(r []rune) int  { return f.width * len(r) }
+func (f *mockFont) StringWidth(s string) int { return f.width * utf8.RuneCountInString(s) }
