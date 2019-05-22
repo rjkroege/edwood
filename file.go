@@ -527,13 +527,17 @@ func (f *File) Seq() int {
 	return f.seq
 }
 
+// Undo undoes edits if isundo is true or redoes edits if isundo is false.
+// It returns the new selection q0, q1 and a bool indicating if the
+// returned selection is meaningful.
+//
 // TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
 // The number actually processed is controlled by mutations to File.seq.
 // This does not align with the semantics of undo.Buffer.
 // Each "Mark" needs to have a seq value provided.
 // TODO(rjk): Consider providing the target seq value as an argument.
-func (f *File) Undo(isundo bool) (q0p, q1p int) {
+func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 	var (
 		stop           int
 		delta, epsilon *[]*Undo
@@ -577,8 +581,9 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			for _, text := range f.text {
 				text.deleted(u.p0, u.p0+u.n)
 			}
-			q0p = u.p0
-			q1p = u.p0
+			q0 = u.p0
+			q1 = u.p0
+			ok = true
 		case Insert:
 			f.seq = u.seq
 			f.Uninsert(epsilon, u.p0, u.n)
@@ -588,8 +593,9 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 			for _, text := range f.text {
 				text.inserted(u.p0, u.buf)
 			}
-			q0p = u.p0
-			q1p = u.p0 + u.n
+			q0 = u.p0
+			q1 = u.p0 + u.n
+			ok = true
 		case Filename:
 			// TODO(rjk): If I have a zerox, does undo a filename change update?
 			f.seq = u.seq
@@ -605,7 +611,7 @@ func (f *File) Undo(isundo bool) (q0p, q1p int) {
 	if isundo {
 		f.seq = 0
 	}
-	return q0p, q1p
+	return q0, q1, ok
 }
 
 // Reset removes all Undo records for this File.
