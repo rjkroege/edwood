@@ -388,7 +388,9 @@ func (w *Window) Delete() {
 func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
-	body.q0, body.q1 = body.file.Undo(isundo)
+	if q0, q1, ok := body.file.Undo(isundo); ok {
+		body.q0, body.q1 = q0, q1
+	}
 
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
