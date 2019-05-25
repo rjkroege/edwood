@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -56,7 +57,9 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 			// Now wait for I/O to finish.
 			err = cmd.Wait()
 			if err != nil {
-				acmeerror("9pserve wait failed", err)
+				// Most likely Edwood is preparing to exit and closed its end of the pipe.
+				// Don't panic -- give Edwood a chance to clean up before exit.
+				log.Printf("9pserve wait failed: %v", err)
 			}
 			conn.Close()
 		}()
@@ -111,7 +114,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 		go func() {
 			err = cmd.Wait()
 			if err != nil {
-				acmeerror("wait failed", err)
+				log.Printf("mount9p/9pfuse wait failed: %v", err)
 			}
 			fd.Close()
 		}()

@@ -37,8 +37,6 @@ var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
 var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)")
 var ncol = 2
 
-var mainpid int
-
 func main() {
 
 	// rfork(RFENVG|RFNAMEG); TODO(flux): I'm sure these are vitally(?) important.
@@ -105,7 +103,6 @@ func main() {
 
 		mousectl = display.InitMouse()
 		keyboardctl = display.InitKeyboard()
-		mainpid = os.Getpid()
 
 		tagfont = *varfontflag
 
@@ -178,15 +175,17 @@ func main() {
 
 		signal.Ignore(ignoreSignals...)
 		signal.Notify(csignal, hangupSignals...)
-		for {
-			select {
-			case <-cexit:
-				shutdown(os.Interrupt, fs)
 
-			case s := <-csignal:
-				shutdown(s, fs)
-			}
+		select {
+		case <-cexit:
+			// Do nothing.
+		case <-csignal:
+			row.lk.Lock()
+			row.Dump("")
+			row.lk.Unlock()
 		}
+		killprocs(fs)
+		os.Exit(0)
 	})
 }
 
@@ -644,21 +643,6 @@ func killprocs(fs *fileServer) {
 	fs.close()
 	for c := command; c != nil; c = c.next {
 		c.proc.Kill()
-	}
-}
-
-var dumping bool
-
-// TODO(rjk): I'm not sure that this is the right thing to do? It fails to
-// handle the situation that is most interesting: trying to save the state
-// if we would otherwise crash. It's also conceivably racy.
-func shutdown(s os.Signal, fs *fileServer) {
-	if !dumping && os.Getpid() == mainpid {
-		killprocs(fs)
-		dumping = true
-		row.Dump("")
-	} else {
-		os.Exit(0)
 	}
 }
 
