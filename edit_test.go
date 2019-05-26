@@ -22,8 +22,11 @@ type teststimulus struct {
 }
 
 func TestEdit(t *testing.T) {
-	testtab := []teststimulus{
+	runfunc = mockrun
+	defer func() { runfunc = run }()
+	cedit = make(chan int)
 
+	testtab := []teststimulus{
 		// 0
 		{Range{0, 0}, "test", "a/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
 		{Range{7, 12}, "test", "a/junk", "This is a\nshjunkort text\nto try addressing\n", []string{}},
@@ -66,10 +69,12 @@ func TestEdit(t *testing.T) {
 		{Range{4, 8}, "test", "m.", "This is a\nshort text\nto try addressing\n", []string{}},
 
 		// s
+		// 21
 		{Range{0, len(contents)}, "test", "s/short/long/", "This is a\nlong text\nto try addressing\n", []string{}},
 		{Range{0, len(contents)}, "test", "s/(i.)/!\\1!/g", "Th!is! !is! a\nshort text\nto try address!in!g\n", []string{}},
 
 		// =
+		// 23
 		{Range{1, 3}, "test", "=", "This is a\nshort text\nto try addressing\n", []string{"test:1\n"}},
 		{Range{1, 3}, "test", "=+", "This is a\nshort text\nto try addressing\n", []string{"test:1+#1\n"}},
 		{Range{1, 3}, "test", "=#", "This is a\nshort text\nto try addressing\n", []string{"test:#1,#3\n"}},
@@ -80,18 +85,39 @@ func TestEdit(t *testing.T) {
 		// x
 		{Range{0, 4}, "test", ",x/$/ a/@/", "This is a@\nshort text@\nto try addressing@\n@", []string{}},
 		{Range{0, 4}, "test", ",x a/@/", "This is a@\nshort text@\nto try addressing@\n", []string{}},
+
+		// \n is missing because we have no way to determine if the result is correct.
+
+		// | > <
+		// 30
+		{Range{0, 4}, "test", "|pipe", "{\"|pipe\" \"\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 4}, "test", ">greater", "This is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 4}, "test", "<less", "{\"<less\" \"\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 4}, "test", "<error", "This is a\nshort text\nto try addressing\n", []string{"Edit: mockrun failed!\n"}},
+
+		// { } NB: grouping requires newlines. And sets . the same for each of the commands.
+		{Range{0, 0}, "test", ",x {\n i/@/ \n a/%/\n }", "@This is a%\n@short text%\n@to try addressing%\n", []string{}},
+		// TODO(rjk): { has a number of constraints not being exercised in this test.
 	}
 
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
 		warnings = []*Warning{}
-		w := makeSkeletonWindowModel(&test)
+		w := makeSkeletonWindowModel(test.dot, test.filename)
+
+		// All middle button commands including Edit run inside a lock discipline
+		// set up by MovedMouse. We need to mirror this for external process
+		// accessing Edit commands.
+		row.lk.Lock()
+		w.Lock('M')
 		editcmd(&w.body, []rune(test.expr))
+		w.Unlock()
+		row.lk.Unlock()
 
 		n, _ := w.body.ReadB(0, buf[:])
 		if string(buf[:n]) != test.expected {
-			t.Errorf("test %d: File.b contents expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
+			t.Errorf("test %d: File.b contents expected \n%#v\nbut got \n%#v\n", i, test.expected, string(buf[:n]))
 		}
 
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
@@ -110,19 +136,32 @@ func TestEdit(t *testing.T) {
 	}
 }
 
-func makeSkeletonWindowModel(test *teststimulus) *Window {
+func makeSkeletonWindowModel(dot Range, filename string) *Window {
 	w := NewWindow().initHeadless(nil)
 	w.body.fr = &MockFrame{}
 	w.tag.fr = &MockFrame{}
-	w.body.Insert(0, []rune("This is a\nshort text\nto try addressing\n"), true)
+	w.body.Insert(0, []rune(contents), true)
+
+	w.body.SetQ0(dot.q0)
+	w.body.SetQ1(dot.q1)
+	w.body.file.SetName(filename)
+	w.body.w = w
+	w.tag.w = w
+
+	w2 := NewWindow().initHeadless(nil)
+	w2.body.fr = &MockFrame{}
+	w2.tag.fr = &MockFrame{}
+	w2.body.Insert(0, []rune(alt_contents), true)
+
+	w2.body.SetQ0(dot.q0)
+	w2.body.SetQ1(dot.q1)
+	w2.body.file.SetName("alt_example_2")
+	w2.body.w = w2
+	w2.tag.w = w2
 
 	// Set up Undo to make sure that we see undoable results.
-	// By default, post-load, file.seq, file.putse = 0, 0.
+	// By default, post-load, file.seq, file.putseq = 0, 0.
 	seq = 1
-
-	w.body.SetQ0(test.dot.q0)
-	w.body.SetQ1(test.dot.q1)
-	w.body.file.SetName(test.filename)
 
 	// Construct the global window machinery.
 	row = Row{
@@ -130,15 +169,26 @@ func makeSkeletonWindowModel(test *teststimulus) *Window {
 			{
 				w: []*Window{
 					w,
+					w2,
 				},
+				fortest: true,
 			},
 		},
 	}
 	w.col = row.col[0]
+	w2.col = row.col[0]
+
+	// TODO(rjk): Why do we need this? Text points at w, w points at col?
+	w.body.col = row.col[0]
+	w.tag.col = row.col[0]
+	w2.body.col = row.col[0]
+	w2.tag.col = row.col[0]
+
 	return w
 }
 
 const contents = "This is a\nshort text\nto try addressing\n"
+const alt_contents = "A different text\nWith other contents\nSo there!\n"
 
 func TestEditCmdWithFile(t *testing.T) {
 	// Make a temporary file.
@@ -161,9 +211,6 @@ func TestEditCmdWithFile(t *testing.T) {
 		// r
 		{Range{0, 0}, tfd.Name(), "r " + tfd.Name(), contents + contents, []string{}},
 		{Range{0, len(contents)}, tfd.Name(), "r " + tfd.Name(), contents, []string{}},
-
-		// a (for confirmation of test rationality)
-		{Range{0, 0}, tfd.Name(), "a/junk", "junkThis is a\nshort text\nto try addressing\n", []string{}},
 	}
 
 	filedirtystates := []struct {
@@ -180,7 +227,7 @@ func TestEditCmdWithFile(t *testing.T) {
 
 	for i, test := range testtab {
 		warnings = []*Warning{}
-		w := makeSkeletonWindowModel(&test)
+		w := makeSkeletonWindowModel(test.dot, test.filename)
 
 		editcmd(&w.body, []rune(test.expr))
 
@@ -201,6 +248,74 @@ func TestEditCmdWithFile(t *testing.T) {
 
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
 			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
+			break
+		}
+
+		for j, tw := range test.expectedwarns {
+			n, _ := warnings[j].buf.Read(0, buf[:])
+			if string(buf[:n]) != tw {
+				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			}
+		}
+	}
+}
+
+func TestEditMultipleWindows(t *testing.T) {
+	testtab := []struct {
+		dot           Range
+		filename      string
+		expr          string
+		expected      []string
+		expectedwarns []string
+	}{
+		// X
+		{Range{0, 0}, "test", "X/.*/ ,x i/@/", []string{
+			"@This is a\n@short text\n@to try addressing\n",
+			"@A different text\n@With other contents\n@So there!\n",
+		}, []string{}},
+
+		{Range{0, 6}, "test", "X/.*/=", []string{
+			contents,
+			alt_contents,
+		}, []string{"test:1\nalt_example_2:1\n"}},
+
+		// X + D
+		{Range{0, 6}, "test", "X/alt.*/D", []string{
+			contents,
+		}, []string{}},
+
+		// Y
+		{Range{0, 6}, "test", "Y/alt.*/=", []string{
+			contents,
+			alt_contents,
+		}, []string{"test:1\n"}},
+	}
+
+	buf := make([]rune, 8192)
+
+	for i, test := range testtab {
+		warnings = []*Warning{}
+		makeSkeletonWindowModel(test.dot, test.filename)
+
+		w := row.col[0].w[0]
+		editcmd(&w.body, []rune(test.expr))
+
+		if got, want := len(row.col[0].w), len(test.expected); got != want {
+			t.Errorf("text %d: expected %d windows but got %d windows", i, want, got)
+			break
+		}
+
+		for j, exp := range test.expected {
+			w := row.col[0].w[j]
+			n, _ := w.body.ReadB(0, buf[:])
+			if string(buf[:n]) != exp {
+				t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
+			}
+
+		}
+
+		if got, want := len(warnings), len(test.expectedwarns); got != want {
+			t.Errorf("text %d: expected %d warnings but got %d warnings", i, want, got)
 			break
 		}
 
@@ -478,3 +593,32 @@ func (mf *MockFrame) SelectOpt(*draw.Mousectl, *draw.Mouse, func(frame.SelectScr
 	return 0, 0
 }
 func (mf *MockFrame) DrawSel(image.Point, int, int, bool) {}
+
+func mockrun(win *Window, s string, rdir string, newns bool, argaddr string, xarg string, iseditcmd bool) {
+	// Optionally generate an error.
+	if s[1:] == "error" {
+		// TODO(rjk): Create more complex error cases.
+		editerror("mockrun failed!")
+		return
+	}
+
+	go func() {
+		// At this point, an external command attaches to the Edwood and writes
+		// data to somewhere in the filesystem. This comes from xfidwrite via
+		// edittext into the elog. We write exepctations in string form into the
+		// buffer here from the inputs so that the test harness can validate
+		// them.
+
+		ds := fmt.Sprintf("{%#v %#v %#v %#v %#v %#v}", s, rdir, newns, argaddr, xarg, iseditcmd)
+
+		if s[0] != '>' {
+			row.lk.Lock()
+			win.Lock('M')
+			edittext(win, 4, []rune(ds))
+			win.Unlock()
+			row.lk.Unlock()
+		}
+
+		cedit <- 0
+	}()
+}
