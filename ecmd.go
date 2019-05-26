@@ -463,6 +463,13 @@ func X_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
+// Make the run function mockable.
+var runfunc func(*Window, string, string, bool, string, string, bool)
+
+func init() {
+	runfunc = run
+}
+
 func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	var (
 		r, s []rune
@@ -496,7 +503,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	if t != nil && t.w != nil {
 		t.w.ref.Inc()
 	}
-	run(w, string(s), dir, true, "", "", true)
+	runfunc(w, string(s), dir, true, "", "", true)
 	if t != nil && t.w != nil {
 		t.w.Unlock()
 	}
@@ -524,6 +531,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	if t != nil && t.w != nil {
 		t.w.Lock('M')
 	}
+
 }
 
 func pipe_cmd(t *Text, cp *Cmd) bool {

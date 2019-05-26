@@ -20,6 +20,7 @@ type Column struct {
 	row     *Row
 	w       []*Window // These are sorted from top to bottom (increasing Y)
 	safe    bool
+	fortest bool // True if running in test mode (to elide hard to mock actions.)
 }
 
 // nw returns the number of Window pointers in Column c.
@@ -210,7 +211,7 @@ func (c *Column) Close(w *Window, dofree bool) {
 		didmouse, up bool
 	)
 	// w is locked
-	if !c.safe {
+	if !c.safe && !c.fortest {
 		c.Grow(w, 1)
 	}
 	for i = 0; i < len(c.w); i++ {
@@ -249,7 +250,7 @@ Found:
 	if c.display != nil {
 		c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.ZP)
 	}
-	if c.safe {
+	if c.safe && !c.fortest {
 		if !didmouse && up {
 			w.showdel = true
 		}
