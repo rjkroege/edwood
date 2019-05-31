@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/edwoodtest"
 	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/sanity-io/litter"
 )
@@ -136,11 +137,22 @@ func TestEdit(t *testing.T) {
 	}
 }
 
+// TODO(rjk): Improve this to make a better mock.
 func makeSkeletonWindowModel(dot Range, filename string) *Window {
+	display := edwoodtest.NewDisplay()
+	// TODO(rjk): Make a proper mock draw.Mouse in edwoodtest.
+	mouse = new(draw.Mouse)
+	button = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+	modbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+	colbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+
 	w := NewWindow().initHeadless(nil)
 	w.body.fr = &MockFrame{}
 	w.tag.fr = &MockFrame{}
 	w.body.Insert(0, []rune(contents), true)
+	w.display = display
+	w.body.display = display
+	w.tag.display = display
 
 	w.body.SetQ0(dot.q0)
 	w.body.SetQ1(dot.q1)
@@ -152,6 +164,9 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 	w2.body.fr = &MockFrame{}
 	w2.tag.fr = &MockFrame{}
 	w2.body.Insert(0, []rune(alt_contents), true)
+	w2.display = display
+	w2.body.display = display
+	w2.tag.display = display
 
 	w2.body.SetQ0(dot.q0)
 	w2.body.SetQ1(dot.q1)
@@ -165,8 +180,15 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 
 	// Construct the global window machinery.
 	row = Row{
+		display: display,
 		col: []*Column{
 			{
+				tag: Text{
+					file:    NewTagFile(),
+					fr:      &MockFrame{},
+					display: display,
+				},
+				display: display,
 				w: []*Window{
 					w,
 					w2,
@@ -177,6 +199,7 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 	}
 	w.col = row.col[0]
 	w2.col = row.col[0]
+	row.col[0].tag.file.AddText(&row.col[0].tag)
 
 	// TODO(rjk): Why do we need this? Text points at w, w points at col?
 	w.body.col = row.col[0]
@@ -190,27 +213,39 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 const contents = "This is a\nshort text\nto try addressing\n"
 const alt_contents = "A different text\nWith other contents\nSo there!\n"
 
-func TestEditCmdWithFile(t *testing.T) {
-	// Make a temporary file.
+func makeTempFile(contents string) (string, func(), error) {
 	tfd, err := ioutil.TempFile("", "example")
 	if err != nil {
-		t.Fatalf("can't make a temp file %s because %v\n", tfd.Name(), err)
+		return "", func() {}, err
 	}
-	defer os.Remove(tfd.Name()) // clean up
+
+	cleaner := func() {
+		os.Remove(tfd.Name())
+	}
+
 	if _, err := tfd.WriteString(contents); err != nil {
-		t.Fatalf("can't write tmpfile %v", err)
+		return "", cleaner, err
 	}
 	if err := tfd.Close(); err != nil {
-		t.Fatalf("can't close tmpfile %v", err)
+		return "", cleaner, err
+	}
+	return tfd.Name(), cleaner, nil
+}
+
+func TestEditCmdWithFile(t *testing.T) {
+	fname, cleaner, err := makeTempFile(contents)
+	defer cleaner()
+	if err != nil {
+		t.Fatalf("can't make a temp file because: %v\n", err)
 	}
 
 	testtab := []teststimulus{
 		// e
-		{Range{0, 0}, tfd.Name(), "e " + tfd.Name(), contents, []string{}},
+		{Range{0, 0}, fname, "e " + fname, contents, []string{}},
 
 		// r
-		{Range{0, 0}, tfd.Name(), "r " + tfd.Name(), contents + contents, []string{}},
-		{Range{0, len(contents)}, tfd.Name(), "r " + tfd.Name(), contents, []string{}},
+		{Range{0, 0}, fname, "r " + fname, contents + contents, []string{}},
+		{Range{0, len(contents)}, fname, "r " + fname, contents, []string{}},
 	}
 
 	filedirtystates := []struct {
@@ -261,6 +296,24 @@ func TestEditCmdWithFile(t *testing.T) {
 }
 
 func TestEditMultipleWindows(t *testing.T) {
+	fn1, cleaner, err := makeTempFile("file one\n")
+	defer cleaner()
+	if err != nil {
+		t.Fatalf("can't make a temp file because: %v\n", err)
+	}
+	fn2, cleaner, err := makeTempFile("file two\n")
+	defer cleaner()
+	if err != nil {
+		t.Fatalf("can't make a temp file because: %v\n", err)
+	}
+
+	// Used only for w and altered in the test.
+	fn3, cleaner, err := makeTempFile("file three\n")
+	defer cleaner()
+	if err != nil {
+		t.Fatalf("can't make a temp file because: %v\n", err)
+	}
+
 	testtab := []struct {
 		dot           Range
 		filename      string
@@ -289,6 +342,27 @@ func TestEditMultipleWindows(t *testing.T) {
 			contents,
 			alt_contents,
 		}, []string{"test:1\n"}},
+
+		// B
+		{Range{0, 0}, "test", "B " + fn1 + " " + fn2, []string{
+			contents,
+			alt_contents,
+			"file one\n",
+			"file two\n",
+		}, []string{}},
+		{Range{0, 0}, "test", "B", []string{
+			contents,
+			alt_contents,
+		}, []string{"Edit: no file name given\n"}},
+
+		// b does the same thing in Acme and Edwood (fails)
+		// Maybe this sets curtext?
+
+		// w
+		// backing file is newer than file.
+		{Range{0, 0}, fn3, "w", []string{contents, alt_contents}, []string{
+			fn3 + " not written; file already exists\n",
+		}},
 	}
 
 	buf := make([]rune, 8192)
@@ -315,7 +389,7 @@ func TestEditMultipleWindows(t *testing.T) {
 		}
 
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
-			t.Errorf("text %d: expected %d warnings but got %d warnings", i, want, got)
+			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
 			break
 		}
 
@@ -325,6 +399,7 @@ func TestEditMultipleWindows(t *testing.T) {
 				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
 			}
 		}
+		// TODO(rjk): Validate that the files on disk have the correct state.
 	}
 }
 
@@ -573,7 +648,7 @@ func (mf *MockFrame) GetFrameFillStatus() frame.FrameFillStatus {
 	}
 }
 func (mf *MockFrame) Charofpt(pt image.Point) int                  { return 0 }
-func (mf *MockFrame) DefaultFontHeight() int                       { return 0 }
+func (mf *MockFrame) DefaultFontHeight() int                       { return 10 }
 func (mf *MockFrame) Delete(int, int) int                          { return 0 }
 func (mf *MockFrame) Insert([]rune, int) bool                      { return false }
 func (mf *MockFrame) IsLastLineFull() bool                         { return false }
