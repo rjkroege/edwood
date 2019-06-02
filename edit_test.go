@@ -363,6 +363,27 @@ func TestEditMultipleWindows(t *testing.T) {
 		{Range{0, 0}, fn3, "w", []string{contents, alt_contents}, []string{
 			fn3 + " not written; file already exists\n",
 		}},
+
+		// b
+		{Range{0, 0}, "test", "b alt_example_2\ni/inserted/\n", []string{
+			contents,
+			"inserted" + alt_contents,
+		}, []string{
+			"'+  alt_example_2\n",
+		}},
+		{Range{0, 0}, "test", "b alt_example_2\n1 i/1/\n2 i/2/\n", []string{
+			contents,
+			"1A different text\n2With other contents\nSo there!\n",
+		}, []string{
+			"'+  alt_example_2\n",
+		}},
+		// TODO(rjk): the edit result here is wrong. See #236.
+		{Range{0, 0}, "test", "b alt_example_2\n2 i/2/\n1 i/1/\n", []string{
+			contents,
+			"1A different text2\nWith other contents\nSo there!\n",
+		}, []string{
+			"'+  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
+		}},
 	}
 
 	buf := make([]rune, 8192)
