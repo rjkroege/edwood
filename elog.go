@@ -10,7 +10,8 @@ const (
 	DeleteType ElogType = iota
 	InsertType
 	FilenameType
-	Wsequence = "warning: changes out of sequence\n"
+	Wsequence     = "warning: changes out of sequence\n"
+	WsequenceDire = "warning: changes out of sequence, edit result probably wrong\n"
 )
 
 // Elog is a log of changes made by editing commands.  Three reasons for this:
@@ -114,7 +115,8 @@ func (e *Elog) Replace(q0, q1 int, r []rune) {
 	eo.nd = q1 - q0
 	eo.setr(r)
 	if eo.q0 < e.secondlast().q0 {
-		panic("Changes not in order")
+		e.warned = true
+		warning(nil, WsequenceDire)
 	}
 }
 
@@ -148,7 +150,8 @@ func (e *Elog) Insert(q0 int, r []rune) {
 	eo.setr(r)
 
 	if eo.q0 < e.secondlast().q0 {
-		panic("Changes not in order")
+		e.warned = true
+		warning(nil, WsequenceDire)
 	}
 }
 
@@ -178,7 +181,8 @@ func (e *Elog) Delete(q0, q1 int) {
 	eo.q0 = q0
 	eo.nd = q1 - q0
 	if eo.q0 < e.secondlast().q0 {
-		panic("Changes not in order")
+		e.warned = true
+		warning(nil, WsequenceDire)
 	}
 }
 

@@ -278,6 +278,7 @@ func (row *Row) Type(r rune, p image.Point) *Text {
 	if t != nil && !(t.what == Tag && p.In(t.scrollr)) {
 		w = t.w
 		if w == nil {
+			// Texts in column tags or the very top.
 			t.Type(r)
 		} else {
 			w.Lock('K')
