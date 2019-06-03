@@ -9,9 +9,8 @@ import (
 	"testing"
 
 	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/internal/dumpfile"
 	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/sanity-io/litter"
 )
 
 type teststimulus struct {
@@ -137,81 +136,40 @@ func TestEdit(t *testing.T) {
 	}
 }
 
-// TODO(rjk): Improve this to make a better mock.
-func makeSkeletonWindowModel(dot Range, filename string) *Window {
-	display := edwoodtest.NewDisplay()
-	// TODO(rjk): Make a proper mock draw.Mouse in edwoodtest.
-	mouse = new(draw.Mouse)
-	button = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	modbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	colbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-
-	w := NewWindow().initHeadless(nil)
-	w.body.fr = &MockFrame{}
-	w.tag.fr = &MockFrame{}
-	w.body.Insert(0, []rune(contents), true)
-	w.display = display
-	w.body.display = display
-	w.tag.display = display
-
-	w.body.SetQ0(dot.q0)
-	w.body.SetQ1(dot.q1)
-	w.body.file.SetName(filename)
-	w.body.w = w
-	w.tag.w = w
-
-	w2 := NewWindow().initHeadless(nil)
-	w2.body.fr = &MockFrame{}
-	w2.tag.fr = &MockFrame{}
-	w2.body.Insert(0, []rune(alt_contents), true)
-	w2.display = display
-	w2.body.display = display
-	w2.tag.display = display
-
-	w2.body.SetQ0(dot.q0)
-	w2.body.SetQ1(dot.q1)
-	w2.body.file.SetName("alt_example_2")
-	w2.body.w = w2
-	w2.tag.w = w2
-
-	// Set up Undo to make sure that we see undoable results.
-	// By default, post-load, file.seq, file.putseq = 0, 0.
-	seq = 1
-
-	// Construct the global window machinery.
-	row = Row{
-		display: display,
-		col: []*Column{
-			{
-				tag: Text{
-					file:    NewTagFile(),
-					fr:      &MockFrame{},
-					display: display,
-				},
-				display: display,
-				w: []*Window{
-					w,
-					w2,
-				},
-				fortest: true,
-			},
-		},
-	}
-	w.col = row.col[0]
-	w2.col = row.col[0]
-	row.col[0].tag.file.AddText(&row.col[0].tag)
-
-	// TODO(rjk): Why do we need this? Text points at w, w points at col?
-	w.body.col = row.col[0]
-	w.tag.col = row.col[0]
-	w2.body.col = row.col[0]
-	w2.tag.col = row.col[0]
-
-	return w
-}
-
 const contents = "This is a\nshort text\nto try addressing\n"
 const alt_contents = "A different text\nWith other contents\nSo there!\n"
+
+func makeSkeletonWindowModel(dot Range, filename string) *Window {
+	MakeWindowScaffold(&dumpfile.Content{
+		Columns: []dumpfile.Column{
+			{},
+		},
+		Windows: []*dumpfile.Window{
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: filename,
+				},
+				Body: dumpfile.Text{
+					Buffer: contents,
+					Q0:     dot.q0,
+					Q1:     dot.q1,
+				},
+			},
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: "alt_example_2",
+				},
+				Body: dumpfile.Text{
+					Buffer: alt_contents,
+				},
+			},
+		},
+	})
+
+	return row.col[0].w[0]
+}
 
 func makeTempFile(contents string) (string, func(), error) {
 	tfd, err := ioutil.TempFile("", "example")
@@ -270,8 +228,6 @@ func TestEditCmdWithFile(t *testing.T) {
 		if string(buf[:n]) != test.expected {
 			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
 		}
-
-		litter.Config.HidePrivateFields = false
 
 		// For e identical.
 		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
@@ -396,7 +352,7 @@ func TestEditMultipleWindows(t *testing.T) {
 		editcmd(&w.body, []rune(test.expr))
 
 		if got, want := len(row.col[0].w), len(test.expected); got != want {
-			t.Errorf("text %d: expected %d windows but got %d windows", i, want, got)
+			t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
 			break
 		}
 
