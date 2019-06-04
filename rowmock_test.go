@@ -26,7 +26,7 @@ func configureGlobals() {
 	seq = 1
 }
 
-// makeText creates a minimal mock Text object from data embedded inside
+// updateText creates a minimal mock Text object from data embedded inside
 // of an Edwood dumpfile structure.
 func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 	t.display = display
@@ -44,6 +44,7 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // file.
 func MakeWindowScaffold(content *dumpfile.Content) {
 	display := edwoodtest.NewDisplay()
+	seq = 0
 
 	row = Row{
 		display: display,
@@ -85,4 +86,13 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 
 	row.col = cols
 	configureGlobals()
+}
+
+// InsertString inserts a string at the beginning of a buffer. It doesn't
+// update the selection.
+func InsertString(w *Window, s string) {
+	// Set an undo point before the insertion. (So that the insertion is undoable)
+	w.body.file.Mark(seq)
+	seq++
+	w.body.Insert(0, []rune(s), true)
 }

@@ -340,6 +340,21 @@ func TestEditMultipleWindows(t *testing.T) {
 		}, []string{
 			"'+  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
 		}},
+
+		// u
+		// 10
+		{Range{0, 0}, "test", "u", []string{
+			contents,
+			alt_contents,
+		}, []string{}},
+		{Range{0, 0}, "test", "1,$p\nu", []string{
+			contents,
+			alt_contents,
+		}, []string{"helloThis is a\nshort text\nto try addressing\n"}},
+		{Range{0, 0}, "test", "1,$p\nu-1\n", []string{
+			"hello" + contents,
+			alt_contents,
+		}, []string{"This is a\nshort text\nto try addressing\n"}},
 	}
 
 	buf := make([]rune, 8192)
@@ -347,6 +362,16 @@ func TestEditMultipleWindows(t *testing.T) {
 	for i, test := range testtab {
 		warnings = []*Warning{}
 		makeSkeletonWindowModel(test.dot, test.filename)
+
+		// TODO(rjk): Make this nicer.
+		if i == 11 || i == 12 {
+			// special setup for undo
+			InsertString(row.col[0].w[0], "hello")
+			if i == 12 {
+				// Undo the above insertion.
+				row.col[0].w[0].Undo(true)
+			}
+		}
 
 		w := row.col[0].w[0]
 		editcmd(&w.body, []rune(test.expr))
