@@ -56,12 +56,12 @@ type Cmd struct {
 
 type Cmdtab struct {
 	cmdc    rune                   // command character
-	text    byte                   // takes a textual argument?
-	regexp  byte                   // takes a regular expression?
-	addr    byte                   // takes an address (m or t)?
+	text    bool                   // takes a textual argument?
+	regexp  bool                   // takes a regular expression?
+	addr    bool                   // takes an address (m or t)?
 	defcmd  rune                   // default command; 0==>none
 	defaddr Defaddr                // default address
-	count   int                    // takes a count e.g. s2///
+	count   countType              // count type (e.g. s can take an unsigned count: s2///)
 	token   string                 // takes text terminated by one of these
 	fn      func(*Text, *Cmd) bool // function to call with parse tree
 }
@@ -74,6 +74,14 @@ const (
 	aAll
 )
 
+type countType int
+
+const (
+	cNo countType = iota
+	cUnsigned
+	cSigned
+)
+
 const (
 	linex = "\n"
 	wordx = "\t\n"
@@ -81,40 +89,39 @@ const (
 
 var cmdtab = []Cmdtab{
 	// cmdc	text	regexp	addr	defcmd	defaddr	count	token	 fn
-	{'\n', 0, 0, 0, 0, aDot, 0, "", nl_cmd},
-	{'a', 1, 0, 0, 0, aDot, 0, "", a_cmd},
-	{'b', 0, 0, 0, 0, aNo, 0, linex, b_cmd},
-	{'c', 1, 0, 0, 0, aDot, 0, "", c_cmd},
-	{'d', 0, 0, 0, 0, aDot, 0, "", d_cmd},
-	{'e', 0, 0, 0, 0, aNo, 0, wordx, e_cmd},
-	{'f', 0, 0, 0, 0, aNo, 0, wordx, f_cmd},
-	{'g', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
-	{'i', 1, 0, 0, 0, aDot, 0, "", i_cmd},
-	{'m', 0, 0, 1, 0, aDot, 0, "", m_cmd},
-	{'p', 0, 0, 0, 0, aDot, 0, "", p_cmd},
-	{'r', 0, 0, 0, 0, aDot, 0, wordx, e_cmd},
-	{'s', 0, 1, 0, 0, aDot, 1, "", s_cmd},
-	{'t', 0, 0, 1, 0, aDot, 0, "", m_cmd},
-	{'u', 0, 0, 0, 0, aNo, 2, "", u_cmd},
-	{'v', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
-	{'w', 0, 0, 0, 0, aAll, 0, wordx, w_cmd},
-	{'x', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
-	{'y', 0, 1, 0, 'p', aDot, 0, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
-	{'=', 0, 0, 0, 0, aDot, 0, linex, eq_cmd},
-	{'B', 0, 0, 0, 0, aNo, 0, linex, B_cmd},
-	{'D', 0, 0, 0, 0, aNo, 0, linex, D_cmd},
-	{'X', 0, 1, 0, 'f', aNo, 0, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
-	{'Y', 0, 1, 0, 'f', aNo, 0, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
-	{'<', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
-	{'|', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
-	{'>', 0, 0, 0, 0, aDot, 0, linex, pipe_cmd},
+	{'\n', false, false, false, 0, aDot, cNo, "", nl_cmd},
+	{'a', true, false, false, 0, aDot, cNo, "", a_cmd},
+	{'b', false, false, false, 0, aNo, cNo, linex, b_cmd},
+	{'c', true, false, false, 0, aDot, cNo, "", c_cmd},
+	{'d', false, false, false, 0, aDot, cNo, "", d_cmd},
+	{'e', false, false, false, 0, aNo, cNo, wordx, e_cmd},
+	{'f', false, false, false, 0, aNo, cNo, wordx, f_cmd},
+	{'g', false, true, false, 'p', aDot, cNo, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
+	{'i', true, false, false, 0, aDot, cNo, "", i_cmd},
+	{'m', false, false, true, 0, aDot, cNo, "", m_cmd},
+	{'p', false, false, false, 0, aDot, cNo, "", p_cmd},
+	{'r', false, false, false, 0, aDot, cNo, wordx, e_cmd},
+	{'s', false, true, false, 0, aDot, cUnsigned, "", s_cmd},
+	{'t', false, false, true, 0, aDot, cNo, "", m_cmd},
+	{'u', false, false, false, 0, aNo, cSigned, "", u_cmd},
+	{'v', false, true, false, 'p', aDot, cNo, "", nil}, // Assingned to g_cmd in init() to avoid initialization loop
+	{'w', false, false, false, 0, aAll, cNo, wordx, w_cmd},
+	{'x', false, true, false, 'p', aDot, cNo, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
+	{'y', false, true, false, 'p', aDot, cNo, "", nil}, // Assingned to x_cmd in init() to avoid initialization loop
+	{'=', false, false, false, 0, aDot, cNo, linex, eq_cmd},
+	{'B', false, false, false, 0, aNo, cNo, linex, B_cmd},
+	{'D', false, false, false, 0, aNo, cNo, linex, D_cmd},
+	{'X', false, true, false, 'f', aNo, cNo, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
+	{'Y', false, true, false, 'f', aNo, cNo, "", nil}, // Assingned to X_cmd in init() to avoid initialization loop
+	{'<', false, false, false, 0, aDot, cNo, linex, pipe_cmd},
+	{'|', false, false, false, 0, aDot, cNo, linex, pipe_cmd},
+	{'>', false, false, false, 0, aDot, cNo, linex, pipe_cmd},
 	/* deliberately unimplemented:
-	{'k',	0,	0,	0,	0,	aDot,	0,	"",	k_cmd,},
-	{'n',	0,	0,	0,	0,	aNo,	0,	"",	n_cmd,},
-	{'q',	0,	0,	0,	0,	aNo,	0,	"",	q_cmd,},
-	{'!',	0,	0,	0,	0,	aNo,	0,	linex,	plan9_cmd,},
+	{'k', false, false, false, 0, aDot, cNo, "", k_cmd},
+	{'n', false, false, false, 0, aNo, cNo, "", n_cmd},
+	{'q', false, false, false, 0, aNo, cNo, "", q_cmd},
+	{'!', false, false, false, 0, aNo, cNo, linex, plan9_cmd},
 	*/
-	//	{0,	0,	0,	0,	0,	0,	0,	0},
 }
 
 func init() {
@@ -263,10 +270,10 @@ func (cp *cmdParser) ungetch() {
 	}
 }
 
-func (cp *cmdParser) getnum(signok int) int {
+func (cp *cmdParser) getnum(signok bool) int {
 	n := int(0)
 	sign := int(1)
-	if signok > 1 && cp.nextc() == '-' {
+	if signok && cp.nextc() == '-' {
 		sign = -1
 		cp.getch()
 	}
@@ -462,10 +469,10 @@ func (cp *cmdParser) parse(nest int) (*Cmd, error) {
 		if ct.defaddr == aNo && cmd.addr != nil {
 			return nil, errAddrNotRequired
 		}
-		if ct.count != 0 {
-			cmd.num = cp.getnum(ct.count)
+		if ct.count != cNo {
+			cmd.num = cp.getnum(ct.count == cSigned)
 		}
-		if ct.regexp != 0 {
+		if ct.regexp {
 			// x without pattern . .*\n, indicated by cmd.re==0
 			// X without pattern is all files
 			c := cp.nextc()
@@ -498,7 +505,7 @@ func (cp *cmdParser) parse(nest int) (*Cmd, error) {
 				}
 			}
 		}
-		if ct.addr != 0 {
+		if ct.addr {
 			var err error
 			cmd.mtaddr, err = cp.simpleaddr()
 			if err != nil {
@@ -523,7 +530,7 @@ func (cp *cmdParser) parse(nest int) (*Cmd, error) {
 					panic("defcmd")
 				}
 			}
-		case ct.text != 0:
+		case ct.text:
 			cmd.text, err = cp.collecttext()
 			if err != nil {
 				return nil, err
@@ -608,10 +615,10 @@ func (cp *cmdParser) simpleaddr() (*Addr, error) {
 	switch cp.skipbl() {
 	case '#':
 		addr.typ = cp.getch()
-		addr.num = cp.getnum(1)
+		addr.num = cp.getnum(false)
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		addr.typ = 'l'
-		addr.num = cp.getnum(1)
+		addr.num = cp.getnum(false)
 	case '/', '?', '"':
 		addr.typ = cp.getch()
 		var err error
