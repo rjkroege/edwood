@@ -13,7 +13,9 @@ Plan9 and the truth of
 
 Note that on unix systems, Edwood (as with Acme) requires by default some
 infrastructure from [plan9port](https://9fans.github.io/plan9port/):
-in particular `devdraw`, `9pserve` and `fontsrv`. So, you'll want to
+in particular `devdraw`, `9pserve` and `fontsrv`. (Note that many other
+utilities like `win` and `9pfuse` that contribute to Edwood's utility
+are also found in [plan9port](https://9fans.github.io/plan9port/).) So, you'll want to
 install [plan9port](https://9fans.github.io/plan9port/) first, unless
 you choose to use the more experimental pure-Go Edwood described below.
 
