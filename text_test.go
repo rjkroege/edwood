@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 func emptyText() *Text {
@@ -234,5 +236,29 @@ func TestGetDirNamesNil(t *testing.T) {
 	_, err := getDirNames(nil)
 	if err == nil {
 		t.Errorf("getDirNames was successful on nil File")
+	}
+}
+
+type textFillMockFrame struct {
+	*MockFrame
+}
+
+func (fr *textFillMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
+	return frame.FrameFillStatus{
+		Nchars:         100,
+		Nlines:         0,
+		Maxlines:       0,
+		MaxPixelHeight: 0,
+	}
+}
+
+func TestTextFill(t *testing.T) {
+	text := &Text{
+		file: &File{},
+	}
+	err := text.fill(&textFillMockFrame{})
+	wantErr := "fill: negative slice length -100"
+	if err == nil || err.Error() != wantErr {
+		t.Errorf("got error %q; want %q", err, wantErr)
 	}
 }

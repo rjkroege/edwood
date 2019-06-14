@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -519,20 +520,25 @@ func (t *Text) inSelection(q0 int) bool {
 }
 
 // Fill inserts additional text from t into the Frame object until the Frame object is full.
-func (t *Text) fill(fr frame.SelectScrollUpdater) {
+func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 	// log.Println("Text.Fill Start", t.what)
 	// defer log.Println("Text.Fill End")
 
 	// Conceivably, LastLineFull should be true or would it only be true if there are no more
 	// characters possible?
 	if fr.IsLastLineFull() || t.nofill {
-		return
+		return nil
 	}
 	if t.file.HasUncommitedChanges() {
 		t.TypeCommit()
 	}
 	for {
 		n := t.file.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
+		if n < 0 {
+			log.Printf("Text.fill: negative slice length %v (file size %v, t.org %v, frame nchars %v)\n",
+				n, t.file.Size(), t.org, fr.GetFrameFillStatus().Nchars)
+			return fmt.Errorf("fill: negative slice length %v", n)
+		}
 		if n == 0 {
 			break
 		}
@@ -563,6 +569,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) {
 			break
 		}
 	}
+	return nil
 }
 
 // Delete removes runes [q0, q1). The selection values will be
