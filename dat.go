@@ -89,9 +89,9 @@ var (
 
 	seltext   *Text
 	argtext   *Text
-	mousetext *Text
-	typetext  *Text
-	barttext  *Text
+	mousetext *Text // global because Text.Close needs to clear it
+	typetext  *Text // global because Text.Close needs to clear it
+	barttext  *Text // shared between mousethread and keyboardthread
 
 	bartflag          bool
 	swapscrollbuttons bool
