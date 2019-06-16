@@ -229,6 +229,10 @@ func xfidclose(x *Xfid) {
 	q = FILE(x.f.qid)
 	x.f.open = false
 	if w != nil {
+		// We need to lock row here before locking window (just like mousethread)
+		// in order to synchronize mousetext with mousethread: mousetext is
+		// set to nil when the associated window is closed.
+		row.lk.Lock()
 		w.Lock('E')
 		switch q {
 		case QWctl:
@@ -271,6 +275,7 @@ func xfidclose(x *Xfid) {
 		}
 		w.Close()
 		w.Unlock()
+		row.lk.Unlock()
 	} else {
 		switch q {
 		case Qeditout:
