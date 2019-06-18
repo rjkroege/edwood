@@ -15,6 +15,7 @@ addons:
   homebrew:
     packages:
       - plan9port
+    update: true
 
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
