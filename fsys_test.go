@@ -98,7 +98,7 @@ func augmentPathEnv() {
 		return
 	}
 
-	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin" + "_" + runtime.GOOS)
+	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin"+"_"+runtime.GOOS)
 	os.Setenv("PATH", path)
 
 	// We also need fonts.
