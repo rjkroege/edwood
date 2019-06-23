@@ -81,8 +81,8 @@ type Acme struct {
 // augmentPath extends PATH so that plan9 dependencies can be
 // found in the build directory.
 func augmentPathEnv() {
-	// We only have Linux executables.
-	if runtime.GOOS != "linux" {
+	// We have Linux and Darwin executables.
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return
 	}
 
@@ -98,7 +98,7 @@ func augmentPathEnv() {
 		return
 	}
 
-	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin")
+	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin"+"_"+runtime.GOOS)
 	os.Setenv("PATH", path)
 
 	// We also need fonts.
