@@ -1,5 +1,7 @@
 module github.com/rjkroege/edwood
 
+go 1.11
+
 require (
 	9fans.net/go v0.0.0-20181112161441-237454027057
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802 // indirect
