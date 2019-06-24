@@ -420,6 +420,7 @@ func MovedMouse(m draw.Mouse) {
 		case m.Buttons&1 != 0:
 			t.Select()
 			if w != nil {
+				// This may replicate work done elsewhere.
 				w.SetTag()
 			}
 			argtext = t

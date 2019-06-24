@@ -463,11 +463,6 @@ func (w *Window) setTag1() {
 	Ledit := (" Edit")
 	//	Lpipe := (" |")
 
-	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if w.tag.file.SaveableAndDirty() {
-		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
-	}
-
 	// (flux) The C implemtation does a lot of work to avoid
 	// re-setting the tag text if unchanged.  That's probably not
 	// relevant in the modern world.  We can build a new tag trivially
@@ -547,6 +542,8 @@ func (w *Window) setTag1() {
 	}
 }
 
+// TODO(rjk): In the future of File's replacement with undo buffer,
+// this method could be renamed to something like "UpdateTag"
 func (w *Window) Commit(t *Text) {
 	t.Commit() // will set the file.mod to true
 	if t.what == Body {

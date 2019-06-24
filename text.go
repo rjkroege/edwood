@@ -530,6 +530,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 		return nil
 	}
 	if t.file.HasUncommitedChanges() {
+		// TODO(rjk): This should probably be t.file.Commit()
 		t.TypeCommit()
 	}
 	for {
@@ -1002,12 +1003,13 @@ func (t *Text) Type(r rune) {
 			return
 		}
 
-		// New way.
-		// Every point before we delete is an Undo point.
 		// TODO(rjk): figure out the way of nofill
 		// TODO(rjk): I'd like the Undo op to group typing better.
 		t.file.Commit()
 		t.Delete(q0, q0+nnb, true)
+
+		// Run through the code that will update the t.w.body.file.name.
+		t.TypeCommit()
 
 		t.iq1 = t.q0
 		return
