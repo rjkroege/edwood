@@ -118,7 +118,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		}
 
 		// if landing window (v) is too small, grow it first (landing window
-		// will be split to accomodate the newly added window.)
+		// will be split to accommodate the newly added window.)
 		// minht is the height of the first line of the tag and the border thickness
 		// TODO(rjk): Make minht a method of the tag to simplify variable height fonts.
 		minht := v.tag.fr.DefaultFontHeight() + c.display.ScaleSize(Border) + 1

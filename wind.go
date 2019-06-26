@@ -334,7 +334,7 @@ func (w *Window) Lock(owner int) {
 	})
 }
 
-// unlock1 unlcoks a single window.
+// unlock1 unlocks a single window.
 func (w *Window) unlock1() {
 	w.owner = 0
 	w.Close()

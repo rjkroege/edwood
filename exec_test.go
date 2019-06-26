@@ -42,7 +42,7 @@ func TestRunproc(t *testing.T) {
 		{false, false, false, "|ls", "."},
 		{false, false, false, "<ls", "."},
 		{false, false, false, ">ls", "."},
-		{false, true, true, "nonexistantcommand", ""},
+		{false, true, true, "nonexistentcommand", ""},
 
 		// Hard: must be executed using a shell
 		{true, false, false, "ls '.'", ""},
@@ -50,7 +50,7 @@ func TestRunproc(t *testing.T) {
 		{true, false, false, "	 ls	 '.'	 ", ""},
 		{true, false, false, "ls '.'", "."},
 		{true, false, true, "dat\x08\x08ate", ""},
-		{true, false, true, "/non-existant-command", ""},
+		{true, false, true, "/non-existent-command", ""},
 	}
 	acmeTestingMain()
 
