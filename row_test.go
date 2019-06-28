@@ -85,7 +85,7 @@ func checkDumpFsys(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 	}
 
 	// Zerox-ed windows don't show up in index file.
-	// Check number of orginal windows matches.
+	// Check number of original windows matches.
 	norig := 0
 	for _, w := range dump.Windows {
 		if w.Type != dumpfile.Zerox {
@@ -266,8 +266,8 @@ func TestRowDumpError(t *testing.T) {
 func TestRowLoadError(t *testing.T) {
 	var r Row
 
-	err := r.Load(nil, "/non-existant-file", true)
-	want := "can't load dump file: open /non-existant-file:"
+	err := r.Load(nil, "/non-existent-file", true)
+	want := "can't load dump file: open /non-existent-file:"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("Row.Load returned error %q; want prefix %q", err, want)
 	}

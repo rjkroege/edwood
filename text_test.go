@@ -74,8 +74,8 @@ func TestLoad(t *testing.T) {
 
 func TestLoadError(t *testing.T) {
 	text := emptyText()
-	wantErr := "can't open /non-existant-filename:"
-	_, err := text.Load(0, "/non-existant-filename", true)
+	wantErr := "can't open /non-existent-filename:"
+	_, err := text.Load(0, "/non-existent-filename", true)
 	if err == nil || !strings.HasPrefix(err.Error(), wantErr) {
 		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
 	}
@@ -191,7 +191,7 @@ func TestGetDirNames(t *testing.T) {
 
 	// add a broken symlink
 	name = "broken-link"
-	err = os.Symlink("/non/existant/file", filepath.Join(dir, name))
+	err = os.Symlink("/non/existent/file", filepath.Join(dir, name))
 	if err != nil {
 		t.Fatalf("Symlink failed: %v", err)
 	}

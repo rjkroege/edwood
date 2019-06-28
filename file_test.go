@@ -70,7 +70,7 @@ func TestFileInsertAt(t *testing.T) {
 
 	f.InsertAtWithoutCommit(0, []rune(s1))
 
-	// NB: the read code not include the uncommited content.
+	// NB: the read code not include the uncommitted content.
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
 		&fileStateSummary{true, true, false, true, s1})
 
@@ -369,7 +369,7 @@ func TestFileUpdateInfo(t *testing.T) {
 }
 
 func TestFileUpdateInfoError(t *testing.T) {
-	filename := "/non-existant-file"
+	filename := "/non-existent-file"
 	f := NewFile(filename)
 	err := f.UpdateInfo(filename, nil)
 	want := "failed to compute hash for"

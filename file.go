@@ -119,7 +119,7 @@ func (f *File) IsDirOrScratch() bool {
 // IsDir returns true if the File has a synthetic backing of
 // a directory.
 // TODO(rjk): File is a facade that subsumes the entire Model
-// of an Edwood MVC. As such, it shoudl look like a text buffer for
+// of an Edwood MVC. As such, it should look like a text buffer for
 // view/controller code. isdir is true for a specific kind of File innards
 // where we automatically alter the contents in various ways.
 // Automatically altering the contents should be expressed differently.
@@ -133,7 +133,7 @@ func (f *File) SetDir(flag bool) {
 	f.isdir = flag
 }
 
-// Size returns the complete size of the buffer including both commited
+// Size returns the complete size of the buffer including both committed
 // and uncommitted runes.
 // NB: naturally forwards to undo.Buffer.Size()
 // TODO(rjk): Switch all callers to Nr() as would be the number of
