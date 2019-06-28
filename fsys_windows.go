@@ -18,7 +18,7 @@ func newPipe() (net.Conn, net.Conn, error) {
 func post9pservice(conn net.Conn, name string, mtpt string) error {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return fmt.Errorf("Listen failed: %v", err)
+		return fmt.Errorf("listen failed: %v", err)
 	}
 	go func() {
 		defer l.Close()
