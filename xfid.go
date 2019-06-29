@@ -360,7 +360,7 @@ func xfidread(x *Xfid) {
 			x.respond(&fc, ErrAddrRange)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.Nc())
+		w.addr.q0 += xfidruneread(x, &w.body, w.addr.q0, w.body.Nc())
 		w.addr.q1 = w.addr.q0
 
 	case QWxdata:
@@ -369,7 +369,7 @@ func xfidread(x *Xfid) {
 			x.respond(&fc, ErrAddrRange)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
+		w.addr.q0 += xfidruneread(x, &w.body, w.addr.q0, w.addr.q1)
 
 	case QWtag:
 		xfidutfread(x, &w.tag, w.tag.Nc(), int(QWtag))
@@ -925,46 +925,37 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	// log.Println("xfidruneread", x)
 	// defer log.Println("done xfidruneread")
-	var (
-		fc plan9.Fcall
-		w  *Window
-	)
 
-	w = t.w
-	w.Commit(t)
+	t.w.Commit(t)
+
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
 	t.file.b.Read(q0, tmp)
 	buf := []byte(string(tmp))
-	// Now chop, and back up the end until we have a full rune
-	buf = buf[:nr]
-	i := nr - utf8.UTFMax
-	// Find a full rune to start in the last 4 bytes
-	for len(buf[i:]) > 0 {
-		ru, count := utf8.DecodeRune(buf[i:])
-		if ru == utf8.RuneError {
-			i += count
-		} else {
-			break
+
+	m := len(buf)
+	if len(buf) > int(x.fcall.Count) {
+		// copy whole runes only
+		m = 0
+		nr = 0
+		for m < len(buf) {
+			_, size := utf8.DecodeRune(buf[m:])
+			if m+size > int(x.fcall.Count) {
+				break
+			}
+			m += size
+			nr++
 		}
 	}
-	// add all further full runes
-	for len(buf[i:]) > 0 {
-		ru, count := utf8.DecodeRune(buf[i:])
-		if ru == utf8.RuneError {
-			break
-		} else {
-			i += count
-		}
+	buf = buf[:m]
+
+	fc := plan9.Fcall{
+		Count: uint32(len(buf)),
+		Data:  buf,
 	}
-
-	buf = buf[:i]
-
-	fc.Count = uint32(len(buf))
-	fc.Data = buf
 	x.respond(&fc, nil)
-	return len(string(buf))
+	return nr
 }
 
 func xfideventread(x *Xfid, w *Window) {

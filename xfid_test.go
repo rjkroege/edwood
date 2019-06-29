@@ -63,3 +63,66 @@ func TestFullrunewrite(t *testing.T) {
 		}
 	}
 }
+
+type mockResponder struct {
+	fcall *plan9.Fcall
+	err   error
+}
+
+func (mr *mockResponder) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
+	mr.fcall = t
+	mr.err = err
+	return x
+}
+
+func (mr *mockResponder) msize() int { return 8192 }
+
+func TestXfidruneread(t *testing.T) {
+	tt := []struct {
+		body   []rune // window body
+		q0, q1 int
+		count  uint32 // input fcall count
+		nr     int    // return value (number of runes)
+		data   []byte // output fcall data
+	}{
+		{[]rune("abcde"), 0, 5, 100, 5, []byte("abcde")},
+		{[]rune("abcde"), 1, 5, 100, 4, []byte("bcde")},
+		{[]rune("abcde"), 2, 5, 100, 3, []byte("cde")},
+		{[]rune("abcde"), 3, 5, 100, 2, []byte("de")},
+		{[]rune("abcde"), 4, 5, 100, 1, []byte("e")},
+		{[]rune("abcde"), 5, 5, 100, 0, []byte("")},
+		{[]rune("αβξδε"), 0, 5, 100, 5, []byte("αβξδε")},
+		{[]rune("αβξδε"), 1, 5, 100, 4, []byte("βξδε")},
+		{[]rune("αβξδε"), 2, 5, 100, 3, []byte("ξδε")},
+		{[]rune("αβξδε"), 3, 5, 100, 2, []byte("δε")},
+		{[]rune("αβξδε"), 4, 5, 100, 1, []byte("ε")},
+		{[]rune("αβξδε"), 0, 5, 8, 4, []byte("αβξδ")},
+		{[]rune("αβξδε"), 0, 5, 5, 2, []byte("αβ")},
+		{[]rune("αβξδε"), 0, 5, 0, 0, []byte("")},
+	}
+
+	for _, tc := range tt {
+		mr := new(mockResponder)
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Count: tc.count,
+			},
+			fs: mr,
+		}
+		w := NewWindow().initHeadless(nil)
+		w.body.file.b = Buffer(tc.body)
+		nr := xfidruneread(x, &w.body, tc.q0, tc.q1)
+		if got, want := nr, tc.nr; got != want {
+			t.Errorf("read %v runes from %q (q0=%v, q1=%v); should read %v runes",
+				got, tc.body, tc.q0, tc.q1, want)
+		}
+		if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
+			t.Errorf("read %v bytes from %q (q0=%v, q1=%v); want %v",
+				got, tc.body, tc.q0, tc.q1, want)
+		}
+		if got, want := mr.fcall.Data, tc.data; !bytes.Equal(got, want) {
+			t.Errorf("read %q from %q (q0=%v, q1=%v); want %q\n",
+				got, tc.body, tc.q0, tc.q1, want)
+		}
+	}
+}
