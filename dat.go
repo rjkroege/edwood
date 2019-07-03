@@ -11,6 +11,9 @@ import (
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
+// These constants are used to identify a file in the file server.
+// They are stored in plan9.Qid.Path (along with window ID).
+// TODO(fhs): Introduce a new type for these constants?
 const (
 	Qdir uint64 = iota
 	Qacme
@@ -214,14 +217,18 @@ func (r *Ref) Dec() int {
 	return int(*r)
 }
 
+// WIN returns the window ID contained in a Qid.
 func WIN(q plan9.Qid) int {
 	return int((uint(q.Path) >> 8) & 0xFFFFFF)
 }
 
+// FILE returns the file identifier (e.g. QWbody) contained in a Qid.
 func FILE(q plan9.Qid) uint64 {
 	return q.Path & 0xff
 }
 
+// QID returns plan9.Qid.Path from window ID id and file identifier q (e.g. QWbody).
+// TODO(fhs): This should be called QIDPath.
 func QID(id int, q uint64) uint64 {
 	return uint64(id<<8) | q
 }

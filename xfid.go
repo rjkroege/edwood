@@ -285,22 +285,19 @@ func xfidclose(x *Xfid) {
 	x.respond(&fc, nil)
 }
 
+// xfidread responds to a plan9.Tread request.
 func xfidread(x *Xfid) {
 	// log.Println("xfidread", x)
 	// defer log.Println("done xfidread")
-	var (
-		fc plan9.Fcall
-		n  int
-		b  string
-		w  *Window
-	)
+	var fc plan9.Fcall
+
 	q := FILE(x.f.qid)
-	w = x.f.w
+	w := x.f.w
 	if w == nil {
 		fc.Count = 0
 		switch q {
-		case Qcons: //breal
-		case Qlabel: //break
+		case Qcons: // Do nothing.
+		case Qlabel: // Do nothing.
 		case Qindex:
 			xfidindexread(x)
 			return
@@ -314,8 +311,8 @@ func xfidread(x *Xfid) {
 		return
 	}
 	w.Lock('F')
+	defer w.Unlock()
 	if w.col == nil {
-		w.Unlock()
 		x.respond(&fc, ErrDeletedWin)
 		return
 	}
@@ -325,7 +322,7 @@ func xfidread(x *Xfid) {
 		w.body.Commit()
 		clampaddr(w)
 		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
-		n = len(buf)
+		n := len(buf)
 		if off > uint64(n) {
 			off = uint64(n)
 		}
@@ -339,8 +336,8 @@ func xfidread(x *Xfid) {
 		xfidutfread(x, &w.body, w.body.Nc(), int(QWbody))
 
 	case QWctl:
-		b = w.CtlPrint(true)
-		n = len(b)
+		b := w.CtlPrint(true)
+		n := len(b)
 		if off > uint64(n) {
 			off = uint64(n)
 		}
@@ -376,7 +373,7 @@ func xfidread(x *Xfid) {
 
 	case QWrdsel:
 		w.rdselfd.Seek(int64(off), 0)
-		n = int(x.fcall.Count)
+		n := int(x.fcall.Count)
 		if n > BUFSIZE {
 			n = BUFSIZE
 		}
@@ -392,7 +389,6 @@ func xfidread(x *Xfid) {
 	default:
 		x.respond(&fc, fmt.Errorf("unknown qid %d in read", q))
 	}
-	w.Unlock()
 }
 
 func shouldscroll(t *Text, q0 int, qid uint64) bool {
@@ -922,6 +918,10 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	x.respond(&fc, nil)
 }
 
+// xfidruneread reads runes from address q0,q1 in t and sends the UTF-8
+// encoding of at most q1-q0 runes to the client. Not all the the runes
+// may be sent because at most x.fcall.Count bytes of full UTF-8 encoding
+// is sent. The number of runes sent is returned.
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	// log.Println("xfidruneread", x)
 	// defer log.Println("done xfidruneread")
