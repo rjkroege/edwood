@@ -116,6 +116,10 @@ func TestXfidruneread(t *testing.T) {
 			t.Errorf("read %v runes from %q (q0=%v, q1=%v); should read %v runes",
 				got, tc.body, tc.q0, tc.q1, want)
 		}
+		if mr.err != nil {
+			t.Errorf("got error %v for %q (q0=%v, q1=%v); want nil",
+				mr.err, tc.body, tc.q0, tc.q1)
+		}
 		if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
 			t.Errorf("read %v bytes from %q (q0=%v, q1=%v); want %v",
 				got, tc.body, tc.q0, tc.q1, want)
@@ -124,5 +128,62 @@ func TestXfidruneread(t *testing.T) {
 			t.Errorf("read %q from %q (q0=%v, q1=%v); want %q\n",
 				got, tc.body, tc.q0, tc.q1, want)
 		}
+	}
+}
+
+func TestXfidreadQWxdata(t *testing.T) {
+	const body = "αβξδεabcde"
+
+	for _, tc := range []struct {
+		q0  int
+		err error
+	}{
+		{0, nil},
+		{len([]rune(body)) + 1, ErrAddrRange},
+	} {
+		w := NewWindow().initHeadless(nil)
+		w.col = new(Column)
+		w.body.file.b = Buffer(body)
+		w.addr.q0 = tc.q0
+		w.addr.q1 = len([]rune(body))
+		mr := new(mockResponder)
+		xfidread(&Xfid{
+			f: &Fid{
+				qid: plan9.Qid{
+					Path: QID(1, QWxdata),
+					Vers: 0,
+					Type: 0,
+				},
+				w: w,
+			},
+			fcall: plan9.Fcall{
+				Count: 64,
+			},
+			fs: mr,
+		})
+		if got, want := mr.err, tc.err; got != want {
+			t.Errorf("got error %v; want %v", got, want)
+		}
+		if tc.err == nil {
+			if got, want := string(mr.fcall.Data), body; want != got {
+				t.Errorf("got data %q; want %q", got, want)
+			}
+			if q0, q1 := w.addr.q0, w.addr.q1; q0 != q1 {
+				t.Errorf("w.addr.q0=%v and w.addr.q1=%v", q0, q1)
+			}
+		}
+	}
+}
+
+func TestXfidreadDeletedWin(t *testing.T) {
+	mr := new(mockResponder)
+	xfidread(&Xfid{
+		f: &Fid{
+			w: NewWindow().initHeadless(nil),
+		},
+		fs: mr,
+	})
+	if got, want := mr.err, ErrDeletedWin; got != want {
+		t.Fatalf("got error %v; want %v", got, want)
 	}
 }
