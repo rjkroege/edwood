@@ -2,10 +2,12 @@ package main
 
 import "strings"
 
+// These constants indicates the direction of regular expresssion search.
+// TODO(fhs): Introduce a new type for these constants.
 const (
 	None = iota
-	Fore = '+'
-	Back = '-'
+	Fore = '+' // Forward
+	Back = '-' // Backward
 )
 
 const (
@@ -152,12 +154,15 @@ Rescue:
 
 var pattern *AcmeRegexp
 
-func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int) (retr Range, foundp bool) {
-	var (
-		sel RangeSet
-		q   int
-		err error
-	)
+// acmeregexp searches for regular expression pattern pat in text t.
+// If pat is empty, it uses the pattern used in the previous invocation of this function.
+// Dir indicates the direction of the search: forward or backward.
+// R sets the text position where search begins.
+// Lim sets the text position where search ends for forward search
+// (set range to {-1, -1} for no limit).
+// Warnings will be shown to user if showerr is true.
+// It returns the match and whether a match was found.
+func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int) (retr Range, found bool) {
 	if len(pat) == 0 && pattern == nil {
 		if showerr {
 			warning(nil, "no previous regular expression\n")
@@ -165,17 +170,19 @@ func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int)
 		return r, false
 	}
 	if len(pat) > 0 {
+		var err error
 		pattern, err = rxcompile(pat)
 		if err != nil {
 			return r, false
 		}
 	}
+
+	var sel RangeSet
 	if dir == Back {
 		sel = pattern.rxbexecute(t, r.q0, 1)
 	} else {
-		if lim.q0 < 0 {
-			q = -1
-		} else {
+		q := -1
+		if lim.q0 >= 0 {
 			q = lim.q1
 		}
 		sels := pattern.rxexecute(t, nil, r.q1, q, 1)
@@ -185,29 +192,35 @@ func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int)
 			sel = nil
 		}
 	}
-	if len(sel) == 0 && showerr {
-		warning(nil, "no match for regexp\n")
+	if len(sel) == 0 {
+		if showerr {
+			warning(nil, "no match for regexp\n")
+		}
 		return Range{-1, -1}, false
 	}
 	return sel[0], true
 }
 
-// getc takes a closure over the address expression and returns the qth rune.
+// address parses an address for text t, where getc takes a closure over
+// the address expression and returns the qth rune in the address
+// (q0 <= q < q1). If eval is true, the address is also evaluated.
+// Lim sets the limits of regular expression search.
+// Warnings will be shown to user if showerr is true.
+// It returns the updated address range (initially set to ar), whether
+// the evaluation was successful, and the position q in the address
+// where parsing was stopped.
 func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc func(q int) rune, eval bool) (r Range, evalp bool, qp int) {
 	var (
-		dir, size    int
-		n            int
-		prevc, c, nc rune
-		q            int
-		pat          string
-		nr           Range
+		n         int
+		prevc, nc rune
+		nr        Range
 	)
 	evalp = eval
 	r = ar
-	q = q0
-	dir = None
-	size = Line
-	c = 0
+	q := q0
+	dir := None
+	size := Line
+	c := rune(0)
 	for q < q1 {
 		prevc = c
 		c = getc(q)
@@ -291,7 +304,7 @@ func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc f
 			dir = Back
 			fallthrough
 		case c == '/':
-			pat = ""
+			pat := ""
 			for q < q1 {
 				c = getc(q)
 				q++

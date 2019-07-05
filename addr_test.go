@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -57,6 +58,68 @@ func TestAddr(t *testing.T) {
 			if test.r != r || test.ep != ep || test.q != q {
 				t.Errorf("address %q: r=%v, ep=%v, q=%v; expected r=%v, ep=%v, q=%v",
 					test.addr, r, ep, q, test.r, test.ep, test.q)
+			}
+		})
+	}
+}
+
+func TestAcmeregexp(t *testing.T) {
+	warnings = nil
+	pattern = nil
+	defer func() {
+		warnings = nil
+		pattern = nil
+	}()
+
+	tt := []struct {
+		name    string
+		pat     string
+		dir     int
+		r       Range
+		found   bool
+		warning string
+	}{
+		{"FirstEmptyPat", "", Fore, Range{0, 0}, false, "no previous regular expression\n"},
+		{"pat=abcd", "abcd", Fore, Range{0, 4}, true, ""},
+		{"SecondEmptyPat", "", Fore, Range{0, 4}, true, ""},
+		{"pat=αβξδ", "αβξδ", Fore, Range{5, 9}, true, ""},
+		{"NoMatch", "xyz", Fore, Range{-1, -1}, false, "no match for regexp\n"},
+		{"InvalidPat", "(abcd", Fore, Range{0, 0}, false, ""},
+		{"Backwards", "abcd", Back, Range{0, 4}, true, ""},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			warnings = nil
+			text := &Text{
+				file: &File{
+					b: Buffer([]rune("abcd αβξδ\n")),
+				},
+			}
+			lim := Range{
+				0,
+				text.file.Nr(),
+			}
+			start := Range{0, 0}
+			if tc.dir == Back {
+				start = Range{text.file.Nr(), text.file.Nr()}
+			}
+			r, found := acmeregexp(true, text, lim, start, tc.pat, tc.dir)
+			if found != tc.found {
+				t.Errorf("found=%v; want %v", found, tc.found)
+			}
+			if !reflect.DeepEqual(r, tc.r) {
+				t.Errorf("range=%v; want %v", r, tc.r)
+			}
+			if tc.warning != "" {
+				want := tc.warning
+				if len(warnings) == 0 {
+					t.Fatalf("no warning generated; want %q", want)
+				}
+				got := string([]rune(warnings[0].buf))
+				if got != want {
+					t.Errorf("warning is %q; want %q", got, want)
+				}
 			}
 		})
 	}
