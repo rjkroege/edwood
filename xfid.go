@@ -426,18 +426,16 @@ func fullrunewrite(x *Xfid) []rune {
 	return r
 }
 
+// xfidwrite responds to a plan9.Twrite request.
 func xfidwrite(x *Xfid) {
 	// log.Println("xfidwrite", x)
 	// defer log.Println("done xfidwrite")
 	var (
-		fc               plan9.Fcall
-		c                int
-		eval             bool
-		r                []rune
-		a                Range
-		t                *Text
-		q0, tq0, tq1, nb int
-		err              error
+		fc           plan9.Fcall
+		c            int
+		t            *Text
+		q0, tq0, tq1 int
+		err          error
 	)
 	qid := FILE(x.f.qid)
 	w := x.f.w
@@ -503,13 +501,13 @@ func xfidwrite(x *Xfid) {
 		x.respond(&fc, nil)
 
 	case QWaddr:
-		r = []rune(string(x.fcall.Data))
+		r := []rune(string(x.fcall.Data))
 		t = &w.body
 		w.Commit(t)
-		eval = true
-		a, eval, nb = address(false, t, w.limit, w.addr, 0, len(r),
+		eval := true
+		a, eval, nr := address(false, t, w.limit, w.addr, 0, len(r),
 			func(q int) rune { return r[q] }, eval)
-		if nb < len(r) {
+		if nr < len(r) {
 			x.respond(&fc, ErrBadAddr)
 			break
 		}
@@ -524,7 +522,7 @@ func xfidwrite(x *Xfid) {
 	case Qeditout:
 		fallthrough
 	case QWeditout:
-		r = fullrunewrite(x)
+		r := fullrunewrite(x)
 		if w != nil {
 			err = edittext(w, w.wrselrange.q1, r)
 		} else {
@@ -552,7 +550,7 @@ func xfidwrite(x *Xfid) {
 		xfidctlwrite(x, w)
 
 	case QWdata:
-		a = w.addr
+		a := w.addr
 		t = &w.body
 		w.Commit(t)
 		if a.q0 > t.Nc() || a.q1 > t.Nc() {

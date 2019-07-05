@@ -77,6 +77,53 @@ func (mr *mockResponder) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 
 func (mr *mockResponder) msize() int { return 8192 }
 
+func TestXfidwriteQWaddr(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		addr []byte
+		r    Range
+		err  error
+	}{
+		{"ErrAddrRange", []byte("/hello/"), Range{}, ErrAddrRange},
+		{"ErrBadAddr", []byte("/hello/\n"), Range{}, ErrBadAddr},
+		{"ValidAddr", []byte("/cα/"), Range{2, 4}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mr := new(mockResponder)
+			w := NewWindow().initHeadless(nil)
+			w.body.file.b = Buffer([]rune("abcαβξ\n"))
+			w.col = new(Column)
+			w.limit = Range{0, w.body.file.Nr()}
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Data: []byte(tc.addr),
+				},
+				f: &Fid{
+					qid: plan9.Qid{
+						Path: QID(0, QWaddr),
+					},
+					w: w,
+				},
+				fs: mr,
+			}
+			xfidwrite(x)
+			if mr.err != tc.err {
+				t.Fatalf("error is %v; want %v", mr.err, tc.err)
+			}
+			if mr.err == nil {
+				got := mr.fcall.Count
+				want := uint32(len(tc.addr))
+				if got != want {
+					t.Errorf("fcall.Count is %v; want %v", got, want)
+				}
+				if !reflect.DeepEqual(w.addr, tc.r) {
+					t.Errorf("window address is %v; want %v", w.addr, tc.r)
+				}
+			}
+		})
+	}
+}
+
 func TestXfidruneread(t *testing.T) {
 	tt := []struct {
 		body   []rune // window body
