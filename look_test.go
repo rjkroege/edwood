@@ -2,39 +2,14 @@ package main
 
 import (
 	"fmt"
-	"reflect"
+	"path/filepath"
 	"runtime"
 	"testing"
+
+	"9fans.net/go/plumb"
+	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/runes"
 )
-
-func TestDirname(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping on windows")
-	}
-	testCases := []struct {
-		b, r, dir []rune
-	}{
-		{[]rune("/a/b/c/d.go Del Snarf | Look "), nil, []rune("/a/b/c")},
-		{[]rune("/a/b/c/d.go Del Snarf | Look "), []rune("e.go"), []rune("/a/b/c/e.go")},
-		{[]rune("/a/b/c/d.go Del Snarf | Look "), []rune("/x/e.go"), []rune("/x/e.go")},
-	}
-
-	for _, tc := range testCases {
-		text := Text{
-			w: &Window{
-				tag: Text{
-					file: &File{
-						b: Buffer(tc.b),
-					},
-				},
-			},
-		}
-		dir := dirname(&text, tc.r)
-		if !reflect.DeepEqual(dir, tc.dir) {
-			t.Errorf("dirname of %q (r=%q) is %q; expected %q\n", tc.b, tc.r, dir, tc.dir)
-		}
-	}
-}
 
 func TestExpand(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -122,5 +97,86 @@ func TestExpandJump(t *testing.T) {
 		if e.jump != tc.jump {
 			t.Errorf("expand of %v set jump to %v; expected %v", tc.kind, e.jump, tc.jump)
 		}
+	}
+}
+
+func TestLook3Message(t *testing.T) {
+	wdir = "/home/gopher"
+	winDir := "/a/b/c"
+	if runtime.GOOS == "windows" {
+		wdir = `C:\User\gopher`
+		winDir = `C:\a\b\c`
+	}
+	defer func() { wdir = "" }()
+
+	for _, tc := range []struct {
+		name         string
+		w            *Window
+		dir          string
+		text         string
+		hasClickAttr bool
+	}{
+		{"NilWindow", nil, wdir, " hello.go ", true},
+		{"Error", nil, wdir, "          ", true},
+		{"InSelection", nil, wdir, " «hello.go» ", false},
+		{
+			"NonNilWindow",
+			windowWithTag(winDir + string(filepath.Separator) + " Del Snarf | Look"),
+			winDir, " hello.go ",
+			true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want := &plumb.Message{
+				Src:  "acme",
+				Dst:  "",
+				Dir:  tc.dir,
+				Type: "text",
+				Data: []byte("hello.go"),
+			}
+			if tc.hasClickAttr {
+				want.Attr = &plumb.Attribute{Name: "click", Value: "3"}
+			}
+
+			text := textWithSelection(tc.text)
+			text.w = tc.w
+			got, err := look3Message(text, 4, 4)
+			if tc.name == "Error" {
+				wantErr := "empty selection"
+				if err.Error() != wantErr {
+					t.Fatalf("got error %v; want %q", err, wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("got error %v", err)
+			}
+
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("plumb.Message mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func textWithSelection(buf string) *Text {
+	b := []rune(buf)
+	popRune := func(r rune) int {
+		q := runes.IndexRune(b, r)
+		if q < 0 {
+			return 0
+		}
+		b = append(b[:q], b[q+1:]...)
+		return q
+	}
+
+	q0 := popRune('«')
+	q1 := popRune('»')
+	return &Text{
+		file: &File{
+			b: Buffer(b),
+		},
+		q0: q0,
+		q1: q1,
 	}
 }

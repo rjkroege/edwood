@@ -592,7 +592,7 @@ func (w *Window) AddIncl(r string) {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}
-		r = string(dirname(&w.body, []rune(r)))
+		r = w.body.DirName(r)
 		d, err := isDir(r)
 		if !d {
 			warning(nil, "%s: Not a directory: %v", r, err)
