@@ -206,10 +206,10 @@ func D_cmd(t *Text, cp *Cmd) bool {
 		D1(t)
 		return true
 	}
-	dir := dirname(t, nil)
+	dir := t.DirName("")
 	for _, s := range strings.Fields(list) {
 		if !filepath.IsAbs(s) {
-			s = filepath.Join(string(dir), s)
+			s = filepath.Join(dir, s)
 		}
 		w := lookfile(s)
 		if w == nil {
@@ -473,7 +473,6 @@ func init() {
 func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	var (
 		r, s []rune
-		dir  string
 		w    *Window
 	)
 
@@ -492,13 +491,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	}
 	s = append([]rune{cmd}, r...)
 
-	dir = ""
-	if t != nil {
-		dir = t.DirName("")
-	}
-	if len(dir) == 1 && dir[0] == '.' { // sigh
-		dir = dir[0:0]
-	}
+	dir := t.DirName("") // exec.Cmd.Dir
 	editing = state
 	if t != nil && t.w != nil {
 		t.w.ref.Inc()

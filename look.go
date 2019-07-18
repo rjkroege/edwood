@@ -135,48 +135,10 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		return
 	}
 	if plumbsendfid != nil {
-		// send whitespace-delimited word to plumber
-		m := plumb.Message{}
-		m.Src = "acme"
-		m.Dst = ""
-		dir := t.DirName("")
-		if dir == "." { // sigh
-			dir = ""
+		m, err := look3Message(t, q0, q1)
+		if err != nil {
+			return
 		}
-		m.Dir = dir
-		m.Type = "text"
-		m.Attr = nil
-		if q1 == q0 {
-			if t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1 {
-				q0 = t.q0
-				q1 = t.q1
-			} else {
-				p := q0
-				for q0 > 0 {
-					c := t.ReadC(q0 - 1)
-					if !(c != ' ' && c != '\t' && c != '\n') {
-						break
-					}
-					q0--
-				}
-				for q1 < t.file.Size() {
-					// TODO(rjk): utf8 conversion change point.
-					c := t.ReadC(q1)
-					if !(c != ' ' && c != '\t' && c != '\n') {
-						break
-					}
-					q1++
-				}
-				if q1 == q0 {
-					return
-				}
-				s := fmt.Sprintf("%d", p-q0)
-				m.Attr = &plumb.Attribute{Name: "click", Value: s, Next: nil}
-			}
-		}
-		r = make([]rune, q1-q0)
-		t.file.b.Read(q0, r[:q1-q0])
-		m.Data = []byte(string(r[:q1-q0]))
 		if m.Send(plumbsendfid) == nil {
 			return
 		}
@@ -207,6 +169,50 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 			row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
 		}
 	}
+}
+
+// look3Message generates a plumb message for the text in t at range [q0, q1).
+// If q0 == q1, the range will be expanded to the current selection if q0/q1 falls
+// within the selection. Otherwise, it'll expand to a whitespace-delimited word.
+func look3Message(t *Text, q0, q1 int) (*plumb.Message, error) {
+	m := &plumb.Message{
+		Src:  "acme",
+		Dst:  "",
+		Dir:  t.AbsDirName(""),
+		Type: "text",
+	}
+	if q1 == q0 {
+		if t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1 {
+			q0 = t.q0
+			q1 = t.q1
+		} else {
+			p := q0
+			for q0 > 0 {
+				c := t.ReadC(q0 - 1)
+				if !(c != ' ' && c != '\t' && c != '\n') {
+					break
+				}
+				q0--
+			}
+			for q1 < t.file.Size() {
+				// TODO(rjk): utf8 conversion change point.
+				c := t.ReadC(q1)
+				if !(c != ' ' && c != '\t' && c != '\n') {
+					break
+				}
+				q1++
+			}
+			if q1 == q0 {
+				return nil, fmt.Errorf("empty selection")
+			}
+			s := fmt.Sprintf("%d", p-q0)
+			m.Attr = &plumb.Attribute{Name: "click", Value: s, Next: nil}
+		}
+	}
+	r := make([]rune, q1-q0)
+	t.file.b.Read(q0, r[:q1-q0])
+	m.Data = []byte(string(r[:q1-q0]))
+	return m, nil
 }
 
 func plumblook(m *plumb.Message) {
@@ -348,48 +354,6 @@ func isfilec(r rune) bool {
 func cleanrname(rs []rune) []rune {
 	s := filepath.Clean(string(rs))
 	r, _, _ := cvttorunes([]byte(s), len(s))
-	return r
-}
-
-// Dirname returns the directory name of the path in the tag file of t.
-// If the filename r is not nil, it'll be appended to the result.
-func dirname(t *Text, r []rune) []rune {
-	var (
-		b     []rune
-		c     rune
-		nt    int
-		slash int
-	)
-
-	if t == nil || t.w == nil {
-		goto Rescue
-	}
-	nt = t.w.tag.file.Size()
-	if nt == 0 || filepath.IsAbs(string(r)) {
-		goto Rescue
-	}
-	b = make([]rune, nt)
-	t.w.tag.file.b.Read(0, b)
-	slash = -1
-	for m := 0; m < nt; m++ {
-		c = b[m]
-		if c == '/' {
-			slash = m
-		}
-		if c == ' ' || c == '\t' {
-			break
-		}
-	}
-	if slash < 0 {
-		goto Rescue
-	}
-	b = append(b[:slash+1], r...)
-	return cleanrname(b)
-
-Rescue:
-	if len(r) > 0 {
-		return cleanrname(r)
-	}
 	return r
 }
 

@@ -1612,19 +1612,35 @@ func (t *Text) Reset() {
 	t.file.b.Reset()
 }
 
-func (t *Text) DirName(name string) string {
-	if t == nil || t.w == nil {
-		return string(cleanrname([]rune(name)))
+func (t *Text) dirName(name string) string {
+	if t == nil || t.w == nil || filepath.IsAbs(name) {
+		return name
 	}
-	if filepath.IsAbs(name) {
-		return filepath.Clean(name)
+	nt := t.w.tag.file.Size()
+	if nt == 0 {
+		return name
 	}
-	b := make([]rune, t.w.tag.file.Size())
+	b := make([]rune, nt)
 	t.w.tag.file.b.Read(0, b)
 	spl := strings.SplitN(string(b), " ", 2)[0]
 	if !strings.HasSuffix(spl, string(filepath.Separator)) {
 		spl = filepath.Dir(spl)
 	}
-	spl = filepath.Clean(spl + string(filepath.Separator) + name)
-	return spl
+	return filepath.Join(spl, name)
+}
+
+// DirName returns the directory name of the path in the tag file of t.
+// The filename name is appended to the result.
+// The returned path is guaranteed to be cleaned, as specified by filepath.Clean.
+func (t *Text) DirName(name string) string {
+	return filepath.Clean(t.dirName(name))
+}
+
+// AbsDirName is the same as DirName but always returns an absolute path.
+func (t *Text) AbsDirName(name string) string {
+	d := t.dirName(name)
+	if !filepath.IsAbs(d) {
+		return filepath.Join(wdir, d)
+	}
+	return filepath.Clean(d)
 }

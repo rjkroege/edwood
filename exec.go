@@ -124,7 +124,6 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		q0, q1 int
 		r      []rune
 		n, f   int
-		dir    string
 	)
 
 	q0 = aq0
@@ -224,10 +223,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	}
 
 	b := r
-	dir = t.DirName("")
-	if dir == "." { // sigh
-		dir = ""
-	}
+	dir := t.DirName("") // exec.Cmd.Dir
 	a, aa := getarg(argt, true, true)
 	if t.w != nil {
 		t.w.ref.Inc()
@@ -491,11 +487,8 @@ func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
 
 func local(et, _, argt *Text, _, _ bool, arg string) {
 	a, aa := getarg(argt, true, true)
-	dir := dirname(et, nil)
-	if len(dir) == 1 && dir[0] == '.' { // sigh
-		dir = dir[:0]
-	}
-	run(nil, arg, string(dir), false, aa, a, false)
+	dir := et.DirName("") // exec.Cmd.Dir
+	run(nil, arg, dir, false, aa, a, false)
 }
 
 // putfile writes File to disk, if it's safe to do so.

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -260,5 +261,83 @@ func TestTextFill(t *testing.T) {
 	wantErr := "fill: negative slice length -100"
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("got error %q; want %q", err, wantErr)
+	}
+}
+
+func TestTextDirName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+	tt := []struct {
+		name          string
+		w             *Window
+		filename, dir string
+	}{
+		{"NilWindow,file=''", nil, "", "."},
+		{"NilWindow", nil, "abc", "abc"},
+		{"EmptyTag,file=''", windowWithTag(""), "", "."},
+		{"EmptyTag", windowWithTag(""), "abc", "abc"},
+		{"Dot,file=''", windowWithTag("./ Del Snarf | Look "), "", "."},
+		{"Dot", windowWithTag("./ Del Snarf | Look "), "d.go", "d.go"},
+		{"NoSlash,file=''", windowWithTag("abc Del Snarf | Look "), "", "."},
+		{"NoSlash", windowWithTag("abc Del Snarf | Look "), "d.go", "d.go"},
+		{"AbsDir,file=''", windowWithTag("/a/b/c/ Del Snarf | Look "), "", "/a/b/c"},
+		{"AbsDir", windowWithTag("/a/b/c/ Del Snarf | Look "), "d.go", "/a/b/c/d.go"},
+		{"RelativeDir,file=''", windowWithTag("a/b/c/ Del Snarf | Look "), "", "a/b/c"},
+		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", "a/b/c/d.go"},
+		{"AbsFile,file=''", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "", "/a/b/c"},
+		{"AbsFile", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "e.go", "/a/b/c/e.go"},
+		{"RelativeFile,file=''", windowWithTag("a/b/c/d.go Del Snarf | Look "), "", "a/b/c"},
+		{"RelativeFile", windowWithTag("a/b/c/d.go Del Snarf | Look "), "e.go", "a/b/c/e.go"},
+		{"IgnoreTag", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "/x/e.go", "/x/e.go"},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			text := Text{
+				w: tc.w,
+			}
+			dir := text.DirName(tc.filename)
+			if !reflect.DeepEqual(dir, tc.dir) {
+				t.Errorf("dirname of %q is %q; want %q", tc.filename, dir, tc.dir)
+			}
+		})
+	}
+}
+
+func TestTextAbsDirName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+	wdir = "/home/gopher"
+	defer func() { wdir = "" }()
+
+	for _, tc := range []struct {
+		name          string
+		w             *Window
+		filename, dir string
+	}{
+		{"AbsDir", windowWithTag("/a/b/c/ Del Snarf | Look "), "d.go", "/a/b/c/d.go"},
+		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", "/home/gopher/a/b/c/d.go"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			text := Text{
+				w: tc.w,
+			}
+			dir := text.AbsDirName(tc.filename)
+			if !reflect.DeepEqual(dir, tc.dir) {
+				t.Errorf("dirname of %q is %q; want %q", tc.filename, dir, tc.dir)
+			}
+		})
+	}
+}
+
+func windowWithTag(tag string) *Window {
+	return &Window{
+		tag: Text{
+			file: &File{
+				b: Buffer([]rune(tag)),
+			},
+		},
 	}
 }
