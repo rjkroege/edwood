@@ -9,7 +9,7 @@ import (
 func TestIsmtpt(t *testing.T) {
 	oldmtpt := mtpt
 	defer func() { mtpt = oldmtpt }()
-	mtpt = "/mnt/acme"
+	*mtpt = "/mnt/acme"
 
 	testCases := []struct {
 		filename string

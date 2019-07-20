@@ -92,7 +92,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.body.file = f.AddText(&w.body)
 
 	w.filemenu = true
-	w.autoindent = globalautoindent
+	w.autoindent = *globalAutoIndent
 
 	if clone != nil {
 		w.autoindent = clone.autoindent

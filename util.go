@@ -136,7 +136,7 @@ func errorwin1(dir string, incl []string) *Window {
 	for _, in := range incl {
 		w.AddIncl(in)
 	}
-	w.autoindent = globalautoindent
+	w.autoindent = *globalAutoIndent
 	return w
 }
 

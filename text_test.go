@@ -95,17 +95,17 @@ func TestLoadError(t *testing.T) {
 		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
 	}
 
-	mtpt = "/mnt/acme"
+	*mtpt = "/mnt/acme"
 	defer func() {
-		mtpt = ""
+		*mtpt = ""
 	}()
-	text.file.name = mtpt
+	text.file.name = *mtpt
 	wantErr = "will not open self mount point /mnt/acme"
-	_, err = text.Load(0, mtpt, true)
+	_, err = text.Load(0, *mtpt, true)
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
 	}
-	_, err = text.LoadReader(0, mtpt, nil, true)
+	_, err = text.LoadReader(0, *mtpt, nil, true)
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
 	}

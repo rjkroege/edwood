@@ -98,7 +98,7 @@ func fsysinit() *fileServer {
 	if err != nil {
 		acmeerror("failed to create pipe", err)
 	}
-	if err := post9pservice(reader, "acme", mtpt); err != nil {
+	if err := post9pservice(reader, "acme", *mtpt); err != nil {
 		acmeerror("can't post service", err)
 	}
 
