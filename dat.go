@@ -96,19 +96,15 @@ var (
 	typetext  *Text // global because Text.Close needs to clear it
 	barttext  *Text // shared between mousethread and keyboardthread
 
-	bartflag          bool
-	swapscrollbuttons bool
-	activewin         *Window
-	activecol         *Column
-	snarfbuf          Buffer
-	home              string
-	acmeshell         string
-	tagcolors         [frame.NumColours]draw.Image
-	textcolors        [frame.NumColours]draw.Image
-	wdir              string
-	editing           = Inactive
-	globalautoindent  bool
-	mtpt              string
+	activewin  *Window
+	activecol  *Column
+	snarfbuf   Buffer
+	home       string
+	acmeshell  string
+	tagcolors  [frame.NumColours]draw.Image
+	textcolors [frame.NumColours]draw.Image
+	wdir       string
+	editing    = Inactive
 
 	cplumb     chan *plumb.Message
 	cwait      chan *os.ProcessState

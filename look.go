@@ -585,7 +585,7 @@ func openfile(t *Text, e *Expand) *Window {
 			}
 			w.autoindent = ow.autoindent
 		} else {
-			w.autoindent = globalautoindent
+			w.autoindent = *globalAutoIndent
 		}
 		xfidlog(w, "new")
 	}

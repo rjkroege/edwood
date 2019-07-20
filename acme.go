@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -21,21 +23,17 @@ import (
 )
 
 var (
-	command           *Command
-	swapscrollButtons bool
-)
+	command *Command
 
-// var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
-var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
-var bartflagflag = flag.Bool("b", false, "Bart's Flag")
-var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
-var varfontflag = flag.String("f", defaultVarFont, "Variable Width Font")
-var fixedfontflag = flag.String("F", defaultFixedFont, "Fixed Width Font")
-var loadfileflag = flag.String("l", "", "Load file name")
-var mtptflag = flag.String("m", defaultMtpt, "Mountpoint")
-var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
-var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)")
-var ncol = 2
+	debugAddr         = flag.String("debug", "", "Serve debug information on the supplied address")
+	globalAutoIndent  = flag.Bool("a", false, "Start each window in autoindent mode")
+	barflag           = flag.Bool("b", false, "Click to focus window instead of focus follows mouse (Bart's flag)")
+	varfontflag       = flag.String("f", defaultVarFont, "Variable-width font")
+	fixedfontflag     = flag.String("F", defaultFixedFont, "Fixed-width font")
+	mtpt              = flag.String("m", defaultMtpt, "Mountpoint for 9P file server")
+	swapScrollButtons = flag.Bool("r", false, "Swap scroll buttons")
+	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
+)
 
 func main() {
 
@@ -43,13 +41,19 @@ func main() {
 
 	runtime.GOMAXPROCS(7)
 
+	var (
+		ncol     int
+		loadfile string
+	)
+	flag.IntVar(&ncol, "c", 2, "Number of columns at startup")
+	flag.StringVar(&loadfile, "l", "", "Load state from file generated with Dump command")
 	flag.Parse()
-	ncol = *ncolflag
-	globalautoindent = *globalautoindentflag
-	loadfile := *loadfileflag
-	mtpt = *mtptflag
-	bartflag = *bartflagflag
-	swapscrollbuttons = *swapscrollbuttonsflag
+
+	if *debugAddr != "" {
+		go func() {
+			log.Println(http.ListenAndServe(*debugAddr, nil))
+		}()
+	}
 
 	// TODO(fhs): This is not very portable.
 	// See https://github.com/rjkroege/edwood/issues/222
@@ -271,11 +275,12 @@ func iconinit(display draw.Display) {
 }
 
 func ismtpt(filename string) bool {
-	if mtpt == "" {
+	m := *mtpt
+	if m == "" {
 		return false
 	}
 	s := path.Clean(filename)
-	return strings.HasPrefix(s, mtpt) && (mtpt[len(mtpt)-1] == '/' || len(s) == len(mtpt) || s[len(mtpt)] == '/')
+	return strings.HasPrefix(s, m) && (m[len(m)-1] == '/' || len(s) == len(m) || s[len(m)] == '/')
 }
 
 func mousethread(display draw.Display) {
@@ -360,7 +365,7 @@ func MovedMouse(m draw.Mouse) {
 	barttext = t
 	if t.what == Body && m.Point.In(t.scrollr) {
 		if but != 0 {
-			if swapscrollButtons {
+			if *swapScrollButtons {
 				switch but {
 				case 1:
 					but = 3

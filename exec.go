@@ -1019,11 +1019,11 @@ func indentval(s string) int {
 	}
 	switch s {
 	case "ON":
-		globalautoindent = true
+		*globalAutoIndent = true
 		warning(nil, "Indent ON\n")
 		return IGlobal
 	case "OFF":
-		globalautoindent = false
+		*globalAutoIndent = false
 		warning(nil, "Indent OFF\n")
 		return IGlobal
 	case "on":
@@ -1048,7 +1048,7 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		autoindent = indentval(strings.SplitN(arg, " ", 2)[0])
 	}
 	if autoindent == IGlobal {
-		row.AllWindows(func(w *Window) { w.autoindent = globalautoindent })
+		row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
 	} else {
 		if w != nil && autoindent >= 0 {
 			w.autoindent = autoindent == Ion
