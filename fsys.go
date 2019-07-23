@@ -505,10 +505,6 @@ func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
 	return fs.respond(x, &t, ErrPermission)
 }
 
-//func idcmp (const  void *a, const  void *b) (int) {
-//	return *(int*)a - *(int*)b;
-//}
-
 // TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
 func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 	var (

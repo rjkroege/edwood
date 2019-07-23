@@ -2,14 +2,13 @@ package main
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 )
 
 func TestNewBlock(t *testing.T) {
 	disk := NewDisk()
-	defer os.Remove(disk.fd.Name())
+	defer disk.Close()
 
 	if len(disk.free) != 33 {
 		t.Errorf("disk.free isn't big enough or I don't understand the code anymore.")
@@ -76,6 +75,7 @@ func writereadtestcore(t *testing.T, testname, inputstring string, oblock *Block
 
 func TestReadWriteSmall(t *testing.T) {
 	disk := NewDisk()
+	defer disk.Close()
 
 	oblock := disk.NewBlock(uint(4))
 	nblock := writereadtestcore(t, "small write-read test", "a日本b", oblock, disk)
@@ -87,6 +87,7 @@ func TestReadWriteSmall(t *testing.T) {
 
 func TestReadWriteBig(t *testing.T) {
 	disk := NewDisk()
+	defer disk.Close()
 
 	// Roundtrip a bigger unicode string
 	// Make a larger string.

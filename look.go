@@ -635,13 +635,9 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 	}
 
 	for _, f := range filenames {
-		fmt.Printf("filename = %#v\n", f)
-		rs := et.DirName(f)
-		fmt.Printf("rs = %#v\n", rs)
-		e := Expand{}
-		e.name = rs
-		e.jump = true
-		fmt.Printf("e = %#v\n", e)
-		openfile(et, &e)
+		openfile(et, &Expand{
+			name: et.DirName(f),
+			jump: true,
+		})
 	}
 }
