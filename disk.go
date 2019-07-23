@@ -52,6 +52,11 @@ func NewDisk() *Disk {
 	}
 }
 
+// Close removes any temporary files used for the disk.
+func (d *Disk) Close() error {
+	return os.Remove(d.fd.Name())
+}
+
 // ntosize computes the size of block to hold n bytes where n must be
 // MaxBlock and the index into the bucket array. The 0-th bucket holds
 // only 0-length blocks.
