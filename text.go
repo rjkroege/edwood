@@ -367,47 +367,23 @@ func getDirNames(f *os.File) ([]string, error) {
 	return names, nil
 }
 
-func (t *Text) Backnl(p int, n int) int {
-	// look for start of this line if n==0
-	if n == 0 && p > 0 && t.file.ReadC(p-1) != '\n' {
-		n = 1
-	}
-	i := n
-	for i > 0 && p > 0 {
-		i--
-		p-- // it's at a newline now; back over it
-		if p == 0 {
-			break
-		}
-		// at 128 chars, call it a line anyway
-		for j := 128; j > 0 && p > 0; p-- {
-			j--
-			if t.file.ReadC(p-1) == '\n' {
-				break
-			}
-		}
-	}
-	return p
-}
-
-func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
-	var (
-		tp                 []rune
-		bp, up, i, initial int
-	)
+// BsInsert inserts runes r at text position q0. If r contains backspaces ('\b'),
+// they are interpreted, removing the runes preceding them.
+// The final text position where r is inserted and the number of runes inserted
+// after interpreting backspaces is returned.
+func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 	n := len(r)
 	if t.what == Tag { // can't happen but safety first: mustn't backspace over file name
 		t.Insert(q0, r, tofile)
-		nrp = n
-		return q0, nrp
+		return q0, n
 	}
-	bp = 0 // bp indexes r
-	for i = 0; i < n; i++ {
+	bp := 0 // bp indexes r
+	for i := 0; i < n; i++ {
 		if r[bp] == '\b' {
-			initial = 0
-			tp = make([]rune, n)
+			initial := 0
+			tp := make([]rune, n)
 			copy(tp, r[:i])
-			up = i // up indexes tp, starting at i
+			up := i // up indexes tp, starting at i
 			for ; i < n; i++ {
 				tp[up] = r[bp]
 				bp++
@@ -430,14 +406,12 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nrp int) {
 			}
 			n = up
 			t.Insert(q0, tp[:n], tofile)
-			nrp = n
-			return q0, nrp
+			return q0, n
 		}
 		bp++
 	}
 	t.Insert(q0, r, tofile)
-	nrp = n
-	return q0, nrp
+	return q0, n
 }
 
 // inserted is a callback invoked by File on Insert* to update each Text
@@ -787,7 +761,7 @@ func (t *Text) Type(r rune) {
 		t.SetOrigin(q0, true)
 	}
 	caseUp := func() {
-		q0 = t.Backnl(t.org, n)
+		q0 = t.BackNL(t.org, n)
 		t.SetOrigin(q0, true)
 	}
 
@@ -862,7 +836,7 @@ func (t *Text) Type(r rune) {
 	case draw.KeyHome:
 		t.TypeCommit()
 		if t.org > t.iq1 {
-			q0 = t.Backnl(t.iq1, 1)
+			q0 = t.BackNL(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
 			t.Show(0, 0, false)
@@ -875,7 +849,7 @@ func (t *Text) Type(r rune) {
 				// should not happen, but does. and it will crash textbacknl.
 				t.iq1 = t.file.Size()
 			}
-			q0 = t.Backnl(t.iq1, 1)
+			q0 = t.BackNL(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
 			t.Show(t.file.Size(), t.file.Size(), false)
@@ -1069,7 +1043,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	}
 	var q0 int
 	if dl < 0 {
-		q0 = t.Backnl(t.org, (-dl))
+		q0 = t.BackNL(t.org, (-dl))
 	} else {
 		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
 			return
@@ -1250,7 +1224,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		} else {
 			nl = t.fr.GetFrameFillStatus().Maxlines / 4
 		}
-		q = t.Backnl(q0, nl)
+		q = t.BackNL(q0, nl)
 		// avoid going backwards if trying to go forwards - long lines!
 		if !(q0 > t.org && q < t.org) {
 			t.SetOrigin(q, true)
@@ -1530,14 +1504,15 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	return 0, 0, false
 }
 
+// BackNL returns the position at the beginning of the line
+// after backing up n lines starting from position p.
 func (t *Text) BackNL(p, n int) int {
 	// look for start of this line if n==0
 	if n == 0 && p > 0 && t.file.ReadC(p-1) != '\n' {
 		n = 1
 	}
-	i := n
-	for i > 0 && p > 0 {
-		i--
+	for n > 0 && p > 0 {
+		n--
 		p-- // it's at a newline now; back over it
 		if p == 0 {
 			break

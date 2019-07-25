@@ -122,7 +122,7 @@ func (t *Text) Scroll(but int) {
 			y = my
 			p0 = t.file.Size() * (y - s.Min.Y) / h
 			if p0 >= t.q1 {
-				p0 = t.Backnl(p0, 2)
+				p0 = t.BackNL(p0, 2)
 			}
 			if oldp0 != p0 {
 				t.SetOrigin(p0, false)
@@ -135,7 +135,7 @@ func (t *Text) Scroll(but int) {
 			continue
 		}
 		if but == 1 {
-			p0 = t.Backnl(t.org, (my-s.Min.Y)/t.fr.DefaultFontHeight())
+			p0 = t.BackNL(t.org, (my-s.Min.Y)/t.fr.DefaultFontHeight())
 		} else {
 			p0 = t.org + t.fr.Charofpt(image.Pt(s.Max.X, my))
 		}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
@@ -339,5 +340,79 @@ func windowWithTag(tag string) *Window {
 				b: Buffer([]rune(tag)),
 			},
 		},
+	}
+}
+
+func TestBackNL(t *testing.T) {
+	tt := []struct {
+		buf  string // Text file buffer
+		p, n int    // Input position and number of lines to back up
+		q    int    // Returned position
+	}{
+		{"", 0, 0, 0},
+		{"", 0, 1, 0},
+		{"", 0, 2, 0},
+		{"01234\n", 3, 0, 0},
+		{"01234\n", 3, 1, 0},
+		{"01234\n", 3, 2, 0},
+		{"01234\n6789\nabcd\n", 13, 0, 11},
+		{"01234\n6789\nabcd\n", 13, 1, 11},
+		{"01234\n6789\nabcd\n", 13, 2, 6},
+		{"01234\n6789\nabcd\n", 13, 3, 0},
+		{"\n1234\n6789\nabcd\n", 13, 3, 1},
+		{"\n1234\n6789\nabcd\n", 13, 4, 0},
+		{"\n1234\n6789\nabcd\n", 13, 5, 0},
+	}
+
+	for _, tc := range tt {
+		text := &Text{
+			file: &File{
+				b: Buffer(tc.buf),
+			},
+		}
+		q := text.BackNL(tc.p, tc.n)
+		if got, want := q, tc.q; got != want {
+			t.Errorf("BackNL(%v, %v) for %q is %v; want %v",
+				tc.p, tc.n, tc.buf, got, want)
+		}
+	}
+}
+
+func TestTextBsInsert(t *testing.T) {
+	tt := []struct {
+		name          string   // Test name
+		what          TextKind // Body, Tag, etc.
+		q0, q         int      // Input and returned position
+		buf           string   // Initial text buffer
+		inbuf, outbuf []rune   // Inserted and modified text buffer
+		nr            int      // Returned number of runes
+	}{
+		{"Tag", Tag, 2, 2, "abc", []rune("xy\bz"), []rune("abxy\bzc"), 4},
+		{"NoBS", Body, 2, 2, "abc", []rune("xyz"), []rune("abxyzc"), 3},
+		{"BSInMiddle", Body, 2, 2, "abc", []rune("xy\bz"), []rune("abxzc"), 2},
+		{"BSAtStart", Body, 2, 1, "abc", []rune("\bxyz"), []rune("axyzc"), 3},
+		{"TwoBS", Body, 2, 0, "abc", []rune("\b\b"), []rune("c"), 0},
+		{"TooManyBS", Body, 2, 0, "abc", []rune("\b\b\b\b\b"), []rune("c"), 0},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			text := &Text{
+				what: tc.what,
+				file: &File{
+					b: Buffer(tc.buf),
+				},
+			}
+			q, nr := text.BsInsert(tc.q0, []rune(tc.inbuf), true)
+			if nr != tc.nr {
+				t.Errorf("nr = %v; want %v", nr, tc.nr)
+			}
+			if q != tc.q {
+				t.Errorf("q = %v; want %v", q, tc.q)
+			}
+			if got, want := []rune(text.file.b), tc.outbuf; !cmp.Equal(got, want) {
+				t.Errorf("text.file.b = %q; want %q", got, want)
+			}
+		})
 	}
 }
