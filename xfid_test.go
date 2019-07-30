@@ -1,13 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	"9fans.net/go/plan9"
+	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/edwoodtest"
 )
 
 func TestXfidAlloc(t *testing.T) {
@@ -222,6 +229,62 @@ func TestXfidreadQWxdata(t *testing.T) {
 	}
 }
 
+func TestXfidreadQWaddr(t *testing.T) {
+	const (
+		body = "0123456789ABCDEF"
+		want = "          5          12 "
+	)
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.body.file.b = Buffer(body)
+	w.addr.q0 = 5
+	w.addr.q1 = 12
+
+	mr := new(mockResponder)
+	xfidread(&Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(1, QWaddr)},
+			w:   w,
+		},
+		fcall: plan9.Fcall{Count: 64},
+		fs:    mr,
+	})
+	if mr.err != nil {
+		t.Fatalf("got error %v; want nil", mr.err)
+	}
+	if got := string(mr.fcall.Data); got != want {
+		t.Errorf("got data %q; want %q", got, want)
+	}
+}
+
+func TestXfidreadQWctl(t *testing.T) {
+	const want = "          1          32          14           0           0           0 /lib/font/edwood.font           0 "
+
+	WinID = 0
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.display = edwoodtest.NewDisplay()
+	w.body.fr = &MockFrame{}
+	w.tag.file.b = Buffer("/etc/hosts Del Snarf | Look Get ")
+	w.body.file.b = Buffer("Hello, world!\n")
+
+	mr := new(mockResponder)
+	xfidread(&Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(1, QWctl)},
+			w:   w,
+		},
+		fcall: plan9.Fcall{Count: 128},
+		fs:    mr,
+	})
+	if mr.err != nil {
+		t.Fatalf("got error %v; want nil", mr.err)
+	}
+	if got := string(mr.fcall.Data); got != want {
+		t.Errorf("got data %q; want %q", got, want)
+	}
+}
+
 func TestXfidreadDeletedWin(t *testing.T) {
 	mr := new(mockResponder)
 	xfidread(&Xfid{
@@ -233,4 +296,72 @@ func TestXfidreadDeletedWin(t *testing.T) {
 	if got, want := mr.err, ErrDeletedWin; got != want {
 		t.Fatalf("got error %v; want %v", got, want)
 	}
+}
+
+func TestXfidindexread(t *testing.T) {
+	for _, name := range []string{
+		"empty-two-cols",
+		"example",
+		"multi-line-tag",
+	} {
+		t.Run(name, func(t *testing.T) {
+			filename := editDumpFileForTesting(t, filepath.Join("testdata", name+".dump"))
+			defer os.Remove(filename)
+
+			setGlobalsForLoadTesting()
+
+			err := row.Load(nil, filename, true)
+			if err != nil {
+				t.Fatalf("Row.Load failed: %v", err)
+			}
+
+			mr := new(mockResponder)
+			xfidindexread(&Xfid{
+				fcall: plan9.Fcall{Count: 1024},
+				fs:    mr,
+			})
+			if mr.err != nil {
+				t.Fatalf("xfidindexread returned error %v", mr.err)
+			}
+			got := mr.fcall.Data
+			want := readIndexFile(t, filepath.Join("testdata", name+".index"))
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("index data mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func readIndexFile(t *testing.T, filename string) []byte {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("open failed: %v", err)
+	}
+	defer f.Close()
+
+	// Read each line in index and adjust tag length (2nd field) if tag contains a path.
+	var buf bytes.Buffer
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		ntag, _ := strconv.Atoi(strings.TrimSpace(line[12 : 12*2]))
+		if strings.Contains(line, gopherEdwoodDir) {
+			ntag += len(cwd) - len(gopherEdwoodDir)
+		}
+		fmt.Fprintf(&buf, "%s%11d %s\n", line[:12], ntag, line[12*2:])
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	b := buf.Bytes()
+	if len(b) == 0 {
+		return nil
+	}
+	return replacePathsForTesting(t, b, false)
 }

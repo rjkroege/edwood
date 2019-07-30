@@ -75,7 +75,7 @@ func NewFont(width, height int) draw.Font {
 	}
 }
 
-func (f *mockFont) Name() string             { return "" }
+func (f *mockFont) Name() string             { return "/lib/font/edwood.font" }
 func (f *mockFont) Height() int              { return f.height }
 func (f *mockFont) BytesWidth(b []byte) int  { return f.width * utf8.RuneCount(b) }
 func (f *mockFont) RunesWidth(r []rune) int  { return f.width * len(r) }

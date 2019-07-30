@@ -25,7 +25,7 @@
 			"Position": 2.263648468708389,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/hello.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
 				"Q0": 93,
 				"Q1": 108
 			},
@@ -40,7 +40,7 @@
 			"Position": 20.63914780292943,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/hello.go Del Snarf | Look Edit The first line\nThe second line\nThe third line",
 				"Q0": 93,
 				"Q1": 108
 			},
@@ -55,7 +55,7 @@
 			"Position": 49.00133155792277,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/ Del Snarf Get | Look Edit The first line\nThe second line\nThe third line",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/ Del Snarf Get | Look Edit The first line\nThe second line\nThe third line",
 				"Q0": 86,
 				"Q1": 101
 			},
@@ -67,7 +67,7 @@
 		{
 			"Type": 1,
 			"Column": 0,
-			"Position": 77.3635153129161,
+			"Position": 53.05084745762712,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
 				"Buffer": "foo Del Snarf Undo Put | Look Edit The first line\nThe second line\nThe third line",
