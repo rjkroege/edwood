@@ -12,6 +12,8 @@ import (
 
 	"9fans.net/go/plan9"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/ninep"
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 const Ctlsize = 5 * 12
@@ -307,30 +309,14 @@ func xfidread(x *Xfid) {
 		w.body.Commit()
 		w.ClampAddr()
 		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
-		n := len(buf)
-		if off > uint64(n) {
-			off = uint64(n)
-		}
-		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n) - off)
-		}
-		fc.Count = x.fcall.Count
-		fc.Data = []byte(buf[off:])
+		ninep.ReadString(&fc, &x.fcall, buf)
 		x.respond(&fc, nil)
+
 	case QWbody:
 		xfidutfread(x, &w.body, w.body.Nc(), int(QWbody))
 
 	case QWctl:
-		b := w.CtlPrint(true)
-		n := len(b)
-		if off > uint64(n) {
-			off = uint64(n)
-		}
-		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n) - off)
-		}
-		fc.Count = x.fcall.Count
-		fc.Data = []byte(b[off : off+uint64(x.fcall.Count)])
+		ninep.ReadString(&fc, &x.fcall, w.CtlPrint(true))
 		x.respond(&fc, nil)
 
 	case QWevent:
@@ -978,9 +964,6 @@ func xfideventread(x *Xfid, w *Window) {
 func xfidindexread(x *Xfid) {
 	// log.Println("xfidindexread", x)
 	// defer log.Println("done xfidindexread")
-	var (
-		fc plan9.Fcall
-	)
 
 	row.lk.Lock()
 	nmax := 0
@@ -991,7 +974,7 @@ func xfidindexread(x *Xfid) {
 	}
 
 	nmax++
-	sb := strings.Builder{}
+	var sb strings.Builder
 	for _, c := range row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
@@ -1002,25 +985,18 @@ func xfidindexread(x *Xfid) {
 			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
 			w.tag.file.b.Read(0, tag)
+
+			// We only include first line of a multi-line tag
+			if i := runes.IndexRune(tag, '\n'); i >= 0 {
+				tag = tag[:i]
+			}
 			sb.WriteString(string(tag))
 			sb.WriteString("\n")
 		}
 	}
 	row.lk.Unlock()
-	off := x.fcall.Offset
-	cnt := x.fcall.Count
 
-	// TODO(flux): This code looks buggy here, as it was in the original.
-	// This trims the output list into blocks without respecting utf8 boundaries.
-	// Or maybe it's ok to split a rune in this call.
-	s := []byte(sb.String())
-	if off > uint64(len(s)) {
-		off = uint64(len(s))
-	}
-	if off+uint64(cnt) > uint64(len(s)) {
-		cnt = uint32(uint64(len(s)) - off)
-	}
-	fc.Count = cnt
-	fc.Data = s[off : off+uint64(cnt)]
+	var fc plan9.Fcall
+	ninep.ReadString(&fc, &x.fcall, sb.String())
 	x.respond(&fc, nil)
 }

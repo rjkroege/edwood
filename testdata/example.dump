@@ -49,7 +49,7 @@
 			"Position": 12.649800266311585,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit ",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/hello.go Del Snarf | Look Edit ",
 				"Q0": 60,
 				"Q1": 65
 			},
@@ -64,7 +64,7 @@
 			"Position": 2.263648468708389,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/ Del Snarf Get | Look Edit ",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/ Del Snarf Get | Look Edit ",
 				"Q0": 49,
 				"Q1": 54
 			},
@@ -76,10 +76,10 @@
 		{
 			"Type": 2,
 			"Column": 1,
-			"Position": 32.62316910785619,
+			"Position": 18.8135593220339,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
-				"Buffer": "/home/gopher/go/src/edwood/row_test.go Del Snarf | Look Edit ",
+				"Buffer": "/home/gopher/go/src/edwood/testdata/hello.go Del Snarf | Look Edit ",
 				"Q0": 60,
 				"Q1": 65
 			},
@@ -91,7 +91,7 @@
 		{
 			"Type": 1,
 			"Column": 1,
-			"Position": 74.96671105193076,
+			"Position": 35.932203389830505,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
 				"Buffer": " Del Snarf | Look Edit ",
