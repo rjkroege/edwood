@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // TestWindowUndoSelection checks text selection change after undo/redo.
 // It tests that selection doesn't change when undoing/redoing
@@ -43,6 +46,30 @@ func TestWindowUndoSelection(t *testing.T) {
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
 				tc.name, w.body.q0, w.body.q1, tc.wantQ0, tc.wantQ1)
+		}
+	}
+}
+
+func TestWindowClampAddr(t *testing.T) {
+	buf := Buffer("Hello, 世界")
+
+	for _, tc := range []struct {
+		addr, want Range
+	}{
+		{Range{-1, -1}, Range{0, 0}},
+		{Range{100, 100}, Range{buf.nc(), buf.nc()}},
+	} {
+		w := &Window{
+			addr: tc.addr,
+			body: Text{
+				file: &File{
+					b: buf,
+				},
+			},
+		}
+		w.ClampAddr()
+		if got := w.addr; !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("got addr %v; want %v", got, tc.want)
 		}
 	}
 }

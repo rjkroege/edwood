@@ -668,3 +668,19 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 		x.c <- nil
 	}
 }
+
+// ClampAddr clamps address range based on the body buffer.
+func (w *Window) ClampAddr() {
+	if w.addr.q0 < 0 {
+		w.addr.q0 = 0
+	}
+	if w.addr.q1 < 0 {
+		w.addr.q1 = 0
+	}
+	if w.addr.q0 > w.body.Nc() {
+		w.addr.q0 = w.body.Nc()
+	}
+	if w.addr.q1 > w.body.Nc() {
+		w.addr.q1 = w.body.Nc()
+	}
+}

@@ -26,21 +26,6 @@ var (
 	ErrBadEvent   = fmt.Errorf("bad event syntax")
 )
 
-func clampaddr(w *Window) {
-	if w.addr.q0 < 0 {
-		w.addr.q0 = 0
-	}
-	if w.addr.q1 < 0 {
-		w.addr.q1 = 0
-	}
-	if w.addr.q0 > w.body.Nc() {
-		w.addr.q0 = w.body.Nc()
-	}
-	if w.addr.q1 > w.body.Nc() {
-		w.addr.q1 = w.body.Nc()
-	}
-}
-
 func (x *Xfid) respond(t *plan9.Fcall, err error) *Xfid {
 	return x.fs.respond(x, t, err)
 }
@@ -320,7 +305,7 @@ func xfidread(x *Xfid) {
 	switch q {
 	case QWaddr:
 		w.body.Commit()
-		clampaddr(w)
+		w.ClampAddr()
 		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
 		n := len(buf)
 		if off > uint64(n) {
@@ -697,7 +682,7 @@ forloop:
 			put(&w.body, nil, nil, XXX, XXX, "")
 		case "dot=addr": // set dot
 			w.body.Commit()
-			clampaddr(w)
+			w.ClampAddr()
 			w.body.q0 = w.addr.q0
 			w.body.q1 = w.addr.q1
 			w.body.SetSelect(w.body.q0, w.body.q1)
@@ -707,7 +692,7 @@ forloop:
 			w.addr.q1 = w.body.q1
 		case "limit=addr": // set limit
 			w.body.Commit()
-			clampaddr(w)
+			w.ClampAddr()
 			w.limit.q0 = w.addr.q0
 			w.limit.q1 = w.addr.q1
 		case "nomark": // turn off automatic marking
