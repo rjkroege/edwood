@@ -60,6 +60,21 @@
 		},
 		{
 			"Type": 0,
+			"Column": 0,
+			"Position": 31.025299600532623,
+			"Font": "/lib/font/bit/lucsans/euro.8.font",
+			"Tag": {
+				"Buffer": "/home/gopher/go/src/edwood/testdata/こんにちは.txt Del Snarf | Look Edit ",
+				"Q0": 67,
+				"Q1": 72
+			},
+			"Body": {
+				"Q0": 82,
+				"Q1": 93
+			}
+		},
+		{
+			"Type": 0,
 			"Column": 1,
 			"Position": 2.263648468708389,
 			"Font": "/lib/font/bit/lucsans/euro.8.font",

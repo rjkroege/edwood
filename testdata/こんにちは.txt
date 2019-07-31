@@ -1,0 +1,9 @@
+ED(1)               Unix Programmer's Manual                ED(1)
+
+NAME
+     ed - text editor
+
+SYNOPSIS
+     ed [ - ] [ -x ] [ name ]
+DESCRIPTION
+     Ed is the standard text editor.
