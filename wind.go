@@ -454,21 +454,23 @@ func (w *Window) SetTag() {
 // setTag1 updates the tag contents for a given window w.
 // TODO(rjk): Handle files with spaces in their names.
 func (w *Window) setTag1() {
-	Ldelsnarf := (" Del Snarf")
-	Lundo := (" Undo")
-	Lredo := (" Redo")
-	Lget := (" Get")
-	Lput := (" Put")
-	Llook := (" Look")
-	Ledit := (" Edit")
-	//	Lpipe := (" |")
+	const (
+		Ldelsnarf = " Del Snarf"
+		Lundo     = " Undo"
+		Lredo     = " Redo"
+		Lget      = " Get"
+		Lput      = " Put"
+		Llook     = " Look"
+		Ledit     = " Edit"
+		Lpipe     = " |"
+	)
 
 	// (flux) The C implemtation does a lot of work to avoid
 	// re-setting the tag text if unchanged.  That's probably not
 	// relevant in the modern world.  We can build a new tag trivially
 	// and put up with the traffic implied for a tag line.
 
-	sb := strings.Builder{}
+	var sb strings.Builder
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
 
@@ -486,13 +488,13 @@ func (w *Window) setTag1() {
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
-	olds := string(w.tag.file.b)
+	old := w.tag.file.b
 	oldbarIndex := w.tag.file.b.IndexRune('|')
 	if oldbarIndex >= 0 {
 		sb.WriteString(" ")
-		sb.WriteString(olds[oldbarIndex:])
+		sb.WriteString(string(old[oldbarIndex:]))
 	} else {
-		sb.WriteString(" |")
+		sb.WriteString(Lpipe)
 		sb.WriteString(Llook)
 		sb.WriteString(Ledit)
 		sb.WriteString(" ")
@@ -516,12 +518,10 @@ func (w *Window) setTag1() {
 		// Rationalize the selection as best as possible
 		w.tag.q0 = min(q0, w.tag.Nc())
 		w.tag.q1 = min(q1, w.tag.Nc())
-		if oldbarIndex != -1 {
-			if q0 > (oldbarIndex) {
-				bar := (newbarIndex - oldbarIndex)
-				w.tag.q0 = q0 + bar
-				w.tag.q1 = q1 + bar
-			}
+		if oldbarIndex != -1 && q0 > oldbarIndex {
+			bar := newbarIndex - oldbarIndex
+			w.tag.q0 = q0 + bar
+			w.tag.q1 = q1 + bar
 		}
 	}
 	w.tag.file.Clean()
