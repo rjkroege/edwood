@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/runes"
@@ -29,6 +31,14 @@ func (b *Buffer) Delete(q0, q1 int) {
 func (b *Buffer) Read(q0 int, r []rune) (int, error) {
 	n := copy(r, (*b)[q0:])
 	return n, nil
+}
+
+// Reader returns reader for text at [q0, q1).
+//
+// TODO(fhs): Once Buffer implements io.ReaderAt,
+// we can use io.SectionReader instead of this function.
+func (b *Buffer) Reader(q0, q1 int) io.Reader {
+	return strings.NewReader(string((*b)[q0:q1]))
 }
 
 func (b *Buffer) ReadC(q int) rune { return (*b)[q] }

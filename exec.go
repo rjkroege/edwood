@@ -531,20 +531,10 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	if isapp {
 		return warnError(nil, "%s not written; file is append only", name)
 	}
-	r := make([]rune, RBUFSIZE)
-	n := 0
-	for q := q0; q < q1; q += n {
-		n = q1 - q
-		if n > RBUFSIZE {
-			n = RBUFSIZE
-		}
-		f.b.Read(q, r[:n])
-		s := string(r[:n])
-		io.WriteString(h, s)
-		nwritten, err := fd.Write([]byte(s))
-		if err != nil || nwritten != len(s) {
-			return warnError(nil, "can't write file %s: %v", name, err)
-		}
+
+	_, err = io.Copy(io.MultiWriter(h, fd), f.b.Reader(q0, q1))
+	if err != nil {
+		return warnError(nil, "can't write file %s: %v", name, err)
 	}
 
 	// Putting to the same file as the one that we originally read from.

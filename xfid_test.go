@@ -84,6 +84,67 @@ func (mr *mockResponder) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 
 func (mr *mockResponder) msize() int { return 8192 }
 
+func TestQWrdsel(t *testing.T) {
+	const wantSel = "εxαmple"
+
+	w := &Window{
+		body: Text{fr: &MockFrame{}},
+		tag: Text{
+			fr:   &MockFrame{},
+			file: &File{},
+		},
+		col: new(Column),
+	}
+	textSetSelection(&w.body, "This is an «"+wantSel+"» sentence.\n")
+	w.body.file.text = []*Text{&w.body}
+	w.tag.file.text = []*Text{&w.tag}
+	w.body.w = w
+	w.tag.w = w
+	w.ref.Inc()
+	mr := &mockResponder{}
+	qid := plan9.Qid{
+		Path: QID(0, QWrdsel),
+	}
+	x := &Xfid{
+		f: &Fid{
+			qid: qid,
+			w:   w,
+		},
+		fs: mr,
+	}
+
+	t.Run("xfidopen", func(t *testing.T) {
+		xfidopen(x)
+		if mr.err != nil {
+			t.Fatalf("got error %v; want nil", mr.err)
+		}
+		if got, want := mr.fcall.Qid, qid; !cmp.Equal(got, want) {
+			t.Fatalf("Qid.Path is %v; want %v", got, want)
+		}
+		if !x.f.open {
+			t.Fatalf("Fid not open")
+		}
+	})
+
+	t.Run("xfidread", func(t *testing.T) {
+		x.fcall.Count = 64
+		xfidread(x)
+		if got, want := mr.fcall.Count, uint32(len(wantSel)); got != want {
+			t.Errorf("fcall.Count is %v; want %v", got, want)
+		}
+		if got, want := string(mr.fcall.Data), wantSel; got != want {
+			t.Errorf("fcall.Data is %q; want %q\n", got, want)
+		}
+	})
+
+	t.Run("xfidclose", func(t *testing.T) {
+		xfidclose(x)
+		if w.rdselfd != nil {
+			t.Errorf("w.rdselfd is not nil")
+		}
+	})
+}
+
 func TestXfidwriteQWaddr(t *testing.T) {
 	for _, tc := range []struct {
 		name string
