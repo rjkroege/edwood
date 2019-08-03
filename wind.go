@@ -32,7 +32,7 @@ type Window struct {
 	nopen      [QMAX]byte
 	nomark     bool
 	wrselrange Range
-	rdselfd    *os.File
+	rdselfd    *os.File // temporary file for rdsel read requests
 
 	col    *Column
 	eventx *Xfid

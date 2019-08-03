@@ -138,9 +138,10 @@ func TestLook3Message(t *testing.T) {
 				want.Attr = &plumb.Attribute{Name: "click", Value: "3"}
 			}
 
-			text := textWithSelection(tc.text)
+			var text Text
+			textSetSelection(&text, tc.text)
 			text.w = tc.w
-			got, err := look3Message(text, 4, 4)
+			got, err := look3Message(&text, 4, 4)
 			if tc.name == "Error" {
 				wantErr := "empty selection"
 				if err.Error() != wantErr {
@@ -159,7 +160,7 @@ func TestLook3Message(t *testing.T) {
 	}
 }
 
-func textWithSelection(buf string) *Text {
+func textSetSelection(t *Text, buf string) {
 	b := []rune(buf)
 	popRune := func(r rune) int {
 		q := runes.IndexRune(b, r)
@@ -170,13 +171,7 @@ func textWithSelection(buf string) *Text {
 		return q
 	}
 
-	q0 := popRune('«')
-	q1 := popRune('»')
-	return &Text{
-		file: &File{
-			b: Buffer(b),
-		},
-		q0: q0,
-		q1: q1,
-	}
+	t.q0 = popRune('«')
+	t.q1 = popRune('»')
+	t.file = &File{b: Buffer(b)}
 }

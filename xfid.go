@@ -78,19 +78,12 @@ out:
 func xfidopen(x *Xfid) {
 	// log.Println("xfidopen", x)
 	// defer log.Println("xfidopen done")
-	var (
-		fc     plan9.Fcall
-		w      *Window
-		t      *Text
-		n      int
-		q0, q1 int
-		q      uint64
-	)
+	var fc plan9.Fcall
 
-	w = x.f.w
-	q = FILE(x.f.qid)
+	w := x.f.w
+	q := FILE(x.f.qid)
 	if w != nil {
-		t = &w.body
+		t := &w.body
 		w.Lock('E')
 		switch q {
 		case QWaddr:
@@ -134,22 +127,10 @@ func xfidopen(x *Xfid) {
 			}
 			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
-			q0 = t.q0
-			q1 = t.q1
-			r := make([]rune, RBUFSIZE)
-			for q0 < q1 {
-				n = q1 - q0
-				if n > RBUFSIZE {
-					n = RBUFSIZE
-				}
-				t.file.b.Read(q0, r[:n])
-				s := string(r[:n])
-				n, err = w.rdselfd.Write([]byte(s))
-				if err != nil || n != len(s) {
-					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
-					break
-				}
-				q0 += n
+
+			_, err = io.Copy(w.rdselfd, t.file.b.Reader(t.q0, t.q1))
+			if err != nil {
+				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
 			}
 		case QWwrsel:
 			w.nopen[q]++
@@ -196,13 +177,9 @@ func xfidopen(x *Xfid) {
 func xfidclose(x *Xfid) {
 	// log.Println("xfidclose", x)
 	// defer log.Println("xfidclose done")
-	var (
-		fc plan9.Fcall
-		w  *Window
-		q  uint64
-		t  *Text
-	)
-	w = x.f.w
+	var fc plan9.Fcall
+
+	w := x.f.w
 	x.f.busy = false
 	x.f.w = nil
 	if !x.f.open {
@@ -213,7 +190,7 @@ func xfidclose(x *Xfid) {
 		return
 	}
 
-	q = FILE(x.f.qid)
+	q := FILE(x.f.qid)
 	x.f.open = false
 	if w != nil {
 		// We need to lock row here before locking window (just like mousethread)
@@ -254,7 +231,7 @@ func xfidclose(x *Xfid) {
 			w.rdselfd = nil
 		case QWwrsel:
 			w.nomark = false
-			t = &w.body
+			t := &w.body
 			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		case QWeditout:
