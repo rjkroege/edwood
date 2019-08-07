@@ -29,7 +29,7 @@ type Window struct {
 	addr  Range
 	limit Range
 
-	nopen      [QMAX]byte
+	nopen      [QMAX]byte // number of open Fid for each file in the file server
 	nomark     bool
 	wrselrange Range
 	rdselfd    *os.File // temporary file for rdsel read requests
@@ -38,12 +38,12 @@ type Window struct {
 	eventx *Xfid
 	events []byte
 
-	owner       int
+	owner       int // TODO(fhs): change type to rune
 	maxlines    int
 	dirnames    []string
 	widths      []int
 	incl        []string
-	ctrllock    *sync.Mutex
+	ctrllock    sync.Mutex
 	ctlfid      uint32
 	dumpstr     string
 	dumpdir     string

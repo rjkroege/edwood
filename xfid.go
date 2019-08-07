@@ -75,6 +75,12 @@ out:
 	x.respond(&fc, nil)
 }
 
+// These variables are only used for testing.
+var (
+	testTempFileFail bool
+	testIOCopyFail   bool
+)
+
 func xfidopen(x *Xfid) {
 	// log.Println("xfidopen", x)
 	// defer log.Println("xfidopen done")
@@ -92,9 +98,7 @@ func xfidopen(x *Xfid) {
 				w.limit = Range{-1, -1}
 			}
 			w.nopen[q]++
-		case QWdata:
-			fallthrough
-		case QWxdata:
+		case QWdata, QWxdata:
 			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
@@ -116,22 +120,23 @@ func xfidopen(x *Xfid) {
 				x.respond(&fc, ErrInUse)
 				return
 			}
-			var err error
 			// TODO(flux): Move the TempFile and Remove
 			// into a tempfile() call
-			w.rdselfd, err = ioutil.TempFile("", "acme")
-			if err != nil {
+			tmp, err := ioutil.TempFile("", "acme")
+			if err != nil || testTempFileFail {
 				w.Unlock()
 				x.respond(&fc, fmt.Errorf("can't create temp file"))
 				return
 			}
-			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
+			os.Remove(tmp.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 
-			_, err = io.Copy(w.rdselfd, t.file.b.Reader(t.q0, t.q1))
-			if err != nil {
+			_, err = io.Copy(tmp, t.file.b.Reader(t.q0, t.q1))
+			if err != nil || testIOCopyFail {
+				// TODO(fhs): Do we want to send an error response to the client?
 				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
 			}
+			w.rdselfd = tmp
 		case QWwrsel:
 			w.nopen[q]++
 			seq++
@@ -204,9 +209,7 @@ func xfidclose(x *Xfid) {
 				w.ctlfid = MaxFid
 				w.ctrllock.Unlock()
 			}
-		case QWdata:
-			fallthrough
-		case QWxdata:
+		case QWdata, QWxdata:
 			w.nomark = false
 			fallthrough
 		case QWaddr:
@@ -575,6 +578,7 @@ forloop:
 			w.ctlfid = x.f.fid
 		case "unlock": // release exclusive use
 			w.ctlfid = math.MaxUint32
+			// BUG(fhs): This will crash if the lock isn't already locked.
 			w.ctrllock.Unlock()
 		case "clean": // mark window 'clean', seq=0
 			t = &w.body
