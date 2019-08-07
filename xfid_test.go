@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -118,6 +119,9 @@ func TestQWrdsel(t *testing.T) {
 		if mr.err != nil {
 			t.Fatalf("got error %v; want nil", mr.err)
 		}
+		if w.rdselfd == nil {
+			t.Fatalf("w.rdselfd is nil after open")
+		}
 		if got, want := mr.fcall.Qid, qid; !cmp.Equal(got, want) {
 			t.Fatalf("Qid.Path is %v; want %v", got, want)
 		}
@@ -186,6 +190,277 @@ func TestXfidwriteQWaddr(t *testing.T) {
 				}
 				if !reflect.DeepEqual(w.addr, tc.r) {
 					t.Errorf("window address is %v; want %v", w.addr, tc.r)
+				}
+			}
+		})
+	}
+}
+
+func TestXfidopen(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		q    uint64
+	}{
+		{"QWaddr", QWaddr},
+		{"QWdata", QWdata},
+		{"QWxdata", QWxdata},
+		{"QWevent", QWevent},
+		{"QWrdsel", QWrdsel},
+		{"QWwrsel", QWwrsel},
+		{"QWeditout", QWeditout},
+		{"Qlog", Qlog},
+		{"Qeditout", Qeditout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			editing = Inserting // for QWeditout
+			mr := new(mockResponder)
+			var w *Window
+			q := tc.q
+			if q != Qlog && q != Qeditout {
+				w = NewWindow().initHeadless(nil)
+				w.col = new(Column)
+				w.body.fr = &MockFrame{}
+			}
+			x := &Xfid{
+				f: &Fid{
+					qid: plan9.Qid{Path: QID(0, q)},
+					w:   w,
+				},
+				fs: mr,
+			}
+			xfidopen(x)
+
+			switch q {
+			case QWaddr:
+				if got, want := w.addr, (Range{0, 0}); !reflect.DeepEqual(got, want) {
+					t.Errorf("w.addr is %v; want %v", got, want)
+				}
+				if got, want := w.limit, (Range{-1, -1}); !reflect.DeepEqual(got, want) {
+					t.Errorf("w.limit is %v; want %v", got, want)
+				}
+			}
+
+			switch q {
+			case QWeditout, Qlog, Qeditout: // Do nothing.
+			default:
+				if got, want := w.nopen[q], byte(1); got != want {
+					t.Errorf("w.nopen[%v] is %v; want %v", q, got, want)
+				}
+			}
+			if mr.err != nil {
+				t.Fatalf("got error %v; want nil", mr.err)
+			}
+			if got, want := mr.fcall.Qid, (plan9.Qid{Path: QID(0, q)}); !cmp.Equal(got, want) {
+				t.Errorf("Fcall.Qid is %#v; want %#v", got, want)
+			}
+			if got, want := mr.fcall.Iounit, uint32(8168); got != want {
+				t.Errorf("Fcall.Iounit is %v; want %v", got, want)
+			}
+			if !x.f.open {
+				t.Errorf("fid not open")
+			}
+		})
+	}
+}
+
+func TestXfidopenQeditout(t *testing.T) {
+	mr := new(mockResponder)
+	x := &Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, Qeditout)},
+		},
+		fs: mr,
+	}
+	editoutlk = nil
+	xfidopen(x)
+	if got, want := mr.err, ErrInUse; got != want {
+		t.Errorf("got error %v; want %v", got, want)
+	}
+}
+
+func TestXfidopenQWeditout(t *testing.T) {
+	mr := new(mockResponder)
+	x := &Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWeditout)},
+			w:   NewWindow().initHeadless(nil),
+		},
+		fs: mr,
+	}
+	t.Run("ErrInUse", func(t *testing.T) {
+		x.f.w.editoutlk = nil
+		xfidopen(x)
+		if got, want := mr.err, ErrInUse; got != want {
+			t.Errorf("got error %v; want %v", got, want)
+		}
+	})
+	t.Run("ErrPermission", func(t *testing.T) {
+		editing = Inactive
+		xfidopen(x)
+		if got, want := mr.err, ErrPermission; got != want {
+			t.Errorf("got error %v; want %v", got, want)
+		}
+	})
+}
+
+func TestXfidopenQWrdsel(t *testing.T) {
+	mr := new(mockResponder)
+	x := &Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWrdsel)},
+			w:   NewWindow().initHeadless(nil),
+		},
+		fs: mr,
+	}
+	t.Run("ErrInUse", func(t *testing.T) {
+		x.f.w.rdselfd = os.Stdout // any non-nil file will do
+		xfidopen(x)
+		if got, want := mr.err, ErrInUse; got != want {
+			t.Errorf("got error %v; want %v", got, want)
+		}
+	})
+	t.Run("TempFile", func(t *testing.T) {
+		x.f.w.rdselfd = nil
+		testTempFileFail = true
+		defer func() { testTempFileFail = false }()
+		xfidopen(x)
+		if mr.err == nil {
+			t.Errorf("got nil error")
+		}
+		if got, want := mr.err.Error(), "can't create temp file"; got != want {
+			t.Errorf("got error %v; want %v", got, want)
+		}
+		if x.f.w.rdselfd != nil {
+			t.Errorf("non-nil w.rdselfd %v", x.f.w.rdselfd)
+		}
+	})
+	t.Run("CopyFail", func(t *testing.T) {
+		x.f.w.rdselfd = nil
+		warnings = nil
+		testIOCopyFail = true
+		defer func() {
+			warnings = nil
+			testIOCopyFail = false
+		}()
+		xfidopen(x)
+		if mr.err != nil {
+			t.Errorf("got error %q; want nil", mr.err)
+		}
+		if len(warnings) == 0 {
+			t.Fatalf("not warning generated")
+		}
+		got := string(warnings[0].buf)
+		want := "can't write temp file for pipe command"
+		if !strings.HasPrefix(got, want) {
+			t.Errorf("got warning %q; want prefix %q", got, want)
+		}
+	})
+}
+
+func TestXfidclose(t *testing.T) {
+	t.Run("NotOpen", func(t *testing.T) {
+		mr := new(mockResponder)
+		w := NewWindow().initHeadless(nil)
+		w.tag.fr = &MockFrame{}
+		w.body.fr = &MockFrame{}
+		x := &Xfid{
+			f: &Fid{
+				qid: plan9.Qid{Path: QID(0, QWdata)},
+				w:   w,
+			},
+			fs: mr,
+		}
+		xfidclose(x)
+		if mr.err != nil {
+			t.Errorf("got error %v", mr.err)
+		}
+	})
+
+	for _, tc := range []struct {
+		name string
+		q    uint64
+	}{
+		{"QWctl", QWctl},
+		{"QWaddr", QWaddr},
+		{"QWdata", QWdata},
+		{"QWxdata", QWxdata},
+		{"QWevent", QWevent},
+		{"QWrdsel", QWrdsel},
+		{"QWwrsel", QWwrsel},
+		{"QWeditout", QWeditout},
+		{"Qeditout", Qeditout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpfile, err := ioutil.TempFile("", "edwood")
+			if err != nil {
+				t.Fatalf("can't create temporary file: %v", err)
+			}
+			defer os.Remove(tmpfile.Name())
+
+			mr := new(mockResponder)
+			var w *Window
+			q := tc.q
+			if q != Qeditout {
+				w = NewWindow().initHeadless(nil)
+				w.tag.fr = &MockFrame{}
+				w.body.fr = &MockFrame{}
+				w.body.display = edwoodtest.NewDisplay()
+				w.col = new(Column)
+				w.rdselfd = tmpfile
+				w.nomark = true
+				w.nopen[q] = 1
+				w.dumpstr = "win"
+				w.dumpdir = "/home/gopher"
+				w.ctlfid = 0
+				w.ctrllock.Lock()
+				close(w.editoutlk) // prevent block on send
+			}
+			editoutlk = make(chan bool)
+			close(editoutlk) // prevent block on send
+			x := &Xfid{
+				f: &Fid{
+					qid: plan9.Qid{
+						Path: QID(0, q),
+					},
+					w:    w,
+					open: true,
+				},
+				fs: mr,
+			}
+			xfidclose(x)
+			if mr.err != nil {
+				t.Errorf("got error %v", mr.err)
+			}
+
+			switch q {
+			case QWctl:
+				if got, want := w.ctlfid, uint32(MaxFid); got != want {
+					t.Errorf("w.ctlfid is %v; want %v", got, want)
+				}
+			case QWdata, QWxdata:
+				if w.nomark != false {
+					t.Errorf("w.nomark is true")
+				}
+				fallthrough
+			case QWaddr, QWevent:
+				if got, want := w.nopen[q], byte(0); got != want {
+					t.Errorf("w.nopen[%v] is %v; want %v", q, got, want)
+				}
+				if q == QWevent {
+					if w.dumpstr != "" {
+						t.Errorf("w.dumpstr is %q", w.dumpstr)
+					}
+					if w.dumpdir != "" {
+						t.Errorf("w.dumpdir is %q", w.dumpdir)
+					}
+				}
+			case QWrdsel:
+				if w.rdselfd != nil {
+					t.Errorf("w.rdselfd is not nil")
+				}
+			case QWwrsel:
+				if w.nomark != false {
+					t.Errorf("w.nomark is true")
 				}
 			}
 		})
