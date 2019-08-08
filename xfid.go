@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -235,7 +234,7 @@ func xfidclose(x *Xfid) {
 		case QWwrsel:
 			w.nomark = false
 			t := &w.body
-			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
+			t.Show(min(w.wrselrange.q0, t.Nc()), min(w.wrselrange.q1, t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		case QWeditout:
 			<-w.editoutlk
@@ -349,7 +348,9 @@ func shouldscroll(t *Text, q0 int, qid uint64) bool {
 	return t.org <= q0 && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars)
 }
 
-// This is fiddly code that handles partial runes at the end of a previous write?
+// fullrunewrite decodes runes from x.fcall.Data and returns the decoded
+// runes. Bytes at the end of x.fcall.Data that can't be fully decoded
+// into a rune (partial runes) are saved for next call to this function.
 func fullrunewrite(x *Xfid) []rune {
 	// extend with previous partial rune at the end.
 	cnt := int(x.fcall.Count)
@@ -377,21 +378,16 @@ func fullrunewrite(x *Xfid) []rune {
 func xfidwrite(x *Xfid) {
 	// log.Println("xfidwrite", x)
 	// defer log.Println("done xfidwrite")
-	var (
-		fc           plan9.Fcall
-		c            int
-		t            *Text
-		q0, tq0, tq1 int
-		err          error
-	)
+	var fc plan9.Fcall
+
 	qid := FILE(x.f.qid)
 	w := x.f.w
 	if w != nil {
-		c = 'F'
+		c := 'F'
 		if qid == QWtag || qid == QWbody {
 			c = 'E'
 		}
-		w.Lock(c)
+		w.Lock(int(c))
 		if w.col == nil {
 			w.Unlock()
 			x.respond(&fc, ErrDeletedWin)
@@ -400,12 +396,14 @@ func xfidwrite(x *Xfid) {
 	}
 	x.fcall.Count = uint32(len(x.fcall.Data))
 
-	BodyTag := func() { // Trimmed from the switch below.
+	// updateText writes x.fcall.Data to text buffer t and sends the 9P response.
+	updateText := func(t *Text) {
 		r := fullrunewrite(x)
 		if len(r) != 0 {
 			w.Commit(t)
+			var q0 int
 			if qid == QWwrsel {
-				q0 = (w.wrselrange.q1)
+				q0 = w.wrselrange.q1
 				if q0 > t.Nc() {
 					q0 = t.Nc()
 				}
@@ -440,8 +438,7 @@ func xfidwrite(x *Xfid) {
 	switch qid {
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X')
-		t = &w.body
-		BodyTag()
+		updateText(&w.body)
 
 	case Qlabel:
 		fc.Count = x.fcall.Count
@@ -449,7 +446,7 @@ func xfidwrite(x *Xfid) {
 
 	case QWaddr:
 		r := []rune(string(x.fcall.Data))
-		t = &w.body
+		t := &w.body
 		w.Commit(t)
 		eval := true
 		a, eval, nr := address(false, t, w.limit, w.addr, 0, len(r),
@@ -466,10 +463,9 @@ func xfidwrite(x *Xfid) {
 		fc.Count = x.fcall.Count
 		x.respond(&fc, nil)
 
-	case Qeditout:
-		fallthrough
-	case QWeditout:
+	case Qeditout, QWeditout:
 		r := fullrunewrite(x)
+		var err error
 		if w != nil {
 			err = edittext(w, w.wrselrange.q1, r)
 		} else {
@@ -484,21 +480,17 @@ func xfidwrite(x *Xfid) {
 
 	case QWerrors:
 		w = errorwinforwin(w)
-		t = &w.body
-		BodyTag()
+		updateText(&w.body)
 
-	case QWbody:
-		fallthrough
-	case QWwrsel:
-		t = &w.body
-		BodyTag()
+	case QWbody, QWwrsel:
+		updateText(&w.body)
 
 	case QWctl:
 		xfidctlwrite(x, w)
 
 	case QWdata:
 		a := w.addr
-		t = &w.body
+		t := &w.body
 		w.Commit(t)
 		if a.q0 > t.Nc() || a.q1 > t.Nc() {
 			x.respond(&fc, ErrAddrRange)
@@ -509,13 +501,13 @@ func xfidwrite(x *Xfid) {
 			seq++
 			t.file.Mark(seq)
 		}
-		q0 = (a.q0)
-		if a.q1 > (q0) {
-			t.Delete(q0, (a.q1), true)
-			w.addr.q1 = (q0)
+		q0 := a.q0
+		if a.q1 > q0 {
+			t.Delete(q0, a.q1, true)
+			w.addr.q1 = q0
 		}
-		tq0 = t.q0
-		tq1 = t.q1
+		tq0 := t.q0
+		tq1 := t.q1
 		t.Insert(q0, r, true)
 		if tq0 >= q0 {
 			tq0 += len(r)
@@ -538,8 +530,7 @@ func xfidwrite(x *Xfid) {
 		xfideventwrite(x, w)
 
 	case QWtag:
-		t = &w.tag
-		BodyTag()
+		updateText(&w.tag)
 
 	default:
 		x.respond(&fc, fmt.Errorf("unknown qid %d in write", qid))
@@ -553,33 +544,34 @@ func xfidctlwrite(x *Xfid, w *Window) {
 	// log.Println("xfidctlwrite", x)
 	// defer log.Println("done xfidctlwrite")
 	var (
-		fc              plan9.Fcall
-		err             error
-		scrdraw, settag bool
-		t               *Text
-		n               int
+		err error
+		t   *Text
 	)
-	err = nil
-	scrdraw = false
-	settag = false
+	const scrdraw = false
+	settag := false
 
 	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
 	var lidx int
-	var line string
 forloop:
 	for lidx = 0; lidx < len(lines); lidx++ {
-		line = lines[lidx]
+		line := lines[lidx]
 		words := strings.SplitN(line, " ", 2)
 		switch words[0] {
 		case "": // empty line.
-		case "lock": // make window exclusive use
-			w.ctrllock.Lock()
-			w.ctlfid = x.f.fid
-		case "unlock": // release exclusive use
-			w.ctlfid = math.MaxUint32
-			// BUG(fhs): This will crash if the lock isn't already locked.
-			w.ctrllock.Unlock()
+
+		// Lock/unlock can hang or crash Edwood.
+		// They don't appear to be used for anything useful, so disable for now.
+		//
+		//case "lock": // make window exclusive use
+		//	// BUG(fhs): This will hang Edwood if the lock is already locked.
+		//	w.ctrllock.Lock()
+		//	w.ctlfid = x.f.fid
+		//case "unlock": // release exclusive use
+		//	w.ctlfid = math.MaxUint32
+		//	// BUG(fhs): This will crash if the lock isn't already locked.
+		//	w.ctrllock.Unlock()
+
 		case "clean": // mark window 'clean', seq=0
 			t = &w.body
 			t.eq0 = ^0
@@ -638,7 +630,7 @@ forloop:
 		case "delete": // delete for sure
 			w.col.Close(w, true)
 		case "del": // delete, but check dirty
-			if w.Clean(true) {
+			if !w.Clean(true) {
 				err = fmt.Errorf("file dirty")
 				break
 			}
@@ -682,11 +674,16 @@ forloop:
 		}
 	}
 
+	var n int
 	if err != nil {
 		n = 0
 	} else {
 		// how far through the buffer did we get?
 		// count bytes up to line lineidx
+		//
+		// TODO(fhs): This appears not to do what was intended.
+		// We break out of forloop early iff err != nil,
+		// but we never even get here in that case.
 		d := x.fcall.Data
 		curline := 0
 		for n = 0; n < len(d); n++ {
@@ -698,7 +695,9 @@ forloop:
 			}
 		}
 	}
-	fc.Count = uint32(n)
+	fc := plan9.Fcall{
+		Count: uint32(n),
+	}
 	x.respond(&fc, err)
 	if settag {
 		w.SetTag()

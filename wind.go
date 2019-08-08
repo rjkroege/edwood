@@ -43,8 +43,8 @@ type Window struct {
 	dirnames    []string
 	widths      []int
 	incl        []string
-	ctrllock    sync.Mutex
-	ctlfid      uint32
+	ctrllock    sync.Mutex // used for lock/unlock ctl mesage
+	ctlfid      uint32     // ctl file Fid which has the ctrllock
 	dumpstr     string
 	dumpdir     string
 	utflastqid  int
