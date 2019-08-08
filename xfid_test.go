@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -464,6 +465,433 @@ func TestXfidclose(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestXfidwriteQWdata(t *testing.T) {
+	configureGlobals()
+
+	mr := new(mockResponder)
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.body.fr = &MockFrame{}
+	w.body.display = edwoodtest.NewDisplay()
+
+	for _, tc := range []struct {
+		name    string // test name
+		addr    Range  // write to this window address
+		data    []byte // data to write
+		err     error  // error response
+		body    []byte // resulting body
+		q0, q1  int    // resulting window body q0, q1
+		newAddr Range  // resulting window address
+	}{
+		{"BadQ0", Range{100, 0}, nil, ErrAddrRange, nil, 0, 0, Range{}},
+		{"BadQ1", Range{0, 100}, nil, ErrAddrRange, nil, 0, 0, Range{}},
+		{"Initial", Range{0, 0}, []byte("αaaaβbbbγccc"), nil, []byte("αaaaβbbbγccc"), 12, 12, Range{12, 12}},
+		{"Hello", Range{4, 8}, []byte("Hello, 世界"), nil, []byte("αaaaHello, 世界γccc"), 17, 17, Range{13, 13}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w.addr = tc.addr
+
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Data:  tc.data,
+					Count: uint32(len(tc.data)),
+				},
+				f: &Fid{
+					qid: plan9.Qid{Path: QID(0, QWdata)},
+					w:   w,
+				},
+				fs: mr,
+			}
+			xfidwrite(x)
+			if got, want := mr.err, tc.err; got != want {
+				t.Fatalf("got error %v; want %v", got, want)
+			}
+			if tc.err == nil {
+				if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
+					t.Errorf("Fcall.Count is %v; want %v", got, want)
+				}
+				if got, want := string(w.body.file.b), string(tc.body); got != want {
+					t.Errorf("got body %q; want %q", got, want)
+				}
+				if tc.q0 != w.body.q0 || tc.q1 != w.body.q1 {
+					t.Errorf("body (q0, q1) = (%v, %v); want (%v, %v)",
+						w.body.q0, w.body.q1, tc.q0, tc.q1)
+				}
+				if got, want := w.addr, tc.newAddr; !reflect.DeepEqual(got, want) {
+					t.Errorf("window address is %v; want %v", got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestXfidwriteDeletedWin(t *testing.T) {
+	mr := new(mockResponder)
+	w := NewWindow().initHeadless(nil)
+	x := &Xfid{
+		f:  &Fid{w: w},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if got, want := mr.err, ErrDeletedWin; got != want {
+		t.Errorf("got error %v; want %v", got, want)
+	}
+}
+
+func TestXfidwriteUnknownQID(t *testing.T) {
+	mr := new(mockResponder)
+	x := &Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QMAX+1)},
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+
+	wantErr := fmt.Sprintf("unknown qid %d in write", QMAX+1)
+	if mr.err == nil {
+		t.Errorf("got nil error; want error %q", wantErr)
+	}
+	if got, want := mr.err.Error(), wantErr; got != want {
+		t.Errorf("got error %q; want error %q", got, want)
+	}
+}
+
+func TestXfidwriteQWtag(t *testing.T) {
+	const (
+		prevTag = "/etc/hosts Del Snarf Undo | Look "
+		extra   = "|fmt Ldef Lrefs"
+		newTag  = prevTag + extra
+	)
+	mr := new(mockResponder)
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.body.file = NewFile("")
+	w.tag.file = NewFile("")
+	w.tag.file.b = Buffer(prevTag)
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  []byte(extra),
+			Count: uint32(len(extra)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWtag)},
+			w:   w,
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if mr.err != nil {
+		t.Errorf("got error %v; want nil", mr.err)
+	}
+	if got, want := mr.fcall.Count, uint32(len(extra)); got != want {
+		t.Errorf("fcall.Count is %v; want %v", got, want)
+	}
+	if got, want := string(w.tag.file.b), newTag; got != want {
+		t.Errorf("tag is %q; want %q", got, want)
+	}
+}
+
+func TestXfidwriteQWwrsel(t *testing.T) {
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.body.file = NewFile("")
+	w.tag.file = NewFile("")
+	w.body.fr = &MockFrame{}
+
+	for _, tc := range []struct {
+		name       string // test name
+		q          uint64 // Qid.Path
+		wrselrange Range  // where to write for QWwrsel
+		data       []byte // data to write
+		want       []byte // resulting body buffer
+	}{
+		{"QWbody", QWbody, Range{0, 0}, []byte("αbcdλβγ"), []byte("αbcdλβγ")},
+		{"QWwrsel", QWwrsel, Range{4, 4}, []byte("εfg"), []byte("αbcdεfgλβγ")},
+		{"QWwrselEND", QWwrsel, Range{100, 100}, []byte("END"), []byte("αbcdεfgλβγEND")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w.wrselrange = tc.wrselrange
+			mr := new(mockResponder)
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Data:  tc.data,
+					Count: uint32(len(tc.data)),
+				},
+				f: &Fid{
+					qid: plan9.Qid{Path: QID(0, tc.q)},
+					w:   w,
+				},
+				fs: mr,
+			}
+			xfidwrite(x)
+			if mr.err != nil {
+				t.Errorf("got error %v; want nil", mr.err)
+			}
+			if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
+				t.Errorf("fcall.Count is %v; want %v", got, want)
+			}
+			if got, want := string(w.body.file.b), string(tc.want); got != want {
+				t.Errorf("buffer is %q; want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestXfidwriteQlabel(t *testing.T) {
+	data := []byte("Hello, 世界!\n")
+	mr := new(mockResponder)
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  data,
+			Count: uint32(len(data)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, Qlabel)},
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if mr.err != nil {
+		t.Errorf("got error %v; want nil", mr.err)
+	}
+	if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+		t.Errorf("fcall.Count is %v; want %v", got, want)
+	}
+}
+
+func TestXfidwriteQcons(t *testing.T) {
+	row.Init(image.Rectangle{
+		image.Point{0, 0},
+		image.Point{800, 600},
+	}, edwoodtest.NewDisplay())
+
+	data := []byte("cons error: Hello, 世界!\n")
+	mr := new(mockResponder)
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  data,
+			Count: uint32(len(data)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, Qcons)},
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if mr.err != nil {
+		t.Fatalf("got error %v; want nil", mr.err)
+	}
+	if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+		t.Errorf("fcall.Count is %v; want %v", got, want)
+	}
+	w := errorwin(x.f.mntdir, 'X')
+	if got, want := w.body.file.b.String(), string(data); got != want {
+		t.Errorf("+Errors window body is %q; want %q", got, want)
+	}
+}
+
+func TestXfidwriteQWerrors(t *testing.T) {
+	data := []byte("window error: Hello, 世界!\n")
+	mr := new(mockResponder)
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.tag.file.b = Buffer("/home/gopher/edwood/row.go Del Snarf | Look ")
+	w.tag.fr = &MockFrame{}
+	w.body.fr = &MockFrame{}
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  data,
+			Count: uint32(len(data)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWerrors)},
+			w:   w,
+		},
+		fs: mr,
+	}
+
+	xfidwrite(x)
+	if mr.err != nil {
+		t.Fatalf("got error %v; want nil", mr.err)
+	}
+	if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+		t.Errorf("fcall.Count is %v; want %v", got, want)
+	}
+
+	w.Lock('F')
+	// Note: errorwinforwin will unlock w and return a new locked window.
+	w = errorwinforwin(w)
+	defer w.Unlock()
+
+	if got, want := w.body.file.b.String(), string(data); got != want {
+		t.Errorf("+Errors window body is %q; want %q", got, want)
+	}
+}
+
+func TestXfidwriteQeditoutError(t *testing.T) {
+	mr := new(mockResponder)
+	x := &Xfid{
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, Qeditout)},
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if got, want := mr.err, ErrPermission; got != want {
+		t.Errorf("got error %v; want %v", got, want)
+	}
+}
+
+func TestXfidwriteQWeditout(t *testing.T) {
+	data := []byte("Exαmplε εditout tεxt.")
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	mr := new(mockResponder)
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  data,
+			Count: uint32(len(data)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWeditout)},
+			w:   w,
+		},
+		fs: mr,
+	}
+
+	editing = Collecting
+	collection = nil
+	defer func() {
+		editing = Inactive
+		collection = nil
+	}()
+	xfidwrite(x)
+	if mr.err != nil {
+		t.Fatalf("got error %v; want nil", mr.err)
+	}
+	if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+		t.Errorf("fcall.Count is %v; want %v", got, want)
+	}
+	if got, want := string(collection), string(data); got != want {
+		t.Errorf("collection is %q; want %q", got, want)
+	}
+}
+
+func TestXfidwriteQWctl(t *testing.T) {
+	for _, tc := range []struct {
+		err       error
+		errString string
+		data      string
+	}{
+		{ErrBadCtl, "", "lock"},   // disabled
+		{ErrBadCtl, "", "unlock"}, // disabled
+		{nil, "", "clean"},
+		{nil, "", "dirty"},
+		{nil, "", "show"},
+		{ErrBadCtl, "", "name"},
+		{nil, "", "name /Test/Write/Ctl"},
+		{nil, "nulls in file name", "name /Test/Write\u0000/Ctl"},
+		{nil, "bad character in file name", "name /Test/Write To/Ctl"},
+		{nil, "", "dump win"},
+		{ErrBadCtl, "", "dump"},
+		{nil, "nulls in dump string", "dump win\u0000rc"},
+		{nil, "", "dumpdir /home/gopher"},
+		{ErrBadCtl, "", "dumpdir"},
+		{nil, "nulls in dump directory string", "dumpdir /home\u0000/gopher"},
+		{nil, "", "delete"},
+		{nil, "", "del"},
+		{nil, "", "get"},
+		{nil, "", "put"},
+		{nil, "", "dot=addr"},
+		{nil, "", "addr=dot"},
+		{nil, "", "limit=addr"},
+		{nil, "", "nomark"},
+		{nil, "", "mark"},
+		{nil, "", "nomenu"},
+		{nil, "", "menu"},
+		{nil, "", "cleartag"},
+		{ErrBadCtl, "", "brewcoffee"},
+	} {
+		mr := new(mockResponder)
+		display := edwoodtest.NewDisplay()
+		w := NewWindow().initHeadless(nil)
+		w.col = &Column{
+			w:       []*Window{w},
+			display: display,
+		}
+		w.body.display = display
+		w.body.fr = &MockFrame{}
+		w.tag.display = display
+		w.tag.fr = &MockFrame{}
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Data:  []byte(tc.data),
+				Count: uint32(len(tc.data)),
+			},
+			f: &Fid{
+				qid: plan9.Qid{Path: QID(0, QWctl)},
+				w:   w,
+			},
+			fs: mr,
+		}
+		xfidwrite(x)
+		if tc.errString != "" {
+			if mr.err == nil || mr.err.Error() != tc.errString {
+				t.Errorf("event %q: got error %v; want error string %q", tc.data, mr.err, tc.errString)
+			}
+		} else {
+			if got, want := mr.err, tc.err; got != want {
+				t.Errorf("event %q: got error %v; want %v", tc.data, got, want)
+			}
+		}
+		if tc.errString == "" && tc.err == nil {
+			if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
+				t.Errorf("event %q: fcall.Count is %v; want %v", tc.data, got, want)
+			}
+		}
+	}
+}
+
+func TestXfidwriteQWevent(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		data string
+	}{
+		{ErrBadEvent, "M"},
+		{ErrBadEvent, "ML"},
+		{ErrBadEvent, "MLX X"},
+		{ErrBadEvent, "ML0 X"},
+		{ErrBadEvent, "ML1 1"},
+		{ErrBadEvent, "%%1 1"},
+		{ErrBadEvent, "Mz0 0"},
+		{nil, "ML0 0"},
+		{nil, "Ml0 0"},
+		{nil, "MX0 0"},
+		{nil, "Mx0 0"},
+		{nil, "\n\n"},
+	} {
+		w := NewWindow().initHeadless(nil)
+		w.col = new(Column)
+		mr := new(mockResponder)
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Data:  []byte(tc.data),
+				Count: uint32(len(tc.data)),
+			},
+			f: &Fid{
+				qid: plan9.Qid{Path: QID(0, QWevent)},
+				w:   w,
+			},
+			fs: mr,
+		}
+		xfidwrite(x)
+		if got, want := mr.err, tc.err; got != want {
+			t.Errorf("event %q: got error %v; want %v", tc.data, got, want)
+		}
 	}
 }
 

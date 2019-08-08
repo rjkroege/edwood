@@ -43,6 +43,9 @@ func (b *Buffer) Reader(q0, q1 int) io.Reader {
 
 func (b *Buffer) ReadC(q int) rune { return (*b)[q] }
 
+// String returns a string representation of buffer. See fmt.Stringer interface.
+func (b *Buffer) String() string { return string(*b) }
+
 func (b *Buffer) Reset() {
 	(*b) = (*b)[0:0]
 }
