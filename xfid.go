@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -563,14 +564,16 @@ forloop:
 		// Lock/unlock can hang or crash Edwood.
 		// They don't appear to be used for anything useful, so disable for now.
 		//
-		//case "lock": // make window exclusive use
-		//	// BUG(fhs): This will hang Edwood if the lock is already locked.
-		//	w.ctrllock.Lock()
-		//	w.ctlfid = x.f.fid
-		//case "unlock": // release exclusive use
-		//	w.ctlfid = math.MaxUint32
-		//	// BUG(fhs): This will crash if the lock isn't already locked.
-		//	w.ctrllock.Unlock()
+		case "lock": // make window exclusive use
+			//w.ctrllock.Lock() // This will hang Edwood if the lock is already locked.
+			//w.ctlfid = x.f.fid
+			fallthrough
+		case "unlock": // release exclusive use
+			//w.ctlfid = math.MaxUint32
+			//w.ctrllock.Unlock() // This will crash if the lock isn't already locked.
+			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.name)
+			err = ErrBadCtl
+			break forloop
 
 		case "clean": // mark window 'clean', seq=0
 			t = &w.body
