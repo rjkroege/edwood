@@ -47,10 +47,6 @@ func xfidctl(x *Xfid, d draw.Display) {
 func xfidflush(x *Xfid) {
 	// log.Println("xfidflush", x)
 	// defer log.Println("done xfidflush")
-	var (
-		fc plan9.Fcall
-		wx *Xfid
-	)
 
 	xfidlogflush(x)
 
@@ -60,7 +56,7 @@ func xfidflush(x *Xfid) {
 	for _, c := range row.col {
 		for _, w := range c.w {
 			w.Lock('E')
-			wx = w.eventx
+			wx := w.eventx
 			if wx != nil && wx.fcall.Tag == x.fcall.Oldtag {
 				w.eventx = nil
 				wx.flushed = true
@@ -72,7 +68,7 @@ func xfidflush(x *Xfid) {
 		}
 	}
 out:
-	x.respond(&fc, nil)
+	x.respond(&plan9.Fcall{}, nil)
 }
 
 // These variables are only used for testing.
@@ -272,7 +268,8 @@ func xfidread(x *Xfid) {
 			xfidlogread(x)
 			return
 		default:
-			warning(nil, "unknown qid %d\n", q)
+			x.respond(&fc, fmt.Errorf("unknown qid %d in read", q))
+			return
 		}
 		x.respond(&fc, nil)
 		return
@@ -804,21 +801,27 @@ forloop:
 	x.respond(&fc, err)
 }
 
+// xfidutfread reads x.fcall.Count bytes from offset x.fcall.Offset in
+// text t and sends the data to the client. It only sends full runes,
+// and optimizes for sequential reads by keeping track of (byte offset,
+// rune offset) pair of the last read from buffer for a matching qid
+// (QWbody or QWtag). No data past rune offset q1 is sent to client.
+//
+// TODO(fhs): Remove this function and use Buffer.ReadAt once Buffer
+// implements io.ReaderAt interface. Buffer.ReadAt will need to be careful
+// to send full runes only, if we want to keep the current behavior.
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	// log.Println("xfidutfread", x)
 	// defer log.Println("done xfidutfread")
-	var (
-		fc           plan9.Fcall
-		w            *Window
-		q            int
-		off, boff    uint64
-		m, n, nr, nb int
-	)
-	w = t.w
+	w := t.w
 	w.Commit(t)
-	off = x.fcall.Offset
-	n = 0
+	off := x.fcall.Offset
+	n := 0
 	b1 := make([]byte, BUFSIZE)
+	var (
+		q    int
+		boff uint64
+	)
 	if qid == w.utflastqid && off >= w.utflastboff && w.utflastq <= q1 {
 		boff = w.utflastboff
 		q = w.utflastq
@@ -835,15 +838,15 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		// than we really need, but that's better than being n^2.
 		w.utflastboff = boff
 		w.utflastq = q
-		nr = q1 - q
+		nr := q1 - q
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
 		t.file.b.Read(q, r[:nr])
 		b := string(r[:nr])
-		nb = len(b)
+		nb := len(b)
 		if boff >= off {
-			m = len(b)
+			m := len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
 				m = int(off + uint64(x.fcall.Count) - boff)
 			}
@@ -854,7 +857,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 				if n != 0 {
 					acmeerror("bad count in utfrune", nil)
 				}
-				m = nb - int(off-boff)
+				m := nb - int(off-boff)
 				if m > int(x.fcall.Count) {
 					m = int(x.fcall.Count)
 				}
@@ -865,6 +868,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		boff += uint64(nb)
 		q += len(r)
 	}
+	var fc plan9.Fcall
 	fc.Data = b1[:n]
 	fc.Count = uint32(len(fc.Data))
 	x.respond(&fc, nil)
@@ -938,15 +942,17 @@ func xfideventread(x *Xfid, w *Window) {
 	fc.Count = uint32(n)
 	fc.Data = w.events[:n]
 	x.respond(&fc, nil)
-	nn := len(w.events)
-	copy(w.events[0:], w.events[n:])
 
-	w.events = w.events[0 : nn-n]
+	w.events = w.events[n:]
 }
 
 func xfidindexread(x *Xfid) {
 	// log.Println("xfidindexread", x)
 	// defer log.Println("done xfidindexread")
+
+	// BUG(fhs): This is broken when the client is doing a sequential
+	// read using a very small buffer and we create/delete windows
+	// in-between the requests.
 
 	row.lk.Lock()
 	nmax := 0
