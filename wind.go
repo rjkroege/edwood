@@ -47,9 +47,9 @@ type Window struct {
 	ctlfid      uint32     // ctl file Fid which has the ctrllock
 	dumpstr     string
 	dumpdir     string
-	utflastqid  int
-	utflastboff uint64
-	utflastq    int
+	utflastqid  int    // Qid of last read request (QWbody or QWtag)
+	utflastboff uint64 // Byte offset of last read of body or tag
+	utflastq    int    // Rune offset of last read of body or tag
 	tagsafe     bool
 	tagexpand   bool
 	taglines    int
