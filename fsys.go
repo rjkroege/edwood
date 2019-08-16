@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"net"
+	"io"
 	"os"
 	"os/user"
 	"sort"
@@ -14,7 +14,7 @@ import (
 )
 
 type fileServer struct {
-	conn        net.Conn
+	conn        io.ReadWriteCloser
 	fids        map[uint32]*Fid
 	fcall       []fsfunc
 	closing     bool
@@ -22,9 +22,7 @@ type fileServer struct {
 	messagesize int
 }
 
-const (
-	DEBUG = 0
-)
+const DEBUG = false
 
 type fsfunc func(*Xfid, *Fid) *Xfid
 
@@ -63,7 +61,6 @@ var dirtab = []*DirTab{
 	{"label", plan9.QTFILE, Qlabel, 0600},
 	{"log", plan9.QTFILE, Qlog, 0400},
 	{"new", plan9.QTDIR, Qnew, 0500 | plan9.DMDIR},
-	//	{ nil, }
 }
 
 var dirtabw = []*DirTab{
@@ -79,7 +76,6 @@ var dirtabw = []*DirTab{
 	{"wrsel", plan9.QTFILE, QWwrsel, 0200},
 	{"tag", plan9.QTAPPEND, QWtag, 0600 | plan9.DMAPPEND},
 	{"xdata", plan9.QTFILE, QWxdata, 0600},
-	//	{ nil, }
 }
 
 // Mnt is a collection of reference counted MntDir.
@@ -94,16 +90,16 @@ type Mnt struct {
 var mnt Mnt
 
 func fsysinit() *fileServer {
-	reader, writer, err := newPipe()
+	p0, p1, err := newPipe()
 	if err != nil {
 		acmeerror("failed to create pipe", err)
 	}
-	if err := post9pservice(reader, "acme", *mtpt); err != nil {
+	if err := post9pservice(p0, "acme", *mtpt); err != nil {
 		acmeerror("can't post service", err)
 	}
 
 	fs := &fileServer{
-		conn:        writer,
+		conn:        p1,
 		fids:        make(map[uint32]*Fid),
 		fcall:       nil, // initialized by initfcall
 		closing:     false,
@@ -125,6 +121,9 @@ func (fs *fileServer) fsysproc() {
 				break
 			}
 			acmeerror("fsysproc", err)
+		}
+		if DEBUG {
+			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
 		}
 		if x == nil {
 			cxfidalloc <- nil
@@ -218,6 +217,9 @@ func (fs *fileServer) close() {
 }
 
 func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
+	if t == nil {
+		t = &plan9.Fcall{}
+	}
 	if err != nil {
 		t.Type = plan9.Rerror
 		t.Ename = err.Error()
@@ -229,8 +231,8 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
 		acmeerror("write error in respond", err)
 	}
-	if DEBUG != 0 {
-		fmt.Fprintf(os.Stderr, "r: %v\n", t)
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "--> %v\n", t)
 	}
 	return x
 }
@@ -262,8 +264,24 @@ func (fs *fileServer) flush(x *Xfid, f *Fid) *Xfid {
 
 func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	if x.fcall.Uname != fs.username {
-		var t plan9.Fcall
-		return fs.respond(x, &t, ErrPermission)
+		return fs.respond(x, nil, ErrPermission)
+	}
+	var id uint64
+	if x.fcall.Aname != "" {
+		var err error
+		id, err = strconv.ParseUint(x.fcall.Aname, 10, 32)
+		if err != nil {
+			err = fmt.Errorf("bad Aname: %v", err)
+			return fs.respond(x, nil, err)
+		}
+	}
+	m := mnt.GetFromID(id) // DecRef in clunk
+	if m == nil && x.fcall.Aname != "" {
+		err := fmt.Errorf("unknown id %q in Aname", x.fcall.Aname)
+		return fs.respond(x, nil, err)
+	}
+	if m != nil {
+		f.mntdir = m
 	}
 	f.busy = true
 	f.open = false
@@ -273,23 +291,9 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	f.dir = dirtab[0] // '.'
 	f.nrpart = 0
 	f.w = nil
-	var t plan9.Fcall
-	t.Qid = f.qid
 	f.mntdir = nil
-	var id uint64
-	if x.fcall.Aname != "" {
-		var err error
-		id, err = strconv.ParseUint(x.fcall.Aname, 10, 32)
-		if err != nil {
-			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
-		}
-	}
-	m := mnt.GetFromID(id) // DecRef in clunk
-	if m == nil && x.fcall.Aname != "" {
-		cerr <- fmt.Errorf("unknown id '%s' in attach", x.fcall.Aname)
-	}
-	if m != nil {
-		f.mntdir = m
+	t := plan9.Fcall{
+		Qid: f.qid,
 	}
 	return fs.respond(x, &t, nil)
 }
@@ -472,7 +476,7 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 }
 
 func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
-	var m uint
+	var m plan9.Perm
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^uint8(plan9.OTRUNC | plan9.OCEXEC)
 	// can't execute or remove anything
@@ -626,7 +630,16 @@ func (fs *fileServer) newfid(fid uint32) *Fid {
 	return ff
 }
 
+var useFixedClock bool // for testing
+
+// fixedClockValue is the same as the one used by https://play.golang.org/
+// (when Go was open sourced).
+const fixedClockValue = 1257894000
+
 func getclock() int64 {
+	if useFixedClock {
+		return fixedClockValue
+	}
 	return time.Now().Unix()
 }
 
@@ -637,7 +650,7 @@ func (fs *fileServer) dostat(id int, dir *DirTab, buf []byte, clock int64) int {
 	d.Qid.Path = QID(id, dir.qid)
 	d.Qid.Vers = 0
 	d.Qid.Type = dir.t
-	d.Mode = plan9.Perm(dir.perm)
+	d.Mode = dir.perm
 	d.Length = 0 // would be nice to do better
 	d.Name = dir.name
 	d.Uid = fs.username

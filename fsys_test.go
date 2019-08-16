@@ -17,6 +17,7 @@ import (
 	"9fans.net/go/acme"
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestMain(m *testing.M) {
@@ -573,5 +574,345 @@ func TestMntDecRef(t *testing.T) {
 	wantErr := fmt.Sprintf("Mnt.DecRef: can't find id %d", md.id)
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("mnt.DecRef invalid id %d generated error %v; expected %q", md.id, err, wantErr)
+	}
+}
+
+func errorFcall(err error) *plan9.Fcall {
+	return &plan9.Fcall{
+		Type:  plan9.Rerror,
+		Ename: err.Error(),
+	}
+}
+
+type mockConn struct {
+	bytes.Buffer
+}
+
+func (mc *mockConn) Close() error { return nil }
+
+func (mc *mockConn) ReadFcall(t *testing.T) *plan9.Fcall {
+	t.Helper()
+
+	fc, err := plan9.ReadFcall(mc)
+	if err != nil {
+		t.Fatalf("failed to read Fcall: %v", err)
+	}
+	return fc
+}
+
+func TestFileServerVersion(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		want    plan9.Fcall
+	}{
+		{"9P2000", plan9.Fcall{
+			Type:    plan9.Rversion,
+			Version: "9P2000",
+			Msize:   8192,
+		}},
+		{"9P2000.u", plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: "unrecognized 9P version",
+		}},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{conn: mc}
+			fs.version(&Xfid{
+				fcall: plan9.Fcall{
+					Type:    plan9.Tversion,
+					Version: tc.version,
+					Msize:   8192,
+				},
+			}, nil)
+
+			if got, want := mc.ReadFcall(t), &tc.want; !cmp.Equal(got, want) {
+				t.Fatalf("got response %v; want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestFileServerAuth(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.auth(&Xfid{}, nil)
+
+	want := errorFcall(fmt.Errorf("acme: authentication not required"))
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerFlushWrite(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+
+	for _, tc := range []struct {
+		name string
+		f    fsfunc
+	}{
+		{"flush", fs.flush},
+		{"write", fs.write},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x := &Xfid{
+				c: make(chan func(*Xfid)),
+			}
+			go func() {
+				<-x.c
+				close(x.c)
+			}()
+			x1 := tc.f(x, nil)
+			if x1 != nil {
+				t.Fatalf("got non-nil Xfid: %v", x1)
+			}
+			// Wait for close above, so we know we actually received something.
+			<-x.c
+		})
+	}
+}
+
+func TestFileServerAttach(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{
+		conn:     mc,
+		username: "gopher",
+	}
+
+	t.Run("BadUname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: "glenda",
+			},
+		}
+		fs.attach(x, nil)
+
+		want := errorFcall(ErrPermission)
+		if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+			t.Fatalf("got response %v; want %v", got, want)
+		}
+	})
+	t.Run("Success", func(t *testing.T) {
+		md := mnt.Add("/", nil)
+		defer mnt.DecRef(md)
+
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: "gopher",
+				Aname: fmt.Sprintf("%v", md.id),
+			},
+		}
+		fs.attach(x, &Fid{})
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type: plan9.Rattach,
+			Qid: plan9.Qid{
+				Path: Qdir,
+				Vers: 0,
+				Type: plan9.QTDIR,
+			},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	})
+	t.Run("BadAname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: "gopher",
+				Aname: "notAnUint",
+			},
+		}
+		fs.attach(x, &Fid{})
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: `bad Aname: strconv.ParseUint: parsing "notAnUint": invalid syntax`,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	})
+	t.Run("UnknownAname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: "gopher",
+				Aname: "42",
+			},
+		}
+		fs.attach(x, &Fid{})
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: `unknown id "42" in Aname`,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestFileServerOpen(t *testing.T) {
+	for _, tc := range []struct {
+		name string     // test name
+		perm plan9.Perm // directory entry mode
+		mode uint8      // open mode
+		err  error
+	}{
+		{"OEXEC", 0600, plan9.OEXEC, ErrPermission},
+		{"ORCLOSE", 0600, plan9.ORCLOSE | plan9.OWRITE, ErrPermission},
+		{"ODIRECT", 0600, plan9.ODIRECT, ErrPermission},
+		{"WriteToReadOnly", 0400, plan9.OWRITE, ErrPermission},
+		{"ReadFromWriteOnly", 0200, plan9.OREAD, ErrPermission},
+		{"ORDWR", 0600, plan9.ORDWR, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{conn: mc}
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Type: plan9.Topen,
+					Mode: tc.mode,
+				},
+				c: make(chan func(*Xfid)),
+			}
+			f := &Fid{
+				dir: &DirTab{"example", plan9.QTFILE, Qindex, tc.perm},
+			}
+			if tc.err == nil {
+				go func() {
+					<-x.c
+					close(x.c)
+				}()
+			}
+			var wantx *Xfid
+			if tc.err != nil {
+				wantx = x
+			}
+			x1 := fs.open(x, f)
+			if x1 != wantx {
+				t.Errorf("expected Xfid %v; got %v", wantx, x1)
+			}
+
+			if tc.err != nil {
+				want := errorFcall(tc.err)
+				if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+					t.Fatalf("got response %v; want %v", got, want)
+				}
+			} else {
+				// Wait for close above, so we know we actually received something.
+				<-x.c
+			}
+		})
+	}
+}
+
+func TestFileServerCreate(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.create(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerRemove(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.remove(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerStat(t *testing.T) {
+	useFixedClock = true
+	defer func() { useFixedClock = false }()
+
+	dirtabResults := []string{
+		"'.' 'gopher' 'gopher' 'gopher' q (0000000000000000 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'acme' 'gopher' 'gopher' 'gopher' q (0000000000000001 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'cons' 'gopher' 'gopher' 'gopher' q (0000000000000002 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'consctl' 'gopher' 'gopher' 'gopher' q (0000000000000003 0 ) m 0 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'draw' 'gopher' 'gopher' 'gopher' q (0000000000000004 0 d) m 020000000000 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'editout' 'gopher' 'gopher' 'gopher' q (0000000000000005 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'index' 'gopher' 'gopher' 'gopher' q (0000000000000006 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'label' 'gopher' 'gopher' 'gopher' q (0000000000000007 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'log' 'gopher' 'gopher' 'gopher' q (0000000000000008 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'new' 'gopher' 'gopher' 'gopher' q (0000000000000009 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+	}
+	dirtabwResults := []string{
+		"'.' 'gopher' 'gopher' 'gopher' q (0000000000000000 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'addr' 'gopher' 'gopher' 'gopher' q (000000000000000a 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'body' 'gopher' 'gopher' 'gopher' q (000000000000000b 0 a) m 010000000600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'ctl' 'gopher' 'gopher' 'gopher' q (000000000000000c 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'data' 'gopher' 'gopher' 'gopher' q (000000000000000d 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'editout' 'gopher' 'gopher' 'gopher' q (000000000000000e 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'errors' 'gopher' 'gopher' 'gopher' q (000000000000000f 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'event' 'gopher' 'gopher' 'gopher' q (0000000000000010 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'rdsel' 'gopher' 'gopher' 'gopher' q (0000000000000011 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'wrsel' 'gopher' 'gopher' 'gopher' q (0000000000000012 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'tag' 'gopher' 'gopher' 'gopher' q (0000000000000013 0 a) m 010000000600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+		"'xdata' 'gopher' 'gopher' 'gopher' q (0000000000000014 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
+	}
+
+	checkDirTab := func(t *testing.T, prefix string, tab []*DirTab, results []string) {
+		for i, dt := range tab {
+			t.Run(prefix+dt.name, func(t *testing.T) {
+				mc := new(mockConn)
+				fs := &fileServer{
+					conn:        mc,
+					messagesize: 8192,
+					username:    "gopher",
+				}
+				x := &Xfid{
+					fcall: plan9.Fcall{
+						Type: plan9.Tstat,
+						Fid:  1,
+					},
+				}
+				x.f = &Fid{
+					dir: dt,
+				}
+				fs.stat(x, x.f)
+
+				fc := mc.ReadFcall(t)
+				if got, want := fc.Type, uint8(plan9.Rstat); got != want {
+					t.Fatalf("got Fcall type %v; want %v", got, want)
+				}
+
+				want := results[i]
+				d, _ := plan9.UnmarshalDir(fc.Stat)
+				got := d.String()
+				if got != want {
+					t.Errorf("stat mismatch:\ngot:  %q\nwant %q", got, want)
+				}
+			})
+		}
+	}
+	checkDirTab(t, "", dirtab, dirtabResults)
+	checkDirTab(t, "winid/", dirtabw, dirtabwResults)
+}
+
+func TestFileServerWstat(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.wstat(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
 	}
 }
