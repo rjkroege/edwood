@@ -139,11 +139,12 @@ type Command struct {
 	next          *Command // TODO(flux).  This really wants to be a canonical slice instead of a linked list
 }
 
+// DirTab describes a file or directory in file server.
 type DirTab struct {
-	name string
-	t    byte
-	qid  uint64
-	perm uint
+	name string     // filename (e.g. "index", "acme", "body")
+	t    byte       // Qid.Type (e.g. plan9.QTFILE, plan9.QTDIR)
+	qid  uint64     // Qid.Path, excluding window ID bits
+	perm plan9.Perm // permission (directory entry mode)
 }
 
 // MntDir contains context of where an external command was run.
