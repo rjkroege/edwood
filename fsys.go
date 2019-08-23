@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"9fans.net/go/plan9"
+	"github.com/rjkroege/edwood/internal/ninep"
 )
 
 type fileServer struct {
@@ -76,6 +77,16 @@ var dirtabw = []*DirTab{
 	{"wrsel", plan9.QTFILE, QWwrsel, 0200},
 	{"tag", plan9.QTAPPEND, QWtag, 0600 | plan9.DMAPPEND},
 	{"xdata", plan9.QTFILE, QWxdata, 0600},
+}
+
+// windowDirTab returns the DirTab entry for window directory for the window with given id.
+func windowDirTab(id int) *DirTab {
+	return &DirTab{
+		name: fmt.Sprintf("%d", id),
+		t:    plan9.QTDIR,
+		qid:  QID(id, Qdir),
+		perm: plan9.DMDIR | 0700,
+	}
 }
 
 // Mnt is a collection of reference counted MntDir.
@@ -511,49 +522,25 @@ func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
 
 // TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
 func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
-	var (
-		t           plan9.Fcall
-		id, n, j, k int
-		i, e, o     uint64
-		ids         []int
-		d           []*DirTab
-		dt          DirTab
-		clock       int64
-		length      int
-	)
 	if f.qid.Type&plan9.QTDIR != 0 {
 		if FILE(f.qid) == Qacme { // empty dir
-			t.Data = nil
-			t.Count = 0
+			t := plan9.Fcall{
+				Data: nil,
+			}
 			fs.respond(x, &t, nil)
 			return x
 		}
-		o = x.fcall.Offset
-		e = x.fcall.Offset + uint64(x.fcall.Count)
-		clock = getclock()
-		b := make([]byte, x.fcall.Count)
-		id = WIN(f.qid)
-		n = 0
+		clock := getclock()
+		id := WIN(f.qid)
+		d := dirtab
 		if id > 0 {
 			d = dirtabw
-		} else {
-			d = dirtab
 		}
 		d = d[1:] // Skip '.'
-		i = uint64(0)
-		for _, de := range d {
-			if !(i < e) {
-				break
-			}
-			length = fs.dostat(WIN(x.f.qid), de, b[n:], clock)
-			if i >= o {
-				n += length
-			}
-			i += uint64(length)
-		}
+
+		var ids []int // for window sub-directories
 		if id == 0 {
 			row.lk.Lock()
-			ids = []int{}
 			for _, c := range row.col {
 				for _, w := range c.w {
 					ids = append(ids, w.id)
@@ -561,26 +548,21 @@ func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 			}
 			row.lk.Unlock()
 			sort.Ints(ids)
-			j = 0
-			length = 0
-			for ; j < len(ids) && i < e; i += uint64(length) {
-				k = ids[j]
-				dt.name = fmt.Sprintf("%d", k)
-				dt.qid = QID(k, Qdir)
-				dt.t = plan9.QTDIR
-				dt.perm = plan9.DMDIR | 0700
-				length = fs.dostat(k, &dt, b[n:], clock)
-				if length == 0 {
-					break
-				}
-				if i >= o {
-					n += length
-				}
-				j++
-			}
 		}
-		t.Data = b[0:n]
-		t.Count = uint32(n)
+
+		var t plan9.Fcall
+		ninep.DirRead(&t, &x.fcall, func(i int) *plan9.Dir {
+			if i < len(d) {
+				return d[i].Dir(id, fs.username, clock)
+			}
+			i -= len(d)
+			if i < len(ids) {
+				k := ids[i]
+				return windowDirTab(k).Dir(k, fs.username, clock)
+			}
+			return nil
+		})
+
 		fs.respond(x, &t, nil)
 		return x
 	}
@@ -608,8 +590,13 @@ func (fs *fileServer) stat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
 	t.Stat = make([]byte, fs.messagesize-plan9.IOHDRSZ)
-	length := fs.dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
-	t.Stat = t.Stat[:length]
+	b, _ := f.dir.Dir(WIN(x.f.qid), fs.username, getclock()).Bytes()
+	if len(b) > len(t.Stat) {
+		// don't send partial directory entry
+		return fs.respond(x, nil, fmt.Errorf("msize too small"))
+	}
+	n := copy(t.Stat, b)
+	t.Stat = t.Stat[:n]
 	x = fs.respond(x, &t, nil)
 	return x
 }
@@ -643,25 +630,27 @@ func getclock() int64 {
 	return time.Now().Unix()
 }
 
-// buf must have enough length to fit this stat object.
-func (fs *fileServer) dostat(id int, dir *DirTab, buf []byte, clock int64) int {
-	var d plan9.Dir
-
-	d.Qid.Path = QID(id, dir.qid)
-	d.Qid.Vers = 0
-	d.Qid.Type = dir.t
-	d.Mode = dir.perm
-	d.Length = 0 // would be nice to do better
-	d.Name = dir.name
-	d.Uid = fs.username
-	d.Gid = fs.username
-	d.Muid = fs.username
-	d.Atime = uint32(clock)
-	d.Mtime = uint32(clock)
-
-	b, _ := d.Bytes()
-	copy(buf, b)
-	return len(b)
+// Dir converts DirTab to plan9.Dir. The given window id is used to
+// compute Qid.Path, username/group is set to user, and Atime/Mtime is
+// set to clock.
+func (dt *DirTab) Dir(id int, user string, clock int64) *plan9.Dir {
+	return &plan9.Dir{
+		Type: 0,
+		Dev:  0,
+		Qid: plan9.Qid{
+			Path: QID(id, dt.qid),
+			Vers: 0,
+			Type: dt.t,
+		},
+		Mode:   dt.perm,
+		Atime:  uint32(clock),
+		Mtime:  uint32(clock),
+		Length: 0, // would be nice to do better
+		Name:   dt.name,
+		Uid:    user,
+		Gid:    user,
+		Muid:   user,
+	}
 }
 
 func getuser() string {
