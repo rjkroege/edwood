@@ -18,6 +18,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/ninep"
 )
 
 func TestMain(m *testing.M) {
@@ -644,7 +645,7 @@ func TestFileServerAuth(t *testing.T) {
 	}
 }
 
-func TestFileServerFlushWrite(t *testing.T) {
+func TestFileServerSendToXfidChan(t *testing.T) {
 	mc := new(mockConn)
 	fs := &fileServer{conn: mc}
 
@@ -654,16 +655,22 @@ func TestFileServerFlushWrite(t *testing.T) {
 	}{
 		{"flush", fs.flush},
 		{"write", fs.write},
+		{"read", fs.read},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x := &Xfid{
 				c: make(chan func(*Xfid)),
 			}
+			fid := &Fid{
+				qid: plan9.Qid{
+					Type: plan9.QTFILE,
+				},
+			}
 			go func() {
 				<-x.c
 				close(x.c)
 			}()
-			x1 := tc.f(x, nil)
+			x1 := tc.f(x, fid)
 			if x1 != nil {
 				t.Fatalf("got non-nil Xfid: %v", x1)
 			}
@@ -826,6 +833,121 @@ func TestFileServerCreate(t *testing.T) {
 	}
 }
 
+func TestFileServerReadQacme(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Type: plan9.Tread,
+		},
+	}
+	f := &Fid{
+		qid: plan9.Qid{
+			Type: plan9.QTDIR,
+			Vers: 0,
+			Path: Qacme,
+		},
+	}
+	fs.read(x, f)
+
+	want := &plan9.Fcall{
+		Type: plan9.Rread,
+		Data: []byte{},
+	}
+	got := mc.ReadFcall(t)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestFileServerRead(t *testing.T) {
+	useFixedClock = true
+	WinID = 0
+	row.col = []*Column{
+		{
+			w: []*Window{
+				NewWindow().initHeadless(nil),
+				NewWindow().initHeadless(nil),
+				NewWindow().initHeadless(nil),
+			},
+		},
+	}
+	defer func() {
+		useFixedClock = false
+		WinID = 0
+		row = Row{}
+	}()
+
+	var rootDirs []plan9.Dir
+	for _, dt := range dirtab[1:] { // skip "."
+		rootDirs = append(rootDirs, *dt.Dir(0, "gopher", fixedClockValue))
+	}
+	for id := 1; id <= WinID; id++ {
+		rootDirs = append(rootDirs, *windowDirTab(id).Dir(0, "gopher", fixedClockValue))
+	}
+
+	var winDirs []plan9.Dir
+	for _, dt := range dirtabw[1:] { // skip "."
+		winDirs = append(winDirs, *dt.Dir(3, "gopher", fixedClockValue))
+	}
+
+	for _, tc := range []struct {
+		name  string
+		winid int
+		count uint32
+		want  []plan9.Dir
+	}{
+		{"OneRead/Root", 0, 1024, rootDirs},
+		{"OneRead/WindowSubdir", 3, 1024, winDirs},
+		{"OneDirPerRead/Root", 0, 100, rootDirs},
+		{"OneDirPerRead/WindowSubdir", 3, 100, winDirs},
+		{"Empty", 0, 0, nil},
+		{"NoPartialDir", 0, 10, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{
+				conn:     mc,
+				username: "gopher",
+			}
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Type:   plan9.Tread,
+					Count:  tc.count,
+					Offset: 0,
+				},
+				f: &Fid{
+					qid: plan9.Qid{
+						Type: plan9.QTDIR,
+						Vers: 0,
+						Path: QID(tc.winid, Qdir),
+					},
+				},
+			}
+
+			var got []plan9.Dir
+			for {
+				fs.read(x, x.f)
+
+				fc := mc.ReadFcall(t)
+				if len(fc.Data) == 0 {
+					break
+				}
+				dirs, err := ninep.UnmarshalDirs(fc.Data)
+				if err != nil {
+					t.Fatalf("failed to unmarshal directory entries: %v", err)
+				}
+				got = append(got, dirs...)
+				x.fcall.Offset += uint64(len(fc.Data))
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("directory entries mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestFileServerRemove(t *testing.T) {
 	mc := new(mockConn)
 	fs := &fileServer{conn: mc}
@@ -841,35 +963,8 @@ func TestFileServerStat(t *testing.T) {
 	useFixedClock = true
 	defer func() { useFixedClock = false }()
 
-	dirtabResults := []string{
-		"'.' 'gopher' 'gopher' 'gopher' q (0000000000000000 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'acme' 'gopher' 'gopher' 'gopher' q (0000000000000001 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'cons' 'gopher' 'gopher' 'gopher' q (0000000000000002 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'consctl' 'gopher' 'gopher' 'gopher' q (0000000000000003 0 ) m 0 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'draw' 'gopher' 'gopher' 'gopher' q (0000000000000004 0 d) m 020000000000 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'editout' 'gopher' 'gopher' 'gopher' q (0000000000000005 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'index' 'gopher' 'gopher' 'gopher' q (0000000000000006 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'label' 'gopher' 'gopher' 'gopher' q (0000000000000007 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'log' 'gopher' 'gopher' 'gopher' q (0000000000000008 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'new' 'gopher' 'gopher' 'gopher' q (0000000000000009 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-	}
-	dirtabwResults := []string{
-		"'.' 'gopher' 'gopher' 'gopher' q (0000000000000000 0 d) m 020000000500 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'addr' 'gopher' 'gopher' 'gopher' q (000000000000000a 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'body' 'gopher' 'gopher' 'gopher' q (000000000000000b 0 a) m 010000000600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'ctl' 'gopher' 'gopher' 'gopher' q (000000000000000c 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'data' 'gopher' 'gopher' 'gopher' q (000000000000000d 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'editout' 'gopher' 'gopher' 'gopher' q (000000000000000e 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'errors' 'gopher' 'gopher' 'gopher' q (000000000000000f 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'event' 'gopher' 'gopher' 'gopher' q (0000000000000010 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'rdsel' 'gopher' 'gopher' 'gopher' q (0000000000000011 0 ) m 0400 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'wrsel' 'gopher' 'gopher' 'gopher' q (0000000000000012 0 ) m 0200 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'tag' 'gopher' 'gopher' 'gopher' q (0000000000000013 0 a) m 010000000600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-		"'xdata' 'gopher' 'gopher' 'gopher' q (0000000000000014 0 ) m 0600 at 1257894000 mt 1257894000 l 0 t 0 d 0",
-	}
-
-	checkDirTab := func(t *testing.T, prefix string, tab []*DirTab, results []string) {
-		for i, dt := range tab {
+	checkDirTab := func(t *testing.T, prefix string, tab []*DirTab) {
+		for _, dt := range tab {
 			t.Run(prefix+dt.name, func(t *testing.T) {
 				mc := new(mockConn)
 				fs := &fileServer{
@@ -893,17 +988,42 @@ func TestFileServerStat(t *testing.T) {
 					t.Fatalf("got Fcall type %v; want %v", got, want)
 				}
 
-				want := results[i]
-				d, _ := plan9.UnmarshalDir(fc.Stat)
-				got := d.String()
-				if got != want {
-					t.Errorf("stat mismatch:\ngot:  %q\nwant %q", got, want)
+				want := dt.Dir(0, "gopher", fixedClockValue)
+				got, err := plan9.UnmarshalDir(fc.Stat)
+				if err != nil {
+					t.Fatalf("UnmarshalDir failed: %v", err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("stat mismatch (-want +got):\n%s", diff)
 				}
 			})
 		}
 	}
-	checkDirTab(t, "", dirtab, dirtabResults)
-	checkDirTab(t, "winid/", dirtabw, dirtabwResults)
+	checkDirTab(t, "", dirtab)
+	checkDirTab(t, "winid/", dirtabw)
+}
+
+func TestFileServerStatSmallMsize(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{
+		conn:        mc,
+		messagesize: plan9.IOHDRSZ + 16, // too small for a directory entry
+		username:    "gopher",
+	}
+	x := &Xfid{
+		fcall: plan9.Fcall{Type: plan9.Tstat},
+	}
+	x.f = &Fid{dir: dirtab[1]}
+	fs.stat(x, x.f)
+
+	got := mc.ReadFcall(t)
+	want := &plan9.Fcall{
+		Type:  plan9.Rerror,
+		Ename: `msize too small`,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestFileServerWstat(t *testing.T) {
