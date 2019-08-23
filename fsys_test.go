@@ -702,17 +702,21 @@ func TestFileServerAttach(t *testing.T) {
 		}
 	})
 	t.Run("Success", func(t *testing.T) {
-		md := mnt.Add("/", nil)
-		defer mnt.DecRef(md)
+		mnt = Mnt{}
+		md := mnt.Add("/sys/src/9/pc", nil)
+		defer func() {
+			mnt = Mnt{}
+		}()
 
 		x := &Xfid{
 			fcall: plan9.Fcall{
 				Type:  plan9.Tattach,
-				Uname: "gopher",
+				Uname: fs.username,
 				Aname: fmt.Sprintf("%v", md.id),
 			},
+			f: &Fid{},
 		}
-		fs.attach(x, &Fid{})
+		fs.attach(x, x.f)
 
 		got := mc.ReadFcall(t)
 		want := &plan9.Fcall{
@@ -726,12 +730,18 @@ func TestFileServerAttach(t *testing.T) {
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf("response mismatch (-want +got):\n%s", diff)
 		}
+		if x.f.mntdir == nil {
+			t.Fatalf("nil mntdir")
+		}
+		if got, want := x.f.mntdir.id, md.id; got != want {
+			t.Errorf("mntdir.id is %v; want %v", got, want)
+		}
 	})
 	t.Run("BadAname", func(t *testing.T) {
 		x := &Xfid{
 			fcall: plan9.Fcall{
 				Type:  plan9.Tattach,
-				Uname: "gopher",
+				Uname: fs.username,
 				Aname: "notAnUint",
 			},
 		}
@@ -750,7 +760,7 @@ func TestFileServerAttach(t *testing.T) {
 		x := &Xfid{
 			fcall: plan9.Fcall{
 				Type:  plan9.Tattach,
-				Uname: "gopher",
+				Uname: fs.username,
 				Aname: "42",
 			},
 		}

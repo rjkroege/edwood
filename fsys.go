@@ -291,9 +291,7 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 		err := fmt.Errorf("unknown id %q in Aname", x.fcall.Aname)
 		return fs.respond(x, nil, err)
 	}
-	if m != nil {
-		f.mntdir = m
-	}
+	f.mntdir = m
 	f.busy = true
 	f.open = false
 	f.qid.Path = Qdir
@@ -302,7 +300,6 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	f.dir = dirtab[0] // '.'
 	f.nrpart = 0
 	f.w = nil
-	f.mntdir = nil
 	t := plan9.Fcall{
 		Qid: f.qid,
 	}
