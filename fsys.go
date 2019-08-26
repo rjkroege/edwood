@@ -307,21 +307,13 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 }
 
 func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
-	var (
-		t    plan9.Fcall
-		q    plan9.Qid
-		typ  byte
-		path uint64
-		d    []*DirTab
-		dir  *DirTab
-		id   int
-	)
-	nf := (*Fid)(nil)
-	w := (*Window)(nil)
+	var t plan9.Fcall
+
 	if f.open {
 		return fs.respond(x, &t, fmt.Errorf("walk of open file"))
 	}
-	if x.fcall.Fid != x.fcall.Newfid {
+	var nf *Fid
+	if x.fcall.Fid != x.fcall.Newfid { // clone fid
 		nf = fs.newfid(x.fcall.Newfid)
 		if nf.busy {
 			return fs.respond(x, &t, fmt.Errorf("newfid already in use"))
@@ -346,115 +338,33 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 
 	t.Wqid = nil
 	var err error
-	dir = nil
-	id = WIN(f.qid)
-	q = f.qid
 
-	var i int
-	var wname string
+	wf := &Fid{
+		qid: f.qid,
+		w:   nil,
+		dir: nil,
+	}
+
 	if len(x.fcall.Wname) > 0 {
-	Wnames:
+		var i int
 		for i = 0; i < len(x.fcall.Wname); i++ {
-			wname = x.fcall.Wname[i]
-			if (q.Type & plan9.QTDIR) == 0 {
-				err = ErrNotDir
-				break
-			}
+			wname := x.fcall.Wname[i]
 
-			if wname == ".." {
-				typ = plan9.QTDIR
-				path = Qdir
-				id = 0
-				if w != nil {
-					w.Close()
-					w = nil
-				}
-				q.Type = typ
-				q.Vers = 0
-				q.Path = QID(id, path)
-				t.Wqid = append(t.Wqid, q)
-				continue
-			}
-			// is it a numeric name?
-			_, err = strconv.ParseInt(wname, 10, 32)
-			if err != nil {
-				err = nil
-				goto Regular
-			}
-			// yes: it's a directory
-			if w != nil { // name has form 27/23; get out before losing w
+			var found bool
+			found, err = wf.Walk1(wname)
+			if err != nil || !found {
 				break
 			}
-			{
-				id64, _ := strconv.ParseInt(wname, 10, 32)
-				id = int(id64)
-			}
-			row.lk.Lock()
-			w = row.LookupWin(id)
-			if w == nil {
-				row.lk.Unlock()
-				break
-			}
-			w.ref.Inc() // we'll drop reference at end if there's an error
-			path = Qdir
-			typ = plan9.QTDIR
-			row.lk.Unlock()
-			dir = dirtabw[0] // '.'
 			if i == plan9.MAXWELEM {
 				err = fmt.Errorf("name too long")
 				break
 			}
-			q.Type = typ
-			q.Vers = 0
-			q.Path = QID(id, path)
-			t.Wqid = append(t.Wqid, q)
-			continue
-
-		Regular:
-			if wname == "new" {
-				if w != nil {
-					acmeerror("w set in walk to new", nil)
-				}
-				cnewwindow <- nil // signal newwindowthread
-				w = <-cnewwindow  // receive new window
-				w.ref.Inc()
-				typ = plan9.QTDIR
-				path = QID(w.id, Qdir)
-				id = w.id
-				dir = dirtabw[0]
-				q.Type = typ
-				q.Vers = 0
-				q.Path = QID(id, path)
-				t.Wqid = append(t.Wqid, q)
-				continue Wnames
-			}
-
-			if id == 0 {
-				d = dirtab
-			} else {
-				d = dirtabw
-			}
-			for _, de := range d[1:] {
-				if wname == de.name {
-					path = de.qid
-					typ = de.t
-					dir = de
-					q.Type = typ
-					q.Vers = 0
-					q.Path = QID(id, path)
-					t.Wqid = append(t.Wqid, q)
-					continue Wnames
-				}
-			}
-			break // file not found
+			t.Wqid = append(t.Wqid, wf.qid)
 		}
 
 		// If we never incremented
 		if i == 0 && err == nil {
 			err = ErrNotExist
-		}
-		if i == plan9.MAXWELEM {
-			err = fmt.Errorf("name too long")
 		}
 	}
 
@@ -463,24 +373,101 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 			nf.busy = false
 			mnt.DecRef(nf.mntdir)
 		}
-	} else {
-		if len(t.Wqid) == len(x.fcall.Wname) {
-			if w != nil {
-				f.w = w
-				w = nil // don't drop the reference when closing below.
-			}
-			if dir != nil {
-				f.dir = dir
-			}
-			f.qid = q
+	} else if len(t.Wqid) == len(x.fcall.Wname) {
+		if wf.w != nil {
+			f.w = wf.w
+			wf.w = nil // don't drop the reference when closing below.
 		}
+		if wf.dir != nil {
+			f.dir = wf.dir
+		}
+		f.qid = wf.qid
 	}
 
-	if w != nil {
-		w.Close()
+	if wf.w != nil {
+		wf.w.Close()
 	}
 
 	return fs.respond(x, &t, err)
+}
+
+// Walk1 walks fid to path name element wname.
+// Found is set to true iff wname was found.
+func (f *Fid) Walk1(wname string) (found bool, err error) {
+	if (f.qid.Type & plan9.QTDIR) == 0 {
+		return false, ErrNotDir
+	}
+
+	if wname == ".." {
+		if f.w != nil {
+			f.w.Close()
+			f.w = nil
+		}
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(0, Qdir)
+		return true, nil
+	}
+
+	// is it a numeric name?
+	_, err = strconv.ParseInt(wname, 10, 32)
+	if err == nil {
+		// yes: it's a directory
+		if f.w != nil { // name has form 27/23; get out before losing w
+			return false, nil
+		}
+		var id int
+		{
+			id64, _ := strconv.ParseInt(wname, 10, 32)
+			id = int(id64)
+		}
+		row.lk.Lock()
+		f.w = row.LookupWin(id)
+		if f.w == nil {
+			row.lk.Unlock()
+			return false, nil
+		}
+		f.w.ref.Inc() // we'll drop reference at end if there's an error
+		row.lk.Unlock()
+
+		f.dir = dirtabw[0] // '.'
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(id, Qdir)
+		return true, nil
+	}
+
+	// Look for regular file (not directory).
+	err = nil
+	if wname == "new" {
+		if f.w != nil {
+			acmeerror("w set in walk to new", nil)
+		}
+		cnewwindow <- nil  // signal newwindowthread
+		f.w = <-cnewwindow // receive new window
+		f.w.ref.Inc()
+		f.dir = dirtabw[0]
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(f.w.id, Qdir)
+		return true, nil
+	}
+
+	id := WIN(f.qid)
+	d := dirtab
+	if id != 0 {
+		d = dirtabw
+	}
+	for _, de := range d[1:] {
+		if wname == de.name {
+			f.dir = de
+			f.qid.Type = de.t
+			f.qid.Vers = 0
+			f.qid.Path = QID(id, de.qid)
+			return true, nil
+		}
+	}
+	return false, nil // file not found
 }
 
 func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
