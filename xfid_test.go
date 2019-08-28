@@ -841,77 +841,98 @@ func TestXfidwriteQWeditout(t *testing.T) {
 }
 
 func TestXfidwriteQWctl(t *testing.T) {
+	configureGlobals()
+	warnings = nil
+	cwarn = nil
+
 	for _, tc := range []struct {
-		err       error
-		errString string
-		data      string
+		err  error
+		data string
 	}{
-		{ErrBadCtl, "", "lock"},   // disabled
-		{ErrBadCtl, "", "unlock"}, // disabled
-		{nil, "", "clean"},
-		{nil, "", "dirty"},
-		{nil, "", "show"},
-		{ErrBadCtl, "", "name"},
-		{nil, "", "name /Test/Write/Ctl"},
-		{nil, "nulls in file name", "name /Test/Write\u0000/Ctl"},
-		{nil, "bad character in file name", "name /Test/Write To/Ctl"},
-		{nil, "", "dump win"},
-		{ErrBadCtl, "", "dump"},
-		{nil, "nulls in dump string", "dump win\u0000rc"},
-		{nil, "", "dumpdir /home/gopher"},
-		{ErrBadCtl, "", "dumpdir"},
-		{nil, "nulls in dump directory string", "dumpdir /home\u0000/gopher"},
-		{nil, "", "delete"},
-		{nil, "", "del"},
-		{nil, "", "get"},
-		{nil, "", "put"},
-		{nil, "", "dot=addr"},
-		{nil, "", "addr=dot"},
-		{nil, "", "limit=addr"},
-		{nil, "", "nomark"},
-		{nil, "", "mark"},
-		{nil, "", "nomenu"},
-		{nil, "", "menu"},
-		{nil, "", "cleartag"},
-		{ErrBadCtl, "", "brewcoffee"},
+		{nil, ""},
+		{nil, "\n"},
+		{ErrBadCtl, "lock"},   // disabled
+		{ErrBadCtl, "unlock"}, // disabled
+		{nil, "clean"},
+		{nil, "clean\n"},
+		{nil, "dirty"},
+		{nil, "show"},
+		{ErrBadCtl, "name"},
+		{nil, "name /Test/Write/Ctl"},
+		{fmt.Errorf("nulls in file name"), "name /Test/Write\u0000/Ctl"},
+		{fmt.Errorf("bad character in file name"), "name /Test/Write To/Ctl"},
+		{nil, "dump win"},
+		{ErrBadCtl, "dump"},
+		{fmt.Errorf("nulls in dump string"), "dump win\u0000rc"},
+		{nil, "dumpdir /home/gopher"},
+		{ErrBadCtl, "dumpdir"},
+		{fmt.Errorf("nulls in dump directory string"), "dumpdir /home\u0000/gopher"},
+		{nil, "delete"},
+		{fmt.Errorf("file dirty"), "del"},
+		{fmt.Errorf("file dirty"), "del\ndel"},
+		{nil, "get"},
+		{nil, "put"},
+		{nil, "dot=addr"},
+		{nil, "addr=dot"},
+		{nil, "limit=addr"},
+		{nil, "nomark"},
+		{nil, "mark"},
+		{nil, "nomenu"},
+		{nil, "menu"},
+		{nil, "cleartag"},
+		{ErrBadCtl, "brewcoffee"},
+		{ErrDeletedWin, "delete\nclean"},
+		{ErrDeletedWin, "delete\nget"},
+		{fmt.Errorf("file dirty"), "del\ndel\nclean"},
+		{nil, "clean\ndel"},
+		{nil, "clean\ndelete"},
 	} {
-		mr := new(mockResponder)
-		display := edwoodtest.NewDisplay()
-		w := NewWindow().initHeadless(nil)
-		w.col = &Column{
-			w:       []*Window{w},
-			display: display,
-		}
-		w.body.display = display
-		w.body.fr = &MockFrame{}
-		w.tag.display = display
-		w.tag.fr = &MockFrame{}
-		x := &Xfid{
-			fcall: plan9.Fcall{
-				Data:  []byte(tc.data),
-				Count: uint32(len(tc.data)),
-			},
-			f: &Fid{
-				qid: plan9.Qid{Path: QID(0, QWctl)},
-				w:   w,
-			},
-			fs: mr,
-		}
-		xfidwrite(x)
-		if tc.errString != "" {
-			if mr.err == nil || mr.err.Error() != tc.errString {
-				t.Errorf("event %q: got error %v; want error string %q", tc.data, mr.err, tc.errString)
+		t.Run(fmt.Sprintf("Data=%q", tc.data), func(t *testing.T) {
+			mr := new(mockResponder)
+			display := edwoodtest.NewDisplay()
+			w := NewWindow().initHeadless(nil)
+			w.display = display
+			w.col = &Column{
+				w:       []*Window{w},
+				display: display,
 			}
-		} else {
-			if got, want := mr.err, tc.err; got != want {
-				t.Errorf("event %q: got error %v; want %v", tc.data, got, want)
+			w.body.display = display
+			w.body.fr = &MockFrame{}
+			w.tag.display = display
+			w.tag.fr = &MockFrame{}
+
+			// mark window dirty
+			f := w.body.file
+			f.InsertAt(0, []rune(strings.Repeat("ha", 100)))
+			f.seq = 0
+			f.putseq = 1
+
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Data:  []byte(tc.data),
+					Count: uint32(len(tc.data)),
+				},
+				f: &Fid{
+					qid: plan9.Qid{Path: QID(0, QWctl)},
+					w:   w,
+				},
+				fs: mr,
 			}
-		}
-		if tc.errString == "" && tc.err == nil {
+			xfidwrite(x)
+
+			if got, want := mr.err, tc.err; want != nil {
+				if got == nil || (got != want && got.Error() != want.Error()) {
+					t.Fatalf("got error %v; want %v", got, want)
+				}
+				return
+			}
+			if got, want := mr.err, tc.err; got != nil {
+				t.Fatalf("got error %v; want %v", got, want)
+			}
 			if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
-				t.Errorf("event %q: fcall.Count is %v; want %v", tc.data, got, want)
+				t.Errorf("fcall.Count is %v; want %v", got, want)
 			}
-		}
+		})
 	}
 }
 
