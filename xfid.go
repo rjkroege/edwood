@@ -541,20 +541,23 @@ func xfidwrite(x *Xfid) {
 func xfidctlwrite(x *Xfid, w *Window) {
 	// log.Println("xfidctlwrite", x)
 	// defer log.Println("done xfidctlwrite")
-	var (
-		err error
-		t   *Text
-	)
+	var err error
 	const scrdraw = false
 	settag := false
 
 	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
-	var lidx int
+	n := 0
 forloop:
-	for lidx = 0; lidx < len(lines); lidx++ {
+	for lidx := 0; lidx < len(lines); lidx++ {
 		line := lines[lidx]
 		words := strings.SplitN(line, " ", 2)
+
+		if words[0] != "" && w == nil { // window was deleted in a previous line
+			err = ErrDeletedWin
+			break
+		}
+
 		switch words[0] {
 		case "": // empty line.
 
@@ -573,18 +576,18 @@ forloop:
 			break forloop
 
 		case "clean": // mark window 'clean', seq=0
-			t = &w.body
+			t := &w.body
 			t.eq0 = ^0
 			t.file.Reset()
 			t.file.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'
-			t = &w.body
+			t := &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
 			t.file.Modded()
 			settag = true
 		case "show": // show dot
-			t = &w.body
+			t := &w.body
 			t.Show(t.q0, t.q1, true)
 		case "name": // set file name
 			if len(words) < 2 {
@@ -599,7 +602,7 @@ forloop:
 			for _, rr := range r {
 				if rr <= ' ' {
 					err = fmt.Errorf("bad character in file name")
-					break
+					break forloop
 				}
 			}
 			seq++
@@ -629,12 +632,14 @@ forloop:
 			w.dumpdir = string(r)
 		case "delete": // delete for sure
 			w.col.Close(w, true)
+			w = nil
 		case "del": // delete, but check dirty
 			if !w.Clean(true) {
 				err = fmt.Errorf("file dirty")
-				break
+				break forloop
 			}
 			w.col.Close(w, true)
+			w = nil
 		case "get": // get file
 			get(&w.body, nil, nil, false, XXX, "")
 		case "put": // put file
@@ -672,37 +677,25 @@ forloop:
 			err = ErrBadCtl
 			break forloop
 		}
+		n += len(line)
+		if d := x.fcall.Data; n < len(d) && d[n] == '\n' {
+			n++
+		}
 	}
 
-	var n int
 	if err != nil {
 		n = 0
-	} else {
-		// how far through the buffer did we get?
-		// count bytes up to line lineidx
-		//
-		// TODO(fhs): This appears not to do what was intended.
-		// We break out of forloop early iff err != nil,
-		// but we never even get here in that case.
-		d := x.fcall.Data
-		curline := 0
-		for n = 0; n < len(d); n++ {
-			if curline == lidx {
-				break
-			}
-			if d[n] == '\n' {
-				curline++
-			}
-		}
 	}
 	fc := plan9.Fcall{
 		Count: uint32(n),
 	}
 	x.respond(&fc, err)
-	if settag {
+
+	if settag && w != nil {
 		w.SetTag()
 	}
-	if scrdraw {
+	if scrdraw && w != nil {
+		t := &w.body
 		w.body.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
 }
