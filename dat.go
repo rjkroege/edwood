@@ -165,11 +165,11 @@ const MaxFid = math.MaxUint32
 
 type Fid struct {
 	fid    uint32
-	busy   bool
-	open   bool
+	busy   bool // true after Tattach/Twalk; false after Tcluck
+	open   bool // true after Topen; false after Tcluck
 	qid    plan9.Qid
 	w      *Window
-	dir    *DirTab
+	dir    *DirTab // Used for stat, and open permission check.
 	mntdir *MntDir
 	nrpart int
 	rpart  [utf8.UTFMax]byte
