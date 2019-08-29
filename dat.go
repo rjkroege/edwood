@@ -142,7 +142,6 @@ type Command struct {
 	av            []string
 	iseditcommand bool
 	md            *MntDir
-	next          *Command // TODO(flux).  This really wants to be a canonical slice instead of a linked list
 }
 
 // DirTab describes a file or directory in file server.

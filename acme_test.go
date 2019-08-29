@@ -48,8 +48,10 @@ func TestKillprocs(t *testing.T) {
 		close(done)
 	}()
 
-	command = &Command{
-		proc: cmd.Process,
+	command = []*Command{
+		{
+			proc: cmd.Process,
+		},
 	}
 	killprocs(nil)
 	timer := time.NewTimer(5 * time.Second)
@@ -66,6 +68,7 @@ func TestKillprocs(t *testing.T) {
 func TestWaitthreadCommandCycle(t *testing.T) {
 	ccommand = make(chan *Command)
 	cwait = make(chan ProcessState)
+	cerr = make(chan error)
 	row = Row{
 		display: edwoodtest.NewDisplay(),
 		tag: Text{
@@ -80,6 +83,7 @@ func TestWaitthreadCommandCycle(t *testing.T) {
 		waitthread(ctx)
 		ccommand = nil
 		cwait = nil
+		cerr = nil
 		row = Row{}
 		close(done)
 	}()
@@ -103,12 +107,22 @@ func TestWaitthreadCommandCycle(t *testing.T) {
 	ccommand <- c[2]
 	ccommand <- c[1]
 	ccommand <- c[0]
+	cerr <- nil // synchornize: wait for c[0] to be added
 
 	// command is 0 -> 1 -> 2 -> 3
+	if got, want := len(command), 4; got != want {
+		t.Errorf("command is length is %v; want %v", got, want)
+	}
 
 	cwait <- w[2] // delete 2, command is 0 -> 1 -> 3, lc = 1 -> 3
 	cwait <- w[0] // delete 0, command is 1 -> 1 -> 1 -> ...
 	cwait <- w[3] // try to delete 2: infinite loop
+	cwait <- w[1]
+	cerr <- nil // synchornize: wait for w[1] to be deleted
+
+	if got, want := len(command), 0; got != want {
+		t.Errorf("command is length is %v; want %v", got, want)
+	}
 
 	cancel() // Ask waithtread to finish up.
 
