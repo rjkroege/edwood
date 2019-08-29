@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	command *Command
+	command []*Command
 
 	debugAddr         = flag.String("debug", "", "Serve debug information on the supplied address")
 	globalAutoIndent  = flag.Bool("a", false, "Start each window in autoindent mode")
@@ -512,9 +512,8 @@ type Pid struct {
 }
 
 func waitthread(ctx context.Context) {
-	var c *Command
 	var pids *Pid
-	Freecmd := func() {
+	Freecmd := func(c *Command) {
 		if c != nil {
 			if c.iseditcommand {
 				cedit <- 0
@@ -536,7 +535,7 @@ func waitthread(ctx context.Context) {
 
 		case cmd := <-ckill:
 			found := false
-			for c = command; c != nil; c = c.next {
+			for _, c := range command {
 				if c.name == cmd+" " {
 					if err := c.proc.Kill(); err != nil {
 						warning(nil, "kill %v: %v\n", cmd, err)
@@ -549,18 +548,16 @@ func waitthread(ctx context.Context) {
 			}
 
 		case w := <-cwait:
+			var (
+				i int
+				c *Command
+			)
 			pid := w.Pid()
-			var lc *Command
-			for c = command; c != nil; c = c.next {
+			for i, c = range command {
 				if c.pid == pid {
-					if lc != nil {
-						lc.next = c.next
-					} else {
-						command = c.next
-					}
+					command = append(command[:i], command[i+1:]...)
 					break
 				}
-				lc = c
 			}
 			row.lk.Lock()
 			t := &row.tag
@@ -578,9 +575,9 @@ func waitthread(ctx context.Context) {
 				row.display.Flush()
 			}
 			row.lk.Unlock()
-			Freecmd()
+			Freecmd(c)
 
-		case c = <-ccommand:
+		case c := <-ccommand:
 			// has this command already exited?
 			lastp := (*Pid)(nil)
 			for p := pids; p != nil; p = p.next {
@@ -593,13 +590,12 @@ func waitthread(ctx context.Context) {
 					} else {
 						lastp.next = p.next
 					}
-					Freecmd()
+					Freecmd(c)
 					break Switch
 				}
 				lastp = p
 			}
-			c.next = command
-			command = c
+			command = append(command, c)
 			row.lk.Lock()
 			t := &row.tag
 			t.Commit()
@@ -656,7 +652,7 @@ func newwindowthread() {
 
 func killprocs(fs *fileServer) {
 	fs.close()
-	for c := command; c != nil; c = c.next {
+	for _, c := range command {
 		c.proc.Kill()
 	}
 }
