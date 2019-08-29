@@ -113,7 +113,7 @@ func main() {
 
 		iconinit(display)
 
-		cwait = make(chan *os.ProcessState)
+		cwait = make(chan ProcessState)
 		ccommand = make(chan *Command)
 		ckill = make(chan string)
 		cxfidalloc = make(chan *Xfid)
@@ -172,11 +172,12 @@ func main() {
 		display.Flush()
 
 		// After row is initialized
+		ctx := context.Background()
 		go mousethread(display)
 		go keyboardthread(display)
-		go waitthread()
+		go waitthread(ctx)
 		go newwindowthread()
-		go xfidallocthread(context.Background(), display)
+		go xfidallocthread(ctx, display)
 
 		signal.Ignore(ignoreSignals...)
 		signal.Notify(csignal, hangupSignals...)
@@ -510,8 +511,8 @@ type Pid struct {
 	next *Pid // TODO(flux) turn this into a slice of Pid
 }
 
-func waitthread() {
-	var lc, c *Command
+func waitthread(ctx context.Context) {
+	var c *Command
 	var pids *Pid
 	Freecmd := func() {
 		if c != nil {
@@ -524,6 +525,9 @@ func waitthread() {
 	for {
 	Switch:
 		select {
+		case <-ctx.Done():
+			return
+
 		case err := <-cerr:
 			row.lk.Lock()
 			warning(nil, "%s", err)
@@ -546,6 +550,7 @@ func waitthread() {
 
 		case w := <-cwait:
 			pid := w.Pid()
+			var lc *Command
 			for c = command; c != nil; c = c.next {
 				if c.pid == pid {
 					if lc != nil {
