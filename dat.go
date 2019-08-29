@@ -107,7 +107,7 @@ var (
 	editing    = Inactive
 
 	cplumb     chan *plumb.Message
-	cwait      chan *os.ProcessState
+	cwait      chan ProcessState
 	ccommand   chan *Command
 	ckill      chan string
 	cxfidalloc chan *Xfid
@@ -123,6 +123,12 @@ var (
 
 	WinID = 0
 )
+
+type ProcessState interface {
+	Pid() int
+	String() string
+	Success() bool
+}
 
 type Range struct {
 	q0, q1 int

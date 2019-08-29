@@ -12,7 +12,7 @@ import (
 
 func acmeTestingMain() {
 	acmeshell = os.Getenv("acmeshell")
-	cwait = make(chan *os.ProcessState)
+	cwait = make(chan ProcessState)
 	cerr = make(chan error)
 	go func() {
 		for range cerr {
