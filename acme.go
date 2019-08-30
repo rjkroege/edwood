@@ -503,16 +503,11 @@ func keyboardthread(display draw.Display) {
 
 }
 
-// There is a race between process exiting and our finding out it was ever created.
-// This structure keeps a list of processes that have exited we haven't heard of.
-type Pid struct {
-	pid  int
-	msg  string
-	next *Pid // TODO(flux) turn this into a slice of Pid
-}
-
 func waitthread(ctx context.Context) {
-	var pids *Pid
+	// There is a race between process exiting and our finding out it was ever created.
+	// This structure keeps a list of processes that have exited we haven't heard of.
+	exited := make(map[int]ProcessState)
+
 	Freecmd := func(c *Command) {
 		if c != nil {
 			if c.iseditcommand {
@@ -522,7 +517,6 @@ func waitthread(ctx context.Context) {
 		}
 	}
 	for {
-	Switch:
 		select {
 		case <-ctx.Done():
 			return
@@ -563,7 +557,8 @@ func waitthread(ctx context.Context) {
 			t := &row.tag
 			t.Commit()
 			if c == nil {
-				warning(nil, "unknown command (pid %v) exited: %v\n", pid, w.String())
+				// command exited before we had a chance to add it to command list
+				exited[pid] = w
 			} else {
 				if search(t, []rune(c.name)) {
 					t.Delete(t.q0, t.q1, true)
@@ -579,21 +574,13 @@ func waitthread(ctx context.Context) {
 
 		case c := <-ccommand:
 			// has this command already exited?
-			lastp := (*Pid)(nil)
-			for p := pids; p != nil; p = p.next {
-				if p.pid == c.pid {
-					if p.msg != "" {
-						warning(c.md, "%s\n", p.msg)
-					}
-					if lastp == nil {
-						pids = p.next
-					} else {
-						lastp.next = p.next
-					}
-					Freecmd(c)
-					break Switch
+			if p, ok := exited[c.pid]; ok {
+				if msg := p.String(); msg != "" {
+					warning(c.md, "%s\n", msg)
 				}
-				lastp = p
+				delete(exited, c.pid)
+				Freecmd(c)
+				break
 			}
 			command = append(command, c)
 			row.lk.Lock()

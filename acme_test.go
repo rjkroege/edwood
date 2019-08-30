@@ -66,26 +66,11 @@ func TestKillprocs(t *testing.T) {
 // TestWaithreadCommandCycle tests that we don't create a cycle in the command linked list
 // (regression test for https://github.com/rjkroege/edwood/issues/279).
 func TestWaitthreadCommandCycle(t *testing.T) {
-	ccommand = make(chan *Command)
-	cwait = make(chan ProcessState)
-	cerr = make(chan error)
-	row = Row{
-		display: edwoodtest.NewDisplay(),
-		tag: Text{
-			file: NewFile(""),
-		},
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	done := make(chan struct{})
-	go func() {
-		waitthread(ctx)
-		ccommand = nil
-		cwait = nil
-		cerr = nil
-		row = Row{}
-		close(done)
+	done := startMockWaitthread(ctx)
+	defer func() {
+		cancel() // Ask waithtread to finish up.
+		<-done   // Wait for waithtread to return and finish clean up.
 	}()
 
 	var (
@@ -124,10 +109,30 @@ func TestWaitthreadCommandCycle(t *testing.T) {
 		t.Errorf("command is length is %v; want %v", got, want)
 	}
 
-	cancel() // Ask waithtread to finish up.
+}
 
-	// Wait for waithtread to return and finish clean up.
-	<-done
+func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
+	ccommand = make(chan *Command)
+	cwait = make(chan ProcessState)
+	command = nil
+	cerr = make(chan error)
+	row = Row{
+		display: edwoodtest.NewDisplay(),
+		tag: Text{
+			file: NewFile(""),
+		},
+	}
+	ch := make(chan struct{})
+	go func() {
+		waitthread(ctx)
+		ccommand = nil
+		cwait = nil
+		command = nil
+		cerr = nil
+		row = Row{}
+		close(ch)
+	}()
+	return ch
 }
 
 type mockProcessState struct {
