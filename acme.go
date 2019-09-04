@@ -104,7 +104,7 @@ func main() {
 		if err := display.Attach(draw.Refnone); err != nil {
 			panic("failed to attach to window")
 		}
-		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 
 		mousectl = display.InitMouse()
 		keyboardctl = display.InitKeyboard()
@@ -257,16 +257,16 @@ func iconinit(display draw.Display) {
 	button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	button.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
+	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.Point{})
 
 	r = button.R()
 	modbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	modbutton.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
+	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
 	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
-	modbutton.Draw(r, tmp, nil, image.ZP)
+	modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = button.R()
 	colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Purpleblue)
@@ -299,7 +299,7 @@ func mousethread(display draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
+			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 			iconinit(display)
 			ScrlResize(display)
 			row.Resize(display.ScreenImage().R())

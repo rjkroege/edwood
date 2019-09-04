@@ -137,7 +137,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
-		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
 	}
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
@@ -292,7 +292,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
-				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
 			}
 			y++
 			r1.Min.Y = min(y, r.Max.Y)

@@ -171,15 +171,15 @@ func (f *frameimpl) SelectPaint(p0, p1 image.Point, col draw.Image) {
 		return
 	}
 	if n == 0 {
-		f.background.Draw(Rpt(p0, q1), col, nil, image.ZP)
+		f.background.Draw(Rpt(p0, q1), col, nil, image.Point{})
 	} else {
 		if p0.X >= f.rect.Max.X {
 			p0.X = f.rect.Max.X - 1
 		}
-		f.background.Draw(image.Rect(p0.X, p0.Y, f.rect.Max.X, q0.Y), col, nil, image.ZP)
+		f.background.Draw(image.Rect(p0.X, p0.Y, f.rect.Max.X, q0.Y), col, nil, image.Point{})
 		if n > 1 {
-			f.background.Draw(image.Rect(f.rect.Min.X, q0.Y, f.rect.Max.X, p1.Y), col, nil, image.ZP)
+			f.background.Draw(image.Rect(f.rect.Min.X, q0.Y, f.rect.Max.X, p1.Y), col, nil, image.Point{})
 		}
-		f.background.Draw(image.Rect(f.rect.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.ZP)
+		f.background.Draw(image.Rect(f.rect.Min.X, p1.Y, q1.X, q1.Y), col, nil, image.Point{})
 	}
 }
