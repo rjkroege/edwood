@@ -8,8 +8,8 @@ os:
   - osx
 
 go:
-  - "1.11.x"
   - "1.12.x"
+  - "1.13.x"
 
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
