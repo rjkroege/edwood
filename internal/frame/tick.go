@@ -35,7 +35,7 @@ func (f *frameimpl) InitTick() {
 		f.tickimage = nil
 		return
 	}
-	f.tickback.Draw(f.tickback.R(), f.cols[ColBack], nil, image.ZP)
+	f.tickback.Draw(f.tickback.R(), f.cols[ColBack], nil, image.Point{})
 
 	f.tickimage.Draw(f.tickimage.R(), f.display.Transparent(), nil, image.Pt(0, 0))
 	// vertical line

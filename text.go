@@ -97,7 +97,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 	t.all = r
 	t.scrollr = r
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
-	t.lastsr = image.ZR
+	t.lastsr = image.Rectangle{}
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
 	t.font = rf
@@ -175,7 +175,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 	t.all = r
 	t.scrollr = r
 	t.scrollr.Max.X = r.Min.X + t.display.ScaleSize(Scrollwid)
-	t.lastsr = image.ZR
+	t.lastsr = image.Rectangle{}
 	r.Min.X += t.display.ScaleSize(Scrollwid + Scrollgap)
 	t.fr.Clear(false)
 	// TODO(rjk): Remove this Font accessor.
