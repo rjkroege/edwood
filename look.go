@@ -18,45 +18,57 @@ import (
 
 var (
 	plumbsendfid *client.Fid
-	plumbeditfid *client.Fid
 	nuntitled    int
 )
 
 func plumbthread() {
+	// Handle a plumber connection and return only if we lose the connection.
+	handleFsys := func(fsys *client.Fsys) {
+		var err error
+		plumbsendfid, err = fsys.Open("send", plan9.OWRITE|plan9.OCEXEC)
+		if err != nil {
+			return
+		}
+		defer func() {
+			plumbsendfid.Close()
+			plumbsendfid = nil
+		}()
+
+		editfid, err := fsys.Open("edit", plan9.OREAD|plan9.OCEXEC)
+		if err != nil {
+			return
+		}
+		defer editfid.Close()
+
+		br := bufio.NewReader(editfid)
+		// Relay messages.
+		for {
+			var m plumb.Message
+			err := m.Recv(br)
+			if err != nil {
+				return
+			}
+			cplumb <- &m
+		}
+	}
+
 	// Loop so that if plumber is restarted, acme need not be.
 	for {
-		var fid *client.Fid
-		var err error
+		var fsys *client.Fsys
+
 		// Connect to plumber.
 		for {
-			if fid, err = plumb.Open("edit", plan9.OREAD|plan9.OCEXEC); err != nil {
-				time.Sleep(2000 * time.Millisecond) // Try every 2 seconds?
+			// We can't use plumb.Open here because it caches the client.Fsys.
+			var err error
+			fsys, err = client.MountService("plumb")
+			if err != nil {
+				time.Sleep(2 * time.Second) // Try every 2 seconds
 			} else {
 				break
 			}
 		}
-		plumbeditfid = fid
-		plumbsendfid, err = plumb.Open("send", plan9.OWRITE|plan9.OCEXEC)
-		if err != nil {
-			continue
-		}
 
-		plumbeditfidbr := bufio.NewReader(plumbeditfid)
-		// Relay messages.
-		for {
-			var m = &plumb.Message{}
-			err := m.Recv(plumbeditfidbr)
-			if err != nil {
-				break
-			}
-			cplumb <- m
-		}
-
-		// Lost connection.
-		plumbsendfid = nil
-
-		plumbeditfid = nil
-		fid.Close()
+		handleFsys(fsys)
 	}
 }
 
