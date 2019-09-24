@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/user"
 	"sort"
@@ -275,7 +276,12 @@ func (fs *fileServer) flush(x *Xfid, f *Fid) *Xfid {
 
 func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	if x.fcall.Uname != fs.username {
-		return fs.respond(x, nil, ErrPermission)
+		// Ignore mismatch because some libraries gets it wrong
+		// anyway. 9fans.net/go/plan9/client just uses the
+		// $USER environment variable, which is wrong in Windows
+		// (See `go doc -u -src 9fans.net/go/plan9/client getuser`)
+		log.Printf("attach from uname %q does not match %q but allowing anyway",
+			x.fcall.Uname, fs.username)
 	}
 	var id uint64
 	if x.fcall.Aname != "" {
@@ -640,7 +646,8 @@ func (dt *DirTab) Dir(id int, user string, clock int64) *plan9.Dir {
 func getuser() string {
 	user, err := user.Current()
 	if err != nil {
-		return "Wile E. Coyote"
+		// Same as https://9fans.github.io/usr/local/plan9/src/lib9/getuser.c
+		return "none"
 	}
 	return user.Username
 }
