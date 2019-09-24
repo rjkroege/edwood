@@ -56,9 +56,11 @@ func main() {
 		}()
 	}
 
-	// TODO(fhs): This is not very portable.
-	// See https://github.com/rjkroege/edwood/issues/222
-	home = os.Getenv("HOME")
+	var err error
+	home, err = os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not get user home directory: %v", err)
+	}
 	acmeshell = os.Getenv("acmeshell")
 	p := os.Getenv("tabstop")
 	if p != "" {
