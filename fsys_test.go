@@ -693,10 +693,18 @@ func TestFileServerAttach(t *testing.T) {
 				Type:  plan9.Tattach,
 				Uname: "glenda",
 			},
+			f: &Fid{},
 		}
-		fs.attach(x, nil)
+		fs.attach(x, x.f)
 
-		want := errorFcall(ErrPermission)
+		want := &plan9.Fcall{
+			Type: plan9.Rattach,
+			Qid: plan9.Qid{
+				Path: Qdir,
+				Vers: 0,
+				Type: plan9.QTDIR,
+			},
+		}
 		if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
 			t.Fatalf("got response %v; want %v", got, want)
 		}
