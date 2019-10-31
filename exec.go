@@ -21,7 +21,7 @@ import (
 
 type Exectab struct {
 	name  string
-	fn    func(t0, t1, t2 *Text, b0, b1 bool, arg string)
+	fn    func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
 	mark  bool
 	flag1 bool
 	flag2 bool
@@ -120,14 +120,10 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 
 // execute must run with an existing lock on t's Window
 func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
-	var (
-		q0, q1 int
-		r      []rune
-		n, f   int
-	)
+	var n, f int
 
-	q0 = aq0
-	q1 = aq1
+	q0 := aq0
+	q1 := aq1
 	if q1 == q0 { // expand to find word (actually file name)
 		// if in selection, choose selection
 		if t.inSelection(q0) {
@@ -155,7 +151,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			}
 		}
 	}
-	r = make([]rune, q1-q0)
+	r := make([]rune, q1-q0)
 	t.file.b.Read(q0, r)
 	e := lookup(string(r))
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
@@ -653,7 +649,8 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	go runwaittask(c, cpid)
 }
 
-func sendx(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
+// sendx appends selected text or snarf buffer to end of body.
+func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if et.w == nil {
 		return
 	}

@@ -975,6 +975,64 @@ func TestXfidwriteQWevent(t *testing.T) {
 	}
 }
 
+// Issue https://github.com/rjkroege/edwood/issues/285
+func TestXfidwriteQWeventExecuteSend(t *testing.T) {
+	// Setup a new window with "Send" in the tag.
+	d := edwoodtest.NewDisplay()
+	row = Row{
+		display: d,
+	}
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.nopen[QWevent]++
+	defer func() { w.nopen[QWevent]-- }()
+	w.tag = Text{
+		w: w,
+		file: &File{
+			b:    Buffer("Send"),
+			text: []*Text{&w.tag},
+		},
+		fr:      &MockFrame{},
+		display: d,
+	}
+	w.body = Text{
+		w: w,
+		file: &File{
+			b:    Buffer(""),
+			text: []*Text{&w.body},
+		},
+		fr:      &MockFrame{},
+		display: d,
+	}
+
+	// Put something in the snarf buffer.
+	const snarfbuf = "Hello, 世界\n"
+	d.WriteSnarf([]byte(snarfbuf))
+
+	// Execute "Send" in the tag. This should append the content of
+	// snarf buffer into the body.
+	mr := new(mockResponder)
+	const event = "Mx1 1"
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Data:  []byte(event),
+			Count: uint32(len(event)),
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(w.id, QWevent)},
+			w:   w,
+		},
+		fs: mr,
+	}
+	xfidwrite(x)
+	if got := mr.err; got != nil {
+		t.Errorf("event %q: got error %v; want nil", event, got)
+	}
+	if got, want := string(w.body.file.b), snarfbuf; got != want {
+		t.Errorf("body contains %q; want %q", got, want)
+	}
+}
+
 func TestXfidreadEmptyFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name string

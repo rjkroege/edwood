@@ -706,14 +706,14 @@ func xfideventwrite(x *Xfid, w *Window) {
 	// We can't lock row while we have a window locked
 	// because that can create deadlock with mousethread.
 	rowLock := func() {
-		w.Unlock()
+		defer w.Lock(w.owner)
+		w.Unlock() // sets w.owner to 0
 		row.lk.Lock()
-		w.Lock(w.owner)
 	}
 	rowUnlock := func() {
-		w.Unlock()
+		defer w.Lock(w.owner)
+		w.Unlock() // sets w.owner to 0
 		row.lk.Unlock()
-		w.Lock(w.owner)
 	}
 
 	// The messages have a fixed format: a character indicating the
