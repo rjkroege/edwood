@@ -75,6 +75,7 @@ var (
 	globalincref bool
 	seq          int
 	maxtab       uint // size of a tab, in units of the '0' character
+	texpand      bool // defines whether to expand tab to spaces
 
 	tagfont     string
 	mouse       *draw.Mouse

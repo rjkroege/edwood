@@ -72,5 +72,5 @@ func (ctx *optioncontext) computemaxtab(maxtab, ftw int) int {
 	if ctx.maxtabchars < 0 {
 		return maxtab
 	}
-	return ctx.maxtabchars * ftw
+	return ctx.maxtabchars * (ftw / 2)
 }
