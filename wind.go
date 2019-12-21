@@ -66,7 +66,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.tag.w = w
 	w.taglines = 1
 	w.tagsafe = false
-	w.tagexpand = false
+	w.tagexpand = true
 	w.body.w = w
 	w.incl = []string{}
 	WinID++
