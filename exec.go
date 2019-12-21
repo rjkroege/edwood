@@ -714,7 +714,6 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 	if tab > 0 {
 		if w.body.tabstop != int(tab) {
-
 			// replace spaces with new tab width
 			if w.body.texpand {
 				var replacement strings.Builder
@@ -729,7 +728,6 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 				replacement.WriteString("/g")
 				editcmd(et, []rune(replacement.String()))
 			}
-
 			w.body.tabstop = int(tab)
 			w.Resize(w.r, false, true)
 		}
@@ -743,11 +741,11 @@ func tabexpand(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		return
 	}
 	w := et.w
-	if w.tabexpand {
-		w.tabexpand = false
+	if w.body.texpand {
+		w.body.texpand = false
 		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.name, w.body.tabstop)
 	} else {
-		w.tabexpand = true
+		w.body.texpand = true
 		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.name, w.body.tabstop)
 	}
 }

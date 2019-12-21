@@ -52,7 +52,6 @@ type Window struct {
 	utflastq    int    // Rune offset of last read of body or tag
 	tagsafe     bool
 	tagexpand   bool
-	tabexpand   bool
 	taglines    int
 	tagtop      image.Rectangle
 	editoutlk   chan bool
@@ -94,11 +93,9 @@ func (w *Window) initHeadless(clone *Window) *Window {
 
 	w.filemenu = true
 	w.autoindent = *globalAutoIndent
-	w.tabexpand = false
 
 	if clone != nil {
 		w.autoindent = clone.autoindent
-		w.tabexpand = clone.tabexpand
 	}
 	w.editoutlk = make(chan bool, 1)
 	return w
