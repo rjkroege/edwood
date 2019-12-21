@@ -71,6 +71,14 @@ func main() {
 		maxtab = 4
 	}
 
+	b := os.Getenv("tabexpand")
+	if b != "" {
+		te, _ := strconv.ParseBool(b)
+		texpand = te
+	} else {
+		texpand = false
+	}
+
 	var dump *dumpfile.Content
 
 	if loadfile != "" {
