@@ -3,7 +3,7 @@ module github.com/rjkroege/edwood
 go 1.11
 
 require (
-	9fans.net/go v0.0.0-20181112161441-237454027057
+	9fans.net/go v0.0.2
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802 // indirect
 	github.com/as/cursor v0.6.7 // indirect
 	github.com/as/ms v0.1.0 // indirect
