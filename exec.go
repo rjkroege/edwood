@@ -91,6 +91,7 @@ func printarg(argt *Text, q0 int, q1 int) string {
 	return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
 }
 
+// TODO(rjk): use a tokenizer on the results of getarg
 func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	if argt == nil {
 		return "", ""
@@ -693,8 +694,6 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		return
 	}
 	w := et.w
-
-	// TODO(rjk): use a tokenizer on the results of getarg
 	r, _ := getarg(argt, false, true)
 	tab := int64(0)
 	if r != "" {
