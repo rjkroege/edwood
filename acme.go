@@ -74,9 +74,9 @@ func main() {
 	b := os.Getenv("tabexpand")
 	if b != "" {
 		te, _ := strconv.ParseBool(b)
-		texpand = te
+		tabexpand = te
 	} else {
-		texpand = false
+		tabexpand = false
 	}
 
 	var dump *dumpfile.Content

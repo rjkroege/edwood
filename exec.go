@@ -55,7 +55,7 @@ var exectab = []Exectab{
 	{"Snarf", cut, false, true, false},
 	{"Sort", sortx, false, true /*unused*/, true /*unused*/},
 	{"Tab", tab, false, true /*unused*/, true /*unused*/},
-	{"Tabexpand", tabexpand, false, true /*unused*/, true /*unused*/},
+	{"Tabexpand", expandtab, false, true /*unused*/, true /*unused*/},
 	{"Undo", undo, false, true, true /*unused*/},
 	{"Zerox", zeroxx, false, true /*unused*/, true /*unused*/},
 }
@@ -714,20 +714,6 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 	if tab > 0 {
 		if w.body.tabstop != int(tab) {
-			// replace spaces with new tab width
-			if w.body.texpand {
-				var replacement strings.Builder
-				replacement.WriteString(", s/^")
-				for i := 0; i < w.body.tabstop; i++ {
-					replacement.WriteString(" ")
-				}
-				replacement.WriteString("/")
-				for i := 0; i < int(tab); i++ {
-					replacement.WriteString(" ")
-				}
-				replacement.WriteString("/g")
-				editcmd(et, []rune(replacement.String()))
-			}
 			w.body.tabstop = int(tab)
 			w.Resize(w.r, false, true)
 		}
@@ -736,16 +722,16 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 }
 
-func tabexpand(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
+func expandtab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	if et == nil || et.w == nil {
 		return
 	}
 	w := et.w
-	if w.body.texpand {
-		w.body.texpand = false
+	if w.body.tabexpand {
+		w.body.tabexpand = false
 		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.name, w.body.tabstop)
 	} else {
-		w.body.texpand = true
+		w.body.tabexpand = true
 		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.name, w.body.tabstop)
 	}
 }
