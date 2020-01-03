@@ -60,18 +60,18 @@ type Text struct {
 	fr      frame.Frame
 	font    string
 
-	org     int // Origin of the frame within the buffer
-	q0      int
-	q1      int
-	what    TextKind
-	tabstop int
+	org       int // Origin of the frame within the buffer
+	q0        int
+	q1        int
+	what      TextKind
+	tabstop   int
 	tabexpand bool
-	w       *Window
-	scrollr image.Rectangle
-	lastsr  image.Rectangle
-	all     image.Rectangle
-	row     *Row
-	col     *Column
+	w         *Window
+	scrollr   image.Rectangle
+	lastsr    image.Rectangle
+	all       image.Rectangle
+	row       *Row
+	col       *Column
 
 	iq1 int
 	eq0 int
