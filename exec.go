@@ -693,6 +693,8 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		return
 	}
 	w := et.w
+
+	// TODO(rjk): use a tokenizer on the results of getarg
 	r, _ := getarg(argt, false, true)
 	tab := int64(0)
 	if r != "" {
