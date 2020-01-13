@@ -4,7 +4,7 @@
 	"VarFont": "/lib/font/bit/lucsans/euro.8.font",
 	"FixedFont": "/lib/font/bit/lucm/unicode.9.font",
 	"RowTag": {
-		"Buffer": "win Newcol Kill Putall Dump Exit win",
+		"Buffer": "Newcol Kill Putall Dump Exit win",
 		"Q0": 23,
 		"Q1": 27
 	},
