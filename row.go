@@ -13,6 +13,8 @@ import (
 	"github.com/rjkroege/edwood/internal/dumpfile"
 )
 
+const RowTag = "Newcol Kill Putall Dump Exit"
+
 type Row struct {
 	display draw.Display
 	lk      sync.Mutex
@@ -42,7 +44,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage().Draw(r1, row.display.Black(), nil, image.Point{})
-	t.Insert(0, []rune("Newcol Kill Putall Dump Exit "), true)
+	t.Insert(0, []rune(RowTag+" "), true)
 	t.SetSelect(t.file.Size(), t.file.Size())
 	return row
 }
@@ -330,12 +332,17 @@ func (r *Row) Dump(file string) error {
 }
 
 func (r *Row) dump() (*dumpfile.Content, error) {
+	rowTag := string(r.tag.file.b)
+	// Remove commands at the beginning of row tag.
+	if i := strings.Index(rowTag, RowTag); i > 1 {
+		rowTag = rowTag[i:]
+	}
 	dump := &dumpfile.Content{
 		CurrentDir: wdir,
 		VarFont:    *varfontflag,
 		FixedFont:  *fixedfontflag,
 		RowTag: dumpfile.Text{
-			Buffer: string(r.tag.file.b),
+			Buffer: rowTag,
 			Q0:     r.tag.q0,
 			Q1:     r.tag.q1,
 		},
