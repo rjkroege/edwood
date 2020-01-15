@@ -416,3 +416,28 @@ func TestTextBsInsert(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandtabInsert(t *testing.T) {
+	w := &Window{
+		body: Text{
+			file:      &File{},
+			tabexpand: true,
+			tabstop:   4,
+		},
+	}
+	text := &w.body
+	text.w = w
+	text.tabexpand = true
+
+	want := "    |"
+	not := "	|"
+	text.Type(0x09)
+	text.Type('|')
+	out := string(text.file.cache)
+	if out != want {
+		t.Errorf("loaded text %q; expected %q", out, want)
+	}
+	if out == not {
+		t.Errorf("loaded text %q; expected %q", out, want)
+	}
+}
