@@ -164,3 +164,23 @@ func TestPutfile(t *testing.T) {
 		t.Fatalf("putfile returned error %v; expected 'modified since last read'", err)
 	}
 }
+
+func TestExpandtabToggle(t *testing.T) {
+	want := true
+	w := &Window{
+		body: Text{
+			file:      &File{},
+			tabexpand: false,
+			tabstop:   4,
+		},
+	}
+	text := &w.body
+	text.w = w
+	text.tabexpand = !want
+
+	expandtab(text, text, text, false, false, "")
+	te := text.w.body.tabexpand
+	if te != want {
+		t.Errorf("tabexpand is set to %v; expected %v", te, want)
+	}
+}
