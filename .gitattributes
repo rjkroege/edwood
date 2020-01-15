@@ -1,4 +1,5 @@
 *            text eol=lf
+build/font/**/* text eol=crlf
 build/bin_linux/9pserve binary
 build/bin_linux/devdraw binary
 build/bin_darwin/9pserve binary
