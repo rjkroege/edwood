@@ -459,7 +459,7 @@ func x_cmd(t *Text, cp *Cmd) bool {
 }
 
 func X_cmd(t *Text, cp *Cmd) bool {
-	filelooper(cp, cp.cmdc == 'X')
+	filelooper(t, cp, cp.cmdc == 'X')
 	return true
 }
 
@@ -806,7 +806,7 @@ func alllocker(w *Window, v bool) {
 	}
 }
 
-func filelooper(cp *Cmd, XY bool) {
+func filelooper(t *Text, cp *Cmd, XY bool) {
 	if Glooping != 0 {
 		isX := 'Y'
 		if XY {
@@ -821,15 +821,35 @@ func filelooper(cp *Cmd, XY bool) {
 	loopstruct.XY = XY
 	loopstruct.w = []*Window{}
 	row.AllWindows(func(w *Window) { alllooper(w, &loopstruct) })
-	//	 * add a ref to all windows to keep safe windows accessed by X
-	//	 * that would not otherwise have a ref to hold them up during
-	//	 * the shenanigans.  note this with globalincref so that any
-	//	 * newly created windows start with an extra reference.
+
+	// add a ref to all windows to keep safe windows accessed by X
+	// that would not otherwise have a ref to hold them up during
+	// the shenanigans.  note this with globalincref so that any
+	// newly created windows start with an extra reference.
 	row.AllWindows(func(w *Window) { alllocker(w, true) })
 	globalincref = true
-	for i := 0; i < len(loopstruct.w); i++ {
-		cmdexec(&loopstruct.w[i].body, cp.cmd)
+
+	// Unlock the window running the X command.
+	// We'll need to lock and unlock each target window in turn.
+	if t != nil && t.w != nil {
+		t.w.Unlock()
 	}
+
+	for i := range loopstruct.w {
+		targ := &loopstruct.w[i].body
+		if targ != nil && targ.w != nil {
+			targ.w.Lock(int(cp.cmdc))
+		}
+		cmdexec(targ, cp.cmd)
+		if targ != nil && targ.w != nil {
+			targ.w.Unlock()
+		}
+	}
+
+	if t != nil && t.w != nil {
+		t.w.Lock(int(cp.cmdc))
+	}
+
 	row.AllWindows(func(w *Window) { alllocker(w, false) })
 	globalincref = false
 	loopstruct.w = nil
