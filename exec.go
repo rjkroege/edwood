@@ -943,7 +943,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 				if winid > 0 {
 					buf = fmt.Sprintf("%d/editout", winid)
 				} else {
-					buf = fmt.Sprintf("editout")
+					buf = "editout"
 				}
 			} else {
 				buf = fmt.Sprintf("%d/wrsel", winid)
