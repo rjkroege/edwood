@@ -116,17 +116,7 @@ func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
 }
 
 func errorwin1Name(dir string) string {
-	const Lpluserrors = "+Errors"
-	var b strings.Builder
-
-	if len(dir) > 0 {
-		b.WriteString(dir)
-		if !strings.HasSuffix(dir, string(filepath.Separator)) {
-			b.WriteRune(filepath.Separator)
-		}
-	}
-	b.WriteString(Lpluserrors)
-	return b.String()
+	return filepath.Join(dir, "+Errors")
 }
 
 func errorwin1(dir string, incl []string) *Window {
@@ -146,7 +136,7 @@ func errorwin1(dir string, incl []string) *Window {
 	for _, in := range incl {
 		w.AddIncl(in)
 	}
-	w.autoindent = globalautoindent
+	w.autoindent = *globalAutoIndent
 	return w
 }
 
@@ -177,15 +167,11 @@ func errorwinforwin(w *Window) *Window {
 	var (
 		owner int
 		incl  []string
-		dir   string
 		t     *Text
 	)
 
 	t = &w.body
-	dir = t.DirName("")
-	if dir == "." { // sigh
-		dir = ""
-	}
+	dir := t.DirName("")
 	incl = append(incl, w.incl...)
 	owner = w.owner
 	w.Unlock()

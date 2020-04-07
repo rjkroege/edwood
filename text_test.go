@@ -6,8 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/frame"
 )
 
 func emptyText() *Text {
@@ -72,8 +76,8 @@ func TestLoad(t *testing.T) {
 
 func TestLoadError(t *testing.T) {
 	text := emptyText()
-	wantErr := "can't open /non-existant-filename:"
-	_, err := text.Load(0, "/non-existant-filename", true)
+	wantErr := "can't open /non-existent-filename:"
+	_, err := text.Load(0, "/non-existent-filename", true)
 	if err == nil || !strings.HasPrefix(err.Error(), wantErr) {
 		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
 	}
@@ -92,17 +96,17 @@ func TestLoadError(t *testing.T) {
 		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
 	}
 
-	mtpt = "/mnt/acme"
+	*mtpt = "/mnt/acme"
 	defer func() {
-		mtpt = ""
+		*mtpt = ""
 	}()
-	text.file.name = mtpt
+	text.file.name = *mtpt
 	wantErr = "will not open self mount point /mnt/acme"
-	_, err = text.Load(0, mtpt, true)
+	_, err = text.Load(0, *mtpt, true)
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("Load returned error %v; expected %v", err, wantErr)
 	}
-	_, err = text.LoadReader(0, mtpt, nil, true)
+	_, err = text.LoadReader(0, *mtpt, nil, true)
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("LoadReader returned error %v; expected %v", err, wantErr)
 	}
@@ -189,7 +193,7 @@ func TestGetDirNames(t *testing.T) {
 
 	// add a broken symlink
 	name = "broken-link"
-	err = os.Symlink("/non/existant/file", filepath.Join(dir, name))
+	err = os.Symlink("/non/existent/file", filepath.Join(dir, name))
 	if err != nil {
 		t.Fatalf("Symlink failed: %v", err)
 	}
@@ -234,5 +238,206 @@ func TestGetDirNamesNil(t *testing.T) {
 	_, err := getDirNames(nil)
 	if err == nil {
 		t.Errorf("getDirNames was successful on nil File")
+	}
+}
+
+type textFillMockFrame struct {
+	*MockFrame
+}
+
+func (fr *textFillMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
+	return frame.FrameFillStatus{
+		Nchars:         100,
+		Nlines:         0,
+		Maxlines:       0,
+		MaxPixelHeight: 0,
+	}
+}
+
+func TestTextFill(t *testing.T) {
+	text := &Text{
+		file: &File{},
+	}
+	err := text.fill(&textFillMockFrame{})
+	wantErr := "fill: negative slice length -100"
+	if err == nil || err.Error() != wantErr {
+		t.Errorf("got error %q; want %q", err, wantErr)
+	}
+}
+
+func TestTextDirName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+	tt := []struct {
+		name          string
+		w             *Window
+		filename, dir string
+	}{
+		{"NilWindow,file=''", nil, "", "."},
+		{"NilWindow", nil, "abc", "abc"},
+		{"EmptyTag,file=''", windowWithTag(""), "", "."},
+		{"EmptyTag", windowWithTag(""), "abc", "abc"},
+		{"Dot,file=''", windowWithTag("./ Del Snarf | Look "), "", "."},
+		{"Dot", windowWithTag("./ Del Snarf | Look "), "d.go", "d.go"},
+		{"NoSlash,file=''", windowWithTag("abc Del Snarf | Look "), "", "."},
+		{"NoSlash", windowWithTag("abc Del Snarf | Look "), "d.go", "d.go"},
+		{"AbsDir,file=''", windowWithTag("/a/b/c/ Del Snarf | Look "), "", "/a/b/c"},
+		{"AbsDir", windowWithTag("/a/b/c/ Del Snarf | Look "), "d.go", "/a/b/c/d.go"},
+		{"RelativeDir,file=''", windowWithTag("a/b/c/ Del Snarf | Look "), "", "a/b/c"},
+		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", "a/b/c/d.go"},
+		{"AbsFile,file=''", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "", "/a/b/c"},
+		{"AbsFile", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "e.go", "/a/b/c/e.go"},
+		{"RelativeFile,file=''", windowWithTag("a/b/c/d.go Del Snarf | Look "), "", "a/b/c"},
+		{"RelativeFile", windowWithTag("a/b/c/d.go Del Snarf | Look "), "e.go", "a/b/c/e.go"},
+		{"IgnoreTag", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "/x/e.go", "/x/e.go"},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			text := Text{
+				w: tc.w,
+			}
+			dir := text.DirName(tc.filename)
+			if !reflect.DeepEqual(dir, tc.dir) {
+				t.Errorf("dirname of %q is %q; want %q", tc.filename, dir, tc.dir)
+			}
+		})
+	}
+}
+
+func TestTextAbsDirName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+	wdir = "/home/gopher"
+	defer func() { wdir = "" }()
+
+	for _, tc := range []struct {
+		name          string
+		w             *Window
+		filename, dir string
+	}{
+		{"AbsDir", windowWithTag("/a/b/c/ Del Snarf | Look "), "d.go", "/a/b/c/d.go"},
+		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", "/home/gopher/a/b/c/d.go"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			text := Text{
+				w: tc.w,
+			}
+			dir := text.AbsDirName(tc.filename)
+			if !reflect.DeepEqual(dir, tc.dir) {
+				t.Errorf("dirname of %q is %q; want %q", tc.filename, dir, tc.dir)
+			}
+		})
+	}
+}
+
+func windowWithTag(tag string) *Window {
+	return &Window{
+		tag: Text{
+			file: &File{
+				b: Buffer([]rune(tag)),
+			},
+		},
+	}
+}
+
+func TestBackNL(t *testing.T) {
+	tt := []struct {
+		buf  string // Text file buffer
+		p, n int    // Input position and number of lines to back up
+		q    int    // Returned position
+	}{
+		{"", 0, 0, 0},
+		{"", 0, 1, 0},
+		{"", 0, 2, 0},
+		{"01234\n", 3, 0, 0},
+		{"01234\n", 3, 1, 0},
+		{"01234\n", 3, 2, 0},
+		{"01234\n6789\nabcd\n", 13, 0, 11},
+		{"01234\n6789\nabcd\n", 13, 1, 11},
+		{"01234\n6789\nabcd\n", 13, 2, 6},
+		{"01234\n6789\nabcd\n", 13, 3, 0},
+		{"\n1234\n6789\nabcd\n", 13, 3, 1},
+		{"\n1234\n6789\nabcd\n", 13, 4, 0},
+		{"\n1234\n6789\nabcd\n", 13, 5, 0},
+	}
+
+	for _, tc := range tt {
+		text := &Text{
+			file: &File{
+				b: Buffer(tc.buf),
+			},
+		}
+		q := text.BackNL(tc.p, tc.n)
+		if got, want := q, tc.q; got != want {
+			t.Errorf("BackNL(%v, %v) for %q is %v; want %v",
+				tc.p, tc.n, tc.buf, got, want)
+		}
+	}
+}
+
+func TestTextBsInsert(t *testing.T) {
+	tt := []struct {
+		name          string   // Test name
+		what          TextKind // Body, Tag, etc.
+		q0, q         int      // Input and returned position
+		buf           string   // Initial text buffer
+		inbuf, outbuf []rune   // Inserted and modified text buffer
+		nr            int      // Returned number of runes
+	}{
+		{"Tag", Tag, 2, 2, "abc", []rune("xy\bz"), []rune("abxy\bzc"), 4},
+		{"NoBS", Body, 2, 2, "abc", []rune("xyz"), []rune("abxyzc"), 3},
+		{"BSInMiddle", Body, 2, 2, "abc", []rune("xy\bz"), []rune("abxzc"), 2},
+		{"BSAtStart", Body, 2, 1, "abc", []rune("\bxyz"), []rune("axyzc"), 3},
+		{"TwoBS", Body, 2, 0, "abc", []rune("\b\b"), []rune("c"), 0},
+		{"TooManyBS", Body, 2, 0, "abc", []rune("\b\b\b\b\b"), []rune("c"), 0},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			text := &Text{
+				what: tc.what,
+				file: &File{
+					b: Buffer(tc.buf),
+				},
+			}
+			q, nr := text.BsInsert(tc.q0, []rune(tc.inbuf), true)
+			if nr != tc.nr {
+				t.Errorf("nr = %v; want %v", nr, tc.nr)
+			}
+			if q != tc.q {
+				t.Errorf("q = %v; want %v", q, tc.q)
+			}
+			if got, want := []rune(text.file.b), tc.outbuf; !cmp.Equal(got, want) {
+				t.Errorf("text.file.b = %q; want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestExpandtabInsert(t *testing.T) {
+	w := &Window{
+		body: Text{
+			file:      &File{},
+			tabexpand: true,
+			tabstop:   4,
+		},
+	}
+	text := &w.body
+	text.w = w
+	text.tabexpand = true
+
+	want := "    |"
+	not := "	|"
+	text.Type(0x09)
+	text.Type('|')
+	out := string(text.file.cache)
+	if out != want {
+		t.Errorf("loaded text %q; expected %q", out, want)
+	}
+	if out == not {
+		t.Errorf("loaded text %q; expected %q", out, want)
 	}
 }

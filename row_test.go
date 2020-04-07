@@ -21,6 +21,8 @@ import (
 	"github.com/rjkroege/edwood/internal/edwoodtest"
 )
 
+const gopherEdwoodDir = "/home/gopher/go/src/edwood"
+
 func TestRowLoadFsys(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
@@ -46,7 +48,7 @@ func TestRowLoadFsys(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ReadFile failed: %v", err)
 			}
-			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood"), []byte(cwd), -1)
+			b = bytes.Replace(b, []byte(gopherEdwoodDir), []byte(cwd), -1)
 
 			f, err := ioutil.TempFile("", "edwood_test")
 			if err != nil {
@@ -85,7 +87,7 @@ func checkDumpFsys(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 	}
 
 	// Zerox-ed windows don't show up in index file.
-	// Check number of orginal windows matches.
+	// Check number of original windows matches.
 	norig := 0
 	for _, w := range dump.Windows {
 		if w.Type != dumpfile.Zerox {
@@ -144,63 +146,32 @@ func TestRowLoad(t *testing.T) {
 		{"multi-line-tag", "testdata/multi-line-tag.dump"},
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current working directory: %v", err)
-	}
-
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			b, err := ioutil.ReadFile(tc.filename)
-			if err != nil {
-				t.Fatalf("ReadFile failed: %v", err)
-			}
-			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood/"),
-				[]byte(jsonEscapePath(cwd+string(filepath.Separator))), -1)
-			b = bytes.Replace(b, []byte("/home/gopher/go/src/edwood"),
-				[]byte(jsonEscapePath(cwd)), -1)
+			filename := editDumpFileForTesting(t, tc.filename)
+			defer os.Remove(filename)
 
-			f, err := ioutil.TempFile("", "edwood_test")
-			if err != nil {
-				t.Fatalf("failed to create temporary file: %v", err)
-			}
-			defer os.Remove(f.Name())
-			_, err = f.Write(b)
-			if err != nil {
-				t.Fatalf("write failed: %v", err)
-			}
-			f.Close()
+			setGlobalsForLoadTesting()
 
-			colbutton = edwoodtest.NewImage(image.Rectangle{})
-			button = edwoodtest.NewImage(image.Rectangle{})
-			modbutton = edwoodtest.NewImage(image.Rectangle{})
-			mouse = &draw.Mouse{}
-			maxtab = 4
-
-			display := edwoodtest.NewDisplay()
-			row = Row{} // reset
-			row.Init(display.ScreenImage().R(), display)
-
-			err = row.Load(nil, f.Name(), true)
+			err := row.Load(nil, filename, true)
 			if err != nil {
 				t.Fatalf("Row.Load failed: %v", err)
 			}
-			dump, err := dumpfile.Load(f.Name())
+			want, err := dumpfile.Load(filename)
 			if err != nil {
 				t.Fatalf("failed to load dump file %v: %v", tc, err)
 			}
-			checkDump(t, f.Name(), dump)
+			got, err := row.dump()
+			if err != nil {
+				t.Fatalf("dump failed: %v", err)
+			}
+			checkDump(t, got, want)
 		})
 	}
 }
 
-// checkDump checks Edwood's current state matches loaded dump file content.
-func checkDump(t *testing.T, filename string, want *dumpfile.Content) {
-	got, err := row.dump()
-	if err != nil {
-		t.Fatalf("dump failed: %v", err)
-	}
-
+// checkDump checks Edwood's current state (got) matches loaded dump file content (want).
+func checkDump(t *testing.T, got, want *dumpfile.Content) {
 	// Ignore some mismatch. Positions may not match exactly.
 	// Window tags may get "Put" added or "Undo" removed, and
 	// because of the change in the tag, selection within the tag may not match.
@@ -266,8 +237,8 @@ func TestRowDumpError(t *testing.T) {
 func TestRowLoadError(t *testing.T) {
 	var r Row
 
-	err := r.Load(nil, "/non-existant-file", true)
-	want := "can't load dump file: open /non-existant-file:"
+	err := r.Load(nil, "/non-existent-file", true)
+	want := "can't load dump file: open /non-existent-file:"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("Row.Load returned error %q; want prefix %q", err, want)
 	}
@@ -454,4 +425,58 @@ func TestRowLookupWin(t *testing.T) {
 // jsonEscapePath escapes blackslashes in Windows path.
 func jsonEscapePath(s string) string {
 	return strings.Replace(s, "\\", "\\\\", -1)
+}
+
+func setGlobalsForLoadTesting() {
+	WinID = 0 // reset
+	colbutton = edwoodtest.NewImage(image.Rectangle{})
+	button = edwoodtest.NewImage(image.Rectangle{})
+	modbutton = edwoodtest.NewImage(image.Rectangle{})
+	mouse = &draw.Mouse{}
+	maxtab = 4
+
+	display := edwoodtest.NewDisplay()
+	row = Row{} // reset
+	row.Init(display.ScreenImage().R(), display)
+}
+
+func replacePathsForTesting(t *testing.T, b []byte, isJSON bool) []byte {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+	d := filepath.Join(cwd, "testdata")
+	gd := gopherEdwoodDir + "/testdata"
+
+	escape := jsonEscapePath
+	if !isJSON {
+		escape = func(s string) string { return s }
+	}
+
+	b = bytes.Replace(b, []byte(gd+"/"),
+		[]byte(escape(d+string(filepath.Separator))), -1)
+	b = bytes.Replace(b, []byte(gd),
+		[]byte(escape(d)), -1)
+	b = bytes.Replace(b, []byte(gopherEdwoodDir),
+		[]byte(escape(cwd)), -1) // CurrentDir
+	return b
+}
+
+func editDumpFileForTesting(t *testing.T, filename string) string {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	b = replacePathsForTesting(t, b, true)
+
+	f, err := ioutil.TempFile("", "edwood_test")
+	if err != nil {
+		t.Fatalf("failed to create temporary file: %v", err)
+	}
+	_, err = f.Write(b)
+	if err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	f.Close()
+	return f.Name()
 }

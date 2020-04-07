@@ -29,27 +29,27 @@ type Window struct {
 	addr  Range
 	limit Range
 
-	nopen      [QMAX]byte
+	nopen      [QMAX]byte // number of open Fid for each file in the file server
 	nomark     bool
 	wrselrange Range
-	rdselfd    *os.File
+	rdselfd    *os.File // temporary file for rdsel read requests
 
 	col    *Column
 	eventx *Xfid
 	events []byte
 
-	owner       int
+	owner       int // TODO(fhs): change type to rune
 	maxlines    int
 	dirnames    []string
 	widths      []int
 	incl        []string
-	ctrllock    *sync.Mutex
-	ctlfid      uint32
+	ctrllock    sync.Mutex // used for lock/unlock ctl mesage
+	ctlfid      uint32     // ctl file Fid which has the ctrllock
 	dumpstr     string
 	dumpdir     string
-	utflastqid  int
-	utflastboff uint64
-	utflastq    int
+	utflastqid  int    // Qid of last read request (QWbody or QWtag)
+	utflastboff uint64 // Byte offset of last read of body or tag
+	utflastq    int    // Rune offset of last read of body or tag
 	tagsafe     bool
 	tagexpand   bool
 	taglines    int
@@ -92,7 +92,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.body.file = f.AddText(&w.body)
 
 	w.filemenu = true
-	w.autoindent = globalautoindent
+	w.autoindent = *globalAutoIndent
 
 	if clone != nil {
 		w.autoindent = clone.autoindent
@@ -137,7 +137,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
-		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
 	}
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
@@ -292,7 +292,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
-				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.ZP)
+				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
 			}
 			y++
 			r1.Min.Y = min(y, r.Max.Y)
@@ -334,7 +334,7 @@ func (w *Window) Lock(owner int) {
 	})
 }
 
-// unlock1 unlcoks a single window.
+// unlock1 unlocks a single window.
 func (w *Window) unlock1() {
 	w.owner = 0
 	w.Close()
@@ -454,26 +454,23 @@ func (w *Window) SetTag() {
 // setTag1 updates the tag contents for a given window w.
 // TODO(rjk): Handle files with spaces in their names.
 func (w *Window) setTag1() {
-	Ldelsnarf := (" Del Snarf")
-	Lundo := (" Undo")
-	Lredo := (" Redo")
-	Lget := (" Get")
-	Lput := (" Put")
-	Llook := (" Look")
-	Ledit := (" Edit")
-	//	Lpipe := (" |")
-
-	// there are races that get us here with stuff in the tag cache, so we take extra care to sync it
-	if w.tag.file.SaveableAndDirty() {
-		w.Commit(&w.tag) // check file name; also guarantees we can modify tag contents
-	}
+	const (
+		Ldelsnarf = " Del Snarf"
+		Lundo     = " Undo"
+		Lredo     = " Redo"
+		Lget      = " Get"
+		Lput      = " Put"
+		Llook     = " Look"
+		Ledit     = " Edit"
+		Lpipe     = " |"
+	)
 
 	// (flux) The C implemtation does a lot of work to avoid
 	// re-setting the tag text if unchanged.  That's probably not
 	// relevant in the modern world.  We can build a new tag trivially
 	// and put up with the traffic implied for a tag line.
 
-	sb := strings.Builder{}
+	var sb strings.Builder
 	sb.WriteString(w.body.file.name)
 	sb.WriteString(Ldelsnarf)
 
@@ -491,13 +488,13 @@ func (w *Window) setTag1() {
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
-	olds := string(w.tag.file.b)
+	old := w.tag.file.b
 	oldbarIndex := w.tag.file.b.IndexRune('|')
 	if oldbarIndex >= 0 {
 		sb.WriteString(" ")
-		sb.WriteString(olds[oldbarIndex:])
+		sb.WriteString(string(old[oldbarIndex:]))
 	} else {
-		sb.WriteString(" |")
+		sb.WriteString(Lpipe)
 		sb.WriteString(Llook)
 		sb.WriteString(Ledit)
 		sb.WriteString(" ")
@@ -521,12 +518,10 @@ func (w *Window) setTag1() {
 		// Rationalize the selection as best as possible
 		w.tag.q0 = min(q0, w.tag.Nc())
 		w.tag.q1 = min(q1, w.tag.Nc())
-		if oldbarIndex != -1 {
-			if q0 > (oldbarIndex) {
-				bar := (newbarIndex - oldbarIndex)
-				w.tag.q0 = q0 + bar
-				w.tag.q1 = q1 + bar
-			}
+		if oldbarIndex != -1 && q0 > oldbarIndex {
+			bar := newbarIndex - oldbarIndex
+			w.tag.q0 = q0 + bar
+			w.tag.q1 = q1 + bar
 		}
 	}
 	w.tag.file.Clean()
@@ -547,6 +542,8 @@ func (w *Window) setTag1() {
 	}
 }
 
+// TODO(rjk): In the future of File's replacement with undo buffer,
+// this method could be renamed to something like "UpdateTag"
 func (w *Window) Commit(t *Text) {
 	t.Commit() // will set the file.mod to true
 	if t.what == Body {
@@ -595,7 +592,7 @@ func (w *Window) AddIncl(r string) {
 			warning(nil, "%s: Not a directory: %v", r, err)
 			return
 		}
-		r = string(dirname(&w.body, []rune(r)))
+		r = w.body.DirName(r)
 		d, err := isDir(r)
 		if !d {
 			warning(nil, "%s: Not a directory: %v", r, err)
@@ -669,5 +666,21 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 	if x != nil {
 		w.eventx = nil
 		x.c <- nil
+	}
+}
+
+// ClampAddr clamps address range based on the body buffer.
+func (w *Window) ClampAddr() {
+	if w.addr.q0 < 0 {
+		w.addr.q0 = 0
+	}
+	if w.addr.q1 < 0 {
+		w.addr.q1 = 0
+	}
+	if w.addr.q0 > w.body.Nc() {
+		w.addr.q0 = w.body.Nc()
+	}
+	if w.addr.q1 > w.body.Nc() {
+		w.addr.q1 = w.body.Nc()
 	}
 }

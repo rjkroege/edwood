@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 
@@ -8,7 +9,10 @@ import (
 	"github.com/fhs/mux9p"
 )
 
-var fsysAddr net.Addr
+var (
+	fsysAddrFlag = flag.String("fsys.addr", "localhost:0", "9P file system listen address")
+	fsysAddr     net.Addr
+)
 
 func newPipe() (net.Conn, net.Conn, error) {
 	c1, c2 := net.Pipe()
@@ -16,9 +20,9 @@ func newPipe() (net.Conn, net.Conn, error) {
 }
 
 func post9pservice(conn net.Conn, name string, mtpt string) error {
-	l, err := net.Listen("tcp", "localhost:0")
+	l, err := net.Listen("tcp", *fsysAddrFlag)
 	if err != nil {
-		return fmt.Errorf("Listen failed: %v", err)
+		return fmt.Errorf("listen failed: %v", err)
 	}
 	go func() {
 		defer l.Close()

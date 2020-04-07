@@ -17,6 +17,8 @@ import (
 	"9fans.net/go/acme"
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/ninep"
 )
 
 func TestMain(m *testing.M) {
@@ -81,8 +83,8 @@ type Acme struct {
 // augmentPath extends PATH so that plan9 dependencies can be
 // found in the build directory.
 func augmentPathEnv() {
-	// We only have Linux executables.
-	if runtime.GOOS != "linux" {
+	// We have Linux and Darwin executables.
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return
 	}
 
@@ -98,7 +100,7 @@ func augmentPathEnv() {
 		return
 	}
 
-	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin")
+	path := os.Getenv("PATH") + ":" + filepath.Join(wd, "build", "bin"+"_"+runtime.GOOS)
 	os.Setenv("PATH", path)
 
 	// We also need fonts.
@@ -573,5 +575,851 @@ func TestMntDecRef(t *testing.T) {
 	wantErr := fmt.Sprintf("Mnt.DecRef: can't find id %d", md.id)
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("mnt.DecRef invalid id %d generated error %v; expected %q", md.id, err, wantErr)
+	}
+}
+
+func errorFcall(err error) *plan9.Fcall {
+	return &plan9.Fcall{
+		Type:  plan9.Rerror,
+		Ename: err.Error(),
+	}
+}
+
+type mockConn struct {
+	bytes.Buffer
+}
+
+func (mc *mockConn) Close() error { return nil }
+
+func (mc *mockConn) ReadFcall(t *testing.T) *plan9.Fcall {
+	t.Helper()
+
+	fc, err := plan9.ReadFcall(mc)
+	if err != nil {
+		t.Fatalf("failed to read Fcall: %v", err)
+	}
+	return fc
+}
+
+func TestFileServerVersion(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		want    plan9.Fcall
+	}{
+		{"9P2000", plan9.Fcall{
+			Type:    plan9.Rversion,
+			Version: "9P2000",
+			Msize:   8192,
+		}},
+		{"9P2000.u", plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: "unrecognized 9P version",
+		}},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{conn: mc}
+			fs.version(&Xfid{
+				fcall: plan9.Fcall{
+					Type:    plan9.Tversion,
+					Version: tc.version,
+					Msize:   8192,
+				},
+			}, nil)
+
+			if got, want := mc.ReadFcall(t), &tc.want; !cmp.Equal(got, want) {
+				t.Fatalf("got response %v; want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestFileServerAuth(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.auth(&Xfid{}, nil)
+
+	want := errorFcall(fmt.Errorf("acme: authentication not required"))
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerSendToXfidChan(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+
+	for _, tc := range []struct {
+		name string
+		f    fsfunc
+	}{
+		{"flush", fs.flush},
+		{"write", fs.write},
+		{"read", fs.read},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x := &Xfid{
+				c: make(chan func(*Xfid)),
+			}
+			fid := &Fid{
+				qid: plan9.Qid{
+					Type: plan9.QTFILE,
+				},
+			}
+			go func() {
+				<-x.c
+				close(x.c)
+			}()
+			x1 := tc.f(x, fid)
+			if x1 != nil {
+				t.Fatalf("got non-nil Xfid: %v", x1)
+			}
+			// Wait for close above, so we know we actually received something.
+			<-x.c
+		})
+	}
+}
+
+func TestFileServerAttach(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{
+		conn:     mc,
+		username: "gopher",
+	}
+
+	t.Run("BadUname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: "glenda",
+			},
+			f: &Fid{},
+		}
+		fs.attach(x, x.f)
+
+		want := &plan9.Fcall{
+			Type: plan9.Rattach,
+			Qid: plan9.Qid{
+				Path: Qdir,
+				Vers: 0,
+				Type: plan9.QTDIR,
+			},
+		}
+		if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+			t.Fatalf("got response %v; want %v", got, want)
+		}
+	})
+	t.Run("Success", func(t *testing.T) {
+		mnt = Mnt{}
+		md := mnt.Add("/sys/src/9/pc", nil)
+		defer func() {
+			mnt = Mnt{}
+		}()
+
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: fs.username,
+				Aname: fmt.Sprintf("%v", md.id),
+			},
+			f: &Fid{},
+		}
+		fs.attach(x, x.f)
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type: plan9.Rattach,
+			Qid: plan9.Qid{
+				Path: Qdir,
+				Vers: 0,
+				Type: plan9.QTDIR,
+			},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+		if x.f.mntdir == nil {
+			t.Fatalf("nil mntdir")
+		}
+		if got, want := x.f.mntdir.id, md.id; got != want {
+			t.Errorf("mntdir.id is %v; want %v", got, want)
+		}
+	})
+	t.Run("BadAname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: fs.username,
+				Aname: "notAnUint",
+			},
+		}
+		fs.attach(x, &Fid{})
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: `bad Aname: strconv.ParseUint: parsing "notAnUint": invalid syntax`,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	})
+	t.Run("UnknownAname", func(t *testing.T) {
+		x := &Xfid{
+			fcall: plan9.Fcall{
+				Type:  plan9.Tattach,
+				Uname: fs.username,
+				Aname: "42",
+			},
+		}
+		fs.attach(x, &Fid{})
+
+		got := mc.ReadFcall(t)
+		want := &plan9.Fcall{
+			Type:  plan9.Rerror,
+			Ename: `unknown id "42" in Aname`,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestFileServerWalk(t *testing.T) {
+	WinID = 0
+	row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					NewWindow().initHeadless(nil),
+				},
+			},
+		},
+	}
+	defer func() {
+		WinID = 0
+		row = Row{}
+	}()
+
+	newwindowSetup := func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{} {
+		cnewwindow = make(chan *Window)
+		done := make(chan struct{})
+		go func() {
+			<-cnewwindow                                // request for window
+			cnewwindow <- NewWindow().initHeadless(nil) // response
+
+			cnewwindow = nil
+			close(done)
+		}()
+		return done
+	}
+
+	for _, tc := range []struct {
+		name  string
+		x     Xfid
+		setup func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{}
+		want  plan9.Fcall
+	}{
+		{
+			"WalkOpenFile",
+			Xfid{
+				f: &Fid{open: true},
+			},
+			nil,
+			*errorFcall(fmt.Errorf("walk of open file")),
+		},
+		{
+			"AlreadyInUse",
+			Xfid{
+				fcall: plan9.Fcall{
+					Fid:    1,
+					Newfid: 2,
+				},
+			},
+			func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{} {
+				nf := fs.newfid(x.fcall.Newfid)
+				nf.busy = true
+				return nil
+			},
+			*errorFcall(fmt.Errorf("newfid already in use")),
+		},
+		{
+			"ErrNotDir",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"missing"},
+				},
+			},
+			func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{} {
+				x.f.qid.Type = plan9.QTFILE
+				return nil
+			},
+			*errorFcall(ErrNotDir),
+		},
+		{
+			"ErrNotExist",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"missing"},
+				},
+			},
+			nil,
+			*errorFcall(ErrNotExist),
+		},
+		{
+			"42",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"42"},
+				},
+			},
+			nil,
+			*errorFcall(ErrNotExist),
+		},
+		{
+			"NameTooLongIndex",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"index",
+					},
+				},
+			},
+			nil,
+			*errorFcall(fmt.Errorf("name too long")),
+		},
+		{
+			"NameTooLongDotDot",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"..",
+					},
+				},
+			},
+			nil,
+			*errorFcall(fmt.Errorf("name too long")),
+		},
+		{
+			"NameTooLong1",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"1",
+					},
+				},
+			},
+			nil,
+			*errorFcall(fmt.Errorf("name too long")),
+		},
+		{
+			"NameTooLongNew",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"..", "..", "..", "..", "..", "..", "..", "..",
+						"new",
+					},
+				},
+			},
+			newwindowSetup,
+			*errorFcall(fmt.Errorf("name too long")),
+		},
+		{
+			"EmptyWalk",
+			Xfid{},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{},
+			},
+		},
+		{
+			"DotDot",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{".."},
+				},
+			},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(0, Qdir),
+						Type: plan9.QTDIR,
+					},
+				},
+			},
+		},
+		{
+			"index",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"index"},
+				},
+			},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(0, Qindex),
+						Type: plan9.QTFILE,
+					},
+				},
+			},
+		},
+		{
+			"1/../index",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"1", "..", "index"},
+				},
+			},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(1, Qdir),
+						Type: plan9.QTDIR,
+					},
+					{
+						Path: QID(0, Qdir),
+						Type: plan9.QTDIR,
+					},
+					{
+						Path: QID(0, Qindex),
+						Type: plan9.QTFILE,
+					},
+				},
+			},
+		},
+		{
+			"1/body",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"1", "body"},
+				},
+			},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(1, Qdir),
+						Type: plan9.QTDIR,
+					},
+					{
+						Path: QID(1, QWbody),
+						Type: plan9.QTAPPEND,
+					},
+				},
+			},
+		},
+		{
+			"bodyFrom1",
+			Xfid{
+				fcall: plan9.Fcall{
+					Fid:    0,
+					Newfid: 1,
+					Wname:  []string{"body"},
+				},
+			},
+			func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{} {
+				x.f.qid = plan9.Qid{
+					Path: QID(1, Qdir),
+					Type: plan9.QTDIR,
+				}
+				x.f.w = row.col[0].w[0]
+				return nil
+			},
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(1, QWbody),
+						Type: plan9.QTAPPEND,
+					},
+				},
+			},
+		},
+		{
+			"1/42",
+			Xfid{
+				fcall: plan9.Fcall{
+					Fid:    0,
+					Newfid: 1,
+					Wname:  []string{"1", "42"},
+				},
+			},
+			nil,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(1, Qdir),
+						Type: plan9.QTDIR,
+					},
+				},
+			},
+		},
+		{
+			"new",
+			Xfid{
+				fcall: plan9.Fcall{
+					Wname: []string{"new"},
+				},
+			},
+			newwindowSetup,
+			plan9.Fcall{
+				Type: plan9.Rwalk,
+				Wqid: []plan9.Qid{
+					{
+						Path: QID(3, Qdir), // Window 2 created by NameTooLongNew
+						Type: plan9.QTDIR,
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{
+				conn: mc,
+				fids: make(map[uint32]*Fid),
+			}
+			x := &tc.x
+			x.fcall.Type = plan9.Twalk
+			if x.f == nil {
+				md := mnt.Add("/home/gopher/src", nil)
+				if md == nil {
+					t.Fatalf("can't allocate mntdir")
+				}
+				x.f = &Fid{
+					qid: plan9.Qid{ // default to root
+						Path: QID(0, Qdir),
+						Type: plan9.QTDIR,
+					},
+					mntdir: md,
+				}
+			}
+			var done <-chan struct{}
+			if tc.setup != nil {
+				done = tc.setup(t, fs, x)
+			}
+			fs.walk(x, x.f)
+			want := &tc.want
+			got := mc.ReadFcall(t)
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("response mismatch (-want +got):\n%s", diff)
+			}
+			if done != nil {
+				<-done
+			}
+		})
+	}
+}
+
+func TestFidWalk1Panic(t *testing.T) {
+	done := make(chan struct{})
+	defer func() {
+		r := recover()
+		got, ok := r.(string)
+		if !ok {
+			t.Fatalf("recovered a %T; want string", got)
+		}
+		want := "acme: w set in walk to new: <nil>\n"
+		if got != want {
+			t.Errorf("recovered string %q; want %q", got, want)
+		}
+		close(done)
+	}()
+	f := &Fid{
+		qid: plan9.Qid{
+			Path: QID(0, Qdir),
+			Type: plan9.QTDIR,
+		},
+		w: &Window{},
+	}
+	f.Walk1("new")
+	<-done
+}
+
+func TestFileServerOpen(t *testing.T) {
+	for _, tc := range []struct {
+		name string     // test name
+		perm plan9.Perm // directory entry mode
+		mode uint8      // open mode
+		err  error
+	}{
+		{"OEXEC", 0600, plan9.OEXEC, ErrPermission},
+		{"ORCLOSE", 0600, plan9.ORCLOSE | plan9.OWRITE, ErrPermission},
+		{"ODIRECT", 0600, plan9.ODIRECT, ErrPermission},
+		{"WriteToReadOnly", 0400, plan9.OWRITE, ErrPermission},
+		{"ReadFromWriteOnly", 0200, plan9.OREAD, ErrPermission},
+		{"ORDWR", 0600, plan9.ORDWR, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{conn: mc}
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Type: plan9.Topen,
+					Mode: tc.mode,
+				},
+				c: make(chan func(*Xfid)),
+			}
+			f := &Fid{
+				dir: &DirTab{"example", plan9.QTFILE, Qindex, tc.perm},
+			}
+			if tc.err == nil {
+				go func() {
+					<-x.c
+					close(x.c)
+				}()
+			}
+			var wantx *Xfid
+			if tc.err != nil {
+				wantx = x
+			}
+			x1 := fs.open(x, f)
+			if x1 != wantx {
+				t.Errorf("expected Xfid %v; got %v", wantx, x1)
+			}
+
+			if tc.err != nil {
+				want := errorFcall(tc.err)
+				if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+					t.Fatalf("got response %v; want %v", got, want)
+				}
+			} else {
+				// Wait for close above, so we know we actually received something.
+				<-x.c
+			}
+		})
+	}
+}
+
+func TestFileServerCreate(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.create(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerReadQacme(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Type: plan9.Tread,
+		},
+	}
+	f := &Fid{
+		qid: plan9.Qid{
+			Type: plan9.QTDIR,
+			Vers: 0,
+			Path: Qacme,
+		},
+	}
+	fs.read(x, f)
+
+	want := &plan9.Fcall{
+		Type: plan9.Rread,
+		Data: []byte{},
+	}
+	got := mc.ReadFcall(t)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestFileServerRead(t *testing.T) {
+	useFixedClock = true
+	WinID = 0
+	row.col = []*Column{
+		{
+			w: []*Window{
+				NewWindow().initHeadless(nil),
+				NewWindow().initHeadless(nil),
+				NewWindow().initHeadless(nil),
+			},
+		},
+	}
+	defer func() {
+		useFixedClock = false
+		WinID = 0
+		row = Row{}
+	}()
+
+	var rootDirs []plan9.Dir
+	for _, dt := range dirtab[1:] { // skip "."
+		rootDirs = append(rootDirs, *dt.Dir(0, "gopher", fixedClockValue))
+	}
+	for id := 1; id <= WinID; id++ {
+		rootDirs = append(rootDirs, *windowDirTab(id).Dir(0, "gopher", fixedClockValue))
+	}
+
+	var winDirs []plan9.Dir
+	for _, dt := range dirtabw[1:] { // skip "."
+		winDirs = append(winDirs, *dt.Dir(3, "gopher", fixedClockValue))
+	}
+
+	for _, tc := range []struct {
+		name  string
+		winid int
+		count uint32
+		want  []plan9.Dir
+	}{
+		{"OneRead/Root", 0, 1024, rootDirs},
+		{"OneRead/WindowSubdir", 3, 1024, winDirs},
+		{"OneDirPerRead/Root", 0, 100, rootDirs},
+		{"OneDirPerRead/WindowSubdir", 3, 100, winDirs},
+		{"Empty", 0, 0, nil},
+		{"NoPartialDir", 0, 10, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mc := new(mockConn)
+			fs := &fileServer{
+				conn:     mc,
+				username: "gopher",
+			}
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Type:   plan9.Tread,
+					Count:  tc.count,
+					Offset: 0,
+				},
+				f: &Fid{
+					qid: plan9.Qid{
+						Type: plan9.QTDIR,
+						Vers: 0,
+						Path: QID(tc.winid, Qdir),
+					},
+				},
+			}
+
+			var got []plan9.Dir
+			for {
+				fs.read(x, x.f)
+
+				fc := mc.ReadFcall(t)
+				if len(fc.Data) == 0 {
+					break
+				}
+				dirs, err := ninep.UnmarshalDirs(fc.Data)
+				if err != nil {
+					t.Fatalf("failed to unmarshal directory entries: %v", err)
+				}
+				got = append(got, dirs...)
+				x.fcall.Offset += uint64(len(fc.Data))
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("directory entries mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFileServerRemove(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.remove(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
+	}
+}
+
+func TestFileServerStat(t *testing.T) {
+	useFixedClock = true
+	defer func() { useFixedClock = false }()
+
+	checkDirTab := func(t *testing.T, prefix string, tab []*DirTab) {
+		for _, dt := range tab {
+			t.Run(prefix+dt.name, func(t *testing.T) {
+				mc := new(mockConn)
+				fs := &fileServer{
+					conn:        mc,
+					messagesize: 8192,
+					username:    "gopher",
+				}
+				x := &Xfid{
+					fcall: plan9.Fcall{
+						Type: plan9.Tstat,
+						Fid:  1,
+					},
+				}
+				x.f = &Fid{
+					dir: dt,
+				}
+				fs.stat(x, x.f)
+
+				fc := mc.ReadFcall(t)
+				if got, want := fc.Type, uint8(plan9.Rstat); got != want {
+					t.Fatalf("got Fcall type %v; want %v", got, want)
+				}
+
+				want := dt.Dir(0, "gopher", fixedClockValue)
+				got, err := plan9.UnmarshalDir(fc.Stat)
+				if err != nil {
+					t.Fatalf("UnmarshalDir failed: %v", err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("stat mismatch (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+	checkDirTab(t, "", dirtab)
+	checkDirTab(t, "winid/", dirtabw)
+}
+
+func TestFileServerStatSmallMsize(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{
+		conn:        mc,
+		messagesize: plan9.IOHDRSZ + 16, // too small for a directory entry
+		username:    "gopher",
+	}
+	x := &Xfid{
+		fcall: plan9.Fcall{Type: plan9.Tstat},
+	}
+	x.f = &Fid{dir: dirtab[1]}
+	fs.stat(x, x.f)
+
+	got := mc.ReadFcall(t)
+	want := &plan9.Fcall{
+		Type:  plan9.Rerror,
+		Ename: `msize too small`,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestFileServerWstat(t *testing.T) {
+	mc := new(mockConn)
+	fs := &fileServer{conn: mc}
+	fs.wstat(&Xfid{}, nil)
+
+	want := errorFcall(ErrPermission)
+	if got := mc.ReadFcall(t); !cmp.Equal(got, want) {
+		t.Fatalf("got response %v; want %v", got, want)
 	}
 }

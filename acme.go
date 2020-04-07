@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"image"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -21,21 +24,17 @@ import (
 )
 
 var (
-	command           *Command
-	swapscrollButtons bool
-)
+	command []*Command
 
-// var threaddebuglevel = flag.Int("D", 0, "Thread Debug Level") // TODO(flux): Unused?
-var globalautoindentflag = flag.Bool("a", false, "Global AutoIntent")
-var bartflagflag = flag.Bool("b", false, "Bart's Flag")
-var ncolflag = flag.Int("c", -1, "Number of columns (> 0)")
-var varfontflag = flag.String("f", defaultVarFont, "Variable Width Font")
-var fixedfontflag = flag.String("F", defaultFixedFont, "Fixed Width Font")
-var loadfileflag = flag.String("l", "", "Load file name")
-var mtptflag = flag.String("m", defaultMtpt, "Mountpoint")
-var swapscrollbuttonsflag = flag.Bool("r", false, "Swap scroll buttons")
-var winsize = flag.String("W", "1024x768", "Window Size (WidthxHeight)")
-var ncol = 2
+	debugAddr         = flag.String("debug", "", "Serve debug information on the supplied address")
+	globalAutoIndent  = flag.Bool("a", false, "Start each window in autoindent mode")
+	barflag           = flag.Bool("b", false, "Click to focus window instead of focus follows mouse (Bart's flag)")
+	varfontflag       = flag.String("f", defaultVarFont, "Variable-width font")
+	fixedfontflag     = flag.String("F", defaultFixedFont, "Fixed-width font")
+	mtpt              = flag.String("m", defaultMtpt, "Mountpoint for 9P file server")
+	swapScrollButtons = flag.Bool("r", false, "Swap scroll buttons")
+	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
+)
 
 func main() {
 
@@ -43,17 +42,25 @@ func main() {
 
 	runtime.GOMAXPROCS(7)
 
+	var (
+		ncol     int
+		loadfile string
+	)
+	flag.IntVar(&ncol, "c", 2, "Number of columns at startup")
+	flag.StringVar(&loadfile, "l", "", "Load state from file generated with Dump command")
 	flag.Parse()
-	ncol = *ncolflag
-	globalautoindent = *globalautoindentflag
-	loadfile := *loadfileflag
-	mtpt = *mtptflag
-	bartflag = *bartflagflag
-	swapscrollbuttons = *swapscrollbuttonsflag
 
-	// TODO(fhs): This is not very portable.
-	// See https://github.com/rjkroege/edwood/issues/222
-	home = os.Getenv("HOME")
+	if *debugAddr != "" {
+		go func() {
+			log.Println(http.ListenAndServe(*debugAddr, nil))
+		}()
+	}
+
+	var err error
+	home, err = os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not get user home directory: %v", err)
+	}
 	acmeshell = os.Getenv("acmeshell")
 	p := os.Getenv("tabstop")
 	if p != "" {
@@ -62,6 +69,14 @@ func main() {
 	}
 	if maxtab == 0 {
 		maxtab = 4
+	}
+
+	b := os.Getenv("tabexpand")
+	if b != "" {
+		te, _ := strconv.ParseBool(b)
+		tabexpand = te
+	} else {
+		tabexpand = false
 	}
 
 	var dump *dumpfile.Content
@@ -99,7 +114,7 @@ func main() {
 		if err := display.Attach(draw.Refnone); err != nil {
 			panic("failed to attach to window")
 		}
-		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 
 		mousectl = display.InitMouse()
 		keyboardctl = display.InitKeyboard()
@@ -108,7 +123,7 @@ func main() {
 
 		iconinit(display)
 
-		cwait = make(chan *os.ProcessState)
+		cwait = make(chan ProcessState)
 		ccommand = make(chan *Command)
 		ckill = make(chan string)
 		cxfidalloc = make(chan *Xfid)
@@ -167,11 +182,12 @@ func main() {
 		display.Flush()
 
 		// After row is initialized
+		ctx := context.Background()
 		go mousethread(display)
 		go keyboardthread(display)
-		go waitthread()
+		go waitthread(ctx)
 		go newwindowthread()
-		go xfidallocthread(display)
+		go xfidallocthread(ctx, display)
 
 		signal.Ignore(ignoreSignals...)
 		signal.Notify(csignal, hangupSignals...)
@@ -251,16 +267,16 @@ func iconinit(display draw.Display) {
 	button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	button.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
+	button.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.Point{})
 
 	r = button.R()
 	modbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	modbutton.Draw(r, tagcolors[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.ZP)
+	modbutton.Border(r, display.ScaleSize(ButtonBorder), tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
 	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
-	modbutton.Draw(r, tmp, nil, image.ZP)
+	modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = button.R()
 	colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Purpleblue)
@@ -271,11 +287,12 @@ func iconinit(display draw.Display) {
 }
 
 func ismtpt(filename string) bool {
-	if mtpt == "" {
+	m := *mtpt
+	if m == "" {
 		return false
 	}
 	s := path.Clean(filename)
-	return strings.HasPrefix(s, mtpt) && (mtpt[len(mtpt)-1] == '/' || len(s) == len(mtpt) || s[len(mtpt)] == '/')
+	return strings.HasPrefix(s, m) && (m[len(m)-1] == '/' || len(s) == len(m) || s[len(m)] == '/')
 }
 
 func mousethread(display draw.Display) {
@@ -292,7 +309,7 @@ func mousethread(display draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.ZP)
+			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 			iconinit(display)
 			ScrlResize(display)
 			row.Resize(display.ScreenImage().R())
@@ -360,7 +377,7 @@ func MovedMouse(m draw.Mouse) {
 	barttext = t
 	if t.what == Body && m.Point.In(t.scrollr) {
 		if but != 0 {
-			if swapscrollButtons {
+			if *swapScrollButtons {
 				switch but {
 				case 1:
 					but = 3
@@ -420,6 +437,7 @@ func MovedMouse(m draw.Mouse) {
 		case m.Buttons&1 != 0:
 			t.Select()
 			if w != nil {
+				// This may replicate work done elsewhere.
 				w.SetTag()
 			}
 			argtext = t
@@ -495,18 +513,12 @@ func keyboardthread(display draw.Display) {
 
 }
 
-// There is a race between process exiting and our finding out it was ever created.
-// This structure keeps a list of processes that have exited we haven't heard of.
-type Pid struct {
-	pid  int
-	msg  string
-	next *Pid // TODO(flux) turn this into a slice of Pid
-}
+func waitthread(ctx context.Context) {
+	// There is a race between process exiting and our finding out it was ever created.
+	// This structure keeps a list of processes that have exited we haven't heard of.
+	exited := make(map[int]ProcessState)
 
-func waitthread() {
-	var lc, c *Command
-	var pids *Pid
-	Freecmd := func() {
+	Freecmd := func(c *Command) {
 		if c != nil {
 			if c.iseditcommand {
 				cedit <- 0
@@ -515,8 +527,10 @@ func waitthread() {
 		}
 	}
 	for {
-	Switch:
 		select {
+		case <-ctx.Done():
+			return
+
 		case err := <-cerr:
 			row.lk.Lock()
 			warning(nil, "%s", err)
@@ -525,7 +539,7 @@ func waitthread() {
 
 		case cmd := <-ckill:
 			found := false
-			for c = command; c != nil; c = c.next {
+			for _, c := range command {
 				if c.name == cmd+" " {
 					if err := c.proc.Kill(); err != nil {
 						warning(nil, "kill %v: %v\n", cmd, err)
@@ -538,23 +552,23 @@ func waitthread() {
 			}
 
 		case w := <-cwait:
+			var (
+				i int
+				c *Command
+			)
 			pid := w.Pid()
-			for c = command; c != nil; c = c.next {
+			for i, c = range command {
 				if c.pid == pid {
-					if lc != nil {
-						lc.next = c.next
-					} else {
-						command = c.next
-					}
+					command = append(command[:i], command[i+1:]...)
 					break
 				}
-				lc = c
 			}
 			row.lk.Lock()
 			t := &row.tag
 			t.Commit()
 			if c == nil {
-				warning(nil, "unknown command (pid %v) exited: %v\n", pid, w.String())
+				// command exited before we had a chance to add it to command list
+				exited[pid] = w
 			} else {
 				if search(t, []rune(c.name)) {
 					t.Delete(t.q0, t.q1, true)
@@ -566,28 +580,19 @@ func waitthread() {
 				row.display.Flush()
 			}
 			row.lk.Unlock()
-			Freecmd()
+			Freecmd(c)
 
-		case c = <-ccommand:
+		case c := <-ccommand:
 			// has this command already exited?
-			lastp := (*Pid)(nil)
-			for p := pids; p != nil; p = p.next {
-				if p.pid == c.pid {
-					if p.msg != "" {
-						warning(c.md, "%s\n", p.msg)
-					}
-					if lastp == nil {
-						pids = p.next
-					} else {
-						lastp.next = p.next
-					}
-					Freecmd()
-					break Switch
+			if p, ok := exited[c.pid]; ok {
+				if msg := p.String(); msg != "" {
+					warning(c.md, "%s\n", msg)
 				}
-				lastp = p
+				delete(exited, c.pid)
+				Freecmd(c)
+				break
 			}
-			c.next = command
-			command = c
+			command = append(command, c)
 			row.lk.Lock()
 			t := &row.tag
 			t.Commit()
@@ -604,10 +609,12 @@ func waitthread() {
 // it instead of using a send and a receive to get one.
 // Frankly, it would be more idiomatic to let the GC take care of them,
 // though that would require an exit signal in xfidctl.
-func xfidallocthread(d draw.Display) {
+func xfidallocthread(ctx context.Context, d draw.Display) {
 	xfree := (*Xfid)(nil)
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-cxfidalloc:
 			x := xfree
 			if x != nil {
@@ -642,7 +649,7 @@ func newwindowthread() {
 
 func killprocs(fs *fileServer) {
 	fs.close()
-	for c := command; c != nil; c = c.next {
+	for _, c := range command {
 		c.proc.Kill()
 	}
 }

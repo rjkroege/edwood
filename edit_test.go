@@ -90,9 +90,9 @@ func TestEdit(t *testing.T) {
 
 		// | > <
 		// 30
-		{Range{0, 4}, "test", "|pipe", "{\"|pipe\" \"\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 4}, "test", "|pipe", "{\"|pipe\" \".\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
 		{Range{0, 4}, "test", ">greater", "This is a\nshort text\nto try addressing\n", []string{}},
-		{Range{0, 4}, "test", "<less", "{\"<less\" \"\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
+		{Range{0, 4}, "test", "<less", "{\"<less\" \".\" true \"\" \"\" true} is a\nshort text\nto try addressing\n", []string{}},
 		{Range{0, 4}, "test", "<error", "This is a\nshort text\nto try addressing\n", []string{"Edit: mockrun failed!\n"}},
 
 		// { } NB: grouping requires newlines. And sets . the same for each of the commands.
@@ -682,7 +682,7 @@ func mockrun(win *Window, s string, rdir string, newns bool, argaddr string, xar
 	go func() {
 		// At this point, an external command attaches to the Edwood and writes
 		// data to somewhere in the filesystem. This comes from xfidwrite via
-		// edittext into the elog. We write exepctations in string form into the
+		// edittext into the elog. We write expectations in string form into the
 		// buffer here from the inputs so that the test harness can validate
 		// them.
 

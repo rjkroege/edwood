@@ -13,7 +13,7 @@ func (f *frameimpl) drawtext(pt image.Point, text draw.Image, back draw.Image) {
 		// log.Printf("box [%d] %#v pt %v NoRedraw %v nrune %d\n",  nb, string(b.Ptr), pt, f.NoRedraw, b.Nrune)
 
 		if !f.noredraw && b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.font, b.Ptr)
+			f.background.Bytes(pt, text, image.Point{}, f.font, b.Ptr)
 		}
 		pt.X += b.Wid
 	}
@@ -158,7 +158,7 @@ func (f *frameimpl) Drawsel0(pt image.Point, p0, p1 int, back draw.Image, text d
 		// f.drawBox(image.Rect(pt.X, pt.Y, x, pt.Y+f.Font.DefaultHeight()), text, back, pt)
 		f.background.Draw(image.Rect(pt.X, pt.Y, x, pt.Y+f.defaultfontheight), back, nil, pt)
 		if b.Nrune >= 0 {
-			f.background.Bytes(pt, text, image.ZP, f.font, ptr[0:runeindex(ptr, nr)])
+			f.background.Bytes(pt, text, image.Point{}, f.font, ptr[0:runeindex(ptr, nr)])
 		}
 		pt.X += w
 		p += nr
@@ -194,7 +194,7 @@ func (f *frameimpl) Redraw(enclosing image.Rectangle) {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	// log.Printf("Redraw %v %v", f.Rect, enclosing)
-	f.background.Draw(enclosing, f.cols[ColBack], nil, image.ZP)
+	f.background.Draw(enclosing, f.cols[ColBack], nil, image.Point{})
 }
 
 func (f *frameimpl) tick(pt image.Point, ticked bool) {
@@ -212,10 +212,10 @@ func (f *frameimpl) tick(pt image.Point, ticked bool) {
 
 	if ticked {
 		f.tickback.Draw(f.tickback.R(), f.background, nil, pt)
-		f.background.Draw(r, f.display.Black(), f.tickimage, image.ZP) // draws an alpha-blended box
+		f.background.Draw(r, f.display.Black(), f.tickimage, image.Point{}) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
-		f.background.Draw(r, f.tickback, nil, image.ZP)
+		f.background.Draw(r, f.tickback, nil, image.Point{})
 	}
 	f.ticked = ticked
 }

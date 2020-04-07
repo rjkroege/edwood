@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"github.com/rjkroege/edwood/internal/edwoodtest"
+)
 
 // TestWindowUndoSelection checks text selection change after undo/redo.
 // It tests that selection doesn't change when undoing/redoing
@@ -43,6 +48,74 @@ func TestWindowUndoSelection(t *testing.T) {
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
 				tc.name, w.body.q0, w.body.q1, tc.wantQ0, tc.wantQ1)
+		}
+	}
+}
+
+func TestSetTag1(t *testing.T) {
+	const (
+		defaultSuffix = " Del Snarf | Look Edit "
+		extraSuffix   = "|fmt g setTag1 Ldef"
+	)
+
+	for _, name := range []string{
+		"/home/gopher/src/hello.go",
+		"/home/ゴーファー/src/エドウード.txt",
+		"/home/ゴーファー/src/",
+	} {
+		configureGlobals()
+
+		display := edwoodtest.NewDisplay()
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    &File{name: name},
+		}
+		w.tag = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    &File{},
+		}
+
+		w.setTag1()
+		got := string(w.tag.file.b)
+		want := name + defaultSuffix
+		if got != want {
+			t.Errorf("bad initial tag for file %q:\n got: %q\nwant: %q", name, got, want)
+		}
+
+		w.tag.file.InsertAt(w.tag.file.Nr(), []rune(extraSuffix))
+		w.setTag1()
+		got = string(w.tag.file.b)
+		want = name + defaultSuffix + extraSuffix
+		if got != want {
+			t.Errorf("bad replacement tag for file %q:\n got: %q\nwant: %q", name, got, want)
+		}
+	}
+}
+
+func TestWindowClampAddr(t *testing.T) {
+	buf := Buffer("Hello, 世界")
+
+	for _, tc := range []struct {
+		addr, want Range
+	}{
+		{Range{-1, -1}, Range{0, 0}},
+		{Range{100, 100}, Range{buf.nc(), buf.nc()}},
+	} {
+		w := &Window{
+			addr: tc.addr,
+			body: Text{
+				file: &File{
+					b: buf,
+				},
+			},
+		}
+		w.ClampAddr()
+		if got := w.addr; !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("got addr %v; want %v", got, tc.want)
 		}
 	}
 }

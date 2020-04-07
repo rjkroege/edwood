@@ -78,7 +78,7 @@ func fsysmount(dir string, incl []string) (*MntDir, *client.Fsys, error) {
 
 // Fsopenfd opens a plan9 Fid.
 func fsopenfd(fsys *client.Fsys, filename string, mode uint8) *os.File {
-	f, err := os.OpenFile(path.Join(mtpt, filename), int(mode), 0)
+	f, err := os.OpenFile(path.Join(*mtpt, filename), int(mode), 0)
 	if err != nil {
 		warning(nil, "Failed to open %v: %v", filename, err)
 		return nil

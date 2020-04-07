@@ -39,12 +39,12 @@ func TestErrorwin1Name(t *testing.T) {
 		dir, name string
 	}{
 		{"", "+Errors"},
+		{".", "+Errors"},
 		{"/", "/+Errors"},
 		{"/home/gopher", "/home/gopher/+Errors"},
 		{"/home/gopher/", "/home/gopher/+Errors"},
 		{"C:/Users/gopher", "C:/Users/gopher/+Errors"},
 		{"C:/Users/gopher/", "C:/Users/gopher/+Errors"},
-		{"C:", "C:/+Errors"},
 		{"C:/", "C:/+Errors"},
 	}
 	for _, tc := range tt {

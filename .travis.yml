@@ -8,14 +8,8 @@ os:
   - osx
 
 go:
-  - "1.10.x"
-  - "1.11.x"
   - "1.12.x"
-
-addons:
-  homebrew:
-    packages:
-      - plan9port
+  - "1.13.x"
 
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
@@ -24,15 +18,19 @@ env:
   global:
     - acmeshell=sh
     - GO111MODULE=on
+    - GOPROXY="https://proxy.golang.org"
 
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PLAN9=/usr/local/opt/plan9port/libexec; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH=$PATH:$PLAN9/bin; fi
   - go get -t -v ./...
   - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then diff -u <(echo -n) <(gofmt -d -s .); fi
   - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
   - go vet .
   - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then go get -tags 'duitdraw mux9p' -t -v ./...; fi
+  - go get honnef.co/go/tools/cmd/staticcheck
+  - staticcheck -debug.version
+  - staticcheck -checks inherit,-U1000,-SA4003 ./...
+  - go get github.com/client9/misspell/cmd/misspell
+  - misspell -error .
 
 after_success:
   # codecov can't seem to combine reports from multiple OSes correctly

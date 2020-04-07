@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"net"
+	"io"
+	"log"
 	"os"
 	"os/user"
 	"sort"
@@ -11,10 +12,11 @@ import (
 	"time"
 
 	"9fans.net/go/plan9"
+	"github.com/rjkroege/edwood/internal/ninep"
 )
 
 type fileServer struct {
-	conn        net.Conn
+	conn        io.ReadWriteCloser
 	fids        map[uint32]*Fid
 	fcall       []fsfunc
 	closing     bool
@@ -22,9 +24,7 @@ type fileServer struct {
 	messagesize int
 }
 
-const (
-	DEBUG = 0
-)
+const DEBUG = false
 
 type fsfunc func(*Xfid, *Fid) *Xfid
 
@@ -63,7 +63,6 @@ var dirtab = []*DirTab{
 	{"label", plan9.QTFILE, Qlabel, 0600},
 	{"log", plan9.QTFILE, Qlog, 0400},
 	{"new", plan9.QTDIR, Qnew, 0500 | plan9.DMDIR},
-	//	{ nil, }
 }
 
 var dirtabw = []*DirTab{
@@ -79,7 +78,16 @@ var dirtabw = []*DirTab{
 	{"wrsel", plan9.QTFILE, QWwrsel, 0200},
 	{"tag", plan9.QTAPPEND, QWtag, 0600 | plan9.DMAPPEND},
 	{"xdata", plan9.QTFILE, QWxdata, 0600},
-	//	{ nil, }
+}
+
+// windowDirTab returns the DirTab entry for window directory for the window with given id.
+func windowDirTab(id int) *DirTab {
+	return &DirTab{
+		name: fmt.Sprintf("%d", id),
+		t:    plan9.QTDIR,
+		qid:  QID(id, Qdir),
+		perm: plan9.DMDIR | 0700,
+	}
 }
 
 // Mnt is a collection of reference counted MntDir.
@@ -94,16 +102,16 @@ type Mnt struct {
 var mnt Mnt
 
 func fsysinit() *fileServer {
-	reader, writer, err := newPipe()
+	p0, p1, err := newPipe()
 	if err != nil {
 		acmeerror("failed to create pipe", err)
 	}
-	if err := post9pservice(reader, "acme", mtpt); err != nil {
+	if err := post9pservice(p0, "acme", *mtpt); err != nil {
 		acmeerror("can't post service", err)
 	}
 
 	fs := &fileServer{
-		conn:        writer,
+		conn:        p1,
 		fids:        make(map[uint32]*Fid),
 		fcall:       nil, // initialized by initfcall
 		closing:     false,
@@ -125,6 +133,9 @@ func (fs *fileServer) fsysproc() {
 				break
 			}
 			acmeerror("fsysproc", err)
+		}
+		if DEBUG {
+			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
 		}
 		if x == nil {
 			cxfidalloc <- nil
@@ -218,6 +229,9 @@ func (fs *fileServer) close() {
 }
 
 func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
+	if t == nil {
+		t = &plan9.Fcall{}
+	}
 	if err != nil {
 		t.Type = plan9.Rerror
 		t.Ename = err.Error()
@@ -229,8 +243,8 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
 		acmeerror("write error in respond", err)
 	}
-	if DEBUG != 0 {
-		fmt.Fprintf(os.Stderr, "r: %v\n", t)
+	if DEBUG {
+		fmt.Fprintf(os.Stderr, "--> %v\n", t)
 	}
 	return x
 }
@@ -262,9 +276,28 @@ func (fs *fileServer) flush(x *Xfid, f *Fid) *Xfid {
 
 func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	if x.fcall.Uname != fs.username {
-		var t plan9.Fcall
-		return fs.respond(x, &t, ErrPermission)
+		// Ignore mismatch because some libraries gets it wrong
+		// anyway. 9fans.net/go/plan9/client just uses the
+		// $USER environment variable, which is wrong in Windows
+		// (See `go doc -u -src 9fans.net/go/plan9/client getuser`)
+		log.Printf("attach from uname %q does not match %q but allowing anyway",
+			x.fcall.Uname, fs.username)
 	}
+	var id uint64
+	if x.fcall.Aname != "" {
+		var err error
+		id, err = strconv.ParseUint(x.fcall.Aname, 10, 32)
+		if err != nil {
+			err = fmt.Errorf("bad Aname: %v", err)
+			return fs.respond(x, nil, err)
+		}
+	}
+	m := mnt.GetFromID(id) // DecRef in clunk
+	if m == nil && x.fcall.Aname != "" {
+		err := fmt.Errorf("unknown id %q in Aname", x.fcall.Aname)
+		return fs.respond(x, nil, err)
+	}
+	f.mntdir = m
 	f.busy = true
 	f.open = false
 	f.qid.Path = Qdir
@@ -273,43 +306,20 @@ func (fs *fileServer) attach(x *Xfid, f *Fid) *Xfid {
 	f.dir = dirtab[0] // '.'
 	f.nrpart = 0
 	f.w = nil
-	var t plan9.Fcall
-	t.Qid = f.qid
-	f.mntdir = nil
-	var id uint64
-	if x.fcall.Aname != "" {
-		var err error
-		id, err = strconv.ParseUint(x.fcall.Aname, 10, 32)
-		if err != nil {
-			acmeerror(fmt.Sprintf("fsysattach: bad Aname %s", x.fcall.Aname), err)
-		}
-	}
-	m := mnt.GetFromID(id) // DecRef in clunk
-	if m == nil && x.fcall.Aname != "" {
-		cerr <- fmt.Errorf("unknown id '%s' in attach", x.fcall.Aname)
-	}
-	if m != nil {
-		f.mntdir = m
+	t := plan9.Fcall{
+		Qid: f.qid,
 	}
 	return fs.respond(x, &t, nil)
 }
 
 func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
-	var (
-		t    plan9.Fcall
-		q    plan9.Qid
-		typ  byte
-		path uint64
-		d    []*DirTab
-		dir  *DirTab
-		id   int
-	)
-	nf := (*Fid)(nil)
-	w := (*Window)(nil)
+	var t plan9.Fcall
+
 	if f.open {
 		return fs.respond(x, &t, fmt.Errorf("walk of open file"))
 	}
-	if x.fcall.Fid != x.fcall.Newfid {
+	var nf *Fid
+	if x.fcall.Fid != x.fcall.Newfid { // clone fid
 		nf = fs.newfid(x.fcall.Newfid)
 		if nf.busy {
 			return fs.respond(x, &t, fmt.Errorf("newfid already in use"))
@@ -334,115 +344,33 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 
 	t.Wqid = nil
 	var err error
-	dir = nil
-	id = WIN(f.qid)
-	q = f.qid
 
-	var i int
-	var wname string
+	wf := &Fid{
+		qid: f.qid,
+		w:   nil,
+		dir: nil,
+	}
+
 	if len(x.fcall.Wname) > 0 {
-	Wnames:
+		var i int
 		for i = 0; i < len(x.fcall.Wname); i++ {
-			wname = x.fcall.Wname[i]
-			if (q.Type & plan9.QTDIR) == 0 {
-				err = ErrNotDir
-				break
-			}
+			wname := x.fcall.Wname[i]
 
-			if wname == ".." {
-				typ = plan9.QTDIR
-				path = Qdir
-				id = 0
-				if w != nil {
-					w.Close()
-					w = nil
-				}
-				q.Type = typ
-				q.Vers = 0
-				q.Path = QID(id, path)
-				t.Wqid = append(t.Wqid, q)
-				continue
-			}
-			// is it a numeric name?
-			_, err = strconv.ParseInt(wname, 10, 32)
-			if err != nil {
-				err = nil
-				goto Regular
-			}
-			// yes: it's a directory
-			if w != nil { // name has form 27/23; get out before losing w
+			var found bool
+			found, err = wf.Walk1(wname)
+			if err != nil || !found {
 				break
 			}
-			{
-				id64, _ := strconv.ParseInt(wname, 10, 32)
-				id = int(id64)
-			}
-			row.lk.Lock()
-			w = row.LookupWin(id)
-			if w == nil {
-				row.lk.Unlock()
-				break
-			}
-			w.ref.Inc() // we'll drop reference at end if there's an error
-			path = Qdir
-			typ = plan9.QTDIR
-			row.lk.Unlock()
-			dir = dirtabw[0] // '.'
 			if i == plan9.MAXWELEM {
 				err = fmt.Errorf("name too long")
 				break
 			}
-			q.Type = typ
-			q.Vers = 0
-			q.Path = QID(id, path)
-			t.Wqid = append(t.Wqid, q)
-			continue
-
-		Regular:
-			if wname == "new" {
-				if w != nil {
-					acmeerror("w set in walk to new", nil)
-				}
-				cnewwindow <- nil // signal newwindowthread
-				w = <-cnewwindow  // receive new window
-				w.ref.Inc()
-				typ = plan9.QTDIR
-				path = QID(w.id, Qdir)
-				id = w.id
-				dir = dirtabw[0]
-				q.Type = typ
-				q.Vers = 0
-				q.Path = QID(id, path)
-				t.Wqid = append(t.Wqid, q)
-				continue Wnames
-			}
-
-			if id == 0 {
-				d = dirtab
-			} else {
-				d = dirtabw
-			}
-			for _, de := range d[1:] {
-				if wname == de.name {
-					path = de.qid
-					typ = de.t
-					dir = de
-					q.Type = typ
-					q.Vers = 0
-					q.Path = QID(id, path)
-					t.Wqid = append(t.Wqid, q)
-					continue Wnames
-				}
-			}
-			break // file not found
+			t.Wqid = append(t.Wqid, wf.qid)
 		}
 
 		// If we never incremented
 		if i == 0 && err == nil {
 			err = ErrNotExist
-		}
-		if i == plan9.MAXWELEM {
-			err = fmt.Errorf("name too long")
 		}
 	}
 
@@ -451,28 +379,105 @@ func (fs *fileServer) walk(x *Xfid, f *Fid) *Xfid {
 			nf.busy = false
 			mnt.DecRef(nf.mntdir)
 		}
-	} else {
-		if len(t.Wqid) == len(x.fcall.Wname) {
-			if w != nil {
-				f.w = w
-				w = nil // don't drop the reference when closing below.
-			}
-			if dir != nil {
-				f.dir = dir
-			}
-			f.qid = q
+	} else if len(t.Wqid) == len(x.fcall.Wname) {
+		if wf.w != nil {
+			f.w = wf.w
+			wf.w = nil // don't drop the reference when closing below.
 		}
+		if wf.dir != nil {
+			f.dir = wf.dir
+		}
+		f.qid = wf.qid
 	}
 
-	if w != nil {
-		w.Close()
+	if wf.w != nil {
+		wf.w.Close()
 	}
 
 	return fs.respond(x, &t, err)
 }
 
+// Walk1 walks fid to path name element wname.
+// Found is set to true iff wname was found.
+func (f *Fid) Walk1(wname string) (found bool, err error) {
+	if (f.qid.Type & plan9.QTDIR) == 0 {
+		return false, ErrNotDir
+	}
+
+	if wname == ".." {
+		if f.w != nil {
+			f.w.Close()
+			f.w = nil
+		}
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(0, Qdir)
+		return true, nil
+	}
+
+	// is it a numeric name?
+	_, err = strconv.ParseInt(wname, 10, 32)
+	if err == nil {
+		// yes: it's a directory
+		if f.w != nil { // name has form 27/23; get out before losing w
+			return false, nil
+		}
+		var id int
+		{
+			id64, _ := strconv.ParseInt(wname, 10, 32)
+			id = int(id64)
+		}
+		row.lk.Lock()
+		f.w = row.LookupWin(id)
+		if f.w == nil {
+			row.lk.Unlock()
+			return false, nil
+		}
+		f.w.ref.Inc() // we'll drop reference at end if there's an error
+		row.lk.Unlock()
+
+		f.dir = dirtabw[0] // '.'
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(id, Qdir)
+		return true, nil
+	}
+
+	// Look for regular file (not directory).
+	err = nil
+	if wname == "new" {
+		if f.w != nil {
+			acmeerror("w set in walk to new", nil)
+		}
+		cnewwindow <- nil  // signal newwindowthread
+		f.w = <-cnewwindow // receive new window
+		f.w.ref.Inc()
+		f.dir = dirtabw[0]
+		f.qid.Type = plan9.QTDIR
+		f.qid.Vers = 0
+		f.qid.Path = QID(f.w.id, Qdir)
+		return true, nil
+	}
+
+	id := WIN(f.qid)
+	d := dirtab
+	if id != 0 {
+		d = dirtabw
+	}
+	for _, de := range d[1:] {
+		if wname == de.name {
+			f.dir = de
+			f.qid.Type = de.t
+			f.qid.Vers = 0
+			f.qid.Path = QID(id, de.qid)
+			return true, nil
+		}
+	}
+	return false, nil // file not found
+}
+
 func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
-	var m uint
+	var m plan9.Perm
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^uint8(plan9.OTRUNC | plan9.OCEXEC)
 	// can't execute or remove anything
@@ -505,55 +510,27 @@ func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
 	return fs.respond(x, &t, ErrPermission)
 }
 
-//func idcmp (const  void *a, const  void *b) (int) {
-//	return *(int*)a - *(int*)b;
-//}
-
 // TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
 func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
-	var (
-		t           plan9.Fcall
-		id, n, j, k int
-		i, e, o     uint64
-		ids         []int
-		d           []*DirTab
-		dt          DirTab
-		clock       int64
-		length      int
-	)
 	if f.qid.Type&plan9.QTDIR != 0 {
 		if FILE(f.qid) == Qacme { // empty dir
-			t.Data = nil
-			t.Count = 0
+			t := plan9.Fcall{
+				Data: nil,
+			}
 			fs.respond(x, &t, nil)
 			return x
 		}
-		o = x.fcall.Offset
-		e = x.fcall.Offset + uint64(x.fcall.Count)
-		clock = getclock()
-		b := make([]byte, x.fcall.Count)
-		id = WIN(f.qid)
-		n = 0
+		clock := getclock()
+		id := WIN(f.qid)
+		d := dirtab
 		if id > 0 {
 			d = dirtabw
-		} else {
-			d = dirtab
 		}
 		d = d[1:] // Skip '.'
-		i = uint64(0)
-		for _, de := range d {
-			if !(i < e) {
-				break
-			}
-			length = fs.dostat(WIN(x.f.qid), de, b[n:], clock)
-			if i >= o {
-				n += length
-			}
-			i += uint64(length)
-		}
+
+		var ids []int // for window sub-directories
 		if id == 0 {
 			row.lk.Lock()
-			ids = []int{}
 			for _, c := range row.col {
 				for _, w := range c.w {
 					ids = append(ids, w.id)
@@ -561,26 +538,21 @@ func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 			}
 			row.lk.Unlock()
 			sort.Ints(ids)
-			j = 0
-			length = 0
-			for ; j < len(ids) && i < e; i += uint64(length) {
-				k = ids[j]
-				dt.name = fmt.Sprintf("%d", k)
-				dt.qid = QID(k, Qdir)
-				dt.t = plan9.QTDIR
-				dt.perm = plan9.DMDIR | 0700
-				length = fs.dostat(k, &dt, b[n:], clock)
-				if length == 0 {
-					break
-				}
-				if i >= o {
-					n += length
-				}
-				j++
-			}
 		}
-		t.Data = b[0:n]
-		t.Count = uint32(n)
+
+		var t plan9.Fcall
+		ninep.DirRead(&t, &x.fcall, func(i int) *plan9.Dir {
+			if i < len(d) {
+				return d[i].Dir(id, fs.username, clock)
+			}
+			i -= len(d)
+			if i < len(ids) {
+				k := ids[i]
+				return windowDirTab(k).Dir(k, fs.username, clock)
+			}
+			return nil
+		})
+
 		fs.respond(x, &t, nil)
 		return x
 	}
@@ -608,8 +580,13 @@ func (fs *fileServer) stat(x *Xfid, f *Fid) *Xfid {
 	var t plan9.Fcall
 
 	t.Stat = make([]byte, fs.messagesize-plan9.IOHDRSZ)
-	length := fs.dostat(WIN(x.f.qid), f.dir, t.Stat, getclock())
-	t.Stat = t.Stat[:length]
+	b, _ := f.dir.Dir(WIN(x.f.qid), fs.username, getclock()).Bytes()
+	if len(b) > len(t.Stat) {
+		// don't send partial directory entry
+		return fs.respond(x, nil, fmt.Errorf("msize too small"))
+	}
+	n := copy(t.Stat, b)
+	t.Stat = t.Stat[:n]
 	x = fs.respond(x, &t, nil)
 	return x
 }
@@ -630,35 +607,47 @@ func (fs *fileServer) newfid(fid uint32) *Fid {
 	return ff
 }
 
+var useFixedClock bool // for testing
+
+// fixedClockValue is the same as the one used by https://play.golang.org/
+// (when Go was open sourced).
+const fixedClockValue = 1257894000
+
 func getclock() int64 {
+	if useFixedClock {
+		return fixedClockValue
+	}
 	return time.Now().Unix()
 }
 
-// buf must have enough length to fit this stat object.
-func (fs *fileServer) dostat(id int, dir *DirTab, buf []byte, clock int64) int {
-	var d plan9.Dir
-
-	d.Qid.Path = QID(id, dir.qid)
-	d.Qid.Vers = 0
-	d.Qid.Type = dir.t
-	d.Mode = plan9.Perm(dir.perm)
-	d.Length = 0 // would be nice to do better
-	d.Name = dir.name
-	d.Uid = fs.username
-	d.Gid = fs.username
-	d.Muid = fs.username
-	d.Atime = uint32(clock)
-	d.Mtime = uint32(clock)
-
-	b, _ := d.Bytes()
-	copy(buf, b)
-	return len(b)
+// Dir converts DirTab to plan9.Dir. The given window id is used to
+// compute Qid.Path, username/group is set to user, and Atime/Mtime is
+// set to clock.
+func (dt *DirTab) Dir(id int, user string, clock int64) *plan9.Dir {
+	return &plan9.Dir{
+		Type: 0,
+		Dev:  0,
+		Qid: plan9.Qid{
+			Path: QID(id, dt.qid),
+			Vers: 0,
+			Type: dt.t,
+		},
+		Mode:   dt.perm,
+		Atime:  uint32(clock),
+		Mtime:  uint32(clock),
+		Length: 0, // would be nice to do better
+		Name:   dt.name,
+		Uid:    user,
+		Gid:    user,
+		Muid:   user,
+	}
 }
 
 func getuser() string {
 	user, err := user.Current()
 	if err != nil {
-		return "Wile E. Coyote"
+		// Same as https://9fans.github.io/usr/local/plan9/src/lib9/getuser.c
+		return "none"
 	}
 	return user.Username
 }

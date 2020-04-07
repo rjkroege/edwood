@@ -12,7 +12,7 @@ import (
 
 func acmeTestingMain() {
 	acmeshell = os.Getenv("acmeshell")
-	cwait = make(chan *os.ProcessState)
+	cwait = make(chan ProcessState)
 	cerr = make(chan error)
 	go func() {
 		for range cerr {
@@ -42,7 +42,7 @@ func TestRunproc(t *testing.T) {
 		{false, false, false, "|ls", "."},
 		{false, false, false, "<ls", "."},
 		{false, false, false, ">ls", "."},
-		{false, true, true, "nonexistantcommand", ""},
+		{false, true, true, "nonexistentcommand", ""},
 
 		// Hard: must be executed using a shell
 		{true, false, false, "ls '.'", ""},
@@ -50,7 +50,7 @@ func TestRunproc(t *testing.T) {
 		{true, false, false, "	 ls	 '.'	 ", ""},
 		{true, false, false, "ls '.'", "."},
 		{true, false, true, "dat\x08\x08ate", ""},
-		{true, false, true, "/non-existant-command", ""},
+		{true, false, true, "/non-existent-command", ""},
 	}
 	acmeTestingMain()
 
@@ -162,5 +162,25 @@ func TestPutfile(t *testing.T) {
 	err = putfile(f, 0, f.Size(), filename)
 	if err == nil || !strings.Contains(err.Error(), "modified since last read") {
 		t.Fatalf("putfile returned error %v; expected 'modified since last read'", err)
+	}
+}
+
+func TestExpandtabToggle(t *testing.T) {
+	want := true
+	w := &Window{
+		body: Text{
+			file:      &File{},
+			tabexpand: false,
+			tabstop:   4,
+		},
+	}
+	text := &w.body
+	text.w = w
+	text.tabexpand = !want
+
+	expandtab(text, text, text, false, false, "")
+	te := text.w.body.tabexpand
+	if te != want {
+		t.Errorf("tabexpand is set to %v; expected %v", te, want)
 	}
 }

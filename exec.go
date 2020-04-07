@@ -21,7 +21,7 @@ import (
 
 type Exectab struct {
 	name  string
-	fn    func(t0, t1, t2 *Text, b0, b1 bool, arg string)
+	fn    func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
 	mark  bool
 	flag1 bool
 	flag2 bool
@@ -55,6 +55,7 @@ var exectab = []Exectab{
 	{"Snarf", cut, false, true, false},
 	{"Sort", sortx, false, true /*unused*/, true /*unused*/},
 	{"Tab", tab, false, true /*unused*/, true /*unused*/},
+	{"Tabexpand", expandtab, false, true /*unused*/, true /*unused*/},
 	{"Undo", undo, false, true, true /*unused*/},
 	{"Zerox", zeroxx, false, true /*unused*/, true /*unused*/},
 }
@@ -90,6 +91,7 @@ func printarg(argt *Text, q0 int, q1 int) string {
 	return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
 }
 
+// TODO(rjk): use a tokenizer on the results of getarg
 func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	if argt == nil {
 		return "", ""
@@ -120,15 +122,10 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 
 // execute must run with an existing lock on t's Window
 func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
-	var (
-		q0, q1 int
-		r      []rune
-		n, f   int
-		dir    string
-	)
+	var n, f int
 
-	q0 = aq0
-	q1 = aq1
+	q0 := aq0
+	q1 := aq1
 	if q1 == q0 { // expand to find word (actually file name)
 		// if in selection, choose selection
 		if t.inSelection(q0) {
@@ -156,7 +153,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			}
 		}
 	}
-	r = make([]rune, q1-q0)
+	r := make([]rune, q1-q0)
 	t.file.b.Read(q0, r)
 	e := lookup(string(r))
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
@@ -224,10 +221,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	}
 
 	b := r
-	dir = t.DirName("")
-	if dir == "." { // sigh
-		dir = ""
-	}
+	dir := t.DirName("") // exec.Cmd.Dir
 	a, aa := getarg(argt, true, true)
 	if t.w != nil {
 		t.w.ref.Inc()
@@ -240,6 +234,7 @@ func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		return
 	}
 	r, _ := getarg(argt, false, true)
+
 	seq++
 	if r != "" {
 		editcmd(et, []rune(r))
@@ -321,6 +316,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		t.SetSelect(t.q0, t.q0)
 		if t.w != nil {
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+			t.w.Commit(t)
 			t.w.SetTag()
 		}
 	} else {
@@ -403,6 +399,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 	if t.w != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
+		t.w.Commit(t)
 		t.w.SetTag()
 	}
 }
@@ -489,11 +486,8 @@ func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
 
 func local(et, _, argt *Text, _, _ bool, arg string) {
 	a, aa := getarg(argt, true, true)
-	dir := dirname(et, nil)
-	if len(dir) == 1 && dir[0] == '.' { // sigh
-		dir = dir[:0]
-	}
-	run(nil, arg, string(dir), false, aa, a, false)
+	dir := et.DirName("") // exec.Cmd.Dir
+	run(nil, arg, dir, false, aa, a, false)
 }
 
 // putfile writes File to disk, if it's safe to do so.
@@ -536,20 +530,10 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	if isapp {
 		return warnError(nil, "%s not written; file is append only", name)
 	}
-	r := make([]rune, RBUFSIZE)
-	n := 0
-	for q := q0; q < q1; q += n {
-		n = q1 - q
-		if n > RBUFSIZE {
-			n = RBUFSIZE
-		}
-		f.b.Read(q, r[:n])
-		s := string(r[:n])
-		io.WriteString(h, s)
-		nwritten, err := fd.Write([]byte(s))
-		if err != nil || nwritten != len(s) {
-			return warnError(nil, "can't write file %s: %v", name, err)
-		}
+
+	_, err = io.Copy(io.MultiWriter(h, fd), f.b.Reader(q0, q1))
+	if err != nil {
+		return warnError(nil, "can't write file %s: %v", name, err)
 	}
 
 	// Putting to the same file as the one that we originally read from.
@@ -668,7 +652,8 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	go runwaittask(c, cpid)
 }
 
-func sendx(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
+// sendx appends selected text or snarf buffer to end of body.
+func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if et.w == nil {
 		return
 	}
@@ -721,6 +706,9 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		args := strings.Split(arg, " ")
 		arg = args[0]
 		p := arg
+		if len(p) == 0 {
+			return
+		}
 		if '0' <= p[0] && p[0] <= '9' {
 			tab, _ = strconv.ParseInt(p, 10, 16)
 		}
@@ -732,6 +720,20 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		}
 	} else {
 		warning(nil, "%s: Tab %d\n", w.body.file.name, w.body.tabstop)
+	}
+}
+
+func expandtab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
+	if et == nil || et.w == nil {
+		return
+	}
+	w := et.w
+	if w.body.tabexpand {
+		w.body.tabexpand = false
+		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.name, w.body.tabstop)
+	} else {
+		w.body.tabexpand = true
+		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.name, w.body.tabstop)
 	}
 }
 
@@ -766,7 +768,7 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 
 	if newfont := fontget(file, row.display); newfont != nil {
 		// TODO(rjk): maybe Frame should know how to clear itself on init?
-		row.display.ScreenImage().Draw(t.w.r, textcolors[frame.ColBack], nil, image.ZP)
+		row.display.ScreenImage().Draw(t.w.r, textcolors[frame.ColBack], nil, image.Point{})
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage()))
 
@@ -1024,11 +1026,11 @@ func indentval(s string) int {
 	}
 	switch s {
 	case "ON":
-		globalautoindent = true
+		*globalAutoIndent = true
 		warning(nil, "Indent ON\n")
 		return IGlobal
 	case "OFF":
-		globalautoindent = false
+		*globalAutoIndent = false
 		warning(nil, "Indent OFF\n")
 		return IGlobal
 	case "on":
@@ -1053,7 +1055,7 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		autoindent = indentval(strings.SplitN(arg, " ", 2)[0])
 	}
 	if autoindent == IGlobal {
-		row.AllWindows(func(w *Window) { w.autoindent = globalautoindent })
+		row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
 	} else {
 		if w != nil && autoindent >= 0 {
 			w.autoindent = autoindent == Ion

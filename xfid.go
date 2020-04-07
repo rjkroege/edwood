@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +12,8 @@ import (
 
 	"9fans.net/go/plan9"
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/ninep"
+	"github.com/rjkroege/edwood/internal/runes"
 )
 
 const Ctlsize = 5 * 12
@@ -25,21 +27,6 @@ var (
 	ErrInUse      = fmt.Errorf("already in use")
 	ErrBadEvent   = fmt.Errorf("bad event syntax")
 )
-
-func clampaddr(w *Window) {
-	if w.addr.q0 < 0 {
-		w.addr.q0 = 0
-	}
-	if w.addr.q1 < 0 {
-		w.addr.q1 = 0
-	}
-	if w.addr.q0 > w.body.Nc() {
-		w.addr.q0 = w.body.Nc()
-	}
-	if w.addr.q1 > w.body.Nc() {
-		w.addr.q1 = w.body.Nc()
-	}
-}
 
 func (x *Xfid) respond(t *plan9.Fcall, err error) *Xfid {
 	return x.fs.respond(x, t, err)
@@ -60,10 +47,6 @@ func xfidctl(x *Xfid, d draw.Display) {
 func xfidflush(x *Xfid) {
 	// log.Println("xfidflush", x)
 	// defer log.Println("done xfidflush")
-	var (
-		fc plan9.Fcall
-		wx *Xfid
-	)
 
 	xfidlogflush(x)
 
@@ -73,7 +56,7 @@ func xfidflush(x *Xfid) {
 	for _, c := range row.col {
 		for _, w := range c.w {
 			w.Lock('E')
-			wx = w.eventx
+			wx := w.eventx
 			if wx != nil && wx.fcall.Tag == x.fcall.Oldtag {
 				w.eventx = nil
 				wx.flushed = true
@@ -85,25 +68,24 @@ func xfidflush(x *Xfid) {
 		}
 	}
 out:
-	x.respond(&fc, nil)
+	x.respond(&plan9.Fcall{}, nil)
 }
+
+// These variables are only used for testing.
+var (
+	testTempFileFail bool
+	testIOCopyFail   bool
+)
 
 func xfidopen(x *Xfid) {
 	// log.Println("xfidopen", x)
 	// defer log.Println("xfidopen done")
-	var (
-		fc     plan9.Fcall
-		w      *Window
-		t      *Text
-		n      int
-		q0, q1 int
-		q      uint64
-	)
+	var fc plan9.Fcall
 
-	w = x.f.w
-	q = FILE(x.f.qid)
+	w := x.f.w
+	q := FILE(x.f.qid)
 	if w != nil {
-		t = &w.body
+		t := &w.body
 		w.Lock('E')
 		switch q {
 		case QWaddr:
@@ -112,9 +94,7 @@ func xfidopen(x *Xfid) {
 				w.limit = Range{-1, -1}
 			}
 			w.nopen[q]++
-		case QWdata:
-			fallthrough
-		case QWxdata:
+		case QWdata, QWxdata:
 			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
@@ -136,34 +116,23 @@ func xfidopen(x *Xfid) {
 				x.respond(&fc, ErrInUse)
 				return
 			}
-			var err error
 			// TODO(flux): Move the TempFile and Remove
 			// into a tempfile() call
-			w.rdselfd, err = ioutil.TempFile("", "acme")
-			if err != nil {
+			tmp, err := ioutil.TempFile("", "acme")
+			if err != nil || testTempFileFail {
 				w.Unlock()
 				x.respond(&fc, fmt.Errorf("can't create temp file"))
 				return
 			}
-			os.Remove(w.rdselfd.Name()) // tempfile ORCLOSE
+			os.Remove(tmp.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
-			q0 = t.q0
-			q1 = t.q1
-			r := make([]rune, RBUFSIZE)
-			for q0 < q1 {
-				n = q1 - q0
-				if n > RBUFSIZE {
-					n = RBUFSIZE
-				}
-				t.file.b.Read(q0, r[:n])
-				s := string(r[:n])
-				n, err = w.rdselfd.Write([]byte(s))
-				if err != nil || n != len(s) {
-					warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
-					break
-				}
-				q0 += n
+
+			_, err = io.Copy(tmp, t.file.b.Reader(t.q0, t.q1))
+			if err != nil || testIOCopyFail {
+				// TODO(fhs): Do we want to send an error response to the client?
+				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
 			}
+			w.rdselfd = tmp
 		case QWwrsel:
 			w.nopen[q]++
 			seq++
@@ -209,13 +178,9 @@ func xfidopen(x *Xfid) {
 func xfidclose(x *Xfid) {
 	// log.Println("xfidclose", x)
 	// defer log.Println("xfidclose done")
-	var (
-		fc plan9.Fcall
-		w  *Window
-		q  uint64
-		t  *Text
-	)
-	w = x.f.w
+	var fc plan9.Fcall
+
+	w := x.f.w
 	x.f.busy = false
 	x.f.w = nil
 	if !x.f.open {
@@ -226,9 +191,13 @@ func xfidclose(x *Xfid) {
 		return
 	}
 
-	q = FILE(x.f.qid)
+	q := FILE(x.f.qid)
 	x.f.open = false
 	if w != nil {
+		// We need to lock row here before locking window (just like mousethread)
+		// in order to synchronize mousetext with mousethread: mousetext is
+		// set to nil when the associated window is closed.
+		row.lk.Lock()
 		w.Lock('E')
 		switch q {
 		case QWctl:
@@ -236,9 +205,7 @@ func xfidclose(x *Xfid) {
 				w.ctlfid = MaxFid
 				w.ctrllock.Unlock()
 			}
-		case QWdata:
-			fallthrough
-		case QWxdata:
+		case QWdata, QWxdata:
 			w.nomark = false
 			fallthrough
 		case QWaddr:
@@ -263,14 +230,15 @@ func xfidclose(x *Xfid) {
 			w.rdselfd = nil
 		case QWwrsel:
 			w.nomark = false
-			t = &w.body
-			t.Show(min((w.wrselrange.q0), t.Nc()), min((w.wrselrange.q1), t.Nc()), true)
+			t := &w.body
+			t.Show(min(w.wrselrange.q0, t.Nc()), min(w.wrselrange.q1, t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		case QWeditout:
 			<-w.editoutlk
 		}
 		w.Close()
 		w.Unlock()
+		row.lk.Unlock()
 	} else {
 		switch q {
 		case Qeditout:
@@ -280,22 +248,19 @@ func xfidclose(x *Xfid) {
 	x.respond(&fc, nil)
 }
 
+// xfidread responds to a plan9.Tread request.
 func xfidread(x *Xfid) {
 	// log.Println("xfidread", x)
 	// defer log.Println("done xfidread")
-	var (
-		fc plan9.Fcall
-		n  int
-		b  string
-		w  *Window
-	)
+	var fc plan9.Fcall
+
 	q := FILE(x.f.qid)
-	w = x.f.w
+	w := x.f.w
 	if w == nil {
 		fc.Count = 0
 		switch q {
-		case Qcons: //breal
-		case Qlabel: //break
+		case Qcons: // Do nothing.
+		case Qlabel: // Do nothing.
 		case Qindex:
 			xfidindexread(x)
 			return
@@ -303,14 +268,15 @@ func xfidread(x *Xfid) {
 			xfidlogread(x)
 			return
 		default:
-			warning(nil, "unknown qid %d\n", q)
+			x.respond(&fc, fmt.Errorf("unknown qid %d in read", q))
+			return
 		}
 		x.respond(&fc, nil)
 		return
 	}
 	w.Lock('F')
+	defer w.Unlock()
 	if w.col == nil {
-		w.Unlock()
 		x.respond(&fc, ErrDeletedWin)
 		return
 	}
@@ -318,32 +284,16 @@ func xfidread(x *Xfid) {
 	switch q {
 	case QWaddr:
 		w.body.Commit()
-		clampaddr(w)
+		w.ClampAddr()
 		buf := fmt.Sprintf("%11d %11d ", w.addr.q0, w.addr.q1)
-		n = len(buf)
-		if off > uint64(n) {
-			off = uint64(n)
-		}
-		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n) - off)
-		}
-		fc.Count = x.fcall.Count
-		fc.Data = []byte(buf[off:])
+		ninep.ReadString(&fc, &x.fcall, buf)
 		x.respond(&fc, nil)
+
 	case QWbody:
 		xfidutfread(x, &w.body, w.body.Nc(), int(QWbody))
 
 	case QWctl:
-		b = w.CtlPrint(true)
-		n = len(b)
-		if off > uint64(n) {
-			off = uint64(n)
-		}
-		if off+uint64(x.fcall.Count) > uint64(n) {
-			x.fcall.Count = uint32(uint64(n) - off)
-		}
-		fc.Count = x.fcall.Count
-		fc.Data = []byte(b[off : off+uint64(x.fcall.Count)])
+		ninep.ReadString(&fc, &x.fcall, w.CtlPrint(true))
 		x.respond(&fc, nil)
 
 	case QWevent:
@@ -355,7 +305,7 @@ func xfidread(x *Xfid) {
 			x.respond(&fc, ErrAddrRange)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), w.body.Nc())
+		w.addr.q0 += xfidruneread(x, &w.body, w.addr.q0, w.body.Nc())
 		w.addr.q1 = w.addr.q0
 
 	case QWxdata:
@@ -364,14 +314,14 @@ func xfidread(x *Xfid) {
 			x.respond(&fc, ErrAddrRange)
 			break
 		}
-		w.addr.q0 += xfidruneread(x, &w.body, (w.addr.q0), (w.addr.q1))
+		w.addr.q0 += xfidruneread(x, &w.body, w.addr.q0, w.addr.q1)
 
 	case QWtag:
 		xfidutfread(x, &w.tag, w.tag.Nc(), int(QWtag))
 
 	case QWrdsel:
 		w.rdselfd.Seek(int64(off), 0)
-		n = int(x.fcall.Count)
+		n := int(x.fcall.Count)
 		if n > BUFSIZE {
 			n = BUFSIZE
 		}
@@ -387,7 +337,6 @@ func xfidread(x *Xfid) {
 	default:
 		x.respond(&fc, fmt.Errorf("unknown qid %d in read", q))
 	}
-	w.Unlock()
 }
 
 func shouldscroll(t *Text, q0 int, qid uint64) bool {
@@ -397,7 +346,9 @@ func shouldscroll(t *Text, q0 int, qid uint64) bool {
 	return t.org <= q0 && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars)
 }
 
-// This is fiddly code that handles partial runes at the end of a previous write?
+// fullrunewrite decodes runes from x.fcall.Data and returns the decoded
+// runes. Bytes at the end of x.fcall.Data that can't be fully decoded
+// into a rune (partial runes) are saved for next call to this function.
 func fullrunewrite(x *Xfid) []rune {
 	// extend with previous partial rune at the end.
 	cnt := int(x.fcall.Count)
@@ -421,27 +372,20 @@ func fullrunewrite(x *Xfid) []rune {
 	return r
 }
 
+// xfidwrite responds to a plan9.Twrite request.
 func xfidwrite(x *Xfid) {
 	// log.Println("xfidwrite", x)
 	// defer log.Println("done xfidwrite")
-	var (
-		fc               plan9.Fcall
-		c                int
-		eval             bool
-		r                []rune
-		a                Range
-		t                *Text
-		q0, tq0, tq1, nb int
-		err              error
-	)
+	var fc plan9.Fcall
+
 	qid := FILE(x.f.qid)
 	w := x.f.w
 	if w != nil {
-		c = 'F'
+		c := 'F'
 		if qid == QWtag || qid == QWbody {
 			c = 'E'
 		}
-		w.Lock(c)
+		w.Lock(int(c))
 		if w.col == nil {
 			w.Unlock()
 			x.respond(&fc, ErrDeletedWin)
@@ -450,12 +394,14 @@ func xfidwrite(x *Xfid) {
 	}
 	x.fcall.Count = uint32(len(x.fcall.Data))
 
-	BodyTag := func() { // Trimmed from the switch below.
+	// updateText writes x.fcall.Data to text buffer t and sends the 9P response.
+	updateText := func(t *Text) {
 		r := fullrunewrite(x)
 		if len(r) != 0 {
 			w.Commit(t)
+			var q0 int
 			if qid == QWwrsel {
-				q0 = (w.wrselrange.q1)
+				q0 = w.wrselrange.q1
 				if q0 > t.Nc() {
 					q0 = t.Nc()
 				}
@@ -490,21 +436,20 @@ func xfidwrite(x *Xfid) {
 	switch qid {
 	case Qcons:
 		w = errorwin(x.f.mntdir, 'X')
-		t = &w.body
-		BodyTag()
+		updateText(&w.body)
 
 	case Qlabel:
 		fc.Count = x.fcall.Count
 		x.respond(&fc, nil)
 
 	case QWaddr:
-		r = []rune(string(x.fcall.Data))
-		t = &w.body
+		r := []rune(string(x.fcall.Data))
+		t := &w.body
 		w.Commit(t)
-		eval = true
-		a, eval, nb = address(false, t, w.limit, w.addr, 0, len(r),
+		eval := true
+		a, eval, nr := address(false, t, w.limit, w.addr, 0, len(r),
 			func(q int) rune { return r[q] }, eval)
-		if nb < len(r) {
+		if nr < len(r) {
 			x.respond(&fc, ErrBadAddr)
 			break
 		}
@@ -516,10 +461,9 @@ func xfidwrite(x *Xfid) {
 		fc.Count = x.fcall.Count
 		x.respond(&fc, nil)
 
-	case Qeditout:
-		fallthrough
-	case QWeditout:
-		r = fullrunewrite(x)
+	case Qeditout, QWeditout:
+		r := fullrunewrite(x)
+		var err error
 		if w != nil {
 			err = edittext(w, w.wrselrange.q1, r)
 		} else {
@@ -534,21 +478,17 @@ func xfidwrite(x *Xfid) {
 
 	case QWerrors:
 		w = errorwinforwin(w)
-		t = &w.body
-		BodyTag()
+		updateText(&w.body)
 
-	case QWbody:
-		fallthrough
-	case QWwrsel:
-		t = &w.body
-		BodyTag()
+	case QWbody, QWwrsel:
+		updateText(&w.body)
 
 	case QWctl:
 		xfidctlwrite(x, w)
 
 	case QWdata:
-		a = w.addr
-		t = &w.body
+		a := w.addr
+		t := &w.body
 		w.Commit(t)
 		if a.q0 > t.Nc() || a.q1 > t.Nc() {
 			x.respond(&fc, ErrAddrRange)
@@ -559,13 +499,13 @@ func xfidwrite(x *Xfid) {
 			seq++
 			t.file.Mark(seq)
 		}
-		q0 = (a.q0)
-		if a.q1 > (q0) {
-			t.Delete(q0, (a.q1), true)
-			w.addr.q1 = (q0)
+		q0 := a.q0
+		if a.q1 > q0 {
+			t.Delete(q0, a.q1, true)
+			w.addr.q1 = q0
 		}
-		tq0 = t.q0
-		tq1 = t.q1
+		tq0 := t.q0
+		tq1 := t.q1
 		t.Insert(q0, r, true)
 		if tq0 >= q0 {
 			tq0 += len(r)
@@ -588,8 +528,7 @@ func xfidwrite(x *Xfid) {
 		xfideventwrite(x, w)
 
 	case QWtag:
-		t = &w.tag
-		BodyTag()
+		updateText(&w.tag)
 
 	default:
 		x.respond(&fc, fmt.Errorf("unknown qid %d in write", qid))
@@ -602,46 +541,53 @@ func xfidwrite(x *Xfid) {
 func xfidctlwrite(x *Xfid, w *Window) {
 	// log.Println("xfidctlwrite", x)
 	// defer log.Println("done xfidctlwrite")
-	var (
-		fc              plan9.Fcall
-		err             error
-		scrdraw, settag bool
-		t               *Text
-		n               int
-	)
-	err = nil
-	scrdraw = false
-	settag = false
+	var err error
+	const scrdraw = false
+	settag := false
 
 	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
-	var lidx int
-	var line string
+	n := 0
 forloop:
-	for lidx = 0; lidx < len(lines); lidx++ {
-		line = lines[lidx]
+	for lidx := 0; lidx < len(lines); lidx++ {
+		line := lines[lidx]
 		words := strings.SplitN(line, " ", 2)
+
+		if words[0] != "" && w == nil { // window was deleted in a previous line
+			err = ErrDeletedWin
+			break
+		}
+
 		switch words[0] {
 		case "": // empty line.
+
+		// Lock/unlock can hang or crash Edwood.
+		// They don't appear to be used for anything useful, so disable for now.
+		//
 		case "lock": // make window exclusive use
-			w.ctrllock.Lock()
-			w.ctlfid = x.f.fid
+			//w.ctrllock.Lock() // This will hang Edwood if the lock is already locked.
+			//w.ctlfid = x.f.fid
+			fallthrough
 		case "unlock": // release exclusive use
-			w.ctlfid = math.MaxUint32
-			w.ctrllock.Unlock()
+			//w.ctlfid = math.MaxUint32
+			//w.ctrllock.Unlock() // This will crash if the lock isn't already locked.
+			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.name)
+			err = ErrBadCtl
+			break forloop
+
 		case "clean": // mark window 'clean', seq=0
-			t = &w.body
+			t := &w.body
 			t.eq0 = ^0
 			t.file.Reset()
 			t.file.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'
-			t = &w.body
+			t := &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
 			t.file.Modded()
 			settag = true
 		case "show": // show dot
-			t = &w.body
+			t := &w.body
 			t.Show(t.q0, t.q1, true)
 		case "name": // set file name
 			if len(words) < 2 {
@@ -656,7 +602,7 @@ forloop:
 			for _, rr := range r {
 				if rr <= ' ' {
 					err = fmt.Errorf("bad character in file name")
-					break
+					break forloop
 				}
 			}
 			seq++
@@ -686,19 +632,21 @@ forloop:
 			w.dumpdir = string(r)
 		case "delete": // delete for sure
 			w.col.Close(w, true)
+			w = nil
 		case "del": // delete, but check dirty
-			if w.Clean(true) {
+			if !w.Clean(true) {
 				err = fmt.Errorf("file dirty")
-				break
+				break forloop
 			}
 			w.col.Close(w, true)
+			w = nil
 		case "get": // get file
 			get(&w.body, nil, nil, false, XXX, "")
 		case "put": // put file
 			put(&w.body, nil, nil, XXX, XXX, "")
 		case "dot=addr": // set dot
 			w.body.Commit()
-			clampaddr(w)
+			w.ClampAddr()
 			w.body.q0 = w.addr.q0
 			w.body.q1 = w.addr.q1
 			w.body.SetSelect(w.body.q0, w.body.q1)
@@ -708,7 +656,7 @@ forloop:
 			w.addr.q1 = w.body.q1
 		case "limit=addr": // set limit
 			w.body.Commit()
-			clampaddr(w)
+			w.ClampAddr()
 			w.limit.q0 = w.addr.q0
 			w.limit.q1 = w.addr.q1
 		case "nomark": // turn off automatic marking
@@ -729,30 +677,25 @@ forloop:
 			err = ErrBadCtl
 			break forloop
 		}
+		n += len(line)
+		if d := x.fcall.Data; n < len(d) && d[n] == '\n' {
+			n++
+		}
 	}
 
 	if err != nil {
 		n = 0
-	} else {
-		// how far through the buffer did we get?
-		// count bytes up to line lineidx
-		d := x.fcall.Data
-		curline := 0
-		for n = 0; n < len(d); n++ {
-			if curline == lidx {
-				break
-			}
-			if d[n] == '\n' {
-				curline++
-			}
-		}
 	}
-	fc.Count = uint32(n)
+	fc := plan9.Fcall{
+		Count: uint32(n),
+	}
 	x.respond(&fc, err)
-	if settag {
+
+	if settag && w != nil {
 		w.SetTag()
 	}
-	if scrdraw {
+	if scrdraw && w != nil {
+		t := &w.body
 		w.body.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
 }
@@ -763,14 +706,14 @@ func xfideventwrite(x *Xfid, w *Window) {
 	// We can't lock row while we have a window locked
 	// because that can create deadlock with mousethread.
 	rowLock := func() {
-		w.Unlock()
+		defer w.Lock(w.owner)
+		w.Unlock() // sets w.owner to 0
 		row.lk.Lock()
-		w.Lock(w.owner)
 	}
 	rowUnlock := func() {
-		w.Unlock()
+		defer w.Lock(w.owner)
+		w.Unlock() // sets w.owner to 0
 		row.lk.Unlock()
-		w.Lock(w.owner)
 	}
 
 	// The messages have a fixed format: a character indicating the
@@ -851,21 +794,27 @@ forloop:
 	x.respond(&fc, err)
 }
 
+// xfidutfread reads x.fcall.Count bytes from offset x.fcall.Offset in
+// text t and sends the data to the client. It only sends full runes,
+// and optimizes for sequential reads by keeping track of (byte offset,
+// rune offset) pair of the last read from buffer for a matching qid
+// (QWbody or QWtag). No data past rune offset q1 is sent to client.
+//
+// TODO(fhs): Remove this function and use Buffer.ReadAt once Buffer
+// implements io.ReaderAt interface. Buffer.ReadAt will need to be careful
+// to send full runes only, if we want to keep the current behavior.
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	// log.Println("xfidutfread", x)
 	// defer log.Println("done xfidutfread")
-	var (
-		fc           plan9.Fcall
-		w            *Window
-		q            int
-		off, boff    uint64
-		m, n, nr, nb int
-	)
-	w = t.w
+	w := t.w
 	w.Commit(t)
-	off = x.fcall.Offset
-	n = 0
+	off := x.fcall.Offset
+	n := 0
 	b1 := make([]byte, BUFSIZE)
+	var (
+		q    int
+		boff uint64
+	)
 	if qid == w.utflastqid && off >= w.utflastboff && w.utflastq <= q1 {
 		boff = w.utflastboff
 		q = w.utflastq
@@ -882,15 +831,15 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		// than we really need, but that's better than being n^2.
 		w.utflastboff = boff
 		w.utflastq = q
-		nr = q1 - q
+		nr := q1 - q
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
 		t.file.b.Read(q, r[:nr])
 		b := string(r[:nr])
-		nb = len(b)
+		nb := len(b)
 		if boff >= off {
-			m = len(b)
+			m := len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
 				m = int(off + uint64(x.fcall.Count) - boff)
 			}
@@ -901,7 +850,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 				if n != 0 {
 					acmeerror("bad count in utfrune", nil)
 				}
-				m = nb - int(off-boff)
+				m := nb - int(off-boff)
 				if m > int(x.fcall.Count) {
 					m = int(x.fcall.Count)
 				}
@@ -912,54 +861,50 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		boff += uint64(nb)
 		q += len(r)
 	}
+	var fc plan9.Fcall
 	fc.Data = b1[:n]
 	fc.Count = uint32(len(fc.Data))
 	x.respond(&fc, nil)
 }
 
+// xfidruneread reads runes from address q0,q1 in t and sends the UTF-8
+// encoding of at most q1-q0 runes to the client. Not all the the runes
+// may be sent because at most x.fcall.Count bytes of full UTF-8 encoding
+// is sent. The number of runes sent is returned.
 func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	// log.Println("xfidruneread", x)
 	// defer log.Println("done xfidruneread")
-	var (
-		fc plan9.Fcall
-		w  *Window
-	)
 
-	w = t.w
-	w.Commit(t)
+	t.w.Commit(t)
+
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
 	t.file.b.Read(q0, tmp)
 	buf := []byte(string(tmp))
-	// Now chop, and back up the end until we have a full rune
-	buf = buf[:nr]
-	i := nr - utf8.UTFMax
-	// Find a full rune to start in the last 4 bytes
-	for len(buf[i:]) > 0 {
-		ru, count := utf8.DecodeRune(buf[i:])
-		if ru == utf8.RuneError {
-			i += count
-		} else {
-			break
+
+	m := len(buf)
+	if len(buf) > int(x.fcall.Count) {
+		// copy whole runes only
+		m = 0
+		nr = 0
+		for m < len(buf) {
+			_, size := utf8.DecodeRune(buf[m:])
+			if m+size > int(x.fcall.Count) {
+				break
+			}
+			m += size
+			nr++
 		}
 	}
-	// add all further full runes
-	for len(buf[i:]) > 0 {
-		ru, count := utf8.DecodeRune(buf[i:])
-		if ru == utf8.RuneError {
-			break
-		} else {
-			i += count
-		}
+	buf = buf[:m]
+
+	fc := plan9.Fcall{
+		Count: uint32(len(buf)),
+		Data:  buf,
 	}
-
-	buf = buf[:i]
-
-	fc.Count = uint32(len(buf))
-	fc.Data = buf
 	x.respond(&fc, nil)
-	return len(string(buf))
+	return nr
 }
 
 func xfideventread(x *Xfid, w *Window) {
@@ -990,18 +935,17 @@ func xfideventread(x *Xfid, w *Window) {
 	fc.Count = uint32(n)
 	fc.Data = w.events[:n]
 	x.respond(&fc, nil)
-	nn := len(w.events)
-	copy(w.events[0:], w.events[n:])
 
-	w.events = w.events[0 : nn-n]
+	w.events = w.events[n:]
 }
 
 func xfidindexread(x *Xfid) {
 	// log.Println("xfidindexread", x)
 	// defer log.Println("done xfidindexread")
-	var (
-		fc plan9.Fcall
-	)
+
+	// BUG(fhs): This is broken when the client is doing a sequential
+	// read using a very small buffer and we create/delete windows
+	// in-between the requests.
 
 	row.lk.Lock()
 	nmax := 0
@@ -1012,7 +956,7 @@ func xfidindexread(x *Xfid) {
 	}
 
 	nmax++
-	sb := strings.Builder{}
+	var sb strings.Builder
 	for _, c := range row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
@@ -1023,25 +967,18 @@ func xfidindexread(x *Xfid) {
 			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
 			w.tag.file.b.Read(0, tag)
+
+			// We only include first line of a multi-line tag
+			if i := runes.IndexRune(tag, '\n'); i >= 0 {
+				tag = tag[:i]
+			}
 			sb.WriteString(string(tag))
 			sb.WriteString("\n")
 		}
 	}
 	row.lk.Unlock()
-	off := x.fcall.Offset
-	cnt := x.fcall.Count
 
-	// TODO(flux): This code looks buggy here, as it was in the original.
-	// This trims the output list into blocks without respecting utf8 boundaries.
-	// Or maybe it's ok to split a rune in this call.
-	s := []byte(sb.String())
-	if off > uint64(len(s)) {
-		off = uint64(len(s))
-	}
-	if off+uint64(cnt) > uint64(len(s)) {
-		cnt = uint32(uint64(len(s)) - off)
-	}
-	fc.Count = cnt
-	fc.Data = s[off : off+uint64(cnt)]
+	var fc plan9.Fcall
+	ninep.ReadString(&fc, &x.fcall, sb.String())
 	x.respond(&fc, nil)
 }

@@ -128,7 +128,6 @@ func (f *frameimpl) clean(pt image.Point, n0, n1 int) {
 			pt.X+f.box[nb].Wid+f.box[nb+1].Wid < c {
 			f.mergebox(nb)
 			n1--
-			b = f.box[nb]
 		}
 		pt = f.advance(pt, f.box[nb])
 	}
