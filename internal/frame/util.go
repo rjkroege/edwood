@@ -173,7 +173,7 @@ func (f *frameimpl) Logboxes(message string, args ...interface{}) {
 
 func (b *frbox) String() string {
 	if b.Nrune == -1 && b.Bc == '\n' {
-		return fmt.Sprintf("newline")
+		return "newline"
 	} else if b.Nrune == -1 && b.Bc == '\t' {
 		return fmt.Sprintf("tab width=%d,%d", b.Wid, b.Minwid)
 	}

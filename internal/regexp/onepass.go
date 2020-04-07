@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Ignore some staticcheck errors because this file is a copy of
+// $GOROOT/src/regexp/onepass.go.
+//lint:file-ignore SA4006 Ignore unused value error
+
 package regexp
 
 import (
