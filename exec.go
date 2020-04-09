@@ -931,6 +931,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		var err error
 		c.md, fs, err = fsysmount(dir, incl)
 		if err != nil {
+			Fail()
 			return fmt.Errorf("fsysmount: %v", err)
 		}
 		if winid > 0 && (pipechar == '|' || pipechar == '>') {

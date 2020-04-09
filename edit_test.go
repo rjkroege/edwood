@@ -374,7 +374,9 @@ func TestEditMultipleWindows(t *testing.T) {
 		}
 
 		w := row.col[0].w[0]
+		w.Lock('M')
 		editcmd(&w.body, []rune(test.expr))
+		w.Unlock()
 
 		if got, want := len(row.col[0].w), len(test.expected); got != want {
 			t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
