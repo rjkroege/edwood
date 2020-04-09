@@ -7,7 +7,6 @@ import (
 // Test for https://github.com/rjkroege/edwood/issues/291
 func TestXCmdPipeMultipleWindows(t *testing.T) {
 	cedit = make(chan int)
-	editoutlk = make(chan bool)
 	ccommand = make(chan *Command)
 	cwait = make(chan ProcessState)
 
@@ -23,24 +22,32 @@ func TestXCmdPipeMultipleWindows(t *testing.T) {
 		w.tag.fr = &MockFrame{}
 		w.tag.file.text = []*Text{&w.tag}
 		w.tag.file.curtext = &w.tag
-		w.editoutlk = make(chan bool)
+		w.editoutlk = make(chan bool, 1)
 		return w
 	}
-	row.col = []*Column{
-		{
-			w: []*Window{
-				newWindow("one.txt"),
-				newWindow("two.txt"),
+	row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					newWindow("one.txt"),
+					newWindow("two.txt"),
+				},
 			},
 		},
 	}
+	defer func() {
+		cedit = nil
+		ccommand = nil
+		cwait = nil
+		row = Row{}
+	}()
 
-	go func() {
-		row.AllWindows(func(w *Window) {
-			cedit <- 0
-			<-w.editoutlk
-			w.editoutlk <- true
-		})
+	done := make(chan struct{})
+	go func() { // waitthread
+		<-ccommand
+		<-cwait
+		cedit <- 0
+		close(done)
 	}()
 
 	// All middle button commands including Edit run inside a lock discipline
@@ -57,4 +64,5 @@ func TestXCmdPipeMultipleWindows(t *testing.T) {
 		t.Fatalf("failed to parse command: %v", err)
 	}
 	X_cmd(nil, cmd)
+	<-done
 }
