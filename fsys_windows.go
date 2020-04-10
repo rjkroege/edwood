@@ -45,6 +45,9 @@ func fsysmount(dir string, incl []string) (*MntDir, *client.Fsys, error) {
 	if md == nil {
 		return nil, nil, fmt.Errorf("child: can't allocate mntdir")
 	}
+	if fsysAddr == nil {
+		return nil, nil, fmt.Errorf("child: unknown address")
+	}
 	conn, err := client.Dial(fsysAddr.Network(), fsysAddr.String())
 	if err != nil {
 		mnt.DecRef(md)
