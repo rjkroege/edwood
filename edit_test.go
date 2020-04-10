@@ -103,7 +103,10 @@ func TestEdit(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
+		warningsMu.Lock()
 		warnings = []*Warning{}
+		warningsMu.Unlock()
+
 		w := makeSkeletonWindowModel(test.dot, test.filename)
 
 		// All middle button commands including Edit run inside a lock discipline
