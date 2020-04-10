@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/runes"
@@ -251,6 +252,7 @@ type Warning struct {
 }
 
 var warnings = []*Warning{}
+var warningsMu sync.Mutex
 
 func flushwarnings() {
 	var (
@@ -310,6 +312,9 @@ func warnError(md *MntDir, s string, args ...interface{}) error {
 }
 
 func addwarningtext(md *MntDir, r []rune) {
+	warningsMu.Lock()
+	defer warningsMu.Unlock()
+
 	for _, warn := range warnings {
 		if warn.md == md {
 			warn.buf.Insert(warn.buf.nc(), r)

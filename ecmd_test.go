@@ -40,14 +40,11 @@ func TestXCmdPipeMultipleWindows(t *testing.T) {
 		ccommand = nil
 		cwait = nil
 		row = Row{}
-	}()
 
-	done := make(chan struct{})
-	go func() { // waitthread
-		<-ccommand
-		<-cwait
-		cedit <- 0
-		close(done)
+		warningsMu.Lock()
+		defer warningsMu.Unlock()
+		// remove fsysmount failure warning
+		warnings = []*Warning{}
 	}()
 
 	// All middle button commands including Edit run inside a lock discipline
@@ -64,5 +61,4 @@ func TestXCmdPipeMultipleWindows(t *testing.T) {
 		t.Fatalf("failed to parse command: %v", err)
 	}
 	X_cmd(nil, cmd)
-	<-done
 }
