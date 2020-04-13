@@ -170,18 +170,11 @@ func (w *Window) DrawButton() {
 }
 
 func (w *Window) delRunePos() int {
-	var n int
-	for n = 0; n < w.tag.Nc(); n++ {
-		r := w.tag.file.b.ReadC(n)
-		if r == ' ' {
-			break
-		}
-	}
-	n += 2
-	if n >= w.tag.Nc() {
+	i := len([]rune(w.ParseTag())) + 2
+	if i >= w.tag.Nc() {
 		return -1
 	}
-	return n
+	return i
 }
 
 func (w *Window) moveToDel() {
@@ -415,12 +408,7 @@ func (w *Window) ClearTag() {
 	n := w.tag.Nc()
 	r := make([]rune, n)
 	w.tag.file.b.Read(0, r)
-	var i int
-	for i = 0; i < n; i++ {
-		if r[i] == ' ' || r[i] == '\t' {
-			break
-		}
-	}
+	i := len([]rune(w.ParseTag()))
 	for ; i < n; i++ {
 		if r[i] == '|' {
 			break
@@ -441,6 +429,28 @@ func (w *Window) ClearTag() {
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 }
 
+// ParseTag returns the filename in the window tag.
+func (w *Window) ParseTag() string {
+	r := make([]rune, w.tag.Nc())
+	w.tag.file.b.Read(0, r)
+	tag := string(r)
+
+	// " |" or "\t|" ends left half of tag
+	// If we find " Del Snarf" in the left half of the tag
+	// (before the pipe), that ends the file name.
+	pipe := strings.Index(tag, " |")
+	if i := strings.Index(tag, "\t|"); i >= 0 && (pipe < 0 || i < pipe) {
+		pipe = i
+	}
+	if i := strings.Index(tag, " Del Snarf"); i >= 0 && (pipe < 0 || i < pipe) {
+		return tag[:i]
+	}
+	if i := strings.IndexAny(tag, " \t"); i >= 0 {
+		return tag[:i]
+	}
+	return tag
+}
+
 // SetTag updates the tag for this Window and all of its clones.
 func (w *Window) SetTag() {
 	f := w.body.file
@@ -452,7 +462,6 @@ func (w *Window) SetTag() {
 }
 
 // setTag1 updates the tag contents for a given window w.
-// TODO(rjk): Handle files with spaces in their names.
 func (w *Window) setTag1() {
 	const (
 		Ldelsnarf = " Del Snarf"
@@ -549,12 +558,7 @@ func (w *Window) Commit(t *Text) {
 	if t.what == Body {
 		return
 	}
-	r := make([]rune, w.tag.Nc())
-	w.tag.file.b.Read(0, r)
-	filename := string(r)
-	if i := strings.IndexAny(filename, " \t"); i >= 0 {
-		filename = filename[:i]
-	}
+	filename := w.ParseTag()
 	if filename != w.body.file.name {
 		seq++
 		w.body.file.Mark(seq)

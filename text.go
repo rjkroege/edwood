@@ -1604,9 +1604,7 @@ func (t *Text) dirName(name string) string {
 	if nt == 0 {
 		return name
 	}
-	b := make([]rune, nt)
-	t.w.tag.file.b.Read(0, b)
-	spl := strings.SplitN(string(b), " ", 2)[0]
+	spl := t.w.ParseTag()
 	if !strings.HasSuffix(spl, string(filepath.Separator)) {
 		spl = filepath.Dir(spl)
 	}
