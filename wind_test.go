@@ -119,3 +119,44 @@ func TestWindowClampAddr(t *testing.T) {
 		}
 	}
 }
+
+func TestWindowParseTag(t *testing.T) {
+	for _, tc := range []struct {
+		tag      string
+		filename string
+	}{
+		{"/foo/bar.txt Del Snarf | Look", "/foo/bar.txt"},
+		{"/foo/bar quux.txt Del Snarf | Look", "/foo/bar quux.txt"},
+		{"/foo/bar.txt", "/foo/bar.txt"},
+		{"/foo/bar.txt | Look", "/foo/bar.txt"},
+		{"/foo/bar.txt Del Snarf\t| Look", "/foo/bar.txt"},
+	} {
+		w := &Window{
+			tag: Text{
+				file: &File{
+					b: Buffer(tc.tag),
+				},
+			},
+		}
+		if got, want := w.ParseTag(), tc.filename; got != want {
+			t.Errorf("tag %q has filename %q; want %q", tc.tag, got, want)
+		}
+	}
+}
+
+func TestWindowClearTag(t *testing.T) {
+	tag := "/foo bar/test.txt Del Snarf Undo Put | Look |fmt mk"
+	want := "/foo bar/test.txt Del Snarf Undo Put |"
+	w := &Window{
+		tag: Text{
+			file: &File{
+				b: Buffer(tag),
+			},
+		},
+	}
+	w.ClearTag()
+	got := w.tag.file.b.String()
+	if got != want {
+		t.Errorf("got %q; want %q", got, want)
+	}
+}

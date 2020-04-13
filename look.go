@@ -456,7 +456,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		nname = n
 	}
 	for i := 0; i < nname; i++ {
-		if !isfilec(rb[i]) {
+		if !isfilec(rb[i]) && rb[i] != ' ' {
 			return false
 		}
 	}
