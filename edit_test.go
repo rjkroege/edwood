@@ -123,6 +123,7 @@ func TestEdit(t *testing.T) {
 			t.Errorf("test %d: File.b contents expected \n%#v\nbut got \n%#v\n", i, test.expected, string(buf[:n]))
 		}
 
+		warningsMu.Lock()
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
 			t.Errorf("text %d: expected %d warnings but got %d warnings", i, want, got)
 			break
@@ -135,7 +136,7 @@ func TestEdit(t *testing.T) {
 			}
 
 		}
-
+		warningsMu.Unlock()
 	}
 }
 
