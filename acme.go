@@ -362,7 +362,7 @@ func MovedMouse(m draw.Mouse) {
 		return
 	}
 	w := t.w
-	if t == nil || m.Buttons == 0 {
+	if m.Buttons == 0 {
 		return
 	}
 	but := 0

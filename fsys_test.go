@@ -51,6 +51,10 @@ func TestMain(m *testing.M) {
 				os.Setenv("DISPLAY", dp)
 			}
 		}
+
+		// Prevent mounting any acme file server being run by the user running tests.
+		os.Unsetenv("NAMESPACE")
+
 		e := m.Run()
 
 		if x != nil {

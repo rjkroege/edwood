@@ -103,7 +103,10 @@ func TestEdit(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
+		warningsMu.Lock()
 		warnings = []*Warning{}
+		warningsMu.Unlock()
+
 		w := makeSkeletonWindowModel(test.dot, test.filename)
 
 		// All middle button commands including Edit run inside a lock discipline
@@ -374,7 +377,9 @@ func TestEditMultipleWindows(t *testing.T) {
 		}
 
 		w := row.col[0].w[0]
+		w.Lock('M')
 		editcmd(&w.body, []rune(test.expr))
+		w.Unlock()
 
 		if got, want := len(row.col[0].w), len(test.expected); got != want {
 			t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
