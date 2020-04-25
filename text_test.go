@@ -419,27 +419,49 @@ func TestTextBsInsert(t *testing.T) {
 	}
 }
 
-func TestExpandtabInsert(t *testing.T) {
-	w := &Window{
-		body: Text{
-			file:      &File{},
-			tabexpand: true,
-			tabstop:   4,
-		},
-	}
-	text := &w.body
-	text.w = w
-	text.tabexpand = true
+func checkTabexpand(t *testing.T, getText func(tabexpand bool, tabstop int) *Text) {
+	for _, tc := range []struct {
+		tabexpand bool
+		tabstop   int
+		input     string
+		want      string
+	}{
+		{false, 4, "\t|", "\t|"},
+		{true, 4, "\t|", "    |"},
+		{true, 2, "\t|", "  |"},
+	} {
+		text := getText(tc.tabexpand, tc.tabstop)
 
-	want := "    |"
-	not := "	|"
-	text.Type(0x09)
-	text.Type('|')
-	out := string(text.file.cache)
-	if out != want {
-		t.Errorf("loaded text %q; expected %q", out, want)
+		for _, r := range tc.input {
+			text.Type(r)
+		}
+		if got := string(text.file.cache); got != tc.want {
+			t.Errorf("loaded text %q; expected %q", got, tc.want)
+		}
 	}
-	if out == not {
-		t.Errorf("loaded text %q; expected %q", out, want)
-	}
+}
+
+func TestTextTypeTabInBody(t *testing.T) {
+	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
+		w := &Window{
+			body: Text{
+				file:      &File{},
+				tabexpand: tabexpand,
+				tabstop:   tabstop,
+			},
+		}
+		text := &w.body
+		text.w = w
+		return text
+	})
+}
+
+func TestTextTypeTabInTag(t *testing.T) {
+	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
+		return &Text{
+			file:      &File{},
+			tabexpand: tabexpand,
+			tabstop:   tabstop,
+		}
+	})
 }
