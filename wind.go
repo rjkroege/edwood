@@ -320,6 +320,9 @@ func (w *Window) Lock(owner int) {
 	w.ref.Inc()
 	w.owner = owner
 	f := w.body.file
+	if f == nil {
+		return
+	}
 	f.AllText(func(t *Text) {
 		if t.w != w {
 			t.w.lock1(owner)
@@ -336,6 +339,9 @@ func (w *Window) unlock1() {
 
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
+	if w.body.file == nil {
+		return
+	}
 	w.body.file.AllText(func(t *Text) {
 		if t.w != w {
 			t.w.unlock1()
