@@ -339,14 +339,13 @@ func (w *Window) unlock1() {
 
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
-	if w.body.file == nil {
-		return
+	if w.body.file != nil {
+		w.body.file.AllText(func(t *Text) {
+			if t.w != w {
+				t.w.unlock1()
+			}
+		})
 	}
-	w.body.file.AllText(func(t *Text) {
-		if t.w != w {
-			t.w.unlock1()
-		}
-	})
 	w.unlock1()
 }
 
