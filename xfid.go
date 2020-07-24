@@ -672,7 +672,17 @@ forloop:
 		case "cleartag": // wipe tag right of bar
 			w.ClearTag()
 			settag = true
-
+		case "font":
+			if len(words) < 2 {
+				err = ErrBadCtl
+				break forloop
+			}
+			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			if nulls {
+				err = fmt.Errorf("nulls in font name")
+				break forloop
+			}
+			fontx(&w.body, nil, nil, XXX, XXX, string(r))
 		default:
 			err = ErrBadCtl
 			break forloop

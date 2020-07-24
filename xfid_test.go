@@ -886,6 +886,9 @@ func TestXfidwriteQWctl(t *testing.T) {
 		{fmt.Errorf("file dirty"), "del\ndel\nclean"},
 		{nil, "clean\ndel"},
 		{nil, "clean\ndelete"},
+		{ErrBadCtl, "font"},
+		{fmt.Errorf("nulls in font name"), "font /path/with/\x00nulls"},
+		{nil, "font /path/to/font"},
 	} {
 		t.Run(fmt.Sprintf("Data=%q", tc.data), func(t *testing.T) {
 			mr := new(mockResponder)
@@ -900,6 +903,7 @@ func TestXfidwriteQWctl(t *testing.T) {
 			w.body.fr = &MockFrame{}
 			w.tag.display = display
 			w.tag.fr = &MockFrame{}
+			row.display = display
 
 			// mark window dirty
 			f := w.body.file
