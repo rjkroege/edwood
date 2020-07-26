@@ -352,7 +352,7 @@ func search(ct *Text, r []rune) bool {
 }
 
 func isfilec(r rune) bool {
-	Lx := ".-+/:"
+	Lx := ".-+/:@"
 	if isalnum(r) {
 		return true
 	}

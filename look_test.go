@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -15,6 +17,16 @@ func TestExpand(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
+	dp, err := ioutil.TempDir("", "testexpand")
+	if err != nil {
+		t.Fatalf("can't make tempdir: %v", err)
+	}
+	defer os.RemoveAll(dp)
+	modpath := filepath.Join(dp, "9fans.net/go@v0.0.0")
+	if err := os.MkdirAll(modpath, 0777); err != nil {
+		t.Fatalf("can't make modpath %s: %v", modpath, err)
+	}
+
 	tt := []struct {
 		ok   bool
 		sel1 int
@@ -41,6 +53,7 @@ func TestExpand(t *testing.T) {
 		{true, 0, "<stdio.h>", 2, "stdio", "", ""},
 		{true, 0, "/etc/hosts", 2, "/etc/hosts", "/etc/hosts", ""},
 		{true, 0, "/etc/hosts:42", 2, "/etc/hosts:42", "/etc/hosts", "42"},
+		{true, 0, modpath + ":531", 2, modpath + ":531", modpath, "531"},
 	}
 	for i, tc := range tt {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
