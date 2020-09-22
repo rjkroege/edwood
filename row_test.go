@@ -137,6 +137,10 @@ func checkDumpFsys(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 }
 
 func TestRowLoad(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+
 	tt := []struct {
 		name     string
 		filename string
