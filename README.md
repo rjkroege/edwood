@@ -41,6 +41,15 @@ Example usage:
 	edwood -f /usr/share/fonts/TTF/DejaVuSans.ttf@12pt -F /usr/share/fonts/TTF/DejaVuSansMono.ttf@12pt
 	edwood -f $PLAN9/font/lucsans/euro.8.font -F $PLAN9/font/lucm/unicode.9.font
 
+## Edwood on Plan 9
+
+To build Edwood on Plan 9, use [9fans.net/go PR#28](https://github.com/9fans/go/pull/28):
+
+	hget https://github.com/rjkroege/edwood/archive/master.tar.gz | tar xvz
+	cd edwood-master
+	go mod edit -replace '9fans.net/go=github.com/fhs/9fans-go@plan9-pr'
+	go build
+	./edwood
 
 # Contributions
 Contributions are welcome. Just submit a pull request and we'll review
