@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://travis-ci.com/rjkroege/edwood.svg?branch=master)](https://travis-ci.com/rjkroege/edwood)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://github.com/rjkroege/edwood/actions/workflows/edwood.yml/badge.svg?branch=master)](https://github.com/rjkroege/edwood/actions)
 
 # Overview
 Go port of Rob Pike's Acme editor. Derived from
