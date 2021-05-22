@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir /tmp/testacme
+mkdir -p /tmp/testacme
 export NAMESPACE=/tmp/testacme
 acme  $*
 
