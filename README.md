@@ -55,6 +55,9 @@ To build Edwood on Plan 9, use [9fans.net/go PR#28](https://github.com/9fans/go/
 Contributions are welcome. Just submit a pull request and we'll review
 the code before merging it in.
 
+# Discussion
+Have thoughts? Questions? Want to talk about Edwood (or Acme and other related Plan9 things)? If so, I've now enabled [Edwood GitHub Discussions](https://github.com/rjkroege/edwood/discussions).
+
 # Project Status
 Edwood has reached the *useful* milestone (v0.1) and should
 serve as drop-in replacement for Plan9 Port Acme. (But probably with
