@@ -219,7 +219,7 @@ func TestXfidwriteQWaddr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
-			w.body.file.b = Buffer([]rune("abcαβξ\n"))
+			w.body.file.b = RuneArray([]rune("abcαβξ\n"))
 			w.col = new(Column)
 			w.limit = Range{0, w.body.file.Nr()}
 			x := &Xfid{
@@ -630,7 +630,7 @@ func TestXfidwriteQWtag(t *testing.T) {
 	w.col = new(Column)
 	w.body.file = NewFile("")
 	w.tag.file = NewFile("")
-	w.tag.file.b = Buffer(prevTag)
+	w.tag.file.b = RuneArray(prevTag)
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  []byte(extra),
@@ -758,7 +758,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.tag.file.b = Buffer("/home/gopher/edwood/row.go Del Snarf | Look ")
+	w.tag.file.b = RuneArray("/home/gopher/edwood/row.go Del Snarf | Look ")
 	w.tag.fr = &MockFrame{}
 	w.body.fr = &MockFrame{}
 	x := &Xfid{
@@ -993,7 +993,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	w.tag = Text{
 		w: w,
 		file: &File{
-			b:    Buffer("Send"),
+			b:    RuneArray("Send"),
 			text: []*Text{&w.tag},
 		},
 		fr:      &MockFrame{},
@@ -1002,7 +1002,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	w.body = Text{
 		w: w,
 		file: &File{
-			b:    Buffer(""),
+			b:    RuneArray(""),
 			text: []*Text{&w.body},
 		},
 		fr:      &MockFrame{},
@@ -1084,9 +1084,9 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 			w.body.fr = &MockFrame{}
 			switch tc.q {
 			case QWbody:
-				w.body.file.b = Buffer(data)
+				w.body.file.b = RuneArray(data)
 			case QWtag:
-				w.tag.file.b = Buffer(data)
+				w.tag.file.b = RuneArray(data)
 			}
 
 			x := &Xfid{
@@ -1145,7 +1145,7 @@ func TestXfidruneread(t *testing.T) {
 			fs: mr,
 		}
 		w := NewWindow().initHeadless(nil)
-		w.body.file.b = Buffer(tc.body)
+		w.body.file.b = RuneArray(tc.body)
 		nr := xfidruneread(x, &w.body, tc.q0, tc.q1)
 		if got, want := nr, tc.nr; got != want {
 			t.Errorf("read %v runes from %q (q0=%v, q1=%v); should read %v runes",
@@ -1187,7 +1187,7 @@ func TestXfidreadQWxdataQWdata(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
-			w.body.file.b = Buffer(body)
+			w.body.file.b = RuneArray(body)
 			w.addr = tc.inAddr
 			xfidread(&Xfid{
 				f: &Fid{
@@ -1221,7 +1221,7 @@ func TestXfidreadQWaddr(t *testing.T) {
 	)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.body.file.b = Buffer(body)
+	w.body.file.b = RuneArray(body)
 	w.addr.q0 = 5
 	w.addr.q1 = 12
 
@@ -1250,8 +1250,8 @@ func TestXfidreadQWctl(t *testing.T) {
 	w.col = new(Column)
 	w.display = edwoodtest.NewDisplay()
 	w.body.fr = &MockFrame{}
-	w.tag.file.b = Buffer("/etc/hosts Del Snarf | Look Get ")
-	w.body.file.b = Buffer("Hello, world!\n")
+	w.tag.file.b = RuneArray("/etc/hosts Del Snarf | Look Get ")
+	w.body.file.b = RuneArray("Hello, world!\n")
 
 	mr := new(mockResponder)
 	xfidread(&Xfid{

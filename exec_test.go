@@ -119,7 +119,7 @@ func TestPutfile(t *testing.T) {
 	w := &Window{
 		body: Text{
 			file: &File{
-				b:    Buffer(want),
+				b:    RuneArray(want),
 				name: filename,
 			},
 		},

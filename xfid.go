@@ -810,8 +810,8 @@ forloop:
 // rune offset) pair of the last read from buffer for a matching qid
 // (QWbody or QWtag). No data past rune offset q1 is sent to client.
 //
-// TODO(fhs): Remove this function and use Buffer.ReadAt once Buffer
-// implements io.ReaderAt interface. Buffer.ReadAt will need to be careful
+// TODO(fhs): Remove this function and use RuneArray.ReadAt once RuneArray
+// implements io.ReaderAt interface. RuneArray.ReadAt will need to be careful
 // to send full runes only, if we want to keep the current behavior.
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	// log.Println("xfidutfread", x)

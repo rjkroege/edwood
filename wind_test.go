@@ -12,7 +12,7 @@ import (
 // using nil delta/epsilon, which fixes https://github.com/rjkroege/edwood/issues/230.
 func TestWindowUndoSelection(t *testing.T) {
 	var (
-		word = Buffer("hello")
+		word = RuneArray("hello")
 		p0   = 3
 		undo = &Undo{
 			t:   Insert,
@@ -38,7 +38,7 @@ func TestWindowUndoSelection(t *testing.T) {
 				q0: tc.q0,
 				q1: tc.q1,
 				file: &File{
-					b:       Buffer("This is an example sentence.\n"),
+					b:       RuneArray("This is an example sentence.\n"),
 					delta:   tc.delta,
 					epsilon: tc.epsilon,
 				},
@@ -97,7 +97,7 @@ func TestSetTag1(t *testing.T) {
 }
 
 func TestWindowClampAddr(t *testing.T) {
-	buf := Buffer("Hello, 世界")
+	buf := RuneArray("Hello, 世界")
 
 	for _, tc := range []struct {
 		addr, want Range
@@ -134,7 +134,7 @@ func TestWindowParseTag(t *testing.T) {
 		w := &Window{
 			tag: Text{
 				file: &File{
-					b: Buffer(tc.tag),
+					b: RuneArray(tc.tag),
 				},
 			},
 		}
@@ -150,7 +150,7 @@ func TestWindowClearTag(t *testing.T) {
 	w := &Window{
 		tag: Text{
 			file: &File{
-				b: Buffer(tag),
+				b: RuneArray(tag),
 			},
 		},
 	}

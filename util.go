@@ -248,7 +248,7 @@ func makenewwindow(t *Text) *Window {
 
 type Warning struct {
 	md  *MntDir
-	buf Buffer
+	buf RuneArray
 }
 
 var warnings = []*Warning{}

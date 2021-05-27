@@ -16,7 +16,7 @@ import (
 // View-Controller.
 //
 // A File tracks several related concepts. First it is a text buffer with
-// undo/redo back to an initial state. Mark (undo.Buffer.Commit) notes
+// undo/redo back to an initial state. Mark (undo.RuneArray.Commit) notes
 // an undo point.
 //
 // Next, a File might have a backing to a disk file.
@@ -25,26 +25,26 @@ import (
 // the same as its disk backing. A specific point in the undo record is
 // considered clean.
 //
-// TODO(rjk): File will be a facade pattern composing an undo.Buffer
+// TODO(rjk): File will be a facade pattern composing an undo.RuneArray
 // and a wrapping utf8string.String indexing wrapper.
-// TODO(rjk): my version of undo.Buffer  will implement Reader, Writer,
+// TODO(rjk): my version of undo.RuneArray  will implement Reader, Writer,
 // RuneReader, Seeker and I will restructure this code to follow the
 // patterns of the Go I/O libraries. I will probably want to provide a cache
-// around undo.Buffer.
+// around undo.RuneArray.
 // Observe: Character motion routines in Text can be written
 // in terms of any object that is Seeker and RuneReader.
 // Observe: Frame can report addresses in byte and rune offsets.
 type File struct {
-	b       Buffer
+	b       RuneArray
 	delta   []*Undo // [private]
 	epsilon []*Undo // [private]
 	elog    Elog
 	name    string
 	info    os.FileInfo
 
-	// TODO(rjk): Remove this when I've inserted undo.Buffer.
+	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
-	// associated with them. In an undo.Buffer context, these two ops
+	// associated with them. In an undo.RuneArray context, these two ops
 	// don't have an implicit Commit. We set editclean in the Edit cmd
 	// implementation code to let multiple Inserts be grouped together?
 	// Figure out how this inter-operates with seq.
@@ -76,18 +76,18 @@ type File struct {
 // a scrawny wrapper around the Undo implementation. As a result, we should
 // expect to see the following entry points:
 //
-// func (b *Buffer) Clean()
-//func (b *Buffer) Commit()
-//func (b *Buffer) Delete(off, length int64) error
-//func (b *Buffer) Dirty() bool
-//func (b *Buffer) Insert(off int64, data []byte) error
-//func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error)
-//func (b *Buffer) Redo() (off, n int64)
-//func (b *Buffer) Size() int64
-//func (b *Buffer) Undo() (off, n int64)
+// func (b *RuneArray) Clean()
+//func (b *RuneArray) Commit()
+//func (b *RuneArray) Delete(off, length int64) error
+//func (b *RuneArray) Dirty() bool
+//func (b *RuneArray) Insert(off int64, data []byte) error
+//func (b *RuneArray) ReadAt(data []byte, off int64) (n int, err error)
+//func (b *RuneArray) Redo() (off, n int64)
+//func (b *RuneArray) Size() int64
+//func (b *RuneArray) Undo() (off, n int64)
 //
-// NB how the cache is folded into Buffer.
-//TODO(rjk): make undo.Buffer implement Reader and Writer.
+// NB how the cache is folded into RuneArray.
+//TODO(rjk): make undo.RuneArray implement Reader and Writer.
 
 // HasUncommitedChanges returns true if there are changes that
 // have been made to the File after the last Commit.
@@ -135,14 +135,14 @@ func (f *File) SetDir(flag bool) {
 
 // Size returns the complete size of the buffer including both committed
 // and uncommitted runes.
-// NB: naturally forwards to undo.Buffer.Size()
+// NB: naturally forwards to undo.RuneArray.Size()
 // TODO(rjk): Switch all callers to Nr() as would be the number of
-// bytes when backed by undo.Buffer.
+// bytes when backed by undo.RuneArray.
 func (f *File) Size() int {
 	return int(f.b.nc()) + len(f.cache)
 }
 
-// Nr returns the number of valid runes in the Buffer.
+// Nr returns the number of valid runes in the RuneArray.
 // At the moment, this is the same as Size. But when File is backed
 // with utf8, this will require adjustment.
 // TODO(rjk): utf8 adjustment
@@ -190,7 +190,7 @@ func (f *File) SaveableAndDirty() bool {
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
-// keeping them in the cache. Does not map to undo.Buffer.Commit (that
+// keeping them in the cache. Does not map to undo.RuneArray.Commit (that
 // method is Mark). Remove this method.
 func (f *File) Commit() {
 	f.treatasclean = false
@@ -234,7 +234,7 @@ type Undo struct {
 func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
 	d, err := ioutil.ReadAll(fd)
 	if err != nil {
-		warning(nil, "read error in Buffer.Load")
+		warning(nil, "read error in RuneArray.Load")
 	}
 	runes, _, hasNulls := cvttorunes(d, len(d))
 
@@ -262,8 +262,8 @@ func (f *File) UpdateInfo(filename string, d os.FileInfo) error {
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-// TODO(rjk): switching to undo.Buffer will require removing use of seq
-// TODO(rjk): This function maps to undo.Buffer.Clean()
+// TODO(rjk): switching to undo.RuneArray will require removing use of seq
+// TODO(rjk): This function maps to undo.RuneArray.Clean()
 func (f *File) SnapshotSeq() {
 	f.putseq = f.seq
 }
@@ -271,7 +271,7 @@ func (f *File) SnapshotSeq() {
 // Dirty reports whether the current state of the File is different from
 // the initial state or from the one at the time of calling Clean.
 //
-// TODO(rjk): switching to undo.Buffer will require removing external uses
+// TODO(rjk): switching to undo.RuneArray will require removing external uses
 // of seq.
 func (f *File) Dirty() bool {
 	return f.seq != f.putseq
@@ -319,8 +319,8 @@ func (f *File) HasMultipleTexts() bool {
 
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
-// TODO(rjk): In terms of the undo.Buffer conversion, this correponds
-// to undo.Buffer.Insert.
+// TODO(rjk): In terms of the undo.RuneArray conversion, this correponds
+// to undo.RuneArray.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
 	f.treatasclean = false
@@ -341,7 +341,7 @@ func (f *File) InsertAt(p0 int, s []rune) {
 
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
-// TODO(rjk): Remove this as a prelude to converting to undo.Buffer
+// TODO(rjk): Remove this as a prelude to converting to undo.RuneArray
 // But preserve the cache. Every "small" insert should go into the cache.
 // It almost certainly greatly improves performance for a series of single
 // character insertions.
@@ -383,9 +383,9 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 
 // DeleteAt removes the rune range [p0,p1) from File.
 // TODO(rjk): Currently, adds an Undo record. It shouldn't
-// TODO(rjk): should map onto undo.Buffer.Delete
+// TODO(rjk): should map onto undo.RuneArray.Delete
 // TODO(rjk): DeleteAt has an implied Commit operation
-// that makes it not match with undo.Buffer.Delete
+// that makes it not match with undo.RuneArray.Delete
 func (f *File) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
@@ -509,10 +509,10 @@ func NewTagFile() *File {
 }
 
 // RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
-// analog in undo.Buffer. The value of seq is used to track intra and
+// analog in undo.RuneArray. The value of seq is used to track intra and
 // inter File edit actions so that cross-File changes via Edit X can be
 // undone with a single action. An implementation of File that wraps
-// undo.Buffer will need to to preserve seq tracking.
+// undo.RuneArray will need to to preserve seq tracking.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
@@ -531,10 +531,10 @@ func (f *File) Seq() int {
 // It returns the new selection q0, q1 and a bool indicating if the
 // returned selection is meaningful.
 //
-// TODO(rjk): Separate Undo and Redo for better alignment with undo.Buffer
+// TODO(rjk): Separate Undo and Redo for better alignment with undo.RuneArray
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
 // The number actually processed is controlled by mutations to File.seq.
-// This does not align with the semantics of undo.Buffer.
+// This does not align with the semantics of undo.RuneArray.
 // Each "Mark" needs to have a seq value provided.
 // TODO(rjk): Consider providing the target seq value as an argument.
 func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
@@ -615,7 +615,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 }
 
 // Reset removes all Undo records for this File.
-// TODO(rjk): This concept doesn't particularly exist in undo.Buffer.
+// TODO(rjk): This concept doesn't particularly exist in undo.RuneArray.
 // Why can't I just create a new File?
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
@@ -626,7 +626,7 @@ func (f *File) Reset() {
 // Mark sets an Undo point and
 // and discards Redo records. Call this at the beginning
 // of a set of edits that ought to be undo-able as a unit. This
-// is equivalent to undo.Buffer.Commit()
+// is equivalent to undo.RuneArray.Commit()
 // NB: current implementation permits calling Mark on an empty
 // file to indicate that one can undo to the file state at the time of
 // calling Mark.

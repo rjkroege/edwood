@@ -509,7 +509,7 @@ func (w *Window) setTag1() {
 		sb.WriteString(" ")
 	}
 
-	new := Buffer([]rune(sb.String()))
+	new := RuneArray([]rune(sb.String()))
 
 	// replace tag if the new one is different
 	resize := false
