@@ -134,7 +134,7 @@ func TestClickHTMLMatch(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
 				file: &File{
-					b: Buffer(r),
+					b: RuneArray(r),
 				},
 			}
 			q0, q1, ok := text.ClickHTMLMatch(tc.inq0)
@@ -339,7 +339,7 @@ func windowWithTag(tag string) *Window {
 	return &Window{
 		tag: Text{
 			file: &File{
-				b: Buffer([]rune(tag)),
+				b: RuneArray([]rune(tag)),
 			},
 		},
 	}
@@ -369,7 +369,7 @@ func TestBackNL(t *testing.T) {
 	for _, tc := range tt {
 		text := &Text{
 			file: &File{
-				b: Buffer(tc.buf),
+				b: RuneArray(tc.buf),
 			},
 		}
 		q := text.BackNL(tc.p, tc.n)
@@ -402,7 +402,7 @@ func TestTextBsInsert(t *testing.T) {
 			text := &Text{
 				what: tc.what,
 				file: &File{
-					b: Buffer(tc.buf),
+					b: RuneArray(tc.buf),
 				},
 			}
 			q, nr := text.BsInsert(tc.q0, []rune(tc.inbuf), true)

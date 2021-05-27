@@ -93,7 +93,7 @@ func TestAcmeregexp(t *testing.T) {
 			warnings = nil
 			text := &Text{
 				file: &File{
-					b: Buffer([]rune("abcd αβξδ\n")),
+					b: RuneArray([]rune("abcd αβξδ\n")),
 				},
 			}
 			lim := Range{

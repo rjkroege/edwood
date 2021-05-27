@@ -99,7 +99,7 @@ var (
 
 	activewin  *Window
 	activecol  *Column
-	snarfbuf   Buffer
+	snarfbuf   RuneArray
 	home       string
 	acmeshell  string
 	tagcolors  [frame.NumColours]draw.Image
