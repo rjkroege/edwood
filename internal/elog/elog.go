@@ -34,6 +34,13 @@ const (
 type Elog struct {
 	Log    []ElogOperation
 	warned bool
+	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
+	// At present, InsertAt and DeleteAt have an implicit Commit operation
+	// associated with them. In an undo.RuneArray context, these two ops
+	// don't have an implicit Commit. We set editclean in the Edit cmd
+	// implementation code to let multiple Inserts be grouped together?
+	// Figure out how this inter-operates with seq.
+	Editclean bool
 }
 
 type ElogOperation struct {
@@ -46,7 +53,7 @@ type ElogOperation struct {
 func MakeElog() Elog {
 	return Elog{[]ElogOperation{
 		{Null, 0, 0, []rune{}}, // Sentinel
-	}, false,
+	}, false, true,
 	}
 }
 

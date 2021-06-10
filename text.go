@@ -478,7 +478,7 @@ func (t *Text) logInsert(q0 int, r []rune) {
 // updated appropriately.
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if !tofile {
-		panic("text.insert")
+		panic("editor.insert")
 	}
 	if tofile && t.file.HasUncommitedChanges() {
 		panic("text.insert")
@@ -568,7 +568,7 @@ func (t *Text) Delete(q0, q1 int, _ bool) {
 	t.file.DeleteAt(q0, q1)
 }
 
-// deleted implements the single-text deletion observer for this Text's
+// deleted implements the single-text deletion text for this Text's
 // backing File. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
 func (t *Text) deleted(q0, q1 int) {
