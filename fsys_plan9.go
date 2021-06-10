@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"net"
 	"os"
 	"path"
@@ -50,15 +51,15 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 		// hasn't been started yet.
 		err := syscall.Mount(cfd, -1, mtpt, plan9.MREPL, "")
 		if err != nil {
-			acmeerror("mount failed", err)
+			util.Acmeerror("mount failed", err)
 		}
 		err = syscall.Bind(mtpt, "/mnt/wsys", MREPL)
 		if err != nil {
-			acmeerror("bind /mnt/wsys filed", err)
+			util.Acmeerror("bind /mnt/wsys filed", err)
 		}
 		err = syscall.Bind(mtpt, "/dev", MBEFORE)
 		if err != nil {
-			acmeerror("bind /dev filed", err)
+			util.Acmeerror("bind /dev filed", err)
 		}
 	}()
 	return nil

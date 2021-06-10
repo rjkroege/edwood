@@ -165,18 +165,18 @@ func editthread(cp *cmdParser) {
 }
 
 func allelogterm(w *Window) {
-	w.body.file.f.elog.Term()
+	w.body.file.elog.Term()
 }
 
 func alleditinit(w *Window) {
 	w.tag.Commit()
 	w.body.Commit()
-	w.body.file.f.editclean = false
+	w.body.file.elog.Editclean = false
 }
 
 func allupdate(w *Window) {
 	t := &w.body
-	f := t.file.f
+	f := t.file
 
 	if !f.elog.Empty() {
 		owner := t.w.owner
@@ -186,7 +186,7 @@ func allupdate(w *Window) {
 		// Set an undo point before applying accumulated Edit actions.
 		f.Mark(seq)
 		f.elog.Apply(t)
-		if f.editclean {
+		if f.elog.Editclean {
 			f.Clean()
 		}
 		t.w.owner = owner

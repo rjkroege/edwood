@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/elog"
 	"github.com/rjkroege/edwood/internal/file"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,7 @@ type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
+	elog         elog.Elog
 	details      *file.DiskDetails
 }
 
@@ -88,6 +90,7 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 		observers:    nil,
 		f:            f,
 		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
+		elog:         elog.MakeElog(),
 	}
 	oeb.f.oeb = oeb
 	return oeb
@@ -101,6 +104,7 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
+		elog:         elog.MakeElog(),
 		details:      &file.DiskDetails{Hash: file.Hash{}},
 	}
 	oeb.f.oeb = oeb

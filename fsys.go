@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"io"
 	"log"
 	"os"
@@ -104,10 +105,10 @@ var mnt Mnt
 func fsysinit() *fileServer {
 	p0, p1, err := newPipe()
 	if err != nil {
-		acmeerror("failed to create pipe", err)
+		util.Acmeerror("failed to create pipe", err)
 	}
 	if err := post9pservice(p0, "acme", *mtpt); err != nil {
-		acmeerror("can't post service", err)
+		util.Acmeerror("can't post service", err)
 	}
 
 	fs := &fileServer{
@@ -132,7 +133,7 @@ func (fs *fileServer) fsysproc() {
 			if fs.closing {
 				break
 			}
-			acmeerror("fsysproc", err)
+			util.Acmeerror("fsysproc", err)
 		}
 		if DEBUG {
 			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
@@ -241,7 +242,7 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	t.Fid = x.fcall.Fid
 	t.Tag = x.fcall.Tag
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
-		acmeerror("write error in respond", err)
+		util.Acmeerror("write error in respond", err)
 	}
 	if DEBUG {
 		fmt.Fprintf(os.Stderr, "--> %v\n", t)
@@ -447,7 +448,7 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 	err = nil
 	if wname == "new" {
 		if f.w != nil {
-			acmeerror("w set in walk to new", nil)
+			util.Acmeerror("w set in walk to new", nil)
 		}
 		cnewwindow <- nil  // signal newwindowthread
 		f.w = <-cnewwindow // receive new window

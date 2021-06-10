@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"net"
 
 	"9fans.net/go/plan9/client"
@@ -27,7 +28,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		defer l.Close()
 		if err := mux9p.Do(l, conn, nil); err != nil {
-			acmeerror("9P multiplexer failed", err)
+			util.Acmeerror("9P multiplexer failed", err)
 		}
 	}()
 	fsysAddr = l.Addr()

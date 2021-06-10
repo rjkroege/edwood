@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 		}
 		row.display.ScreenImage().Draw(r, row.display.White(), nil, image.Point{})
 		r1 := r
-		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
+		r1.Max.X = util.Min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
 		if r1.Dx() < row.display.ScaleSize(50) {
 			r1.Max.X = r1.Min.X + row.display.ScaleSize(50)
 		}
@@ -160,11 +161,11 @@ func (row *Row) DragCol(c *Column, _ int) {
 			goto Found
 		}
 	}
-	acmeerror("can't find column", nil)
+	util.Acmeerror("can't find column", nil)
 
 Found:
 	p = mouse.Point
-	if abs(p.X-op.X) < 5 && abs(p.Y-op.Y) < 5 {
+	if util.Abs(p.X-op.X) < 5 && util.Abs(p.Y-op.Y) < 5 {
 		return
 	}
 	if (i > 0 && p.X < row.col[i-1].r.Min.X) || (i < len(row.col)-1 && p.X > c.r.Max.X) {
@@ -217,7 +218,7 @@ func (row *Row) Close(c *Column, dofree bool) {
 			goto Found
 		}
 	}
-	acmeerror("can't find column", nil)
+	util.Acmeerror("can't find column", nil)
 Found:
 	r = c.r
 	if dofree {
@@ -501,7 +502,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	// Update the selection on the Text.
 	w.body.Show(q0, q1, true)
 	ffs := w.body.fr.GetFrameFillStatus()
-	w.maxlines = min(ffs.Nlines, max(w.maxlines, ffs.Nlines))
+	w.maxlines = util.Min(ffs.Nlines, util.Max(w.maxlines, ffs.Nlines))
 
 	// TODO(rjk): Conceivably this should be a zerox xfidlog when reconstituting a zerox?
 	xfidlog(w, "new")

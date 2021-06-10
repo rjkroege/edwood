@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
-	"log"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -11,36 +11,6 @@ import (
 
 	"github.com/rjkroege/edwood/internal/runes"
 )
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func minu(a, b uint) uint {
-	if a < b {
-		return a
-	}
-	return b
-}
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func acmeerror(s string, err error) {
-	log.Panicf("acme: %s: %v\n", s, err)
-}
 
 var (
 	prevmouse image.Point
@@ -126,7 +96,7 @@ func errorwin1(dir string, incl []string) *Window {
 	if w == nil {
 		if len(row.col) == 0 {
 			if row.Add(nil, -1) == nil {
-				acmeerror("can't create column to make error window", nil)
+				util.Acmeerror("can't create column to make error window", nil)
 			}
 		}
 		w = row.col[len(row.col)-1].Add(nil, nil, -1)
@@ -205,7 +175,7 @@ func makenewwindow(t *Text) *Window {
 		c = t.col
 	default:
 		if len(row.col) == 0 && row.Add(nil, -1) == nil {
-			acmeerror("can't make column", nil)
+			util.Acmeerror("can't make column", nil)
 		}
 		c = row.col[len(row.col)-1]
 	}

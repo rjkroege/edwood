@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/rjkroege/edwood/internal/elog"
 	"github.com/rjkroege/edwood/internal/regexp"
 )
 
@@ -23,7 +24,7 @@ func rxcompile(r string) (*AcmeRegexp, error) {
 
 // rxexecute searches forward in r[start:end] (from beginning of the slice to the end)
 // and returns at most n matches. If r is nil, it is derived from t.
-func (re *AcmeRegexp) rxexecute(t Texter, r []rune, start int, end int, n int) []RangeSet {
+func (re *AcmeRegexp) rxexecute(t elog.Texter, r []rune, start int, end int, n int) []RangeSet {
 	if r == nil {
 		r = t.View(0, t.Nc())
 	}
@@ -32,7 +33,7 @@ func (re *AcmeRegexp) rxexecute(t Texter, r []rune, start int, end int, n int) [
 
 // rxbexecute derives the full rune slice r from t and searches backwards in r[:end]
 // (from end of the slice to the beginning) and returns at most n matches.
-func (re *AcmeRegexp) rxbexecute(t Texter, end int, n int) RangeSet {
+func (re *AcmeRegexp) rxbexecute(t elog.Texter, end int, n int) RangeSet {
 	r := t.View(0, t.Nc())
 	matches := re.FindBackward(r, 0, end, n)
 	var rs RangeSet

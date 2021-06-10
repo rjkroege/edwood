@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
 )
@@ -49,7 +50,7 @@ func TestAddr(t *testing.T) {
 		{Range{0, 0}, "#X", Range{0, 0}, true, 1},
 	}
 
-	text := &TextBuffer{0, 0, []rune("This is a\nshort text\nto try addressing\n")}
+	text := elog.NewTextBuffer(0, 0, []rune("This is a\nshort text\nto try addressing\n"))
 
 	for i, test := range testtab {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
