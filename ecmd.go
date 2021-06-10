@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -117,8 +118,11 @@ func edittext(w *Window, q int, r []rune) error {
 	case Inactive:
 		return ErrPermission
 	case Inserting:
-		f := w.body.file.f
-		f.elog.Insert(q, r)
+		f := w.body.file
+		err := f.elog.Insert(q, r)
+		if err != nil {
+			warning(nil, err.Error())
+		}
 		return nil
 	case Collecting:
 		collection = append(collection, r...)
@@ -180,7 +184,10 @@ func B_cmd(t *Text, cp *Cmd) bool {
 }
 
 func c_cmd(t *Text, cp *Cmd) bool {
-	t.file.f.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
+	err := t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
+	if err != nil {
+		warning(nil, err.Error())
+	}
 	t.q0 = addr.r.q0
 	t.q1 = addr.r.q1
 	return true
@@ -188,7 +195,10 @@ func c_cmd(t *Text, cp *Cmd) bool {
 
 func d_cmd(t *Text, cp *Cmd) bool {
 	if addr.r.q1 > addr.r.q0 {
-		t.file.f.elog.Delete(addr.r.q0, addr.r.q1)
+		err := t.file.elog.Delete(addr.r.q0, addr.r.q1)
+		if err != nil {
+			warning(nil, err.Error())
+		}
 	}
 	t.q0 = addr.r.q0
 	t.q1 = addr.r.q0
@@ -255,12 +265,15 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror("%v unreadable", name)
 	}
 	runes, _, nulls := cvttorunes(d, len(d))
-	f.elog.Replace(q0, q1, runes)
+	err = f.elog.Replace(q0, q1, runes)
+	if err != nil {
+		warning(nil, err.Error())
+	}
 
 	if nulls {
 		warning(nil, "%v: NUL bytes elided\n", name)
 	} else if allreplaced && samename {
-		f.editclean = true
+		f.elog.Editclean = true
 	}
 	return true
 }
@@ -299,7 +312,7 @@ func i_cmd(t *Text, cp *Cmd) bool {
 	return appendx(t.file, cp, addr.r.q0)
 }
 
-func copyx(f *File, addr2 Address) {
+func copyx(f *ObservableEditableBuffer, addr2 Address) {
 	ni := 0
 	buf := make([]rune, RBUFSIZE)
 	for p := addr.r.q0; p < addr.r.q1; p += ni {
@@ -307,18 +320,27 @@ func copyx(f *File, addr2 Address) {
 		if ni > RBUFSIZE {
 			ni = RBUFSIZE
 		}
-		f.b.Read(p, buf[:ni])
-		addr2.file.f.elog.Insert(addr2.r.q1, buf[:ni])
+		f.Read(p, buf[:ni])
+		err := addr2.file.elog.Insert(addr2.r.q1, buf[:ni])
+		if err != nil {
+			warning(nil, err.Error())
+		}
 	}
 }
 
-func move(f *File, addr2 Address) {
+func move(f *ObservableEditableBuffer, addr2 Address) {
 	if addr.file != addr2.file || addr.r.q1 <= addr2.r.q0 {
-		f.elog.Delete(addr.r.q0, addr.r.q1)
+		err := f.elog.Delete(addr.r.q0, addr.r.q1)
+		if err != nil {
+			warning(nil, err.Error())
+		}
 		copyx(f, addr2)
 	} else if addr.r.q0 >= addr2.r.q1 {
 		copyx(f, addr2)
-		f.elog.Delete(addr.r.q0, addr.r.q1)
+		err := f.elog.Delete(addr.r.q0, addr.r.q1)
+		if err != nil {
+			warning(nil, err.Error())
+		}
 	} else if addr.r.q0 == addr2.r.q0 && addr.r.q1 == addr2.r.q1 {
 		// move to self; no-op
 	} else {
@@ -330,9 +352,9 @@ func m_cmd(t *Text, cp *Cmd) bool {
 	dot := mkaddr(t.file)
 	addr2 := cmdaddress(cp.mtaddr, dot, 0)
 	if cp.cmdc == 'm' {
-		move(t.file.f, addr2)
+		move(t.file, addr2)
 	} else {
-		copyx(t.file.f, addr2)
+		copyx(t.file, addr2)
 	}
 	return true
 }
@@ -406,7 +428,10 @@ func s_cmd(t *Text, cp *Cmd) bool {
 				}
 			}
 		}
-		t.file.f.elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
+		err := t.file.elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
+		if err != nil {
+			warning(nil, err.Error())
+		}
 		delta -= sel[0].q1 - sel[0].q0
 		delta += len([]rune(buf))
 		didsub = true
@@ -488,7 +513,10 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 		t.q0 = addr.r.q0
 		t.q1 = addr.r.q1
 		if cmd == '<' || cmd == '|' {
-			t.file.f.elog.Delete(t.q0, t.q1)
+			err := t.file.elog.Delete(t.q0, t.q1)
+			if err != nil {
+				warning(nil, err.Error())
+			}
 		}
 	}
 	s = append([]rune{cmd}, r...)
@@ -647,7 +675,10 @@ func nl_cmd(t *Text, cp *Cmd) bool {
 
 func appendx(file *ObservableEditableBuffer, cp *Cmd, p int) bool {
 	if len(cp.text) > 0 {
-		file.f.elog.Insert(p, []rune(cp.text))
+		err := file.elog.Insert(p, []rune(cp.text))
+		if err != nil {
+			warning(nil, err.Error())
+		}
 	}
 	cur := file.GetCurObserver().(*Text)
 	cur.q0 = p
@@ -1006,7 +1037,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 				a = lineaddr(1, a, sign)
 			}
 		default:
-			acmeerror("cmdaddress", nil)
+			util.Acmeerror("cmdaddress", nil)
 			return a
 		}
 		ap = ap.next
