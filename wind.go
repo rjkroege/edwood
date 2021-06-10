@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -246,12 +247,12 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height()
 
 	r1 := r
-	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
+	r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
 
 	// If needed, recompute number of lines in tag.
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
-		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
+		r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
 	}
 
 	// Resize/redraw tag TODO(flux)
@@ -291,7 +292,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
 			}
 			y++
-			r1.Min.Y = min(y, r.Max.Y)
+			r1.Min.Y = util.Min(y, r.Max.Y)
 			r1.Max.Y = r.Max.Y
 		} else {
 			r1.Min.Y = y
@@ -303,7 +304,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 		w.body.all.Min.Y = oy
 	}
-	w.maxlines = min(w.body.fr.GetFrameFillStatus().Nlines, max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
+	w.maxlines = util.Min(w.body.fr.GetFrameFillStatus().Nlines, util.Max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
 	// TODO(rjk): this value doesn't make sense when we've collapsed
 	// the tag if the rectangle update block is not executed.
 	return w.r.Max.Y
@@ -531,8 +532,8 @@ func (w *Window) setTag1() {
 		w.tag.Insert(0, new, true)
 
 		// Rationalize the selection as best as possible
-		w.tag.q0 = min(q0, w.tag.Nc())
-		w.tag.q1 = min(q1, w.tag.Nc())
+		w.tag.q0 = util.Min(q0, w.tag.Nc())
+		w.tag.q1 = util.Min(q1, w.tag.Nc())
 		if oldbarIndex != -1 && q0 > oldbarIndex {
 			bar := newbarIndex - oldbarIndex
 			w.tag.q0 = q0 + bar
@@ -667,7 +668,7 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 		return
 	}
 	if w.owner == 0 {
-		acmeerror("no window owner", nil)
+		util.Acmeerror("no window owner", nil)
 	}
 	b := []byte(fmt.Sprintf(format, args...))
 	w.events = append(w.events, byte(w.owner))
