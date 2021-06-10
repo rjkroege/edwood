@@ -38,8 +38,8 @@ type Addr struct {
 }
 
 type Address struct {
-	r Range
-	f *File
+	r   Range
+	oeb *ObservableEditableBuffer
 }
 
 type Cmd struct {
@@ -165,18 +165,18 @@ func editthread(cp *cmdParser) {
 }
 
 func allelogterm(w *Window) {
-	w.body.file.elog.Term()
+	w.body.oeb.f.elog.Term()
 }
 
 func alleditinit(w *Window) {
 	w.tag.Commit()
 	w.body.Commit()
-	w.body.file.editclean = false
+	w.body.oeb.f.editclean = false
 }
 
 func allupdate(w *Window) {
 	t := &w.body
-	f := t.file
+	f := t.oeb.f
 
 	if !f.elog.Empty() {
 		owner := t.w.owner

@@ -80,7 +80,7 @@ func (t *Text) ScrDraw(nchars int) {
 	r1 = r
 	r1.Min.X = 0
 	r1.Max.X = r.Dx()
-	r2 = scrpos(r1, t.org, t.org+nchars, t.file.Size())
+	r2 = scrpos(r1, t.org, t.org+nchars, t.oeb.f.Size())
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.
@@ -120,7 +120,7 @@ func (t *Text) Scroll(but int) {
 		}
 		if but == 2 {
 			y = my
-			p0 = t.file.Size() * (y - s.Min.Y) / h
+			p0 = t.oeb.f.Size() * (y - s.Min.Y) / h
 			if p0 >= t.q1 {
 				p0 = t.BackNL(p0, 2)
 			}

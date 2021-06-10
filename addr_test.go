@@ -92,17 +92,15 @@ func TestAcmeregexp(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warnings = nil
 			text := &Text{
-				file: &File{
-					b: RuneArray([]rune("abcd αβξδ\n")),
-				},
+				oeb: MakeObservableEditableBufferTag(RuneArray([]rune("abcd αβξδ\n"))),
 			}
 			lim := Range{
 				0,
-				text.file.Nr(),
+				text.oeb.f.Nr(),
 			}
 			start := Range{0, 0}
 			if tc.dir == Back {
-				start = Range{text.file.Nr(), text.file.Nr()}
+				start = Range{text.oeb.f.Nr(), text.oeb.f.Nr()}
 			}
 			r, found := acmeregexp(true, text, lim, start, tc.pat, tc.dir)
 			if found != tc.found {

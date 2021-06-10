@@ -82,13 +82,13 @@ func isexecc(c rune) bool {
 }
 
 func printarg(argt *Text, q0 int, q1 int) string {
-	if argt.what != Body || argt.file.name == "" {
+	if argt.what != Body || argt.oeb.f.details.Name == "" {
 		return ""
 	}
 	if q0 == q1 {
-		return fmt.Sprintf("%s:#%d", argt.file.name, q0)
+		return fmt.Sprintf("%s:#%d", argt.oeb.f.details.Name, q0)
 	}
-	return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
+	return fmt.Sprintf("%s:#%d,#%d", argt.oeb.f.details.Name, q0, q1)
 }
 
 // TODO(rjk): use a tokenizer on the results of getarg
@@ -113,7 +113,7 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	}
 	n := e.q1 - e.q0
 	r := make([]rune, n)
-	argt.file.b.Read(e.q0, r)
+	argt.oeb.f.b.Read(e.q0, r)
 	if doaddr {
 		a = printarg(argt, e.q0, e.q1)
 	}
@@ -132,8 +132,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			q0 = t.q0
 			q1 = t.q1
 		} else {
-			for q1 < t.file.Size() {
-				c := t.file.ReadC(q1)
+			for q1 < t.oeb.f.Size() {
+				c := t.oeb.f.ReadC(q1)
 				if isexecc(c) && c != ':' {
 					q1++
 				} else {
@@ -141,7 +141,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 				}
 			}
 			for q0 > 0 {
-				c := t.file.ReadC(q0 - 1)
+				c := t.oeb.f.ReadC(q0 - 1)
 				if isexecc(c) && c != ':' {
 					q0--
 				} else {
@@ -154,7 +154,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 	}
 	r := make([]rune, q1-q0)
-	t.file.b.Read(q0, r)
+	t.oeb.f.b.Read(q0, r)
 	e := lookup(string(r))
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		f = 0
@@ -163,7 +163,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		if q0 != aq0 || q1 != aq1 {
 			r = make([]rune, aq1-aq0)
-			t.file.b.Read(aq0, r)
+			t.oeb.f.b.Read(aq0, r)
 			f |= 2
 		}
 		aa, a := getarg(argt, true, true)
@@ -187,7 +187,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if q0 != aq0 || q1 != aq1 {
 			n = q1 - q0
 			r := make([]rune, n)
-			t.file.b.Read(q0, r)
+			t.oeb.f.b.Read(q0, r)
 			if n <= EVENTSIZE {
 				t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
 			} else {
@@ -207,7 +207,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	if e != nil {
 		if (e.mark && seltext != nil) && seltext.what == Body {
 			seq++
-			seltext.w.body.file.Mark(seq)
+			seltext.w.body.oeb.f.Mark(seq)
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
@@ -254,7 +254,7 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 	if et.col == nil || et.w == nil {
 		return
 	}
-	if flag1 || et.w.body.file.HasMultipleTexts() || et.w.Clean(false) {
+	if flag1 || et.w.body.oeb.HasMultipleObservers() || et.w.Clean(false) {
 		et.col.Close(et.w, true)
 	}
 }
@@ -271,7 +271,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark(seq) // seq has been incremented by execute
+				t.oeb.f.Mark(seq) // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -305,7 +305,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 			if n > RBUFSIZE {
 				n = RBUFSIZE
 			}
-			t.file.b.Read(q0, r[:n])
+			t.oeb.f.b.Read(q0, r[:n])
 			snarfbuf.Insert(snarfbuf.nc(), r[:n])
 			q0 += n
 		}
@@ -343,7 +343,7 @@ func delcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
 		if w.nopen[QWevent]+w.nopen[QWaddr]+w.nopen[QWdata]+w.nopen[QWxdata] > 0 {
-			warning(nil, "can't delete column; %s is running an external command\n", w.body.file.name)
+			warning(nil, "can't delete column; %s is running an external command\n", w.body.oeb.f.details.Name)
 			return
 		}
 	}
@@ -359,7 +359,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark(seq) // seq has been incremented by execute
+		t.oeb.f.Mark(seq) // seq has been incremented by execute
 	}
 	if t == nil {
 		return
@@ -422,7 +422,7 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 	}
 	if promote {
 		if arg == "" {
-			return t.file.name
+			return t.oeb.f.details.Name
 		}
 		// prefix with directory name if necessary
 		r = filepath.Join(t.DirName(""), arg)
@@ -438,7 +438,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	}
 
 	isclean := et.w.Clean(true)
-	if et.w.body.file.Size() > 0 && !isclean {
+	if et.w.body.oeb.f.Size() > 0 && !isclean {
 		return
 	}
 	w := et.w
@@ -449,13 +449,13 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		return
 	}
 	newNameIsdir, _ := isDir(name)
-	if t.file.HasMultipleTexts() && newNameIsdir {
+	if t.oeb.HasMultipleObservers() && newNameIsdir {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
 	}
 
-	t.Delete(0, t.file.Nr(), true)
-	samename := name == t.file.name
+	t.Delete(0, t.oeb.f.Nr(), true)
+	samename := name == t.oeb.f.details.Name
 	t.Load(0, name, samename)
 
 	// Text.Delete followed by Text.Load will always mark the File as
@@ -463,7 +463,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	// samename is true here, we know that the Text.body.File is now the same
 	// as it is on disk. So indicate this with file.Clean().
 	if samename {
-		t.file.Clean()
+		t.oeb.f.Clean()
 	}
 	w.SetTag()
 	xfidlog(w, "get")
@@ -493,27 +493,27 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 // putfile writes File to disk, if it's safe to do so.
 //
 // TODO(flux): Write this in terms of the various cases.
-func putfile(f *File, q0 int, q1 int, name string) error {
-	w := f.curtext.w
+func putfile(oeb *ObservableEditableBuffer, q0 int, q1 int, name string) error {
+	w := oeb.GetCurObserver().(*Text).w
 	d, err := os.Stat(name)
 
 	// Putting to the same file that we already read from.
-	if err == nil && name == f.name {
-		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
-			f.UpdateInfo(name, d)
+	if err == nil && name == oeb.f.details.Name {
+		if !os.SameFile(oeb.f.details.Info, d) || d.ModTime().Sub(oeb.f.details.Info.ModTime()) > time.Millisecond {
+			oeb.f.details.UpdateInfo(name, d)
 		}
-		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
+		if !os.SameFile(oeb.f.details.Info, d) || d.ModTime().Sub(oeb.f.details.Info.ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
-			f.info = d
+			oeb.f.details.Info = d
 
-			if f.hash == file.EmptyHash {
+			if oeb.f.details.Hash == file.EmptyHash {
 				// Edwood created the File but a disk file with the same name exists.
 				return warnError(nil, "%s not written; file already exists", name)
 			}
 
 			// Edwood loaded the disk file to File but the disk file has been modified since.
-			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, f.info.ModTime(), d.ModTime())
+			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, oeb.f.details.Info.ModTime(), d.ModTime())
 		}
 	}
 
@@ -531,26 +531,26 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 		return warnError(nil, "%s not written; file is append only", name)
 	}
 
-	_, err = io.Copy(io.MultiWriter(h, fd), f.b.Reader(q0, q1))
+	_, err = io.Copy(io.MultiWriter(h, fd), oeb.f.b.Reader(q0, q1))
 	if err != nil {
 		return warnError(nil, "can't write file %s: %v", name, err)
 	}
 
 	// Putting to the same file as the one that we originally read from.
-	if name == f.name {
-		if q0 != 0 || q1 != f.Size() {
+	if name == oeb.f.details.Name {
+		if q0 != 0 || q1 != oeb.f.Size() {
 			// The backing disk file contents now differ from File because
 			// we've over-written the disk file with part of File.
-			f.Modded()
+			oeb.f.Modded()
 		} else {
 			// A normal put operation of a file modified in Edwood but not
 			// modified on disk.
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
-			f.info = d
-			f.hash.Set(h.Sum(nil))
-			f.Clean()
+			oeb.f.details.Info = d
+			oeb.f.details.Hash.Set(h.Sum(nil))
+			oeb.f.Clean()
 		}
 	}
 	w.SetTag()
@@ -558,17 +558,17 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 }
 
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
-	if et == nil || et.w == nil || et.w.body.file.IsDir() {
+	if et == nil || et.w == nil || et.w.body.oeb.f.IsDir() {
 		return
 	}
 	w := et.w
-	f := w.body.file
+	f := w.body.oeb.f
 	name := getname(&w.body, argt, arg, true)
 	if name == "" {
 		warning(nil, "no file name\n")
 		return
 	}
-	putfile(f, 0, f.Size(), name)
+	putfile(w.body.oeb, 0, f.Size(), name)
 	xfidlog(w, "put")
 }
 
@@ -578,8 +578,8 @@ func putall(et, _, _ *Text, _, _ bool, arg string) {
 			if w.nopen[QWevent] > 0 {
 				continue
 			}
-			a := w.body.file.name
-			if w.body.file.SaveableAndDirty() {
+			a := w.body.oeb.f.details.Name
+			if w.body.oeb.f.SaveableAndDirty() {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
 				} else {
@@ -600,10 +600,10 @@ func sortx(et, _, _ *Text, _, _ bool, _ string) {
 func seqof(w *Window, isundo bool) int {
 	// if it's undo, see who changed with us
 	if isundo {
-		return w.body.file.Seq()
+		return w.body.oeb.f.Seq()
 	}
 	// if it's redo, see who we'll be sync'ed up with
-	return w.body.file.RedoSeq()
+	return w.body.oeb.f.RedoSeq()
 }
 
 // TODO(rjk): Why does this work this way?
@@ -652,7 +652,7 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	go runwaittask(c, cpid)
 }
 
-// sendx appends selected text or snarf buffer to end of body.
+// sendx appends selected observers or snarf buffer to end of body.
 func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if et.w == nil {
 		return
@@ -661,11 +661,11 @@ func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
-	t.SetSelect(t.file.Size(), t.file.Size())
+	t.SetSelect(t.oeb.f.Size(), t.oeb.f.Size())
 	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.Size()-1) != '\n' {
-		t.Insert(t.file.Size(), []rune("\n"), true)
-		t.SetSelect(t.file.Size(), t.file.Size())
+	if t.ReadC(t.oeb.f.Size()-1) != '\n' {
+		t.Insert(t.oeb.f.Size(), []rune("\n"), true)
+		t.SetSelect(t.oeb.f.Size(), t.oeb.f.Size())
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)
@@ -682,7 +682,7 @@ func look(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		if r == "" {
 			n := t.q1 - t.q0
 			rb := make([]rune, n)
-			t.file.b.Read(t.q0, rb[:n])
+			t.oeb.f.b.Read(t.q0, rb[:n])
 			r = string(rb) // TODO(flux) Too many gross []rune-string conversions in here
 		}
 		search(t, []rune(r))
@@ -719,7 +719,7 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 			w.Resize(w.r, false, true)
 		}
 	} else {
-		warning(nil, "%s: Tab %d\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab %d\n", w.body.oeb.f.details.Name, w.body.tabstop)
 	}
 }
 
@@ -730,10 +730,10 @@ func expandtab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	w := et.w
 	if w.body.tabexpand {
 		w.body.tabexpand = false
-		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.oeb.f.details.Name, w.body.tabstop)
 	} else {
 		w.body.tabexpand = true
-		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.oeb.f.details.Name, w.body.tabstop)
 	}
 }
 
@@ -772,7 +772,7 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		t.font = file
 		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage()))
 
-		if t.w.body.file.IsDir() {
+		if t.w.body.oeb.f.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!
 			for i, dir := range t.w.dirnames {
 				t.w.widths[i] = newfont.StringWidth(dir)
@@ -799,9 +799,9 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 		return
 	}
 	t = &t.w.body
-	if t.w.body.file.IsDir() {
+	if t.w.body.oeb.f.IsDir() {
 		// TODO(rjk): Why?
-		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
+		warning(nil, "%s is a directory; Zerox illegal\n", t.oeb.f.details.Name)
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
 		// ugly: fix locks so w.unlock works
@@ -908,7 +908,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
 			win.lk.Lock()
-			filename = win.body.file.name
+			filename = win.body.oeb.f.details.Name
 			winid = win.id
 			incl = append([]string{}, win.incl...)
 			win.lk.Unlock()

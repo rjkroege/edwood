@@ -50,7 +50,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		display: display,
 		tag: *updateText(&Text{
 			what: Rowtag,
-			file: NewTagFile(),
+			oeb:  MakeObservableEditableBufferTag(nil),
 		}, &content.RowTag, display),
 	}
 
@@ -59,7 +59,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		col := &Column{
 			tag: *updateText(&Text{
 				what: Columntag,
-				file: NewTagFile(),
+				oeb:  MakeObservableEditableBufferTag(nil),
 			}, &sercol.Tag, display),
 			display: display,
 			fortest: true,
@@ -73,7 +73,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		w.display = display
 		updateText(&w.body, &serwin.Body, display)
 		updateText(&w.tag, &serwin.Tag, display)
-		w.body.file.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
+		w.body.oeb.f.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
 		w.body.w = w
 		w.tag.w = w
 
@@ -92,7 +92,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 // update the selection.
 func InsertString(w *Window, s string) {
 	// Set an undo point before the insertion. (So that the insertion is undoable)
-	w.body.file.Mark(seq)
+	w.body.oeb.f.Mark(seq)
 	seq++
 	w.body.Insert(0, []rune(s), true)
 }
