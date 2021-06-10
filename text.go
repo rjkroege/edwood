@@ -41,6 +41,8 @@ var (
 		left2,
 		left3,
 	}
+
+	_ BufferObserver = (*Text)(nil) // Enforce at compile time that Text implements BufferObserver
 )
 
 type TextKind byte
@@ -56,7 +58,7 @@ const (
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
 	display draw.Display
-	file    *File
+	oeb     *ObservableEditableBuffer
 	fr      frame.Frame
 	font    string
 
@@ -83,7 +85,7 @@ type Text struct {
 }
 
 // getfont is a convenience accessor that gets the draw.Font from the font
-// used in this text.
+// used in this observers.
 func (t *Text) getfont() draw.Font {
 	return fontget(t.font, t.display)
 }
@@ -110,7 +112,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 }
 
 func (t *Text) Nc() int {
-	return t.file.Size()
+	return t.oeb.f.Size()
 }
 
 // String returns a string representation of the TextKind.
@@ -134,7 +136,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// use no wider than 3-space tabs in a directory
 	maxt := int(maxtab)
 	if t.what == Body {
-		if t.file.IsDir() {
+		if t.oeb.f.IsDir() {
 			maxt = min(TABDIR, int(maxtab))
 		} else {
 			maxt = t.tabstop
@@ -148,7 +150,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 		t.fr.Redraw(enclosing)
 	}
 
-	if t.what == Body && t.file.IsDir() && odx != t.all.Dx() {
+	if t.what == Body && t.oeb.f.IsDir() && odx != t.all.Dx() {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
@@ -187,10 +189,10 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 
 func (t *Text) Close() {
 	t.fr.Clear(true)
-	if err := t.file.DelText(t); err != nil {
+	if err := t.oeb.DelObserver(t); err != nil {
 		acmeerror(err.Error(), nil)
 	}
-	t.file = nil
+	t.oeb = nil //Should this make the file nil or the entire OEB?
 	if argtext == t {
 		argtext = nil
 	}
@@ -210,11 +212,11 @@ func (t *Text) Close() {
 
 func (t *Text) Columnate(names []string, widths []int) {
 	var colw, mint, maxt, ncol, nrow int
-	q1 := (0)
+	q1 := 0
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
-	if t.file.HasMultipleTexts() {
+	if t.oeb.HasMultipleObservers() {
 		panic("Text.Columnate is only for directories that can't have zerox")
 	}
 
@@ -244,19 +246,19 @@ func (t *Text) Columnate(names []string, widths []int) {
 	for i := 0; i < nrow; i++ {
 		for j := i; j < len(names); j += nrow {
 			dl := bytetorune([]byte(names[j]))
-			t.file.InsertAt(q1, dl)
+			t.oeb.f.InsertAt(q1, dl)
 			q1 += len(dl)
 			if j+nrow >= len(names) {
 				break
 			}
 			w := widths[j]
 			if maxt-w%maxt < mint {
-				t.file.InsertAt(q1, Ltab)
+				t.oeb.f.InsertAt(q1, Ltab)
 				q1++
 				w += mint
 			}
 			for {
-				t.file.InsertAt(q1, Ltab)
+				t.oeb.f.InsertAt(q1, Ltab)
 				q1++
 				w += maxt - (w % maxt)
 				if !(w < colw) {
@@ -264,17 +266,17 @@ func (t *Text) Columnate(names []string, widths []int) {
 				}
 			}
 		}
-		t.file.InsertAt(q1, Lnl)
+		t.oeb.f.InsertAt(q1, Lnl)
 		q1++
 	}
 }
 
 func (t *Text) checkSafeToLoad(filename string) error {
-	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
-		panic("text.load")
+	if t.oeb.f.HasUncommitedChanges() || t.oeb.f.Size() > 0 || t.w == nil || t != &t.w.body {
+		panic("editor.load")
 	}
 
-	if t.file.IsDir() && t.file.name == "" {
+	if t.oeb.f.IsDir() && t.oeb.f.details.Name == "" {
 		return warnError(nil, "empty directory name")
 	}
 	if ismtpt(filename) {
@@ -284,9 +286,9 @@ func (t *Text) checkSafeToLoad(filename string) error {
 }
 
 func (t *Text) loadReader(q0 int, filename string, rd io.Reader, sethash bool) (nread int, err error) {
-	t.file.SetDir(false)
+	t.oeb.f.SetDir(false)
 	t.w.filemenu = true
-	count, hasNulls, err := t.file.Load(q0, rd, sethash)
+	count, hasNulls, err := t.oeb.f.Load(q0, rd, sethash)
 	if err != nil {
 		return 0, warnError(nil, "error reading file %s: %v", filename, err)
 	}
@@ -320,19 +322,19 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, warnError(nil, "can't fstat %s: %v", filename, err)
 	}
 	if setqid {
-		t.file.info = d
+		t.oeb.f.details.Info = d
 	}
 
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
-		if t.file.HasMultipleTexts() {
+		if t.oeb.HasMultipleObservers() {
 			return 0, warnError(nil, "%s is a directory; can't read with multiple windows on it", filename)
 		}
-		t.file.SetDir(true)
+		t.oeb.f.SetDir(true)
 		t.w.filemenu = false
-		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, string(filepath.Separator)) {
-			t.file.name = t.file.name + string(filepath.Separator)
-			t.w.SetName(t.file.name)
+		if len(t.oeb.f.details.Name) > 0 && !strings.HasSuffix(t.oeb.f.details.Name, string(filepath.Separator)) {
+			t.oeb.f.details.Name = t.oeb.f.details.Name + string(filepath.Separator)
+			t.w.SetName(t.oeb.f.details.Name)
 		}
 		dirNames, err := getDirNames(fd)
 		if err != nil {
@@ -346,7 +348,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 := t.file.Size()
+		q1 := t.oeb.f.Size()
 		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
@@ -369,9 +371,9 @@ func getDirNames(f *os.File) ([]string, error) {
 	return names, nil
 }
 
-// BsInsert inserts runes r at text position q0. If r contains backspaces ('\b'),
+// BsInsert inserts runes r at observers position q0. If r contains backspaces ('\b'),
 // they are interpreted, removing the runes preceding them.
-// The final text position where r is inserted and the number of runes inserted
+// The final observers position where r is inserted and the number of runes inserted
 // after interpreting backspaces is returned.
 func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 	n := len(r)
@@ -475,15 +477,18 @@ func (t *Text) logInsert(q0 int, r []rune) {
 // updated appropriately.
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if !tofile {
-		panic("text.insert")
+		panic("editor.insert")
 	}
-	if tofile && t.file.HasUncommitedChanges() {
-		panic("text.insert")
+	if tofile && t.oeb.f.HasUncommitedChanges() {
+		panic("editor.insert")
 	}
 	if len(r) == 0 {
 		return
 	}
-	t.file.InsertAt(q0, r)
+	t.oeb.AllObservers(func(i interface{}) {
+		i.(BufferObserver).inserted(q0, r)
+	})
+	t.oeb.f.InsertAt(q0, r)
 }
 
 func (t *Text) TypeCommit() {
@@ -498,7 +503,7 @@ func (t *Text) inSelection(q0 int) bool {
 	return t.q1 > t.q0 && t.q0 <= q0 && q0 <= t.q1
 }
 
-// Fill inserts additional text from t into the Frame object until the Frame object is full.
+// Fill inserts additional observers from t into the Frame object until the Frame object is full.
 func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 	// log.Println("Text.Fill Start", t.what)
 	// defer log.Println("Text.Fill End")
@@ -508,15 +513,15 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 	if fr.IsLastLineFull() || t.nofill {
 		return nil
 	}
-	if t.file.HasUncommitedChanges() {
+	if t.oeb.f.HasUncommitedChanges() {
 		// TODO(rjk): This should probably be t.file.Commit()
 		t.TypeCommit()
 	}
 	for {
-		n := t.file.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
+		n := t.oeb.f.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n < 0 {
 			log.Printf("Text.fill: negative slice length %v (file size %v, t.org %v, frame nchars %v)\n",
-				n, t.file.Size(), t.org, fr.GetFrameFillStatus().Nchars)
+				n, t.oeb.f.Size(), t.org, fr.GetFrameFillStatus().Nchars)
 			return fmt.Errorf("fill: negative slice length %v", n)
 		}
 		if n == 0 {
@@ -526,7 +531,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 			n = 2000
 		}
 		rp := make([]rune, n)
-		t.file.b.Read(t.org+fr.GetFrameFillStatus().Nchars, rp)
+		t.oeb.f.b.Read(t.org+fr.GetFrameFillStatus().Nchars, rp)
 		//
 		// it's expensive to frinsert more than we need, so
 		// count newlines.
@@ -555,17 +560,20 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 // Delete removes runes [q0, q1). The selection values will be
 // updated appropriately.
 func (t *Text) Delete(q0, q1 int, _ bool) {
-	if t.file.HasUncommitedChanges() {
-		panic("text.delete")
+	if t.oeb.f.HasUncommitedChanges() {
+		panic("editor.delete")
 	}
 	n := q1 - q0
 	if n == 0 {
 		return
 	}
-	t.file.DeleteAt(q0, q1)
+	t.oeb.f.DeleteAt(q0, q1)
+	t.oeb.AllObservers(func(i interface{}) {
+		i.(BufferObserver).deleted(q0, q1)
+	})
 }
 
-// deleted implements the single-text deletion observer for this Text's
+// deleted implements the single-observers deletion observer for this Text's
 // backing File. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
 func (t *Text) deleted(q0, q1 int) {
@@ -587,7 +595,7 @@ func (t *Text) deleted(q0, q1 int) {
 	} else if t.fr != nil && q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
 		p1 := q1 - t.org
 		if p1 > (t.fr.GetFrameFillStatus().Nchars) {
-			p1 = (t.fr.GetFrameFillStatus().Nchars)
+			p1 = t.fr.GetFrameFillStatus().Nchars
 		}
 		p0 := 0
 		if q0 < t.org {
@@ -596,7 +604,7 @@ func (t *Text) deleted(q0, q1 int) {
 		} else {
 			p0 = q0 - t.org
 		}
-		t.fr.Delete((p0), (p1))
+		t.fr.Delete(p0, p1)
 		t.fill(t.fr)
 	}
 
@@ -619,16 +627,16 @@ func (t *Text) logInsertDelete(q0, q1 int) {
 	}
 }
 
-func (t *Text) View(q0, q1 int) []rune                   { return t.file.b.View(q0, q1) }
-func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
-func (t *Text) nc() int                                  { return t.file.Size() }
+func (t *Text) View(q0, q1 int) []rune                   { return t.oeb.f.b.View(q0, q1) }
+func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.oeb.f.b.Read(q, r); return }
+func (t *Text) nc() int                                  { return t.oeb.f.Size() }
 func (t *Text) Q0() int                                  { return t.q0 }
 func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, t.file.Size())
-	p1 = min(q1, t.file.Size())
+	p0 = min(q0, t.oeb.f.Size())
+	p1 = min(q1, t.oeb.f.Size())
 	return p0, p1
 }
 
@@ -640,7 +648,7 @@ func (t *Text) BsWidth(c rune) int {
 	q := t.q0
 	skipping := true
 	for q > 0 {
-		r := t.file.ReadC(q - 1)
+		r := t.oeb.f.ReadC(q - 1)
 		if r == '\n' { // eat at most one more character
 			if q == t.q0 { // eat the newline
 				q--
@@ -665,7 +673,7 @@ func (t *Text) BsWidth(c rune) int {
 func (t *Text) FileWidth(q0 int, oneelement bool) int {
 	q := q0
 	for q > 0 {
-		r := t.file.ReadC(q - 1)
+		r := t.oeb.f.ReadC(q - 1)
 		if r <= ' ' {
 			break
 		}
@@ -678,19 +686,19 @@ func (t *Text) FileWidth(q0 int, oneelement bool) int {
 }
 
 func (t *Text) Complete() []rune {
-	if t.q0 < t.Nc() && t.file.ReadC(t.q0) > ' ' { // must be at end of word
+	if t.q0 < t.Nc() && t.oeb.f.ReadC(t.q0) > ' ' { // must be at end of word
 		return nil
 	}
 	str := make([]rune, t.FileWidth(t.q0, true))
 	q := t.q0 - len(str)
 	for i := range str {
-		str[i] = t.file.ReadC(q)
+		str[i] = t.oeb.f.ReadC(q)
 		q++
 	}
 	path := make([]rune, t.FileWidth(t.q0-len(str), false))
 	q = t.q0 - len(str) - len(path)
 	for i := range path {
-		path[i] = t.file.ReadC(q)
+		path[i] = t.oeb.f.ReadC(q)
 		q++
 	}
 
@@ -745,7 +753,7 @@ func (t *Text) Type(r rune) {
 	rp := []rune{r}
 
 	Tagdown := func() {
-		// expand tag to show all text
+		// expand tag to show all observers
 		if !t.w.tagexpand {
 			t.w.tagexpand = true
 			t.w.Resize(t.w.r, false, true)
@@ -783,7 +791,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyRight:
 		t.TypeCommit()
-		if t.q1 < t.file.Size() {
+		if t.q1 < t.oeb.f.Size() {
 			// This is a departure from the plan9/plan9port acme
 			// Instead of always going right one char from q1, it
 			// collapses multi-character selections first, behaving
@@ -850,14 +858,14 @@ func (t *Text) Type(r rune) {
 	case draw.KeyEnd:
 		t.TypeCommit()
 		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.Size() {
+			if t.iq1 > t.oeb.f.Size() {
 				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.Size()
+				t.iq1 = t.oeb.f.Size()
 			}
 			q0 = t.BackNL(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
-			t.Show(t.file.Size(), t.file.Size(), false)
+			t.Show(t.oeb.f.Size(), t.oeb.f.Size(), false)
 		}
 		return
 	case '\t': // ^I (TAB)
@@ -871,7 +879,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		// go to where ^U would erase, if not already at BOL
 		nnb = 0
-		if t.q0 > 0 && t.file.ReadC(t.q0-1) != '\n' {
+		if t.q0 > 0 && t.oeb.f.ReadC(t.q0-1) != '\n' {
 			nnb = t.BsWidth(0x15)
 		}
 		t.Show(t.q0-nnb, t.q0-nnb, true)
@@ -879,7 +887,7 @@ func (t *Text) Type(r rune) {
 	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.Size() && t.file.ReadC(q0) != '\n' {
+		for q0 < t.oeb.f.Size() && t.oeb.f.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
@@ -900,7 +908,7 @@ func (t *Text) Type(r rune) {
 	}
 	if t.what == Body {
 		seq++
-		t.file.Mark(seq)
+		t.oeb.f.Mark(seq)
 	}
 	// cut/paste must be done after the seq++/filemark
 	switch r {
@@ -908,7 +916,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
-			t.file.Mark(seq)
+			t.oeb.f.Mark(seq)
 		}
 		cut(t, t, nil, true, true, "")
 		t.Show(t.q0, t.q0, true)
@@ -918,7 +926,7 @@ func (t *Text) Type(r rune) {
 		t.TypeCommit()
 		if t.what == Body {
 			seq++
-			t.file.Mark(seq)
+			t.oeb.f.Mark(seq)
 		}
 		paste(t, t, nil, true, false, "")
 		t.Show(t.q0, t.q1, true)
@@ -927,8 +935,8 @@ func (t *Text) Type(r rune) {
 	}
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
-		if t.file.HasUncommitedChanges() {
-			acmeerror("text.type", nil)
+		if t.oeb.f.HasUncommitedChanges() {
+			acmeerror("editor.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
@@ -953,7 +961,7 @@ func (t *Text) Type(r rune) {
 				t.SetSelect(t.q0, t.eq0)
 			}
 		}
-		if t.file.HasUncommitedChanges() {
+		if t.oeb.f.HasUncommitedChanges() {
 			t.TypeCommit()
 		}
 		t.iq1 = t.q0
@@ -980,7 +988,7 @@ func (t *Text) Type(r rune) {
 		nnb = t.BsWidth(r)
 		q1 = t.q0
 		q0 = q1 - nnb
-		// if selection is at beginning of window, avoid deleting invisible text
+		// if selection is at beginning of window, avoid deleting invisible observers
 		if q0 < t.org {
 			q0 = t.org
 			nnb = q1 - q0
@@ -991,10 +999,10 @@ func (t *Text) Type(r rune) {
 
 		// TODO(rjk): figure out the way of nofill
 		// TODO(rjk): I'd like the Undo op to group typing better.
-		t.file.Commit()
+		t.oeb.f.Commit()
 		t.Delete(q0, q0+nnb, true)
 
-		// Run through the code that will update the t.w.body.file.name.
+		// Run through the code that will update the t.w.body.file.details.Name.
 		t.TypeCommit()
 
 		t.iq1 = t.q0
@@ -1008,7 +1016,7 @@ func (t *Text) Type(r rune) {
 			rp[nr] = r
 			nr++
 			for i = 0; i < nnb; i++ {
-				r = t.file.ReadC(t.q0 - nnb + i)
+				r = t.oeb.f.ReadC(t.q0 - nnb + i)
 				if r != ' ' && r != '\t' {
 					break
 				}
@@ -1019,7 +1027,7 @@ func (t *Text) Type(r rune) {
 		}
 	}
 	// otherwise ordinary character; just insert, typically in caches of all texts
-	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
+	t.oeb.f.InsertAtWithoutCommit(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
 
 	// TODO(rjk): Do we always want to commit if editing a
@@ -1031,7 +1039,7 @@ func (t *Text) Type(r rune) {
 }
 
 func (t *Text) Commit() {
-	t.file.Commit()
+	t.oeb.f.Commit()
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
@@ -1055,14 +1063,14 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	}
 	var q0 int
 	if dl < 0 {
-		q0 = t.BackNL(t.org, (-dl))
+		q0 = t.BackNL(t.org, -dl)
 	} else {
-		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
+		if t.org+(fr.GetFrameFillStatus().Nchars) == t.oeb.f.Size() {
 			return
 		}
 		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
 	}
-	// Insert text into the frame.
+	// Insert observers into the frame.
 	t.setorigin(fr, q0, true, true)
 }
 
@@ -1118,7 +1126,7 @@ func (t *Text) Select() {
 		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		// horrible botch: while asleep, may have lost selection altogether
-		if selectq > t.file.Size() {
+		if selectq > t.oeb.f.Size() {
 			selectq = t.org + sP0
 		}
 		if selectq < t.org {
@@ -1152,7 +1160,7 @@ func (t *Text) Select() {
 		if (b&1) != 0 && (b&6) != 0 {
 			if state == None && t.what == Body {
 				seq++
-				t.w.body.file.Mark(seq)
+				t.w.body.oeb.f.Mark(seq)
 			}
 			if b&2 != 0 {
 				if state == Paste && t.what == Body {
@@ -1212,13 +1220,13 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false // do we call textscrdraw?
-	nc = t.file.Size()
+	nc = t.oeb.f.Size()
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
 		} else {
 			if q0 == qe && qe == nc {
-				if t.file.ReadC(nc-1) == '\n' {
+				if t.oeb.f.ReadC(nc-1) == '\n' {
 					if t.fr.GetFrameFillStatus().Nlines < t.fr.GetFrameFillStatus().Maxlines {
 						tsd = true
 					}
@@ -1249,7 +1257,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 
 // TODO(rjk): remove me in a subsequent CL.
 func (t *Text) ReadC(q int) rune {
-	return t.file.ReadC(q)
+	return t.oeb.f.ReadC(q)
 }
 
 func (t *Text) SetSelect(q0, q1 int) {
@@ -1274,10 +1282,10 @@ func (t *Text) SetSelect(q0, q1 int) {
 	}
 	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
 		ticked = false
-		p0 = (t.fr.GetFrameFillStatus().Nchars)
+		p0 = t.fr.GetFrameFillStatus().Nchars
 	}
 	if p1 > (t.fr.GetFrameFillStatus().Nchars) {
-		p1 = (t.fr.GetFrameFillStatus().Nchars)
+		p1 = t.fr.GetFrameFillStatus().Nchars
 	}
 	if p0 > p1 {
 		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.GetFrameFillStatus().Nchars))
@@ -1332,7 +1340,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		if q == 0 {
 			c = '\n'
 		} else {
-			c = t.file.ReadC(q - 1)
+			c = t.oeb.f.ReadC(q - 1)
 		}
 		p := runes.IndexRune(l, c)
 		if p != -1 {
@@ -1345,20 +1353,20 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			return
 		}
 		// try matching character to right, looking left
-		if q == t.file.Size() {
+		if q == t.oeb.f.Size() {
 			c = '\n'
 		} else {
-			c = t.file.ReadC(q)
+			c = t.oeb.f.ReadC(q)
 		}
 		p = runes.IndexRune(r, c)
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0
-				if q0 < t.file.Size() && c == '\n' {
+				if q0 < t.oeb.f.Size() && c == '\n' {
 					q1++
 				}
 				q0 = q
-				if c != '\n' || q != 0 || t.file.ReadC(0) == '\n' {
+				if c != '\n' || q != 0 || t.oeb.f.ReadC(0) == '\n' {
 					q0++
 				}
 			}
@@ -1367,11 +1375,11 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	}
 	// try filling out word to right
 	q1 = inq0
-	for q1 < t.file.Size() && isalnum(t.file.ReadC(q1)) {
+	for q1 < t.oeb.f.Size() && isalnum(t.oeb.f.ReadC(q1)) {
 		q1++
 	}
 	// try filling out word to left
-	for q0 > 0 && isalnum(t.file.ReadC(q0-1)) {
+	for q0 > 0 && isalnum(t.oeb.f.ReadC(q0-1)) {
 		q0--
 	}
 
@@ -1383,17 +1391,17 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	var c rune
 	for {
 		if dir > 0 {
-			if inq == t.file.Size() {
+			if inq == t.oeb.f.Size() {
 				break
 			}
-			c = t.file.ReadC(inq)
-			(inq)++
+			c = t.oeb.f.ReadC(inq)
+			inq++
 		} else {
 			if inq == 0 {
 				break
 			}
-			(inq)--
-			c = t.file.ReadC(inq)
+			inq--
+			c = t.oeb.f.ReadC(inq)
 		}
 		if c == cr {
 			nest--
@@ -1409,27 +1417,27 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	return inq, cl == '\n' && nest == 1
 }
 
-// ishtmlstart checks whether the text starting at location q an html tag.
+// ishtmlstart checks whether the observers starting at location q an html tag.
 // Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
 // Returned q1 is the location after the tag.
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-	if q+2 > t.file.Size() {
+	if q+2 > t.oeb.f.Size() {
 		return 0, 0
 	}
-	if t.file.ReadC(q) != '<' {
+	if t.oeb.f.ReadC(q) != '<' {
 		return 0, 0
 	}
 	q++
-	c := t.file.ReadC(q)
+	c := t.oeb.f.ReadC(q)
 	q++
 	c1 := c
 	c2 := c
 	for c != '>' {
-		if q >= t.file.Size() {
+		if q >= t.oeb.f.Size() {
 			return 0, 0
 		}
 		c2 = c
-		c = t.file.ReadC(q)
+		c = t.oeb.f.ReadC(q)
 		q++
 	}
 	if c1 == '/' { // closing tag
@@ -1441,7 +1449,7 @@ func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
 	return q, 1
 }
 
-// ishtmlend checks whether the text ending at location q an html tag.
+// ishtmlend checks whether the observers ending at location q an html tag.
 // Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
 // Returned q0 is the start of the tag.
 func (t *Text) ishtmlend(q int) (q1 int, stat int) {
@@ -1449,11 +1457,11 @@ func (t *Text) ishtmlend(q int) (q1 int, stat int) {
 		return 0, 0
 	}
 	q--
-	if t.file.ReadC(q) != '>' {
+	if t.oeb.f.ReadC(q) != '>' {
 		return 0, 0
 	}
 	q--
-	c := t.file.ReadC(q)
+	c := t.oeb.f.ReadC(q)
 	c1 := c
 	c2 := c
 	for c != '<' {
@@ -1462,7 +1470,7 @@ func (t *Text) ishtmlend(q int) (q1 int, stat int) {
 		}
 		c1 = c
 		q--
-		c = t.file.ReadC(q)
+		c = t.oeb.f.ReadC(q)
 	}
 	if c1 == '/' { // closing tag
 		return q, -1
@@ -1481,7 +1489,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	if _, stat := t.ishtmlend(q0); stat == 1 {
 		depth := 1
 		q := q1
-		for q < t.file.Size() {
+		for q < t.oeb.f.Size() {
 			nq, n := t.ishtmlstart(q)
 			if n != 0 {
 				depth += n
@@ -1520,7 +1528,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 // after backing up n lines starting from position p.
 func (t *Text) BackNL(p, n int) int {
 	// look for start of this line if n==0
-	if n == 0 && p > 0 && t.file.ReadC(p-1) != '\n' {
+	if n == 0 && p > 0 && t.oeb.f.ReadC(p-1) != '\n' {
 		n = 1
 	}
 	for n > 0 && p > 0 {
@@ -1531,7 +1539,7 @@ func (t *Text) BackNL(p, n int) int {
 		}
 		// at 128 chars, call it a line anyway
 		for j := 128; j > 0 && p > 0; p-- {
-			if t.file.ReadC(p-1) == '\n' {
+			if t.oeb.f.ReadC(p-1) == '\n' {
 				break
 			}
 			j--
@@ -1556,11 +1564,11 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	)
 
 	// rjk: I'm not sure what this is for exactly.
-	if org > 0 && !exact && t.file.ReadC(org-1) != '\n' {
+	if org > 0 && !exact && t.oeb.f.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
-		for i = 0; i < 256 && org < t.file.Size(); i++ {
-			if t.file.ReadC(org) == '\n' {
+		for i = 0; i < 256 && org < t.oeb.f.Size(); i++ {
+			if t.oeb.f.ReadC(org) == '\n' {
 				org++
 				break
 			}
@@ -1574,7 +1582,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 		if a < 0 && -a < fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = make([]rune, n)
-			t.file.b.Read(org, r)
+			t.oeb.f.b.Read(org, r)
 			fr.Insert(r, 0)
 		} else {
 			fr.Delete(0, fr.GetFrameFillStatus().Nchars)
@@ -1595,15 +1603,15 @@ func (t *Text) Reset() {
 	t.org = 0
 	t.q0 = 0
 	t.q1 = 0
-	t.file.Reset()
-	t.file.b.Reset()
+	t.oeb.f.Reset()
+	t.oeb.f.b.Reset()
 }
 
 func (t *Text) dirName(name string) string {
 	if t == nil || t.w == nil || filepath.IsAbs(name) {
 		return name
 	}
-	nt := t.w.tag.file.Size()
+	nt := t.w.tag.oeb.f.Size()
 	if nt == 0 {
 		return name
 	}

@@ -213,7 +213,7 @@ func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
 	row = Row{
 		display: edwoodtest.NewDisplay(),
 		tag: Text{
-			file: NewFile(""),
+			oeb: MakeObservableEditableBuffer("", nil),
 		},
 	}
 	ch := make(chan struct{})

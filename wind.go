@@ -79,18 +79,18 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
 
-	f := NewTagFile()
-	f.AddText(&w.tag)
-	w.tag.file = f
+	f := MakeObservableEditableBufferTag(nil)
+	f.AddObserver(&w.tag)
+	w.tag.oeb = f
 
 	// Body setup.
-	f = NewFile("")
+	f = MakeObservableEditableBuffer("", nil)
 	if clone != nil {
-		f = clone.body.file
+		f = clone.body.oeb
 		w.body.org = clone.body.org
 	}
-	w.body.file = f.AddText(&w.body)
-
+	f.AddObserver(&w.body)
+	w.body.oeb = f
 	w.filemenu = true
 	w.autoindent = *globalAutoIndent
 
@@ -116,9 +116,9 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	// tag is a copy of the contents, not a tracked image
 	if clone != nil {
 		w.tag.Delete(0, w.tag.Nc(), true)
-		w.tag.Insert(0, clone.tag.file.b, true)
-		w.tag.file.Reset()
-		w.tag.SetSelect(len(w.tag.file.b), len(w.tag.file.b))
+		w.tag.Insert(0, clone.tag.oeb.f.b, true)
+		w.tag.oeb.f.Reset()
+		w.tag.SetSelect(len(w.tag.oeb.f.b), len(w.tag.oeb.f.b))
 	}
 	r1 = r
 	r1.Min.Y += w.taglines*fontget(tagfont, w.display).Height() + 1
@@ -157,7 +157,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 
 func (w *Window) DrawButton() {
 	b := button
-	if w.body.file.SaveableAndDirty() {
+	if w.body.oeb.f.SaveableAndDirty() {
 		b = modbutton
 	}
 	var br image.Rectangle
@@ -213,8 +213,8 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	// if tag ends with \n, include empty line at end for typing
 	n := w.tag.fr.GetFrameFillStatus().Nlines
-	if w.tag.file.Size() > 0 {
-		c := w.tag.file.b.ReadC(w.tag.file.Size() - 1)
+	if w.tag.oeb.f.Size() > 0 {
+		c := w.tag.oeb.f.b.ReadC(w.tag.oeb.f.Size() - 1)
 		if c == '\n' {
 			n++
 		}
@@ -314,13 +314,14 @@ func (w *Window) lock1(owner int) {
 	w.owner = owner
 }
 
-// Lock locks every text/clone of w
+// Lock locks every observers/clone of w
 func (w *Window) Lock(owner int) {
 	w.lk.Lock()
 	w.ref.Inc()
 	w.owner = owner
-	f := w.body.file
-	f.AllText(func(t *Text) {
+	f := w.body.oeb
+	f.AllObservers(func(i interface{}) {
+		t := i.(*Text)
 		if t.w != w {
 			t.w.lock1(owner)
 		}
@@ -336,7 +337,8 @@ func (w *Window) unlock1() {
 
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
-	w.body.file.AllText(func(t *Text) {
+	w.body.oeb.AllObservers(func(i interface{}) {
+		t := i.(*Text)
 		if t.w != w {
 			t.w.unlock1()
 		}
@@ -381,7 +383,7 @@ func (w *Window) Delete() {
 func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
-	if q0, q1, ok := body.file.Undo(isundo); ok {
+	if q0, q1, ok := body.oeb.f.Undo(isundo); ok {
 		body.q0, body.q1 = q0, q1
 	}
 
@@ -393,7 +395,7 @@ func (w *Window) Undo(isundo bool) {
 
 func (w *Window) SetName(name string) {
 	t := &w.body
-	t.file.SetName(name)
+	t.oeb.f.SetName(name)
 
 	w.SetTag()
 }
@@ -407,7 +409,7 @@ func (w *Window) ClearTag() {
 	// w must be committed
 	n := w.tag.Nc()
 	r := make([]rune, n)
-	w.tag.file.b.Read(0, r)
+	w.tag.oeb.f.b.Read(0, r)
 	i := len([]rune(w.ParseTag()))
 	for ; i < n; i++ {
 		if r[i] == '|' {
@@ -419,7 +421,7 @@ func (w *Window) ClearTag() {
 	}
 	i++
 	w.tag.Delete(i, n, true)
-	w.tag.file.Clean()
+	w.tag.oeb.f.Clean()
 	if w.tag.q0 > i {
 		w.tag.q0 = i
 	}
@@ -432,7 +434,7 @@ func (w *Window) ClearTag() {
 // ParseTag returns the filename in the window tag.
 func (w *Window) ParseTag() string {
 	r := make([]rune, w.tag.Nc())
-	w.tag.file.b.Read(0, r)
+	w.tag.oeb.f.b.Read(0, r)
 	tag := string(r)
 
 	// " |" or "\t|" ends left half of tag
@@ -453,8 +455,9 @@ func (w *Window) ParseTag() string {
 
 // SetTag updates the tag for this Window and all of its clones.
 func (w *Window) SetTag() {
-	f := w.body.file
-	f.AllText(func(u *Text) {
+	f := w.body.oeb
+	f.AllObservers(func(i interface{}) {
+		u := i.(*Text)
 		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
 			u.w.setTag1()
 		}
@@ -475,30 +478,30 @@ func (w *Window) setTag1() {
 	)
 
 	// (flux) The C implemtation does a lot of work to avoid
-	// re-setting the tag text if unchanged.  That's probably not
+	// re-setting the tag observers if unchanged.  That's probably not
 	// relevant in the modern world.  We can build a new tag trivially
 	// and put up with the traffic implied for a tag line.
 
 	var sb strings.Builder
-	sb.WriteString(w.body.file.name)
+	sb.WriteString(w.body.oeb.f.details.Name)
 	sb.WriteString(Ldelsnarf)
 
 	if w.filemenu {
-		if w.body.needundo || w.body.file.HasUndoableChanges() {
+		if w.body.needundo || w.body.oeb.f.HasUndoableChanges() {
 			sb.WriteString(Lundo)
 		}
-		if w.body.file.HasRedoableChanges() {
+		if w.body.oeb.f.HasRedoableChanges() {
 			sb.WriteString(Lredo)
 		}
-		if w.body.file.SaveableAndDirty() {
+		if w.body.oeb.f.SaveableAndDirty() {
 			sb.WriteString(Lput)
 		}
 	}
-	if w.body.file.IsDir() {
+	if w.body.oeb.f.IsDir() {
 		sb.WriteString(Lget)
 	}
-	old := w.tag.file.b
-	oldbarIndex := w.tag.file.b.IndexRune('|')
+	old := w.tag.oeb.f.b
+	oldbarIndex := w.tag.oeb.f.b.IndexRune('|')
 	if oldbarIndex >= 0 {
 		sb.WriteString(" ")
 		sb.WriteString(string(old[oldbarIndex:]))
@@ -513,7 +516,7 @@ func (w *Window) setTag1() {
 
 	// replace tag if the new one is different
 	resize := false
-	if !new.Equal(w.tag.file.b) {
+	if !new.Equal(w.tag.oeb.f.b) {
 		resize = true // Might need to resize the tag
 		// try to preserve user selection
 		newbarIndex := new.IndexRune('|') // New always has '|'
@@ -533,8 +536,8 @@ func (w *Window) setTag1() {
 			w.tag.q1 = q1 + bar
 		}
 	}
-	w.tag.file.Clean()
-	n := w.tag.file.Size()
+	w.tag.oeb.f.Clean()
+	n := w.tag.oeb.f.Size()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}
@@ -559,10 +562,10 @@ func (w *Window) Commit(t *Text) {
 		return
 	}
 	filename := w.ParseTag()
-	if filename != w.body.file.name {
+	if filename != w.body.oeb.f.details.Name {
 		seq++
-		w.body.file.Mark(seq)
-		w.body.file.Modded()
+		w.body.oeb.f.Mark(seq)
+		w.body.oeb.f.Modded()
 		w.SetName(filename)
 		w.SetTag()
 	}
@@ -610,15 +613,15 @@ func (w *Window) AddIncl(r string) {
 // This will modify the File so that the next call to Clean will return true
 // even if this one returned false.
 func (w *Window) Clean(conservative bool) bool {
-	if w.body.file.IsDirOrScratch() { // don't whine if it's a guide file, error window, etc.
+	if w.body.oeb.f.IsDirOrScratch() { // don't whine if it's a guide file, error window, etc.
 		return true
 	}
 	if !conservative && w.nopen[QWevent] > 0 {
 		return true
 	}
-	if w.body.file.TreatAsDirty() {
-		if len(w.body.file.name) != 0 {
-			warning(nil, "%v modified\n", w.body.file.name)
+	if w.body.oeb.f.TreatAsDirty() {
+		if len(w.body.oeb.f.details.Name) != 0 {
+			warning(nil, "%v modified\n", w.body.oeb.f.details.Name)
 		} else {
 			if w.body.Nc() < 100 { // don't whine if it's too small
 				return true
@@ -626,7 +629,7 @@ func (w *Window) Clean(conservative bool) bool {
 			warning(nil, "unnamed file modified\n")
 		}
 		// This toggle permits checking if we can safely destroy the window.
-		w.body.file.TreatAsClean()
+		w.body.oeb.f.TreatAsClean()
 		return false
 	}
 	return true
@@ -636,11 +639,11 @@ func (w *Window) Clean(conservative bool) bool {
 // Otherwise,it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
-	if w.body.file.IsDir() {
+	if w.body.oeb.f.IsDir() {
 		isdir = 1
 	}
 	dirty := 0
-	if w.body.file.Dirty() {
+	if w.body.oeb.f.Dirty() {
 		dirty = 1
 	}
 	buf := fmt.Sprintf("%11d %11d %11d %11d %11d ", w.id, w.tag.Nc(),

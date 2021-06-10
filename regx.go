@@ -10,7 +10,7 @@ type AcmeRegexp struct {
 }
 
 // rxcompile parses a regular expression and returns a regular expression object
-// that can be used to match against text.
+// that can be used to match against observers.
 func rxcompile(r string) (*AcmeRegexp, error) {
 	re, err := regexp.CompileAcme(r)
 	if err != nil {

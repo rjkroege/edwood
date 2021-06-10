@@ -50,8 +50,9 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
-	tagfile := NewFile("")
-	c.tag.file = tagfile.AddText(&c.tag)
+	tagfile := MakeObservableEditableBuffer("", nil)
+	tagfile.AddObserver(&c.tag)
+	c.tag.oeb = tagfile
 	c.tag.Init(r1, tagfont, tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
@@ -60,7 +61,7 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 		c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.Point{})
 	}
 	c.tag.Insert(0, Lheader, true)
-	c.tag.SetSelect(c.tag.file.Size(), c.tag.file.Size())
+	c.tag.SetSelect(c.tag.oeb.f.Size(), c.tag.oeb.f.Size())
 	if c.display != nil {
 		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
 		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
@@ -312,7 +313,7 @@ func (c *Column) Resize(r image.Rectangle) {
 }
 
 func (c *Column) Sort() {
-	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.name < c.w[j].body.file.name })
+	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.oeb.f.details.Name < c.w[j].body.oeb.f.details.Name })
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
@@ -379,7 +380,7 @@ func (c *Column) Grow(w *Window, but int) {
 	}
 
 	// Observation: before I can support lines of arbitrary height, I need to change
-	// Frame to paint partial lines of text.
+	// Frame to paint partial lines of observers.
 	// TODO(rjk): Rewrite this logic for computing heights when font heights vary.
 	// store old #lines for each window
 	onl := w.body.fr.GetFrameFillStatus().Maxlines

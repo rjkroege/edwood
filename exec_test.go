@@ -118,27 +118,26 @@ func TestPutfile(t *testing.T) {
 	want := "Hello, 世界\n"
 	w := &Window{
 		body: Text{
-			file: &File{
-				b:    RuneArray(want),
-				name: filename,
-			},
+			oeb: MakeObservableEditableBuffer(filename, RuneArray(want)),
 		},
 	}
-	f := w.body.file
-	f.curtext = &w.body
-	f.curtext.w = w
+	f := w.body.oeb.f
+	oeb := w.body.oeb
+	cur := &w.body
+	cur.w = w
+	oeb.SetCurObserver(cur)
 	increaseMtime := func(t *testing.T, duration time.Duration) {
-		tm := f.info.ModTime().Add(duration)
+		tm := f.details.Info.ModTime().Add(duration)
 		if err := os.Chtimes(filename, tm, tm); err != nil {
 			t.Fatalf("Chtimes failed: %v", err)
 		}
 	}
 
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(oeb, 0, f.Size(), filename)
 	if err == nil || !strings.Contains(err.Error(), "file already exists") {
 		t.Fatalf("putfile returned error %v; expected 'file already exists'", err)
 	}
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(oeb, 0, f.Size(), filename)
 	if err != nil {
 		t.Fatalf("putfile failed: %v", err)
 	}
@@ -146,7 +145,7 @@ func TestPutfile(t *testing.T) {
 
 	// mtime increased but hash is the same
 	increaseMtime(t, time.Second)
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(oeb, 0, f.Size(), filename)
 	if err != nil {
 		t.Fatalf("putfile failed: %v", err)
 	}
@@ -159,7 +158,7 @@ func TestPutfile(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	increaseMtime(t, time.Second)
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(oeb, 0, f.Size(), filename)
 	if err == nil || !strings.Contains(err.Error(), "modified since last read") {
 		t.Fatalf("putfile returned error %v; expected 'modified since last read'", err)
 	}
@@ -169,7 +168,7 @@ func TestExpandtabToggle(t *testing.T) {
 	want := true
 	w := &Window{
 		body: Text{
-			file:      &File{},
+			oeb:       MakeObservableEditableBuffer("", nil),
 			tabexpand: false,
 			tabstop:   4,
 		},

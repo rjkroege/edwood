@@ -210,11 +210,11 @@ func readfile(c *Column, filename string) {
 	abspath, _ := filepath.Abs(filename)
 	w.SetName(abspath)
 	w.body.Load(0, filename, true)
-	w.body.file.Clean()
+	w.body.oeb.f.Clean()
 	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
-	w.tag.SetSelect(w.tag.file.Size(), w.tag.file.Size())
+	w.tag.SetSelect(w.tag.oeb.f.Size(), w.tag.oeb.f.Size())
 	xfidlog(w, "new")
 }
 
@@ -487,8 +487,8 @@ func keyboardthread(display draw.Display) {
 					activecol = t.col
 				}
 				if t != nil && t.w != nil {
-					// In a set of zeroxes, the last typed-in body becomes the curtext.
-					t.w.body.file.curtext = &t.w.body
+					// In a set of zeroxes, the last typed-in body becomes the currobserver.
+					t.w.body.oeb.SetCurObserver(&t.w.body)
 				}
 				if timer != nil {
 					timer.Stop()

@@ -234,10 +234,10 @@ func TestEditCmdWithFile(t *testing.T) {
 		}
 
 		// For e identical.
-		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
+		if got, want := w.body.oeb.f.Dirty(), filedirtystates[i].Dirty; got != want {
 			t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
 		}
-		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
+		if got, want := w.body.oeb.f.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
 			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
 		}
 
@@ -316,7 +316,7 @@ func TestEditMultipleWindows(t *testing.T) {
 		}, []string{"Edit: no file name given\n"}},
 
 		// b does the same thing in Acme and Edwood (fails)
-		// Maybe this sets curtext?
+		// Maybe this sets currobserver?
 
 		// w
 		// backing file is newer than file.

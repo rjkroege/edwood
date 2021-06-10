@@ -33,10 +33,11 @@ func resetxec() {
 	clearcollection()
 }
 
-func mkaddr(f *File) (a Address) {
-	a.r.q0 = f.curtext.q0
-	a.r.q1 = f.curtext.q1
-	a.f = f
+func mkaddr(oeb *ObservableEditableBuffer) (a Address) {
+	cur := oeb.GetCurObserver().(*Text)
+	a.r.q0 = cur.q0
+	a.r.q1 = cur.q1
+	a.oeb = oeb
 	return a
 }
 
@@ -54,11 +55,11 @@ func cmdexec(t *Text, cp *Cmd) bool {
 		editerror("no current window")
 	}
 	i := cmdlookup(cp.cmdc) // will be -1 for '{'
-	f := (*File)(nil)
+	oeb := (*ObservableEditableBuffer)(nil)
 	if t != nil && t.w != nil {
 		t = &t.w.body
-		f = t.file
-		f.curtext = t
+		oeb = t.oeb
+		oeb.SetCurObserver(t)
 	}
 	if i >= 0 && cmdtab[i].defaddr != aNo {
 		ap := cp.addr
@@ -77,24 +78,24 @@ func cmdexec(t *Text, cp *Cmd) bool {
 			}
 		}
 		if cp.addr != nil { // may be false for '\n' (only
-			if f != nil {
-				dot = mkaddr(f)
+			if oeb != nil {
+				dot = mkaddr(oeb)
 				addr = cmdaddress(ap, dot, 0)
 			} else { // a "
 				addr = cmdaddress(ap, none, 0)
 			}
-			f = addr.f
-			t = f.curtext
+			oeb = addr.oeb
+			t = oeb.GetCurObserver().(*Text)
 		}
 	}
 	switch cp.cmdc {
 	case '{':
-		dot = mkaddr(f)
+		dot = mkaddr(oeb)
 		if cp.addr != nil {
 			dot = cmdaddress(cp.addr, dot, 0)
 		}
 		for cp = cp.cmd; cp != nil; cp = cp.next {
-			if dot.r.q1 > t.file.Nr() {
+			if dot.r.q1 > t.oeb.f.Nr() {
 				editerror("dot extends past end of buffer during { command")
 			}
 			// TODO(rjk): utf8 buffer addressing change.
@@ -116,7 +117,7 @@ func edittext(w *Window, q int, r []rune) error {
 	case Inactive:
 		return ErrPermission
 	case Inserting:
-		f := w.body.file
+		f := w.body.oeb.f
 		f.elog.Insert(q, r)
 		return nil
 	case Collecting:
@@ -139,22 +140,22 @@ func filelist(t *Text, r string) string {
 	if r[0] != '<' {
 		return r
 	}
-	// use < command to collect text
+	// use < command to collect observers
 	clearcollection()
 	runpipe(t, '<', []rune(r[1:]), Collecting)
 	return string(collection)
 }
 
 func a_cmd(t *Text, cp *Cmd) bool {
-	return appendx(t.file, cp, addr.r.q1)
+	return appendx(t.oeb, cp, addr.r.q1)
 }
 
 func b_cmd(t *Text, cp *Cmd) bool {
-	f := tofile(cp.text)
+	oeb := toOEB(cp.text)
 	if nest == 0 {
-		pfilename(f)
+		pfilename(oeb.f)
 	}
-	curtext = f.curtext
+	curtext = oeb.GetCurObserver().(*Text)
 	return true
 }
 
@@ -179,7 +180,7 @@ func B_cmd(t *Text, cp *Cmd) bool {
 }
 
 func c_cmd(t *Text, cp *Cmd) bool {
-	t.file.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
+	t.oeb.f.elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
 	t.q0 = addr.r.q0
 	t.q1 = addr.r.q1
 	return true
@@ -187,7 +188,7 @@ func c_cmd(t *Text, cp *Cmd) bool {
 
 func d_cmd(t *Text, cp *Cmd) bool {
 	if addr.r.q1 > addr.r.q0 {
-		t.file.elog.Delete(addr.r.q0, addr.r.q1)
+		t.oeb.f.elog.Delete(addr.r.q0, addr.r.q1)
 	}
 	t.q0 = addr.r.q0
 	t.q1 = addr.r.q0
@@ -195,7 +196,7 @@ func d_cmd(t *Text, cp *Cmd) bool {
 }
 
 func D1(t *Text) {
-	if t.w.body.file.HasMultipleTexts() || t.w.Clean(false) {
+	if t.w.body.oeb.HasMultipleObservers() || t.w.Clean(false) {
 		t.col.Close(t.w, true)
 	}
 }
@@ -222,7 +223,8 @@ func D_cmd(t *Text, cp *Cmd) bool {
 }
 
 func e_cmd(t *Text, cp *Cmd) bool {
-	f := t.file
+	oeb := t.oeb
+	f := t.oeb.f
 	q0 := addr.r.q0
 	q1 := addr.r.q1
 	if cp.cmdc == 'e' {
@@ -233,11 +235,11 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		q1 = f.Nr()
 	}
 	allreplaced := q0 == 0 && q1 == f.Nr()
-	name := cmdname(f, cp.text, cp.cmdc == 'e')
+	name := cmdname(oeb, cp.text, cp.cmdc == 'e')
 	if name == "" {
 		editerror(Enoname)
 	}
-	samename := name == t.file.name
+	samename := name == oeb.f.details.Name
 	fd, err := os.Open(name)
 	if err != nil {
 		editerror("can't open %v: %v", name, err)
@@ -270,14 +272,14 @@ func f_cmd(t *Text, cp *Cmd) bool {
 	} else {
 		str = cp.text
 	}
-	cmdname(t.file, str, true)
-	pfilename(t.file)
+	cmdname(t.oeb, str, true)
+	pfilename(t.oeb.f)
 	return true
 }
 
 func g_cmd(t *Text, cp *Cmd) bool {
-	if t.file != addr.f {
-		warning(nil, "internal error: g_cmd f!=addr.f\n")
+	if t.oeb.f != addr.oeb.f {
+		warning(nil, "internal error: g_cmd oeb.f !=addr.oeb.f\n")
 		return false
 	}
 	are, err := rxcompile(cp.re)
@@ -294,7 +296,7 @@ func g_cmd(t *Text, cp *Cmd) bool {
 }
 
 func i_cmd(t *Text, cp *Cmd) bool {
-	return appendx(t.file, cp, addr.r.q0)
+	return appendx(t.oeb, cp, addr.r.q0)
 }
 
 func copyx(f *File, addr2 Address) {
@@ -306,12 +308,12 @@ func copyx(f *File, addr2 Address) {
 			ni = RBUFSIZE
 		}
 		f.b.Read(p, buf[:ni])
-		addr2.f.elog.Insert(addr2.r.q1, buf[:ni])
+		addr2.oeb.f.elog.Insert(addr2.r.q1, buf[:ni])
 	}
 }
 
 func move(f *File, addr2 Address) {
-	if addr.f != addr2.f || addr.r.q1 <= addr2.r.q0 {
+	if addr.oeb != addr2.oeb || addr.r.q1 <= addr2.r.q0 {
 		f.elog.Delete(addr.r.q0, addr.r.q1)
 		copyx(f, addr2)
 	} else if addr.r.q0 >= addr2.r.q1 {
@@ -325,18 +327,18 @@ func move(f *File, addr2 Address) {
 }
 
 func m_cmd(t *Text, cp *Cmd) bool {
-	dot := mkaddr(t.file)
+	dot := mkaddr(t.oeb)
 	addr2 := cmdaddress(cp.mtaddr, dot, 0)
 	if cp.cmdc == 'm' {
-		move(t.file, addr2)
+		move(t.oeb.f, addr2)
 	} else {
-		copyx(t.file, addr2)
+		copyx(t.oeb.f, addr2)
 	}
 	return true
 }
 
 func p_cmd(t *Text, cp *Cmd) bool {
-	return pdisplay(t.file)
+	return pdisplay(t.oeb)
 }
 
 func s_cmd(t *Text, cp *Cmd) bool {
@@ -385,7 +387,7 @@ func s_cmd(t *Text, cp *Cmd) bool {
 					if sel[j].q1-sel[j].q0 > RBUFSIZE {
 						editerror("replacement string too long")
 					}
-					t.file.b.Read(sel[j].q0, rbuf[:sel[j].q1-sel[j].q0])
+					t.oeb.f.b.Read(sel[j].q0, rbuf[:sel[j].q1-sel[j].q0])
 					for k := 0; k < sel[j].q1-sel[j].q0; k++ {
 						buf = buf + string(rbuf[k])
 					}
@@ -398,13 +400,13 @@ func s_cmd(t *Text, cp *Cmd) bool {
 				if sel[0].q1-sel[0].q0 > RBUFSIZE {
 					editerror("right hand side too long in substitution")
 				}
-				t.file.b.Read(sel[0].q0, rbuf[:sel[0].q1-sel[0].q0])
+				t.oeb.f.b.Read(sel[0].q0, rbuf[:sel[0].q1-sel[0].q0])
 				for k := 0; k < sel[0].q1-sel[0].q0; k++ {
 					buf += string(rbuf[k])
 				}
 			}
 		}
-		t.file.elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
+		t.oeb.f.elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
 		delta -= sel[0].q1 - sel[0].q0
 		delta += len([]rune(buf))
 		didsub = true
@@ -428,32 +430,32 @@ func u_cmd(t *Text, cp *Cmd) bool {
 		flag = false
 	}
 	oseq := -1
-	for n > 0 && t.file.Seq() != oseq {
+	for n > 0 && t.oeb.f.Seq() != oseq {
 		n--
-		oseq = t.file.Seq()
+		oseq = t.oeb.f.Seq()
 		undo(t, nil, nil, flag, false, "")
 	}
 	return true
 }
 
 func w_cmd(t *Text, cp *Cmd) bool {
-	f := t.file
-	if f.Seq() == seq {
+	oeb := t.oeb
+	if oeb.f.Seq() == seq {
 		editerror("can't write file with pending modifications")
 	}
-	r := cmdname(f, cp.text, false)
+	r := cmdname(t.oeb, cp.text, false)
 	if r == "" {
 		editerror("no name specified for 'w' command")
 	}
-	putfile(f, addr.r.q0, addr.r.q1, r)
+	putfile(oeb, addr.r.q0, addr.r.q1, r)
 	return true
 }
 
 func x_cmd(t *Text, cp *Cmd) bool {
 	if cp.re != "" {
-		looper(t.file, cp, cp.cmdc == 'x')
+		looper(t.oeb, cp, cp.cmdc == 'x')
 	} else {
-		linelooper(t.file, cp)
+		linelooper(t.oeb, cp)
 	}
 	return true
 }
@@ -486,7 +488,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 		t.q0 = addr.r.q0
 		t.q1 = addr.r.q1
 		if cmd == '<' || cmd == '|' {
-			t.file.elog.Delete(t.q0, t.q1)
+			t.oeb.f.elog.Delete(t.q0, t.q1)
 		}
 	}
 	s = append([]rune{cmd}, r...)
@@ -544,7 +546,7 @@ func nlcount(t *Text, q0, q1 int) (nl, pnr int) {
 			if nbuf > RBUFSIZE {
 				nbuf = RBUFSIZE
 			}
-			t.file.b.Read(q0, buf[:nbuf])
+			t.oeb.f.b.Read(q0, buf[:nbuf])
 			i = 0
 		}
 		if buf[i] == '\n' {
@@ -565,8 +567,8 @@ const (
 
 func printposn(t *Text, mode int) {
 	var l1, l2 int
-	if t != nil && t.file != nil && t.file.name != "" {
-		warning(nil, "%s:", t.file.name)
+	if t != nil && t.oeb.f != nil && t.oeb.f.details.Name != "" {
+		warning(nil, "%s:", t.oeb.f.details.Name)
 	}
 	switch mode {
 	case PosnChars:
@@ -627,15 +629,15 @@ func eq_cmd(t *Text, cp *Cmd) bool {
 }
 
 func nl_cmd(t *Text, cp *Cmd) bool {
-	f := t.file
+	oeb := t.oeb
 	if cp.addr == nil {
 		// First put it on newline boundaries
-		a := mkaddr(f)
+		a := mkaddr(oeb)
 		addr = lineaddr(0, a, -1)
 		a = lineaddr(0, a, 1)
 		addr.r.q1 = a.r.q1
 		if addr.r.q0 == t.q0 && addr.r.q1 == t.q1 {
-			a := mkaddr(f)
+			a := mkaddr(oeb)
 			addr = lineaddr(1, a, 1)
 		}
 	}
@@ -643,20 +645,21 @@ func nl_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-func appendx(f *File, cp *Cmd, p int) bool {
+func appendx(oeb *ObservableEditableBuffer, cp *Cmd, p int) bool {
 	if len(cp.text) > 0 {
-		f.elog.Insert(p, []rune(cp.text))
+		oeb.f.elog.Insert(p, []rune(cp.text))
 	}
-	f.curtext.q0 = p
-	f.curtext.q1 = p
+	cur := oeb.GetCurObserver().(*Text)
+	cur.q0 = p
+	cur.q1 = p
 	return true
 }
 
-func pdisplay(f *File) bool {
+func pdisplay(oeb *ObservableEditableBuffer) bool {
 	p1 := addr.r.q0
 	p2 := addr.r.q1
-	if p2 > f.Nr() {
-		p2 = f.Nr()
+	if p2 > oeb.f.Nr() {
+		p2 = oeb.f.Nr()
 	}
 	buf := make([]rune, RBUFSIZE)
 	for p1 < p2 {
@@ -664,12 +667,13 @@ func pdisplay(f *File) bool {
 		if np > RBUFSIZE-1 {
 			np = RBUFSIZE - 1
 		}
-		f.b.Read(p1, buf[:np])
+		oeb.f.b.Read(p1, buf[:np])
 		warning(nil, "%s", string(buf[:np]))
 		p1 += np
 	}
-	f.curtext.q0 = addr.r.q0
-	f.curtext.q1 = addr.r.q1
+	cur := oeb.GetCurObserver().(*Text)
+	cur.q0 = addr.r.q0
+	cur.q1 = addr.r.q1
 	return true
 }
 
@@ -679,22 +683,23 @@ func pfilename(f *File) {
 		dirtychar = '\''
 	}
 	fc := ' '
-	if curtext != nil && curtext.file == f {
+	if curtext != nil && curtext.oeb.f == f {
 		fc = '.'
 	}
 	warning(nil, "%c%c%c %s\n", dirtychar,
-		'+', fc, f.name)
+		'+', fc, f.details.Name)
 }
 
-func loopcmd(f *File, cp *Cmd, rp []Range) {
+func loopcmd(oeb *ObservableEditableBuffer, cp *Cmd, rp []Range) {
 	for _, r := range rp {
-		f.curtext.q0 = r.q0
-		f.curtext.q1 = r.q1
-		cmdexec(f.curtext, cp)
+		cur := oeb.GetCurObserver().(*Text)
+		cur.q0 = r.q0
+		cur.q1 = r.q1
+		cmdexec(cur, cp)
 	}
 }
 
-func looper(f *File, cp *Cmd, isX bool) {
+func looper(oeb *ObservableEditableBuffer, cp *Cmd, isX bool) {
 	rp := []Range{}
 	tr := Range{}
 	r := addr.r
@@ -708,7 +713,8 @@ func looper(f *File, cp *Cmd, isX bool) {
 	if isY {
 		op = r.q0
 	}
-	sels := are.rxexecute(f.curtext, nil, r.q0, r.q1, -1)
+	cur := oeb.GetCurObserver().(*Text)
+	sels := are.rxexecute(cur, nil, r.q0, r.q1, -1)
 	if len(sels) == 0 {
 		if isY {
 			rp = append(rp, Range{r.q0, r.q1})
@@ -731,11 +737,11 @@ func looper(f *File, cp *Cmd, isX bool) {
 			rp = append(rp, tr)
 		}
 	}
-	loopcmd(f, cp.cmd, rp)
+	loopcmd(oeb, cp.cmd, rp)
 	nest--
 }
 
-func linelooper(f *File, cp *Cmd) {
+func linelooper(oeb *ObservableEditableBuffer, cp *Cmd) {
 	//	long nrp, p;
 	//	Range r, linesel;
 	//	Address a, a3;
@@ -744,7 +750,7 @@ func linelooper(f *File, cp *Cmd) {
 	nest++
 	r := addr.r
 	var a3 Address
-	a3.f = f
+	a3.oeb = oeb
 	a3.r.q0 = r.q0
 	a3.r.q1 = r.q0
 	a := lineaddr(0, a3, 1)
@@ -770,7 +776,7 @@ func linelooper(f *File, cp *Cmd) {
 		}
 		break
 	}
-	loopcmd(f, cp.cmd, rp)
+	loopcmd(oeb, cp.cmd, rp)
 	nest--
 }
 
@@ -786,14 +792,15 @@ func alllooper(w *Window, lp *Looper) {
 	cp := lp.cp
 	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t {
+	curr := t.oeb.GetCurObserver()
+	if curr != t {
 		return
 	}
 	// no auto-execute on files without names
-	if cp.re == "" && t.file.name == "" {
+	if cp.re == "" && t.oeb.f.details.Name == "" {
 		return
 	}
-	if cp.re == "" || filematch(t.file, cp.re) == lp.XY {
+	if cp.re == "" || filematch(t.oeb.f, cp.re) == lp.XY {
 		lp.w = append(lp.w, w)
 	}
 }
@@ -860,14 +867,15 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 
 // TODO(flux) This actually looks like "find one match after p"
 // This is almost certainly broken for ^
-func nextmatch(f *File, r string, p int, sign int) {
+func nextmatch(oeb *ObservableEditableBuffer, r string, p int, sign int) {
 	are, err := rxcompile(r)
 	if err != nil {
 		editerror("bad regexp in command address")
 	}
 	sel = RangeSet{Range{0, 0}}
+	cur := oeb.GetCurObserver().(*Text)
 	if sign >= 0 {
-		sels := are.rxexecute(f.curtext, nil, p, -1, 2)
+		sels := are.rxexecute(cur, nil, p, -1, 2)
 		if len(sels) == 0 {
 			editerror("no match for regexp")
 		} else {
@@ -878,10 +886,10 @@ func nextmatch(f *File, r string, p int, sign int) {
 				sel = sels[1]
 			} else { // wrap around
 				p++
-				if p > f.Nr() {
+				if p > oeb.f.Nr() {
 					p = 0
 				}
-				sels := are.rxexecute(f.curtext, nil, p, -1, 1)
+				sels := are.rxexecute(cur, nil, p, -1, 1)
 				if len(sels) == 0 {
 					editerror("address")
 				} else {
@@ -890,16 +898,16 @@ func nextmatch(f *File, r string, p int, sign int) {
 			}
 		}
 	} else {
-		sel = are.rxbexecute(f.curtext, p, NRange)
+		sel = are.rxbexecute(cur, p, NRange)
 		if len(sel) == 0 {
 			editerror("no match for regexp")
 		}
 		if sel[0].q0 == sel[0].q1 && sel[0].q1 == p {
 			p--
 			if p < 0 {
-				p = f.Nr()
+				p = oeb.f.Nr()
 			}
-			sel = are.rxbexecute(f.curtext, p, NRange)
+			sel = are.rxbexecute(cur, p, NRange)
 			if len(sel) != 0 {
 				editerror("address")
 			}
@@ -908,7 +916,8 @@ func nextmatch(f *File, r string, p int, sign int) {
 }
 
 func cmdaddress(ap *Addr, a Address, sign int) Address {
-	f := a.f
+	oeb := a.oeb
+	cur := oeb.GetCurObserver().(*Text)
 	var a1, a2 Address
 	var qbydir int
 	for {
@@ -918,10 +927,10 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 		case '#':
 			a = charaddr(ap.num, a, sign)
 		case '.':
-			a = mkaddr(f)
+			a = mkaddr(oeb)
 
 		case '$':
-			a.r.q0 = f.Nr()
+			a.r.q0 = oeb.f.Nr()
 			a.r.q1 = a.r.q0
 
 		case '\'':
@@ -941,16 +950,16 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 			} else {
 				qbydir = a.r.q0
 			}
-			nextmatch(f, ap.re, qbydir, sign)
+			nextmatch(oeb, ap.re, qbydir, sign)
 			a.r = sel[0]
 
 		case '"':
-			f = matchfile(ap.re)
-			a = mkaddr(f)
+			oeb = matchfile(ap.re)
+			a = mkaddr(oeb)
 
 		case '*':
 			a.r.q0 = 0
-			a.r.q1 = f.Nr()
+			a.r.q1 = oeb.f.Nr()
 
 		case ',':
 			fallthrough
@@ -958,27 +967,27 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 			if ap.left != nil {
 				a1 = cmdaddress(ap.left, a, 0)
 			} else {
-				a1.f = a.f
+				a1.oeb = a.oeb
 				a1.r.q0 = 0
 				a1.r.q1 = 0
 			}
 			if ap.typ == ';' {
-				f = a1.f
+				oeb = a1.oeb
 				a = a1
-				f.curtext.q0 = a1.r.q0
-				f.curtext.q1 = a1.r.q1
+				cur.q0 = a1.r.q0
+				cur.q1 = a1.r.q1
 			}
 			if ap.next != nil {
 				a2 = cmdaddress(ap.next, a, 0)
 			} else {
-				a2.f = a.f
+				a2.oeb = a.oeb
 				a2.r.q0 = 0
-				a2.r.q1 = f.Nr()
+				a2.r.q1 = oeb.f.Nr()
 			}
-			if a1.f != a2.f {
+			if a1.oeb != a2.oeb {
 				editerror("addresses in different files")
 			}
-			a.f = a1.f
+			a.oeb = a1.oeb
 			a.r.q0 = a1.r.q0
 			a.r.q1 = a2.r.q1
 			if a.r.q1 < a.r.q0 {
@@ -1008,72 +1017,72 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 	return a
 }
 
-type Tofile struct {
-	f *File
-	r string
+type ToOEB struct {
+	oeb *ObservableEditableBuffer
+	r   string
 }
 
-func alltofile(w *Window, tp *Tofile) {
-	if tp.f != nil {
+func alltofile(w *Window, tp *ToOEB) {
+	if tp.oeb != nil {
 		return
 	}
-	if w.body.file.IsDirOrScratch() {
+	if w.body.oeb.f.IsDirOrScratch() {
 		return
 	}
 	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t {
+	if t.oeb.GetCurObserver().(*Text) != t {
 		return
 	}
 	//	if w.nopen[QWevent] > 0   {
 	//		return;
-	if tp.r == t.file.name {
-		tp.f = t.file
+	if tp.r == t.oeb.f.details.Name {
+		tp.oeb = t.oeb
 	}
 }
 
-func tofile(r string) *File {
-	var t Tofile
+func toOEB(r string) *ObservableEditableBuffer {
+	var t ToOEB
 
 	t.r = strings.TrimLeft(r, " \t\n")
-	t.f = nil
+	t.oeb = nil
 	row.AllWindows(func(w *Window) { alltofile(w, &t) })
-	if t.f == nil {
+	if t.oeb == nil {
 		editerror("no such file\"%v\"", t.r)
 	}
-	return t.f
+	return t.oeb
 }
 
-func allmatchfile(w *Window, tp *Tofile) {
-	if w.body.file.IsDirOrScratch() {
+func allmatchfile(w *Window, tp *ToOEB) {
+	if w.body.oeb.f.IsDirOrScratch() {
 		return
 	}
 	t := &w.body
 	// only use this window if it's the current window for the file  {
-	if t.file.curtext != t {
+	if t.oeb.GetCurObserver().(*Text) != t {
 		return
 	}
 	//	if w.nopen[QWevent] > 0   {
 	//		return;
-	if filematch(w.body.file, tp.r) {
-		if tp.f != nil {
+	if filematch(w.body.oeb.f, tp.r) {
+		if tp.oeb.f != nil {
 			editerror("too many files match \"%v\"", tp.r)
 		}
-		tp.f = w.body.file
+		tp.oeb.f = w.body.oeb.f
 	}
 }
 
-func matchfile(r string) *File {
-	var tf Tofile
+func matchfile(r string) *ObservableEditableBuffer {
+	var tf ToOEB
 
-	tf.f = nil
+	tf.oeb.f = nil
 	tf.r = r
 	row.AllWindows(func(w *Window) { allmatchfile(w, &tf) })
 
-	if tf.f == nil {
+	if tf.oeb.f == nil {
 		editerror("no file matches \"%v\"", r)
 	}
-	return tf.f
+	return tf.oeb
 }
 
 func filematch(f *File, r string) bool {
@@ -1087,10 +1096,10 @@ func filematch(f *File, r string) bool {
 		dmark = '\''
 	}
 	fmark := ' '
-	if curtext != nil && curtext.file == f {
+	if curtext != nil && curtext.oeb.f == f {
 		fmark = '.'
 	}
-	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.name)
+	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.details.Name)
 
 	s := are.rxexecute(nil, []rune(buf), 0, len([]rune(buf)), 1)
 	return len(s) > 0
@@ -1107,7 +1116,7 @@ func charaddr(l int, addr Address, sign int) Address {
 		addr.r.q1 += l
 		addr.r.q0 = addr.r.q1
 	}
-	if addr.r.q0 < 0 || addr.r.q1 > addr.f.Nr() {
+	if addr.r.q0 < 0 || addr.r.q1 > addr.oeb.f.Nr() {
 		editerror("address out of range")
 	}
 	return addr
@@ -1115,8 +1124,9 @@ func charaddr(l int, addr Address, sign int) Address {
 
 func lineaddr(l int, addr Address, sign int) Address {
 	var a Address
-	f := addr.f
-	a.f = f
+	oeb := addr.oeb
+	a.oeb = oeb
+	f := oeb.f
 	n := 0
 	p := 0
 	if sign >= 0 {
@@ -1193,48 +1203,48 @@ type Filecheck struct {
 }
 
 func allfilecheck(w *Window, fp *Filecheck) {
-	f := w.body.file
-	if w.body.file == fp.f {
+	f := w.body.oeb.f
+	if w.body.oeb.f == fp.f {
 		return
 	}
-	if fp.r == f.name {
+	if fp.r == f.details.Name {
 		warning(nil, "warning: duplicate file name \"%s\"\n", fp.r)
 	}
 }
 
-func cmdname(f *File, str string, set bool) string {
+func cmdname(oeb *ObservableEditableBuffer, str string, set bool) string {
 	var fc Filecheck
 	r := ""
 	s := ""
 	if str == "" {
 		// no name; use existing
-		if f.name == "" {
+		if oeb.f.details.Name == "" {
 			return ""
 		}
-		return f.name
+		return oeb.f.details.Name
 	}
 	s = strings.TrimLeft(str, " \t")
+	cur := oeb.GetCurObserver().(*Text)
 	if s == "" {
 		goto Return
 	}
-
 	if filepath.IsAbs(s) {
 		r = s
 	} else {
-		r = f.curtext.DirName(s)
+		r = cur.DirName(s)
 	}
-	fc.f = f
+	fc.f = oeb.f
 	fc.r = r
 	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) })
-	if f.name == "" {
+	if oeb.f.details.Name == "" {
 		set = true
 	}
 
 Return:
-	if set && !(r == f.name) {
-		f.Mark(seq)
-		f.Modded()
-		f.curtext.w.SetName(r)
+	if set && !(r == oeb.f.details.Name) {
+		oeb.f.Mark(seq)
+		oeb.f.Modded()
+		cur.w.SetName(r)
 	}
 	return r
 }

@@ -2,7 +2,7 @@ package main
 
 // Texter abstracts the buffering side of Text, allowing testing of Elog Apply
 // TODO(flux): This is probably lame and will get re-done when I understand
-// how Text stores its text.
+// how Text stores its observers.
 type Texter interface {
 	Constrain(q0, q1 int) (p0, p1 int)
 	Delete(q0, q1 int, tofile bool)

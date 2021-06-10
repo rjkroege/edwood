@@ -98,7 +98,7 @@ func xfidopen(x *Xfid) {
 			w.nopen[q]++
 		case QWevent:
 			if w.nopen[q] == 0 {
-				if !w.body.file.IsDir() && w.col != nil {
+				if !w.body.oeb.f.IsDir() && w.col != nil {
 					w.filemenu = false
 					w.SetTag()
 				}
@@ -127,7 +127,7 @@ func xfidopen(x *Xfid) {
 			os.Remove(tmp.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 
-			_, err = io.Copy(tmp, t.file.b.Reader(t.q0, t.q1))
+			_, err = io.Copy(tmp, t.oeb.f.b.Reader(t.q0, t.q1))
 			if err != nil || testIOCopyFail {
 				// TODO(fhs): Do we want to send an error response to the client?
 				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
@@ -136,7 +136,7 @@ func xfidopen(x *Xfid) {
 		case QWwrsel:
 			w.nopen[q]++
 			seq++
-			t.file.Mark(seq)
+			t.oeb.f.Mark(seq)
 			cut(t, t, nil, false, true, "")
 			w.wrselrange = Range{t.q1, t.q1}
 			w.nomark = true
@@ -216,7 +216,7 @@ func xfidclose(x *Xfid) {
 				if q == QWdata || q == QWxdata {
 					w.nomark = false
 				}
-				if q == QWevent && !w.body.file.IsDir() && w.col != nil {
+				if q == QWevent && !w.body.oeb.f.IsDir() && w.col != nil {
 					w.filemenu = true
 					w.SetTag()
 				}
@@ -394,7 +394,7 @@ func xfidwrite(x *Xfid) {
 	}
 	x.fcall.Count = uint32(len(x.fcall.Data))
 
-	// updateText writes x.fcall.Data to text buffer t and sends the 9P response.
+	// updateText writes x.fcall.Data to observers buffer t and sends the 9P response.
 	updateText := func(t *Text) {
 		r := fullrunewrite(x)
 		if len(r) != 0 {
@@ -413,7 +413,7 @@ func xfidwrite(x *Xfid) {
 			} else {
 				if !w.nomark {
 					seq++
-					t.file.Mark(seq)
+					t.oeb.f.Mark(seq)
 				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
@@ -497,7 +497,7 @@ func xfidwrite(x *Xfid) {
 		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
 		if !w.nomark {
 			seq++
-			t.file.Mark(seq)
+			t.oeb.f.Mark(seq)
 		}
 		q0 := a.q0
 		if a.q1 > q0 {
@@ -571,20 +571,20 @@ forloop:
 		case "unlock": // release exclusive use
 			//w.ctlfid = math.MaxUint32
 			//w.ctrllock.Unlock() // This will crash if the lock isn't already locked.
-			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.name)
+			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.oeb.f.details.Name)
 			err = ErrBadCtl
 			break forloop
 
 		case "clean": // mark window 'clean', seq=0
 			t := &w.body
 			t.eq0 = ^0
-			t.file.Reset()
-			t.file.Clean()
+			t.oeb.f.Reset()
+			t.oeb.f.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'
 			t := &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
-			t.file.Modded()
+			t.oeb.f.Modded()
 			settag = true
 		case "show": // show dot
 			t := &w.body
@@ -606,7 +606,7 @@ forloop:
 				}
 			}
 			seq++
-			w.body.file.Mark(seq)
+			w.body.oeb.f.Mark(seq)
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
@@ -663,7 +663,7 @@ forloop:
 			w.nomark = true
 		case "mark": // mark file
 			seq++
-			w.body.file.Mark(seq)
+			w.body.oeb.f.Mark(seq)
 			settag = true
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
@@ -729,11 +729,11 @@ func xfideventwrite(x *Xfid, w *Window) {
 	// The messages have a fixed format: a character indicating the
 	// origin or cause of the action, a character indicating
 	// the type of the action, four free-format blank-terminated
-	// decimal numbers, optional text, and a newline.
+	// decimal numbers, optional observers, and a newline.
 	// The first and second numbers are the character
 	// addresses of the action, the third is a flag, and the
 	// final is a count of the characters in the optional
-	// text, which may itself contain newlines.
+	// observers, which may itself contain newlines.
 	// %c%c%d %d %d %d %s\n
 	lines := strings.Split(string(x.fcall.Data), "\n")
 forloop:
@@ -805,7 +805,7 @@ forloop:
 }
 
 // xfidutfread reads x.fcall.Count bytes from offset x.fcall.Offset in
-// text t and sends the data to the client. It only sends full runes,
+// observers t and sends the data to the client. It only sends full runes,
 // and optimizes for sequential reads by keeping track of (byte offset,
 // rune offset) pair of the last read from buffer for a matching qid
 // (QWbody or QWtag). No data past rune offset q1 is sent to client.
@@ -845,7 +845,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
-		t.file.b.Read(q, r[:nr])
+		t.oeb.f.b.Read(q, r[:nr])
 		b := string(r[:nr])
 		nb := len(b)
 		if boff >= off {
@@ -890,7 +890,7 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
-	t.file.b.Read(q0, tmp)
+	t.oeb.f.b.Read(q0, tmp)
 	buf := []byte(string(tmp))
 
 	m := len(buf)
@@ -970,13 +970,13 @@ func xfidindexread(x *Xfid) {
 	for _, c := range row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
-			if w.body.file.curtext != &w.body {
+			if w.body.oeb.GetCurObserver().(*Text) != &w.body {
 				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
 			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
-			w.tag.file.b.Read(0, tag)
+			w.tag.oeb.f.b.Read(0, tag)
 
 			// We only include first line of a multi-line tag
 			if i := runes.IndexRune(tag, '\n'); i >= 0 {

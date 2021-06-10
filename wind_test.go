@@ -7,7 +7,7 @@ import (
 	"github.com/rjkroege/edwood/internal/edwoodtest"
 )
 
-// TestWindowUndoSelection checks text selection change after undo/redo.
+// TestWindowUndoSelection checks observers selection change after undo/redo.
 // It tests that selection doesn't change when undoing/redoing
 // using nil delta/epsilon, which fixes https://github.com/rjkroege/edwood/issues/230.
 func TestWindowUndoSelection(t *testing.T) {
@@ -35,15 +35,13 @@ func TestWindowUndoSelection(t *testing.T) {
 	} {
 		w := &Window{
 			body: Text{
-				q0: tc.q0,
-				q1: tc.q1,
-				file: &File{
-					b:       RuneArray("This is an example sentence.\n"),
-					delta:   tc.delta,
-					epsilon: tc.epsilon,
-				},
+				q0:  tc.q0,
+				q1:  tc.q1,
+				oeb: MakeObservableEditableBufferTag(RuneArray("This is an example sentence.\n")),
 			},
 		}
+		w.body.oeb.f.delta = tc.delta
+		w.body.oeb.f.epsilon = tc.epsilon
 		w.Undo(tc.isundo)
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
@@ -71,24 +69,24 @@ func TestSetTag1(t *testing.T) {
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{name: name},
+			oeb:     MakeObservableEditableBuffer(name, nil),
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{},
+			oeb:     MakeObservableEditableBuffer("", nil),
 		}
 
 		w.setTag1()
-		got := string(w.tag.file.b)
+		got := string(w.tag.oeb.f.b)
 		want := name + defaultSuffix
 		if got != want {
 			t.Errorf("bad initial tag for file %q:\n got: %q\nwant: %q", name, got, want)
 		}
 
-		w.tag.file.InsertAt(w.tag.file.Nr(), []rune(extraSuffix))
+		w.tag.oeb.f.InsertAt(w.tag.oeb.f.Nr(), []rune(extraSuffix))
 		w.setTag1()
-		got = string(w.tag.file.b)
+		got = string(w.tag.oeb.f.b)
 		want = name + defaultSuffix + extraSuffix
 		if got != want {
 			t.Errorf("bad replacement tag for file %q:\n got: %q\nwant: %q", name, got, want)
@@ -108,9 +106,7 @@ func TestWindowClampAddr(t *testing.T) {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: &File{
-					b: buf,
-				},
+				oeb: MakeObservableEditableBufferTag(buf),
 			},
 		}
 		w.ClampAddr()
@@ -133,9 +129,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: &File{
-					b: RuneArray(tc.tag),
-				},
+				oeb: MakeObservableEditableBufferTag(RuneArray(tc.tag)),
 			},
 		}
 		if got, want := w.ParseTag(), tc.filename; got != want {
@@ -149,13 +143,11 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: &File{
-				b: RuneArray(tag),
-			},
+			oeb: MakeObservableEditableBufferTag(RuneArray(tag)),
 		},
 	}
 	w.ClearTag()
-	got := w.tag.file.b.String()
+	got := w.tag.oeb.f.b.String()
 	if got != want {
 		t.Errorf("got %q; want %q", got, want)
 	}
