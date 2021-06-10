@@ -267,13 +267,13 @@ func flushwarnings() {
 		if owner == 0 {
 			w.owner = 'E'
 		}
-		w.Commit(t) // marks the backing text as dirty
+		w.Commit(t) // marks the backing observers as dirty
 
 		// Most commands don't generate much output. For instance,
 		// Edit ,>cat goes through /dev/cons and is already in blocks
 		// because of the i/o system, but a few can.  Edit ,p will
 		// put the entire result into a single hunk.  So it's worth doing
-		// this in blocks (and putting the text in a buffer in the first
+		// this in blocks (and putting the observers in a buffer in the first
 		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)

@@ -410,10 +410,10 @@ func TestFSysAddr(t *testing.T) {
 	defer a.Cleanup()
 	tfs := tFsys{t, a.fsys}
 
-	//Add some known text
+	//Add some known observers
 	text := `
 This is a short block
-Of text crafted
+Of observers crafted
 Just for this
 Occasion
 `

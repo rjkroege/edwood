@@ -237,7 +237,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 		file.Hash{0xf0, 0x21, 0xb5, 0x73, 0x6a, 0xb5, 0x21, 0x6d, 0x29, 0x1b, 0x19, 0xfb, 0xe, 0xa8, 0x53, 0x4a, 0x59, 0x7e, 0xb3, 0xfa}
 
 	f := MakeObservableEditableBuffer("edwood", nil).f
-	if got, want := f.details.Name, "edwood"; got != want {
+	if got, want := f.oeb.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash bad initial name. got %v want %v", got, want)
 	}
 
@@ -247,7 +247,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// f.Load marks the file as modified.
 	f.Clean()
 
-	if got, want := f.details.Hash, hashOfS2nS2; !got.Eq(want) {
+	if got, want := f.oeb.Hash(), hashOfS2nS2; !got.Eq(want) {
 		t.Errorf("TestFileLoadUndoHash bad initial name. got %#v want %#v", got, want)
 	}
 
@@ -269,7 +269,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	check(t, "TestFileLoadUndoHash after SetName", f,
 		&fileStateSummary{false, true, false, true, s2 + s2})
 
-	if got, want := f.details.Name, "plan9"; got != want {
+	if got, want := f.oeb.Name(), "plan9"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
 
@@ -277,7 +277,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	f.Undo(true)
 	check(t, "TestFileLoadUndoHash after Undo", f,
 		&fileStateSummary{false, false, true, false, s2 + s2})
-	if got, want := f.details.Name, "edwood"; got != want {
+	if got, want := f.oeb.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
 }
@@ -361,29 +361,30 @@ func TestFileUpdateInfo(t *testing.T) {
 		t.Fatalf("stat failed: %v", err)
 	}
 	f := MakeObservableEditableBuffer(filename, nil).f
-	f.details.Hash = file.EmptyHash
-	f.details.Info = nil
-	f.details.UpdateInfo(filename, d)
-	if f.details.Info != nil {
-		t.Errorf("File info is %v; want nil", f.details.Info)
+	f.oeb.SetHash(file.EmptyHash)
+	f.oeb.SetInfo(nil)
+
+	f.oeb.UpdateInfo(filename, d)
+	if f.oeb.Info() != nil {
+		t.Errorf("File info is %v; want nil", f.oeb.Info())
 	}
 
 	h, err := file.HashFor(filename)
 	if err != nil {
 		t.Fatalf("HashFor(%v) failed: %v", filename, err)
 	}
-	f.details.Hash = h
-	f.details.Info = nil
-	f.details.UpdateInfo(filename, d)
-	if f.details.Info != d {
-		t.Errorf("File info is %v; want %v", f.details.Info, d)
+	f.oeb.SetHash(h)
+	f.oeb.SetInfo(nil)
+	f.oeb.UpdateInfo(filename, d)
+	if f.oeb.Info() != d {
+		t.Errorf("File info is %v; want %v", f.oeb.Info(), d)
 	}
 }
 
 func TestFileUpdateInfoError(t *testing.T) {
 	filename := "/non-existent-file"
 	f := MakeObservableEditableBuffer(filename, nil).f
-	err := f.details.UpdateInfo(filename, nil)
+	err := f.oeb.UpdateInfo(filename, nil)
 	want := "failed to compute hash for"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
@@ -394,7 +395,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil).f
 	// Empty File is an Undo point and considered clean
 
-	if got, want := f.details.Name, "edwood"; got != want {
+	if got, want := f.oeb.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
 	if got, want := f.isscratch, false; got != want {
@@ -407,7 +408,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	f.Mark(2)
 	f.SetName("/hello/+Errors")
 
-	if got, want := f.details.Name, "/hello/+Errors"; got != want {
+	if got, want := f.oeb.Name(), "/hello/+Errors"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
 	if got, want := f.isscratch, true; got != want {
@@ -416,7 +417,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 
 	f.Undo(true)
 
-	if got, want := f.details.Name, "/guide"; got != want {
+	if got, want := f.oeb.Name(), "/guide"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
 	if got, want := f.isscratch, true; got != want {
@@ -424,7 +425,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	}
 
 	f.Undo(true)
-	if got, want := f.details.Name, "edwood"; got != want {
+	if got, want := f.oeb.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
 	if got, want := f.isscratch, false; got != want {

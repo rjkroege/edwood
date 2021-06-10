@@ -23,7 +23,7 @@ const (
 // Insert and Delete
 //
 // There is a significant assumption that the log has increasing q0s.
-// The log is then played back backwards to apply the changes to the text.
+// The log is then played back backwards to apply the changes to the observers.
 // Out-of-order edits are warned about.
 type Elog struct {
 	log    []ElogOperation
@@ -192,11 +192,11 @@ func (e *Elog) Empty() bool {
 	return len(e.log) == 1
 }
 
-// Apply plays back the log, from back to front onto the given text.
+// Apply plays back the log, from back to front onto the given observers.
 // Unlike the C version, this does not mark the file - that should happen at a higher
 // level.
 func (e *Elog) Apply(t Texter) {
-	// The log is applied back-to-front - this avoids disturbing the text ahead of the
+	// The log is applied back-to-front - this avoids disturbing the observers ahead of the
 	// current application point.
 	for i := len((*e).log) - 1; i >= 1; i-- {
 		eo := (*e).log[i]

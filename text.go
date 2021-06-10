@@ -322,7 +322,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, warnError(nil, "can't fstat %s: %v", filename, err)
 	}
 	if setqid {
-		t.file.f.details.Info = d
+		t.file.SetInfo(d)
 	}
 
 	if d.IsDir() {

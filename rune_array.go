@@ -33,7 +33,7 @@ func (b *RuneArray) Read(q0 int, r []rune) (int, error) {
 	return n, nil
 }
 
-// Reader returns reader for text at [q0, q1).
+// Reader returns reader for observers at [q0, q1).
 //
 // TODO(fhs): Once RuneArray implements io.ReaderAt,
 // we can use io.SectionReader instead of this function.

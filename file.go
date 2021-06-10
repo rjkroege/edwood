@@ -38,7 +38,6 @@ type File struct {
 	delta   []*Undo // [private]
 	epsilon []*Undo // [private]
 	elog    Elog
-	details *file.DiskDetails
 
 	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
@@ -180,7 +179,7 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return f.details.Name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
+	return f.oeb.details.Name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
@@ -233,7 +232,7 @@ func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, e
 	runes, _, hasNulls := cvttorunes(d, len(d))
 
 	if sethash {
-		f.details.Hash = file.CalcHash(d)
+		f.oeb.SetHash(file.CalcHash(d))
 	}
 
 	// Would appear to require a commit operation.
@@ -370,7 +369,7 @@ const (
 // Some backings that opt them out of typically being persisted.
 // Resetting a file name to a new value does not have any effect.
 func (f *File) SetName(name string) {
-	if f.details.Name == name {
+	if f.oeb.Name() == name {
 		return
 	}
 
@@ -383,7 +382,7 @@ func (f *File) SetName(name string) {
 // setnameandisscratch updates the File.name and isscratch bit
 // at the same time.
 func (f *File) setnameandisscratch(name string) {
-	f.details.Name = name
+	f.oeb.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		f.isscratch = true
 	} else {
@@ -398,22 +397,17 @@ func (f *File) UnsetName(delta *[]*Undo) {
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = 0 // unused
-	u.n = len(f.details.Name)
-	u.buf = []rune(f.details.Name)
+	u.n = len(f.oeb.details.Name)
+	u.buf = []rune(f.oeb.details.Name)
 	*delta = append(*delta, &u)
 }
 
-func NewFile(filename string) *File {
+func NewFile() *File {
 	return &File{
-		b:       NewBuffer(),
-		delta:   []*Undo{},
-		epsilon: []*Undo{},
-		elog:    MakeElog(),
-		details: &file.DiskDetails{
-			Name: filename,
-			Info: nil,
-			Hash: file.Hash{},
-		},
+		b:         NewBuffer(),
+		delta:     []*Undo{},
+		epsilon:   []*Undo{},
+		elog:      MakeElog(),
 		editclean: true,
 		//	seq       int
 		mod: false,
@@ -429,19 +423,15 @@ func NewTagFile() *File {
 		epsilon: []*Undo{},
 
 		elog: MakeElog(),
-		details: &file.DiskDetails{
-			Name: "",
-			Info: nil,
-			Hash: file.Hash{},
-		},
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
 		editclean: true,
 		//	seq       int
 		mod: false,
-		//	currobserver *Text
-		//	observers    **Text
+
+		//	curtext *Text
+		//	text    **Text
 		//	ntext   int
 	}
 }
