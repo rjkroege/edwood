@@ -316,7 +316,7 @@ func TestEditMultipleWindows(t *testing.T) {
 		}, []string{"Edit: no file name given\n"}},
 
 		// b does the same thing in Acme and Edwood (fails)
-		// Maybe this sets curtext?
+		// Maybe this sets currobserver?
 
 		// w
 		// backing file is newer than file.

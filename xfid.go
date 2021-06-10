@@ -127,7 +127,7 @@ func xfidopen(x *Xfid) {
 			os.Remove(tmp.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 
-			_, err = io.Copy(tmp, t.file.b.Reader(t.q0, t.q1))
+			_, err = io.Copy(tmp, t.file.Reader(t.q0, t.q1))
 			if err != nil || testIOCopyFail {
 				// TODO(fhs): Do we want to send an error response to the client?
 				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
@@ -571,7 +571,7 @@ forloop:
 		case "unlock": // release exclusive use
 			//w.ctlfid = math.MaxUint32
 			//w.ctrllock.Unlock() // This will crash if the lock isn't already locked.
-			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.name)
+			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.Name())
 			err = ErrBadCtl
 			break forloop
 
@@ -845,7 +845,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
-		t.file.b.Read(q, r[:nr])
+		t.file.Read(q, r[:nr])
 		b := string(r[:nr])
 		nb := len(b)
 		if boff >= off {
@@ -890,7 +890,7 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	// Get Count runes, but that might be larger than Count bytes
 	nr := min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
-	t.file.b.Read(q0, tmp)
+	t.file.Read(q0, tmp)
 	buf := []byte(string(tmp))
 
 	m := len(buf)
@@ -970,13 +970,13 @@ func xfidindexread(x *Xfid) {
 	for _, c := range row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
-			if w.body.file.curtext != &w.body {
+			if w.body.file.GetCurObserver().(*Text) != &w.body {
 				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
 			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
-			w.tag.file.b.Read(0, tag)
+			w.tag.file.Read(0, tag)
 
 			// We only include first line of a multi-line tag
 			if i := runes.IndexRune(tag, '\n'); i >= 0 {

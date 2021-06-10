@@ -92,9 +92,7 @@ func TestAcmeregexp(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warnings = nil
 			text := &Text{
-				file: &File{
-					b: RuneArray([]rune("abcd αβξδ\n")),
-				},
+				file: MakeObservableEditableBufferTag(RuneArray([]rune("abcd αβξδ\n"))),
 			}
 			lim := Range{
 				0,

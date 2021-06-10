@@ -17,7 +17,7 @@ func (b *RuneArray) Insert(q0 int, r []rune) {
 	if q0 > len(*b) {
 		panic("internal error: buffer.Insert: Out of range insertion")
 	}
-	(*b) = append((*b)[:q0], append(r, (*b)[q0:]...)...)
+	*b = append((*b)[:q0], append(r, (*b)[q0:]...)...)
 }
 
 func (b *RuneArray) Delete(q0, q1 int) {
@@ -25,7 +25,7 @@ func (b *RuneArray) Delete(q0, q1 int) {
 		panic("internal error: buffer.Delete: Out-of-range Delete")
 	}
 	copy((*b)[q0:], (*b)[q1:])
-	(*b) = (*b)[:len(*b)-(q1-q0)] // Reslice to length
+	*b = (*b)[:len(*b)-(q1-q0)] // Reslice to length
 }
 
 func (b *RuneArray) Read(q0 int, r []rune) (int, error) {
@@ -47,7 +47,7 @@ func (b *RuneArray) ReadC(q int) rune { return (*b)[q] }
 func (b *RuneArray) String() string { return string(*b) }
 
 func (b *RuneArray) Reset() {
-	(*b) = (*b)[0:0]
+	*b = (*b)[0:0]
 }
 
 // nc returns the number of characters in the RuneArray.
