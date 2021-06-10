@@ -132,8 +132,7 @@ func xfidlog(w *Window, op string) {
 			eventlog.ev = eventlog.ev[:len(eventlog.ev)-n] // TODO(flux) fussy, might have messed this up
 		}
 	}
-	f := w.body.file
-	name := f.name
+	name := w.body.file.Name()
 	eventlog.ev = append(eventlog.ev, fmt.Sprintf("%d %s %s\n", w.id, op, name))
 	if eventlog.r.L == nil {
 		eventlog.r.L = &eventlog.lk
