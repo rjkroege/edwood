@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"io"
 	"log"
@@ -138,7 +137,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	maxt := int(maxtab)
 	if t.what == Body {
 		if t.file.IsDir() {
-			maxt = util.Min(TABDIR, int(maxtab))
+			maxt = min(TABDIR, int(maxtab))
 		} else {
 			maxt = t.tabstop
 		}
@@ -191,7 +190,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 func (t *Text) Close() {
 	t.fr.Clear(true)
 	if err := t.file.DelObserver(t); err != nil {
-		util.Acmeerror(err.Error(), nil)
+		acmeerror(err.Error(), nil)
 	}
 	t.file = nil
 	if argtext == t {
@@ -223,7 +222,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
-	t.fr.Maxtab(util.Min(int(maxtab), TABDIR) * mint)
+	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
 		if maxt-w%maxt < mint || w%maxt == 0 {
@@ -239,7 +238,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	if colw == 0 {
 		ncol = 1
 	} else {
-		ncol = util.Max(1, t.fr.Rect().Dx()/colw)
+		ncol = max(1, t.fr.Rect().Dx()/colw)
 	}
 	nrow = (len(names) + ncol - 1) / ncol
 
@@ -478,7 +477,7 @@ func (t *Text) logInsert(q0 int, r []rune) {
 // updated appropriately.
 func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if !tofile {
-		panic("editor.insert")
+		panic("text.insert")
 	}
 	if tofile && t.file.HasUncommitedChanges() {
 		panic("text.insert")
@@ -568,7 +567,7 @@ func (t *Text) Delete(q0, q1 int, _ bool) {
 	t.file.DeleteAt(q0, q1)
 }
 
-// deleted implements the single-text deletion text for this Text's
+// deleted implements the single-text deletion observer for this Text's
 // backing File. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
 func (t *Text) deleted(q0, q1 int) {
@@ -577,13 +576,13 @@ func (t *Text) deleted(q0, q1 int) {
 		t.w.utflastqid = -1
 	}
 	if q0 < t.iq1 {
-		t.iq1 -= util.Min(n, t.iq1-q0)
+		t.iq1 -= min(n, t.iq1-q0)
 	}
 	if q0 < t.q0 {
-		t.q0 -= util.Min(n, t.q0-q0)
+		t.q0 -= min(n, t.q0-q0)
 	}
 	if q0 < t.q1 {
-		t.q1 -= util.Min(n, t.q1-q0)
+		t.q1 -= min(n, t.q1-q0)
 	}
 	if q1 <= t.org {
 		t.org -= n
@@ -630,8 +629,8 @@ func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = util.Min(q0, t.file.Size())
-	p1 = util.Min(q1, t.file.Size())
+	p0 = min(q0, t.file.Size())
+	p1 = min(q1, t.file.Size())
 	return p0, p1
 }
 
@@ -931,7 +930,7 @@ func (t *Text) Type(r rune) {
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		if t.file.HasUncommitedChanges() {
-			util.Acmeerror("text.type", nil)
+			acmeerror("text.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
@@ -1107,7 +1106,7 @@ func (t *Text) Select() {
 		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
 			mousectl.Read()
-			if !(mouse.Buttons == b && util.Abs(mouse.Point.X-x) < 3 && util.Abs(mouse.Point.Y-y) < 3) {
+			if !(mouse.Buttons == b && abs(mouse.Point.X-x) < 3 && abs(mouse.Point.Y-y) < 3) {
 				break
 			}
 		}
