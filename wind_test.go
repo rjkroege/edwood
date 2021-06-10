@@ -35,15 +35,13 @@ func TestWindowUndoSelection(t *testing.T) {
 	} {
 		w := &Window{
 			body: Text{
-				q0: tc.q0,
-				q1: tc.q1,
-				file: &File{
-					b:       RuneArray("This is an example sentence.\n"),
-					delta:   tc.delta,
-					epsilon: tc.epsilon,
-				},
+				q0:   tc.q0,
+				q1:   tc.q1,
+				file: MakeObservableEditableBufferTag(RuneArray("This is an example sentence.\n")),
 			},
 		}
+		w.body.file.f.delta = tc.delta
+		w.body.file.f.epsilon = tc.epsilon
 		w.Undo(tc.isundo)
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
@@ -71,16 +69,16 @@ func TestSetTag1(t *testing.T) {
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{name: name},
+			file:    MakeObservableEditableBuffer(name, nil),
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{},
+			file:    MakeObservableEditableBuffer("", nil),
 		}
 
 		w.setTag1()
-		got := string(w.tag.file.b)
+		got := w.tag.file.String()
 		want := name + defaultSuffix
 		if got != want {
 			t.Errorf("bad initial tag for file %q:\n got: %q\nwant: %q", name, got, want)
@@ -88,7 +86,7 @@ func TestSetTag1(t *testing.T) {
 
 		w.tag.file.InsertAt(w.tag.file.Nr(), []rune(extraSuffix))
 		w.setTag1()
-		got = string(w.tag.file.b)
+		got = w.tag.file.String()
 		want = name + defaultSuffix + extraSuffix
 		if got != want {
 			t.Errorf("bad replacement tag for file %q:\n got: %q\nwant: %q", name, got, want)
@@ -108,9 +106,7 @@ func TestWindowClampAddr(t *testing.T) {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: &File{
-					b: buf,
-				},
+				file: MakeObservableEditableBufferTag(buf),
 			},
 		}
 		w.ClampAddr()
@@ -133,9 +129,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: &File{
-					b: RuneArray(tc.tag),
-				},
+				file: MakeObservableEditableBufferTag(RuneArray(tc.tag)),
 			},
 		}
 		if got, want := w.ParseTag(), tc.filename; got != want {
@@ -149,13 +143,11 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: &File{
-				b: RuneArray(tag),
-			},
+			file: MakeObservableEditableBufferTag(RuneArray(tag)),
 		},
 	}
 	w.ClearTag()
-	got := w.tag.file.b.String()
+	got := w.tag.file.String()
 	if got != want {
 		t.Errorf("got %q; want %q", got, want)
 	}
