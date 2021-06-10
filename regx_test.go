@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
 )
@@ -24,7 +25,7 @@ func TestRegexpForward(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to compile regular expression %q", tc.re)
 			}
-			text := &TextBuffer{0, 0, []rune(tc.text)}
+			text := elog.NewTextBuffer(0, 0, []rune(tc.text))
 			rs := re.rxexecute(text, nil, 0, text.Nc(), tc.nmax)
 			if !reflect.DeepEqual(rs, tc.expected) {
 				t.Errorf("regexp %q incorrectly matches %q:\nexpected: %v\ngot: %v",
@@ -53,7 +54,7 @@ func TestRegexpBackward(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to compile regular expression %q", tc.re)
 			}
-			text := &TextBuffer{0, 0, []rune(tc.text)}
+			text := elog.NewTextBuffer(0, 0, []rune(tc.text))
 			rs := re.rxbexecute(text, text.Nc(), tc.nmax)
 			if !reflect.DeepEqual(rs, tc.expected) {
 				t.Errorf("regexp %q incorrectly matches %q:\nexpected: %v\ngot: %v",

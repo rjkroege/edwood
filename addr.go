@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"github.com/rjkroege/edwood/internal/elog"
+	"strings"
+)
 
 // These constants indicates the direction of regular expresssion search.
 // TODO(fhs): Introduce a new type for these constants.
@@ -40,7 +43,7 @@ func isregexc(r rune) bool {
 // and then nr chars, being careful not to walk past
 // the end of the current line.
 // It returns the final position.
-func nlcounttopos(t Texter, q0 int, nl int, nr int) int {
+func nlcounttopos(t elog.Texter, q0 int, nl int, nr int) int {
 	for nl > 0 && q0 < t.Nc() {
 		if t.ReadC(q0) == '\n' {
 			nl--
@@ -57,7 +60,7 @@ func nlcounttopos(t Texter, q0 int, nl int, nr int) int {
 	return q0
 }
 
-func number(showerr bool, t Texter, r Range, line int, dir int, size int) (Range, bool) {
+func number(showerr bool, t elog.Texter, r Range, line int, dir int, size int) (Range, bool) {
 	var q0, q1 int
 
 	if size == Char {
@@ -162,7 +165,7 @@ var pattern *AcmeRegexp
 // (set range to {-1, -1} for no limit).
 // Warnings will be shown to user if showerr is true.
 // It returns the match and whether a match was found.
-func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int) (retr Range, found bool) {
+func acmeregexp(showerr bool, t elog.Texter, lim Range, r Range, pat string, dir int) (retr Range, found bool) {
 	if len(pat) == 0 && pattern == nil {
 		if showerr {
 			warning(nil, "no previous regular expression\n")
@@ -209,7 +212,7 @@ func acmeregexp(showerr bool, t Texter, lim Range, r Range, pat string, dir int)
 // It returns the updated address range (initially set to ar), whether
 // the evaluation was successful, and the position q in the address
 // where parsing was stopped.
-func address(showerr bool, t Texter, lim Range, ar Range, q0 int, q1 int, getc func(q int) rune, eval bool) (r Range, evalp bool, qp int) {
+func address(showerr bool, t elog.Texter, lim Range, ar Range, q0 int, q1 int, getc func(q int) rune, eval bool) (r Range, evalp bool, qp int) {
 	var (
 		n         int
 		prevc, nc rune

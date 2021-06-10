@@ -49,12 +49,7 @@ const (
 	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
 	RBUFSIZE  = BUFSIZE / utf8.UTFMax
 
-	Empty    = 0
-	Null     = '-'
-	Delete   = 'd'
-	Insert   = 'i'
-	Replace  = 'r'
-	Filename = 'f'
+	Empty = 0
 
 	Inactive   = 0
 	Inserting  = 1

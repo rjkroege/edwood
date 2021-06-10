@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/elog"
 	"github.com/rjkroege/edwood/internal/file"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,14 @@ type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
+	elog         elog.Elog
+	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
+	// At present, InsertAt and DeleteAt have an implicit Commit operation
+	// associated with them. In an undo.RuneArray context, these two ops
+	// don't have an implicit Commit. We set editclean in the Edit cmd
+	// implementation code to let multiple Inserts be grouped together?
+	// Figure out how this inter-operates with seq.
+	Editclean bool
 	details      *file.DiskDetails
 	isscratch    bool // Used to track if this File should warn on unsaved deletion. [private]
 }
@@ -89,6 +98,8 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 		observers:    nil,
 		f:            f,
 		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
+		elog:         elog.MakeElog(),
+		Editclean:    true,
 	}
 	oeb.f.oeb = oeb
 	return oeb
@@ -102,7 +113,9 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
+		elog:         elog.MakeElog(),
 		details:      &file.DiskDetails{Hash: file.Hash{}},
+		Editclean:    true,
 	}
 	oeb.f.oeb = oeb
 	return oeb

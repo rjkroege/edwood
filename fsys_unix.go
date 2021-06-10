@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"net"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		err := mux9p.Listen("unix", addr, conn, nil)
 		if err != nil {
-			acmeerror("9P multiplexer failed", err)
+			util.Acmeerror("9P multiplexer failed", err)
 		}
 	}()
 	return nil

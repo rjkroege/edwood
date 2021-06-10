@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestWindowUndoSelection(t *testing.T) {
 		word = RuneArray("hello")
 		p0   = 3
 		undo = &Undo{
-			t:   Insert,
+			t:   elog.Insert,
 			buf: word,
 			p0:  p0,
 			n:   word.nc(),

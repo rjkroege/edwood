@@ -1,4 +1,8 @@
-package main
+package elog
+
+import (
+	"github.com/rjkroege/edwood/internal/util"
+)
 
 // Texter abstracts the buffering side of Text, allowing testing of Elog Apply
 // TODO(flux): This is probably lame and will get re-done when I understand
@@ -23,9 +27,14 @@ type TextBuffer struct {
 	buf    []rune
 }
 
+// NewTextBuffer is a constructor for texter.TextBuffer.
+func NewTextBuffer(q0 int, q1 int, buf []rune) *TextBuffer {
+	return &TextBuffer{q0: q0, q1: q1, buf: buf}
+}
+
 func (t TextBuffer) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, len(t.buf))
-	p1 = min(q1, len(t.buf))
+	p0 = util.Min(q0, len(t.buf))
+	p1 = util.Min(q1, len(t.buf))
 	return p0, p1
 }
 

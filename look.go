@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -274,7 +275,7 @@ func search(ct *Text, r []rune) bool {
 		warning(nil, "string too long\n")
 		return false
 	}
-	maxn = max(2*n, RBUFSIZE)
+	maxn = util.Max(2*n, RBUFSIZE)
 	s := make([]rune, RBUFSIZE)
 	bi := 0 // b indexes s
 	nb := 0
@@ -311,7 +312,7 @@ func search(ct *Text, r []rune) bool {
 			ct.file.Read(q, s[:nb])
 			bi = 0
 		}
-		limit := min(len(s), bi+n)
+		limit := util.Min(len(s), bi+n)
 		if runes.Equal(s[bi:limit], r) {
 			if ct.w != nil {
 				ct.Show(q, q+n, true)

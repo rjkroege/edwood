@@ -1,6 +1,7 @@
-package main
+package elog
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -12,6 +13,11 @@ const (
 	FilenameType
 	Wsequence     = "warning: changes out of sequence\n"
 	WsequenceDire = "warning: changes out of sequence, edit result probably wrong\n"
+	Delete        = 'd'
+	Insert        = 'i'
+	Filename      = 'f'
+	Null          = '-'
+	Replace       = 'r'
 )
 
 // Elog is a log of changes made by editing commands.  Three reasons for this:
@@ -26,12 +32,12 @@ const (
 // The log is then played back backwards to apply the changes to the text.
 // Out-of-order edits are warned about.
 type Elog struct {
-	log    []ElogOperation
+	Log    []ElogOperation
 	warned bool
 }
 
 type ElogOperation struct {
-	t  ElogType // Delete, Insert, Filename
+	T  ElogType // Delete, Insert, Filename
 	q0 int      // location of change (unused in f)
 	nd int      // number of deleted characters
 	r  []rune
@@ -48,8 +54,8 @@ func (e *Elog) Reset() {
 	// TODO(flux): If working on large documents we may want to actually trim the
 	// array here, as it will hog memory after a fine-grained edit.  But don't worry about
 	// that until there's a memory issue.
-	(*e).log = (*e).log[0:1] // Just the sentinel
-	(*e).log[0].t = Null
+	(*e).Log = (*e).Log[0:1] // Just the sentinel
+	(*e).Log[0].T = Null
 }
 
 func (e *Elog) Term() {
@@ -58,7 +64,7 @@ func (e *Elog) Term() {
 }
 
 func (eo *ElogOperation) reset() {
-	eo.t = Null
+	eo.T = Null
 	eo.nd = 0
 	eo.r = eo.r[0:0]
 }
@@ -68,20 +74,20 @@ func (eo *ElogOperation) reset() {
 func (e *Elog) extend() {
 	// Slightly too clever code:  Double the slice if we're out,
 	// adding the reservation for the new eo
-	if cap((*e).log) == len((*e).log) {
-		t := make([]ElogOperation, len((*e).log), (cap((*e).log)+1)*2)
-		copy(t, (*e).log)
-		(*e).log = t
+	if cap((*e).Log) == len((*e).Log) {
+		t := make([]ElogOperation, len((*e).Log), (cap((*e).Log)+1)*2)
+		copy(t, (*e).Log)
+		(*e).Log = t
 	}
-	(*e).log = (*e).log[:len((*e).log)+1]
+	(*e).Log = (*e).Log[:len((*e).Log)+1]
 }
 
 func (e *Elog) last() *ElogOperation {
-	return &((*e).log)[len((*e).log)-1]
+	return &((*e).Log)[len((*e).Log)-1]
 }
 
 func (e *Elog) secondlast() *ElogOperation {
-	return &((*e).log)[len((*e).log)-2]
+	return &((*e).Log)[len((*e).Log)-2]
 }
 
 func (eo *ElogOperation) setr(r []rune) {
@@ -93,9 +99,10 @@ func (eo *ElogOperation) setr(r []rune) {
 	copy(eo.r, r)
 }
 
-func (e *Elog) Replace(q0, q1 int, r []rune) {
+func (e *Elog) Replace(q0, q1 int, r []rune) error {
+	var err error = nil
 	if q0 == q1 && len(r) == 0 {
-		return
+		return err
 	}
 
 	eo := e.last()
@@ -103,26 +110,32 @@ func (e *Elog) Replace(q0, q1 int, r []rune) {
 	// Check for out-of-order
 	if q0 < eo.q0 && !e.warned {
 		e.warned = true
-		warning(nil, Wsequence)
+		err = errors.New(Wsequence)
 	}
 
 	// TODO(flux): try to merge with previous
 
 	e.extend()
 	eo = e.last()
-	eo.t = Replace
+	eo.T = Replace
 	eo.q0 = q0
 	eo.nd = q1 - q0
 	eo.setr(r)
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
-		warning(nil, WsequenceDire)
+		if err != nil {
+			err = errors.New(err.Error() + Wsequence)
+		} else {
+			err = errors.New(Wsequence)
+		}
 	}
+	return err
 }
 
-func (e *Elog) Insert(q0 int, r []rune) {
+func (e *Elog) Insert(q0 int, r []rune) error {
+	var err error = nil
 	if len(r) == 0 {
-		return
+		return err
 	}
 
 	// This merge only works on the last item; I assume
@@ -133,31 +146,37 @@ func (e *Elog) Insert(q0 int, r []rune) {
 	// Check for out-of-order
 	if (q0 < eo.q0) && !e.warned {
 		e.warned = true
-		warning(nil, Wsequence)
+		err = errors.New(Wsequence)
 	}
 
-	if eo.t == Insert && q0 == eo.q0 {
+	if eo.T == Insert && q0 == eo.q0 {
 		eo.r = append(eo.r, r...)
-		return
+		return err
 	}
 
 	e.extend()
 
 	eo = e.last()
-	eo.t = Insert
+	eo.T = Insert
 	eo.q0 = q0
 	eo.nd = 0
 	eo.setr(r)
 
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
-		warning(nil, WsequenceDire)
+		if err != nil {
+			err = errors.New(err.Error() + WsequenceDire)
+		} else {
+			err = errors.New(WsequenceDire)
+		}
 	}
+	return err
 }
 
-func (e *Elog) Delete(q0, q1 int) {
+func (e *Elog) Delete(q0, q1 int) error {
+	var err error = nil
 	if q0 == q1 {
-		return
+		return err
 	}
 
 	// Try to merge deletes
@@ -166,30 +185,35 @@ func (e *Elog) Delete(q0, q1 int) {
 	// Check for out-of-order
 	if (q0 < eo.q0+eo.nd) && !e.warned {
 		e.warned = true
-		warning(nil, Wsequence)
+		err = errors.New(Wsequence)
 	}
 
-	if eo.t == Delete && (eo.q0+eo.nd == q0) {
+	if eo.T == Delete && (eo.q0+eo.nd == q0) {
 		eo.nd += q1 - q0
-		return
+		return err
 	}
 
 	e.extend()
 
 	eo = e.last()
-	eo.t = Delete
+	eo.T = Delete
 	eo.q0 = q0
 	eo.nd = q1 - q0
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
-		warning(nil, WsequenceDire)
+		if err != nil {
+			err = errors.New(err.Error() + WsequenceDire)
+		} else {
+			err = errors.New(WsequenceDire)
+		}
 	}
+	return err
 }
 
 const tracelog = false
 
 func (e *Elog) Empty() bool {
-	return len(e.log) == 1
+	return len(e.Log) == 1
 }
 
 // Apply plays back the log, from back to front onto the given text.
@@ -198,9 +222,9 @@ func (e *Elog) Empty() bool {
 func (e *Elog) Apply(t Texter) {
 	// The log is applied back-to-front - this avoids disturbing the text ahead of the
 	// current application point.
-	for i := len((*e).log) - 1; i >= 1; i-- {
-		eo := (*e).log[i]
-		switch eo.t {
+	for i := len((*e).Log) - 1; i >= 1; i-- {
+		eo := (*e).Log[i]
+		switch eo.T {
 		case Replace:
 			if tracelog {
 				fmt.Printf("elog replace %d %d (%d %d)\n",

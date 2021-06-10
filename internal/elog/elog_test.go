@@ -1,4 +1,4 @@
-package main
+package elog
 
 import (
 	"fmt"
@@ -59,13 +59,13 @@ func TestElogInsertDelete(t *testing.T) {
 	e.Insert(0, t1)
 	e.Insert(0, t2)
 
-	if len(e.log) != 2 {
+	if len(e.Log) != 2 {
 		t.Errorf("Insertions should have catenated")
 	}
-	if e.log[0].t != Null {
+	if e.Log[0].T != Null {
 		t.Errorf("Sentinel displaced")
 	}
-	if string(e.log[1].r) != "This is a test" {
+	if string(e.Log[1].r) != "This is a test" {
 		t.Errorf("Failed to catenate properly")
 	}
 
@@ -73,28 +73,28 @@ func TestElogInsertDelete(t *testing.T) {
 	e.Insert(0, t0)
 	e.Insert(0, t1)
 	e.Insert(1, t2)
-	if len(e.log) != 3 {
-		t.Errorf("Expected 3 elements, have %d", len(e.log))
+	if len(e.Log) != 3 {
+		t.Errorf("Expected 3 elements, have %d", len(e.Log))
 	}
-	if string(e.log[1].r) != "This is" {
-		t.Errorf("Failed to catenate properly.  Expected 'This is', got '%s'", string(e.log[1].r))
+	if string(e.Log[1].r) != "This is" {
+		t.Errorf("Failed to catenate properly.  Expected 'This is', got '%s'", string(e.Log[1].r))
 	}
-	if string(e.log[2].r) != " a test" {
+	if string(e.Log[2].r) != " a test" {
 		t.Errorf("Failed to catenate properly")
 	}
 	e.Insert(1, t2)
-	if string(e.log[2].r) != " a test a test" {
-		t.Errorf("Failed to catenate properly.  Expected ' a test a test', got '%s'", string(e.log[1].r))
+	if string(e.Log[2].r) != " a test a test" {
+		t.Errorf("Failed to catenate properly.  Expected ' a test a test', got '%s'", string(e.Log[1].r))
 	}
 
 	e.Delete(1, 5)
-	if len(e.log) != 4 {
-		t.Errorf("Expected 4 elements, have %d", len(e.log))
+	if len(e.Log) != 4 {
+		t.Errorf("Expected 4 elements, have %d", len(e.Log))
 	}
 	e.Delete(5, 5)
-	if len(e.log) != 4 {
+	if len(e.Log) != 4 {
 		fmt.Println(e)
-		t.Errorf("Expected 4 elements, have %d", len(e.log))
+		t.Errorf("Expected 4 elements, have %d", len(e.Log))
 	}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"sort"
 
@@ -145,10 +146,10 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		}
 
 		// new window must start after v's tag ends
-		y = max(y, v.tagtop.Max.Y+c.display.ScaleSize(Border))
+		y = util.Max(y, v.tagtop.Max.Y+c.display.ScaleSize(Border))
 
 		// new window must start early enough to end before ymax
-		y = min(y, ymax-minht)
+		y = util.Min(y, ymax-minht)
 
 		// if y is too small, too many windows in column
 		if y < v.tagtop.Max.Y+c.display.ScaleSize(Border) {
@@ -162,9 +163,9 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
 		}
 		r1 := r
-		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
+		y = util.Min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
 		ffs := v.body.fr.GetFrameFillStatus()
-		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
+		r1.Max.Y = util.Min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
 		if c.display != nil {
@@ -220,7 +221,7 @@ func (c *Column) Close(w *Window, dofree bool) {
 			goto Found
 		}
 	}
-	acmeerror("can't find window", nil)
+	util.Acmeerror("can't find window", nil)
 Found:
 	r = w.r
 	w.tag.col = nil
@@ -302,7 +303,7 @@ func (c *Column) Resize(r image.Rectangle) {
 				r1.Max.Y += (w.r.Dy() + c.display.ScaleSize(Border)) * r.Dy() / c.r.Dy()
 			}
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height())
+		r1.Max.Y = util.Max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height())
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
 		c.display.ScreenImage().Draw(r2, c.display.Black(), nil, image.Point{})
@@ -347,7 +348,7 @@ func (c *Column) Grow(w *Window, but int) {
 		}
 	}
 	if windex == len(c.w) {
-		acmeerror("can't find window", nil)
+		util.Acmeerror("can't find window", nil)
 	}
 
 	cr := c.r
@@ -400,7 +401,7 @@ func (c *Column) Grow(w *Window, but int) {
 		goto Pack
 	}
 	{ // Scope for nnl & dln
-		nnl := min(onl+max(min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
+		nnl := util.Min(onl+util.Max(util.Min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
 		if nnl < w.taglines-1+w.maxlines {
 			nnl = (w.taglines - 1 + w.maxlines + nnl) / 2
 		}
@@ -413,7 +414,7 @@ func (c *Column) Grow(w *Window, but int) {
 			// prune from later window
 			j := windex + k
 			if j < c.nw() && nl[j] != 0 {
-				l := min(dnl, max(1, nl[j]/2))
+				l := util.Min(dnl, util.Max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
 				dnl -= l
@@ -421,7 +422,7 @@ func (c *Column) Grow(w *Window, but int) {
 			// prune from earlier window
 			j = windex - k
 			if j >= 0 && nl[j] != 0 {
-				l := min(dnl, max(1, nl[j]/2))
+				l := util.Min(dnl, util.Max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
 				dnl -= l
@@ -530,20 +531,20 @@ func (c *Column) DragWin(w *Window, but int) {
 			goto Found
 		}
 	}
-	acmeerror("can't find window", nil)
+	util.Acmeerror("can't find window", nil)
 
 Found:
 	if w.tagexpand { // force recomputation of window tag size
 		w.taglines = 1
 	}
 	p = mouse.Point
-	if abs(p.X-op.X) < 5 && abs(p.Y-op.Y) < 5 {
+	if util.Abs(p.X-op.X) < 5 && util.Abs(p.Y-op.Y) < 5 {
 		c.Grow(w, but)
 		w.MouseBut()
 		return
 	}
 	// is it a flick to the right? Or a jump to the le-e-e-eft?
-	if abs(p.Y-op.Y) < 10 && p.X > op.X+30 && c.row.WhichCol(p) == c {
+	if util.Abs(p.Y-op.Y) < 10 && p.X > op.X+30 && c.row.WhichCol(p) == c {
 		p.X = op.X + w.r.Dx() // yes: toss to next column
 	}
 	nc = c.row.WhichCol(p)

@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/elog"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -32,15 +34,6 @@ type File struct {
 	b       RuneArray
 	delta   []*Undo // [private]
 	epsilon []*Undo // [private]
-	elog    Elog
-
-	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
-	// At present, InsertAt and DeleteAt have an implicit Commit operation
-	// associated with them. In an undo.RuneArray context, these two ops
-	// don't have an implicit Commit. We set editclean in the Edit cmd
-	// implementation code to let multiple Inserts be grouped together?
-	// Figure out how this inter-operates with seq.
-	editclean bool
 
 	oeb *ObservableEditableBuffer
 
@@ -282,7 +275,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	} else {
 		if p0 != f.cq0+len(f.cache) {
 			// TODO(rjk): actually print something useful here
-			acmeerror("File.InsertAtWithoutCommit cq0", nil)
+			util.Acmeerror("File.InsertAtWithoutCommit cq0", nil)
 		}
 	}
 	f.cache = append(f.cache, s...)
@@ -294,7 +287,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
-	u.t = Delete
+	u.t = elog.Delete
 
 	u.mod = f.mod
 	u.seq = f.seq
@@ -311,10 +304,10 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 func (f *File) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
-		acmeerror("internal error: DeleteAt", nil)
+		util.Acmeerror("internal error: DeleteAt", nil)
 	}
 	if len(f.cache) > 0 {
-		acmeerror("internal error: DeleteAt", nil)
+		util.Acmeerror("internal error: DeleteAt", nil)
 	}
 
 	if f.seq > 0 {
@@ -334,7 +327,7 @@ func (f *File) DeleteAt(p0, p1 int) {
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting
 	var u Undo
-	u.t = Insert
+	u.t = elog.Insert
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = p0
@@ -369,7 +362,7 @@ func (f *File) SetName(name string) {
 func (f *File) UnsetName(delta *[]*Undo) {
 	var u Undo
 	// undo a file name change by restoring old name
-	u.t = Filename
+	u.t = elog.Filename
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = 0 // unused
@@ -380,11 +373,9 @@ func (f *File) UnsetName(delta *[]*Undo) {
 
 func NewFile() *File {
 	return &File{
-		b:         NewBuffer(),
-		delta:     []*Undo{},
-		epsilon:   []*Undo{},
-		elog:      MakeElog(),
-		editclean: true,
+		b:       NewBuffer(),
+		delta:   []*Undo{},
+		epsilon: []*Undo{},
 		//	seq       int
 		mod: false,
 		//	ntext   int
@@ -397,12 +388,9 @@ func NewTagFile() *File {
 		b:       NewBuffer(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
-
-		elog: MakeElog(),
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		editclean: true,
 		//	seq       int
 		mod: false,
 
@@ -476,7 +464,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 		switch u.t {
 		default:
 			panic(fmt.Sprintf("undo: 0x%x\n", u.t))
-		case Delete:
+		case elog.Delete:
 			f.seq = u.seq
 			f.Undelete(epsilon, u.p0, u.p0+u.n)
 			f.mod = u.mod
@@ -486,7 +474,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			q0 = u.p0
 			q1 = u.p0
 			ok = true
-		case Insert:
+		case elog.Insert:
 			f.seq = u.seq
 			f.Uninsert(epsilon, u.p0, u.n)
 			f.mod = u.mod
