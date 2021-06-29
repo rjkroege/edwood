@@ -458,9 +458,9 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	samename := name == t.file.name
 	t.Load(0, name, samename)
 
-	// Text.Delete followed by Text.Load will always mark the File as
+	// Text.Delete followed by Text.Load will always mark the OldEditableBuffer as
 	// modified unless loading a 0-length file over a 0-length file. But if
-	// samename is true here, we know that the Text.body.File is now the same
+	// samename is true here, we know that the Text.body.OldEditableBuffer is now the same
 	// as it is on disk. So indicate this with file.Clean().
 	if samename {
 		t.file.Clean()
@@ -490,10 +490,10 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 	run(nil, arg, dir, false, aa, a, false)
 }
 
-// putfile writes File to disk, if it's safe to do so.
+// putfile writes OldEditableBuffer to disk, if it's safe to do so.
 //
 // TODO(flux): Write this in terms of the various cases.
-func putfile(f *File, q0 int, q1 int, name string) error {
+func putfile(f *OldEditableBuffer, q0 int, q1 int, name string) error {
 	w := f.curtext.w
 	d, err := os.Stat(name)
 
@@ -503,16 +503,16 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 			f.UpdateInfo(name, d)
 		}
 		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
-			// By setting File.info here, a subsequent Put will ignore that
-			// the disk file was mutated and will write File to the disk file.
+			// By setting OldEditableBuffer.info here, a subsequent Put will ignore that
+			// the disk file was mutated and will write OldEditableBuffer to the disk file.
 			f.info = d
 
 			if f.hash == file.EmptyHash {
-				// Edwood created the File but a disk file with the same name exists.
+				// Edwood created the OldEditableBuffer but a disk file with the same name exists.
 				return warnError(nil, "%s not written; file already exists", name)
 			}
 
-			// Edwood loaded the disk file to File but the disk file has been modified since.
+			// Edwood loaded the disk file to OldEditableBuffer but the disk file has been modified since.
 			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, f.info.ModTime(), d.ModTime())
 		}
 	}
@@ -539,8 +539,8 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	// Putting to the same file as the one that we originally read from.
 	if name == f.name {
 		if q0 != 0 || q1 != f.Size() {
-			// The backing disk file contents now differ from File because
-			// we've over-written the disk file with part of File.
+			// The backing disk file contents now differ from OldEditableBuffer because
+			// we've over-written the disk file with part of OldEditableBuffer.
 			f.Modded()
 		} else {
 			// A normal put operation of a file modified in Edwood but not
@@ -753,7 +753,7 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 			file = *fixedfontflag
 		case "var":
 			file = *varfontflag
-		default: // File/fontname
+		default: // OldEditableBuffer/fontname
 			file = wrd
 		}
 	}

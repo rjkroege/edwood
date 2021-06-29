@@ -56,7 +56,7 @@ const (
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
 	display draw.Display
-	file    *File
+	file    *OldEditableBuffer
 	fr      frame.Frame
 	font    string
 
@@ -416,8 +416,8 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 	return q0, n
 }
 
-// inserted is a callback invoked by File on Insert* to update each Text
-// that is using a given File.
+// inserted is a callback invoked by OldEditableBuffer on Insert* to update each Text
+// that is using a given OldEditableBuffer.
 func (t *Text) inserted(q0 int, r []rune) {
 	if t.eq0 == -1 {
 		t.eq0 = q0
@@ -566,7 +566,7 @@ func (t *Text) Delete(q0, q1 int, _ bool) {
 }
 
 // deleted implements the single-text deletion observer for this Text's
-// backing File. It updates the Text (i.e. the view) for the removal of
+// backing OldEditableBuffer. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
 func (t *Text) deleted(q0, q1 int) {
 	n := q1 - q0

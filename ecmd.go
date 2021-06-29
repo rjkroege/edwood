@@ -33,7 +33,7 @@ func resetxec() {
 	clearcollection()
 }
 
-func mkaddr(f *File) (a Address) {
+func mkaddr(f *OldEditableBuffer) (a Address) {
 	a.r.q0 = f.curtext.q0
 	a.r.q1 = f.curtext.q1
 	a.f = f
@@ -54,7 +54,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 		editerror("no current window")
 	}
 	i := cmdlookup(cp.cmdc) // will be -1 for '{'
-	f := (*File)(nil)
+	f := (*OldEditableBuffer)(nil)
 	if t != nil && t.w != nil {
 		t = &t.w.body
 		f = t.file
@@ -297,7 +297,7 @@ func i_cmd(t *Text, cp *Cmd) bool {
 	return appendx(t.file, cp, addr.r.q0)
 }
 
-func copyx(f *File, addr2 Address) {
+func copyx(f *OldEditableBuffer, addr2 Address) {
 	ni := 0
 	buf := make([]rune, RBUFSIZE)
 	for p := addr.r.q0; p < addr.r.q1; p += ni {
@@ -310,7 +310,7 @@ func copyx(f *File, addr2 Address) {
 	}
 }
 
-func move(f *File, addr2 Address) {
+func move(f *OldEditableBuffer, addr2 Address) {
 	if addr.f != addr2.f || addr.r.q1 <= addr2.r.q0 {
 		f.elog.Delete(addr.r.q0, addr.r.q1)
 		copyx(f, addr2)
@@ -643,7 +643,7 @@ func nl_cmd(t *Text, cp *Cmd) bool {
 	return true
 }
 
-func appendx(f *File, cp *Cmd, p int) bool {
+func appendx(f *OldEditableBuffer, cp *Cmd, p int) bool {
 	if len(cp.text) > 0 {
 		f.elog.Insert(p, []rune(cp.text))
 	}
@@ -652,7 +652,7 @@ func appendx(f *File, cp *Cmd, p int) bool {
 	return true
 }
 
-func pdisplay(f *File) bool {
+func pdisplay(f *OldEditableBuffer) bool {
 	p1 := addr.r.q0
 	p2 := addr.r.q1
 	if p2 > f.Nr() {
@@ -673,7 +673,7 @@ func pdisplay(f *File) bool {
 	return true
 }
 
-func pfilename(f *File) {
+func pfilename(f *OldEditableBuffer) {
 	dirtychar := ' '
 	if f.SaveableAndDirty() {
 		dirtychar = '\''
@@ -686,7 +686,7 @@ func pfilename(f *File) {
 		'+', fc, f.name)
 }
 
-func loopcmd(f *File, cp *Cmd, rp []Range) {
+func loopcmd(f *OldEditableBuffer, cp *Cmd, rp []Range) {
 	for _, r := range rp {
 		f.curtext.q0 = r.q0
 		f.curtext.q1 = r.q1
@@ -694,7 +694,7 @@ func loopcmd(f *File, cp *Cmd, rp []Range) {
 	}
 }
 
-func looper(f *File, cp *Cmd, isX bool) {
+func looper(f *OldEditableBuffer, cp *Cmd, isX bool) {
 	rp := []Range{}
 	tr := Range{}
 	r := addr.r
@@ -735,7 +735,7 @@ func looper(f *File, cp *Cmd, isX bool) {
 	nest--
 }
 
-func linelooper(f *File, cp *Cmd) {
+func linelooper(f *OldEditableBuffer, cp *Cmd) {
 	//	long nrp, p;
 	//	Range r, linesel;
 	//	Address a, a3;
@@ -860,7 +860,7 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 
 // TODO(flux) This actually looks like "find one match after p"
 // This is almost certainly broken for ^
-func nextmatch(f *File, r string, p int, sign int) {
+func nextmatch(f *OldEditableBuffer, r string, p int, sign int) {
 	are, err := rxcompile(r)
 	if err != nil {
 		editerror("bad regexp in command address")
@@ -1009,7 +1009,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 }
 
 type Tofile struct {
-	f *File
+	f *OldEditableBuffer
 	r string
 }
 
@@ -1032,7 +1032,7 @@ func alltofile(w *Window, tp *Tofile) {
 	}
 }
 
-func tofile(r string) *File {
+func tofile(r string) *OldEditableBuffer {
 	var t Tofile
 
 	t.r = strings.TrimLeft(r, " \t\n")
@@ -1063,7 +1063,7 @@ func allmatchfile(w *Window, tp *Tofile) {
 	}
 }
 
-func matchfile(r string) *File {
+func matchfile(r string) *OldEditableBuffer {
 	var tf Tofile
 
 	tf.f = nil
@@ -1076,7 +1076,7 @@ func matchfile(r string) *File {
 	return tf.f
 }
 
-func filematch(f *File, r string) bool {
+func filematch(f *OldEditableBuffer, r string) bool {
 	// compile expr first so if we get an error, we haven't allocated anything  {
 	are, err := rxcompile(r)
 	if err != nil {
@@ -1188,7 +1188,7 @@ func lineaddr(l int, addr Address, sign int) Address {
 }
 
 type Filecheck struct {
-	f *File
+	f *OldEditableBuffer
 	r string
 }
 
@@ -1202,7 +1202,7 @@ func allfilecheck(w *Window, fp *Filecheck) {
 	}
 }
 
-func cmdname(f *File, str string, set bool) string {
+func cmdname(f *OldEditableBuffer, str string, set bool) string {
 	var fc Filecheck
 	r := ""
 	s := ""

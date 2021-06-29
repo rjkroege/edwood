@@ -551,7 +551,7 @@ func (w *Window) setTag1() {
 	}
 }
 
-// TODO(rjk): In the future of File's replacement with undo buffer,
+// TODO(rjk): In the future of OldEditableBuffer's replacement with undo buffer,
 // this method could be renamed to something like "UpdateTag"
 func (w *Window) Commit(t *Text) {
 	t.Commit() // will set the file.mod to true
@@ -607,7 +607,7 @@ func (w *Window) AddIncl(r string) {
 }
 
 // Clean returns true iff w can be treated as unmodified.
-// This will modify the File so that the next call to Clean will return true
+// This will modify the OldEditableBuffer so that the next call to Clean will return true
 // even if this one returned false.
 func (w *Window) Clean(conservative bool) bool {
 	if w.body.file.IsDirOrScratch() { // don't whine if it's a guide file, error window, etc.

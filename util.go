@@ -277,7 +277,7 @@ func flushwarnings() {
 		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)
-		// TODO(rjk): Figure out why Warning doesn't use a File.
+		// TODO(rjk): Figure out why Warning doesn't use a OldEditableBuffer.
 		for n = 0; n < warn.buf.nc(); n += nr {
 			nr = warn.buf.nc() - n
 			if nr > RBUFSIZE {

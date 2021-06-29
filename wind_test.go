@@ -37,7 +37,7 @@ func TestWindowUndoSelection(t *testing.T) {
 			body: Text{
 				q0: tc.q0,
 				q1: tc.q1,
-				file: &File{
+				file: &OldEditableBuffer{
 					b:       RuneArray("This is an example sentence.\n"),
 					delta:   tc.delta,
 					epsilon: tc.epsilon,
@@ -71,12 +71,12 @@ func TestSetTag1(t *testing.T) {
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{name: name},
+			file:    &OldEditableBuffer{name: name},
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{},
+			file:    &OldEditableBuffer{},
 		}
 
 		w.setTag1()
@@ -108,7 +108,7 @@ func TestWindowClampAddr(t *testing.T) {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: &File{
+				file: &OldEditableBuffer{
 					b: buf,
 				},
 			},
@@ -133,7 +133,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: &File{
+				file: &OldEditableBuffer{
 					b: RuneArray(tc.tag),
 				},
 			},
@@ -149,7 +149,7 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: &File{
+			file: &OldEditableBuffer{
 				b: RuneArray(tag),
 			},
 		},
