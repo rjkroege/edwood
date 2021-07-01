@@ -102,8 +102,8 @@ var (
 	snarfbuf   RuneArray
 	home       string
 	acmeshell  string
-	tagcolors  [frame.NumColours]draw.Image
-	textcolors [frame.NumColours]draw.Image
+	tagcolors  [frame.Numcolors]draw.Image
+	textcolors [frame.Numcolors]draw.Image
 	wdir       string
 	editing    = Inactive
 
