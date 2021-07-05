@@ -34,7 +34,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height()
 	t := &row.tag
-	f := new(File)
+	f := new(OldEditableBuffer)
 	t.file = f.AddText(t)
 	t.Init(r1, tagfont, tagcolors, row.display)
 	t.what = Rowtag
@@ -350,7 +350,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 		Windows: nil,
 	}
 
-	dumpid := make(map[*File]int)
+	dumpid := make(map[*OldEditableBuffer]int)
 
 	for i, c := range r.col {
 		dump.Columns[i] = dumpfile.Column{

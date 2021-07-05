@@ -10,22 +10,22 @@ import (
 	"github.com/rjkroege/edwood/internal/file"
 )
 
-// File is an editable text buffer with undo. Many Text can share one
-// File (to implement Zerox). The File is responsible for updating the
-// Text instances. File is a model in MVC parlance while Text is a
+// OldEditableBuffer is an editable text buffer with undo. Many Text can share one
+// OldEditableBuffer (to implement Zerox). The OldEditableBuffer is responsible for updating the
+// Text instances. OldEditableBuffer is a model in MVC parlance while Text is a
 // View-Controller.
 //
-// A File tracks several related concepts. First it is a text buffer with
+// A OldEditableBuffer tracks several related concepts. First it is a text buffer with
 // undo/redo back to an initial state. Mark (undo.RuneArray.Commit) notes
 // an undo point.
 //
-// Next, a File might have a backing to a disk file.
+// Next, an OldEditableBuffer might have a backing to a disk OldEditableBuffer.
 //
 // Lastly the text buffer might be clean/dirty. A clean buffer is possibly
 // the same as its disk backing. A specific point in the undo record is
 // considered clean.
 //
-// TODO(rjk): File will be a facade pattern composing an undo.RuneArray
+// TODO(rjk): file.EditableBuffer will be a facade pattern composing an undo.RuneArray
 // and a wrapping utf8string.String indexing wrapper.
 // TODO(rjk): my version of undo.RuneArray  will implement Reader, Writer,
 // RuneReader, Seeker and I will restructure this code to follow the
@@ -34,7 +34,7 @@ import (
 // Observe: Character motion routines in Text can be written
 // in terms of any object that is Seeker and RuneReader.
 // Observe: Frame can report addresses in byte and rune offsets.
-type File struct {
+type OldEditableBuffer struct {
 	b       RuneArray
 	delta   []*Undo // [private]
 	epsilon []*Undo // [private]
@@ -56,12 +56,12 @@ type File struct {
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
 
-	// Observer pattern: many Text instances can share a File.
+	// Observer pattern: many Text instances can share a OldEditableBuffer.
 	curtext *Text
 	text    []*Text // [private I think]
 
-	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
-	isdir     bool // Used to track if this File is populated from a directory list. [private]
+	isscratch bool // Used to track if this OldEditableBuffer should warn on unsaved deletion. [private]
+	isdir     bool // Used to track if this OldEditableBuffer is populated from a directory list. [private]
 
 	hash file.Hash // Used to check if the file has changed on disk since loaded.
 
@@ -90,46 +90,46 @@ type File struct {
 //TODO(rjk): make undo.RuneArray implement Reader and Writer.
 
 // HasUncommitedChanges returns true if there are changes that
-// have been made to the File after the last Commit.
-func (t *File) HasUncommitedChanges() bool {
+// have been made to the OldEditableBuffer after the last Commit.
+func (t *OldEditableBuffer) HasUncommitedChanges() bool {
 	return len(t.cache) != 0
 }
 
-// HasUndoableChanges returns true if there are changes to the File
+// HasUndoableChanges returns true if there are changes to the OldEditableBuffer
 // that can be undone.
 // Has no analog in buffer.Undo. It will require modification.
-func (f *File) HasUndoableChanges() bool {
+func (f *OldEditableBuffer) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
 // Has no analog in buffer.Undo. It will require modification.
-func (f *File) HasRedoableChanges() bool {
+func (f *OldEditableBuffer) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
-// IsDirOrScratch returns true if the File has a synthetic backing of
+// IsDirOrScratch returns true if the OldEditableBuffer has a synthetic backing of
 // a directory listing or has a name pattern that excludes it from
 // being saved under typical circumstances.
-func (f *File) IsDirOrScratch() bool {
+func (f *OldEditableBuffer) IsDirOrScratch() bool {
 	return f.isscratch || f.isdir
 }
 
-// IsDir returns true if the File has a synthetic backing of
+// IsDir returns true if the OldEditableBuffer has a synthetic backing of
 // a directory.
-// TODO(rjk): File is a facade that subsumes the entire Model
+// TODO(rjk): OldEditableBuffer is a facade that subsumes the entire Model
 // of an Edwood MVC. As such, it should look like a text buffer for
 // view/controller code. isdir is true for a specific kind of File innards
 // where we automatically alter the contents in various ways.
 // Automatically altering the contents should be expressed differently.
 // Directory listings should not be special cased throughout.
-func (f *File) IsDir() bool {
+func (f *OldEditableBuffer) IsDir() bool {
 	return f.isdir
 }
 
 // SetDir updates the setting of the isdir flag.
-func (f *File) SetDir(flag bool) {
+func (f *OldEditableBuffer) SetDir(flag bool) {
 	f.isdir = flag
 }
 
@@ -138,41 +138,41 @@ func (f *File) SetDir(flag bool) {
 // NB: naturally forwards to undo.RuneArray.Size()
 // TODO(rjk): Switch all callers to Nr() as would be the number of
 // bytes when backed by undo.RuneArray.
-func (f *File) Size() int {
+func (f *OldEditableBuffer) Size() int {
 	return int(f.b.nc()) + len(f.cache)
 }
 
 // Nr returns the number of valid runes in the RuneArray.
-// At the moment, this is the same as Size. But when File is backed
+// At the moment, this is the same as Size. But when OldEditableBuffer is backed
 // with utf8, this will require adjustment.
 // TODO(rjk): utf8 adjustment
-func (f *File) Nr() int {
+func (f *OldEditableBuffer) Nr() int {
 	return f.Size()
 }
 
-// ReadC reads a single rune from the File.
+// ReadC reads a single rune from the OldEditableBuffer.
 // Can be easily converted to being utf8 backed but
 // every caller will require adjustment.
-// TODO(rjk): File needs to implement RuneReader and code should
+// TODO(rjk): OldEditableBuffer needs to implement RuneReader and code should
 // use that interface instead.
 // TODO(rjk): Better name to align with utf8string.String.At().
-func (f *File) ReadC(q int) rune {
+func (f *OldEditableBuffer) ReadC(q int) rune {
 	if f.cq0 <= q && q < f.cq0+len(f.cache) {
 		return f.cache[q-f.cq0]
 	}
 	return f.b.ReadC(q)
 }
 
-// ReadAtRune reads at most len(r) runes from File at rune off.
+// ReadAtRune reads at most len(r) runes from OldEditableBuffer at rune off.
 // It returns the number of  runes read and an error if something goes wrong.
-func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
+func (f *OldEditableBuffer) ReadAtRune(r []rune, off int) (n int, err error) {
 	// TODO(rjk): This should include cache contents but currently
 	// callers do not require it to.
 	return f.b.Read(off, r)
 }
 
-// SaveableAndDirty returns true if the File's contents differ from the
-// backing diskfile File.name, and the diskfile is plausibly writable
+// SaveableAndDirty returns true if the OldEditableBuffer's contents differ from the
+// backing diskfile OldEditableBuffer.name, and the diskfile is plausibly writable
 // (not a directory or scratch file).
 //
 // When this is true, the tag's button should
@@ -183,16 +183,16 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // to be used to determine the "if the contents differ")
 //
 // Latest thought: there are two separate issues: are we at a point marked
-// as clean and is this File writable to a backing. They are combined in this
+// as clean and is this OldEditableBuffer writable to a backing. They are combined in this
 // this method.
-func (f *File) SaveableAndDirty() bool {
+func (f *OldEditableBuffer) SaveableAndDirty() bool {
 	return f.name != "" && (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
 // keeping them in the cache. Does not map to undo.RuneArray.Commit (that
 // method is Mark). Remove this method.
-func (f *File) Commit() {
+func (f *OldEditableBuffer) Commit() {
 	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
@@ -200,7 +200,7 @@ func (f *File) Commit() {
 
 	if f.cq0 > f.b.nc() {
 		// TODO(rjk): Generate a better error message.
-		panic("internal error: File.Commit")
+		panic("internal error: OldEditableBuffer.Commit")
 	}
 	if f.seq > 0 {
 		f.Uninsert(&f.delta, f.cq0, len(f.cache))
@@ -221,7 +221,7 @@ type Undo struct {
 	buf []rune
 }
 
-// Load inserts fd's contents into File at location q0. Load will always
+// Load inserts fd's contents into OldEditableBuffer at location q0. Load will always
 // mark the file as modified so follow this up with a call to f.Clean() to
 // indicate that the file corresponds to its disk file backing.
 // TODO(rjk): hypothesis: we can make this API cleaner: we will only
@@ -231,7 +231,7 @@ type Undo struct {
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
+func (f *OldEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
 	d, err := ioutil.ReadAll(fd)
 	if err != nil {
 		warning(nil, "read error in RuneArray.Load")
@@ -249,8 +249,8 @@ func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, e
 	return len(runes), hasNulls, err
 }
 
-// UpdateInfo updates File's info to d if file hash hasn't changed.
-func (f *File) UpdateInfo(filename string, d os.FileInfo) error {
+// UpdateInfo updates OldEditableBuffer's info to d if file hash hasn't changed.
+func (f *OldEditableBuffer) UpdateInfo(filename string, d os.FileInfo) error {
 	h, err := file.HashFor(filename)
 	if err != nil {
 		return warnError(nil, "failed to compute hash for %v: %v", filename, err)
@@ -264,31 +264,31 @@ func (f *File) UpdateInfo(filename string, d os.FileInfo) error {
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): switching to undo.RuneArray will require removing use of seq
 // TODO(rjk): This function maps to undo.RuneArray.Clean()
-func (f *File) SnapshotSeq() {
+func (f *OldEditableBuffer) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
-// Dirty reports whether the current state of the File is different from
+// Dirty reports whether the current state of the OldEditableBuffer is different from
 // the initial state or from the one at the time of calling Clean.
 //
 // TODO(rjk): switching to undo.RuneArray will require removing external uses
 // of seq.
-func (f *File) Dirty() bool {
+func (f *OldEditableBuffer) Dirty() bool {
 	return f.seq != f.putseq
 }
 
-// AddText adds t as an observer for edits to this File.
+// AddText adds t as an observer for edits to this OldEditableBuffer.
 // TODO(rjk): The observer should be an interface.
-func (f *File) AddText(t *Text) *File {
+func (f *OldEditableBuffer) AddText(t *Text) *OldEditableBuffer {
 	f.text = append(f.text, t)
 	f.curtext = t
 	return f
 }
 
-// DelText removes t as an observer for edits to this File.
+// DelText removes t as an observer for edits to this OldEditableBuffer.
 // TODO(rjk): The observer should be an interface.
 // TODO(rjk): Can make this more idiomatic?
-func (f *File) DelText(t *Text) error {
+func (f *OldEditableBuffer) DelText(t *Text) error {
 	for i, text := range f.text {
 		if text == t {
 			f.text[i] = f.text[len(f.text)-1]
@@ -302,18 +302,18 @@ func (f *File) DelText(t *Text) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("can't find text in File.DelText")
+	return fmt.Errorf("can't find text in OldEditableBuffer.DelText")
 }
 
-func (f *File) AllText(tf func(t *Text)) {
+func (f *OldEditableBuffer) AllText(tf func(t *Text)) {
 	for _, t := range f.text {
 		tf(t)
 	}
 }
 
-// HasMultipleTexts returns true if this File has multiple texts
+// HasMultipleTexts returns true if this OldEditableBuffer has multiple texts
 // display its contents.
-func (f *File) HasMultipleTexts() bool {
+func (f *OldEditableBuffer) HasMultipleTexts() bool {
 	return len(f.text) > 1
 }
 
@@ -322,7 +322,7 @@ func (f *File) HasMultipleTexts() bool {
 // TODO(rjk): In terms of the undo.RuneArray conversion, this correponds
 // to undo.RuneArray.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
-func (f *File) InsertAt(p0 int, s []rune) {
+func (f *OldEditableBuffer) InsertAt(p0 int, s []rune) {
 	f.treatasclean = false
 	if p0 > f.b.nc() {
 		panic("internal error: fileinsert")
@@ -345,10 +345,10 @@ func (f *File) InsertAt(p0 int, s []rune) {
 // But preserve the cache. Every "small" insert should go into the cache.
 // It almost certainly greatly improves performance for a series of single
 // character insertions.
-func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
+func (f *OldEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	f.treatasclean = false
 	if p0 > f.b.nc()+len(f.cache) {
-		panic("File.InsertAtWithoutCommit insertion off the end")
+		panic("OldEditableBuffer.InsertAtWithoutCommit insertion off the end")
 	}
 
 	if len(f.cache) == 0 {
@@ -356,7 +356,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	} else {
 		if p0 != f.cq0+len(f.cache) {
 			// TODO(rjk): actually print something useful here
-			acmeerror("File.InsertAtWithoutCommit cq0", nil)
+			acmeerror("OldEditableBuffer.InsertAtWithoutCommit cq0", nil)
 		}
 	}
 	f.cache = append(f.cache, s...)
@@ -367,9 +367,9 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	}
 }
 
-// Uninsert generates an action record that deletes runes from the File
+// Uninsert generates an action record that deletes runes from the OldEditableBuffer
 // to undo an insertion.
-func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
+func (f *OldEditableBuffer) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
 	u.t = Delete
@@ -381,12 +381,12 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	(*delta) = append(*delta, &u)
 }
 
-// DeleteAt removes the rune range [p0,p1) from File.
+// DeleteAt removes the rune range [p0,p1) from OldEditableBuffer.
 // TODO(rjk): Currently, adds an Undo record. It shouldn't
 // TODO(rjk): should map onto undo.RuneArray.Delete
 // TODO(rjk): DeleteAt has an implied Commit operation
 // that makes it not match with undo.RuneArray.Delete
-func (f *File) DeleteAt(p0, p1 int) {
+func (f *OldEditableBuffer) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
 		acmeerror("internal error: DeleteAt", nil)
@@ -409,9 +409,9 @@ func (f *File) DeleteAt(p0, p1 int) {
 	}
 }
 
-// Undelete generates an action record that inserts runes into the File
+// Undelete generates an action record that inserts runes into the OldEditableBuffer
 // to undo a deletion.
-func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
+func (f *OldEditableBuffer) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting
 	var u Undo
 	u.t = Insert
@@ -424,8 +424,8 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	(*delta) = append(*delta, &u)
 }
 
-// A File can have a spcific name that permit it to be persisted to disk
-// but typically would not be. These two constants are suffixes of File
+// A OldEditableBuffer can have a spcific name that permit it to be persisted to disk
+// but typically would not be. These two constants are suffixes of OldEditableBuffer
 // names that have this property.
 const (
 	slashguide = "/guide"
@@ -435,7 +435,7 @@ const (
 // SetName sets the name of the backing for this file.
 // Some backings that opt them out of typically being persisted.
 // Resetting a file name to a new value does not have any effect.
-func (f *File) SetName(name string) {
+func (f *OldEditableBuffer) SetName(name string) {
 	if f.name == name {
 		return
 	}
@@ -446,9 +446,9 @@ func (f *File) SetName(name string) {
 	f.setnameandisscratch(name)
 }
 
-// setnameandisscratch updates the File.name and isscratch bit
+// setnameandisscratch updates the OldEditableBuffer.name and isscratch bit
 // at the same time.
-func (f *File) setnameandisscratch(name string) {
+func (f *OldEditableBuffer) setnameandisscratch(name string) {
 	f.name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		f.isscratch = true
@@ -457,7 +457,7 @@ func (f *File) setnameandisscratch(name string) {
 	}
 }
 
-func (f *File) UnsetName(delta *[]*Undo) {
+func (f *OldEditableBuffer) UnsetName(delta *[]*Undo) {
 	var u Undo
 	// undo a file name change by restoring old name
 	u.t = Filename
@@ -469,8 +469,8 @@ func (f *File) UnsetName(delta *[]*Undo) {
 	(*delta) = append(*delta, &u)
 }
 
-func NewFile(filename string) *File {
-	return &File{
+func NewFile(filename string) *OldEditableBuffer {
+	return &OldEditableBuffer{
 		b:         NewBuffer(),
 		delta:     []*Undo{},
 		epsilon:   []*Undo{},
@@ -486,9 +486,9 @@ func NewFile(filename string) *File {
 	}
 }
 
-func NewTagFile() *File {
+func NewTagFile() *OldEditableBuffer {
 
-	return &File{
+	return &OldEditableBuffer{
 		b:       NewBuffer(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
@@ -510,10 +510,10 @@ func NewTagFile() *File {
 
 // RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
 // analog in undo.RuneArray. The value of seq is used to track intra and
-// inter File edit actions so that cross-File changes via Edit X can be
-// undone with a single action. An implementation of File that wraps
+// inter OldEditableBuffer edit actions so that cross-OldEditableBuffer changes via Edit X can be
+// undone with a single action. An implementation of OldEditableBuffer that wraps
 // undo.RuneArray will need to to preserve seq tracking.
-func (f *File) RedoSeq() int {
+func (f *OldEditableBuffer) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {
 		return 0
@@ -523,7 +523,7 @@ func (f *File) RedoSeq() int {
 }
 
 // Seq returns the current value of seq.
-func (f *File) Seq() int {
+func (f *OldEditableBuffer) Seq() int {
 	return f.seq
 }
 
@@ -533,11 +533,11 @@ func (f *File) Seq() int {
 //
 // TODO(rjk): Separate Undo and Redo for better alignment with undo.RuneArray
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
-// The number actually processed is controlled by mutations to File.seq.
+// The number actually processed is controlled by mutations to OldEditableBuffer.seq.
 // This does not align with the semantics of undo.RuneArray.
 // Each "Mark" needs to have a seq value provided.
 // TODO(rjk): Consider providing the target seq value as an argument.
-func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
+func (f *OldEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
 	var (
 		stop           int
 		delta, epsilon *[]*Undo
@@ -614,10 +614,10 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 	return q0, q1, ok
 }
 
-// Reset removes all Undo records for this File.
+// Reset removes all Undo records for this OldEditableBuffer.
 // TODO(rjk): This concept doesn't particularly exist in undo.RuneArray.
-// Why can't I just create a new File?
-func (f *File) Reset() {
+// Why can't I just create a new OldEditableBuffer?
+func (f *OldEditableBuffer) Reset() {
 	f.delta = f.delta[0:0]
 	f.epsilon = f.epsilon[0:0]
 	f.seq = 0
@@ -632,33 +632,33 @@ func (f *File) Reset() {
 // calling Mark.
 // TODO(rjk): Consider renaming to SetUndoPoint
 // TODO(rjk): Don't pass in seq. (Remove seq entirely?)
-func (f *File) Mark(seq int) {
+func (f *OldEditableBuffer) Mark(seq int) {
 	f.epsilon = f.epsilon[0:0]
 	f.seq = seq
 }
 
-// TreatAsDirty returns true if the File should be considered modified
+// TreatAsDirty returns true if the OldEditableBuffer should be considered modified
 // for the purpose of warning the user if Del-ing a Dirty() file.
-func (f *File) TreatAsDirty() bool {
+func (f *OldEditableBuffer) TreatAsDirty() bool {
 	return !f.treatasclean && f.Dirty()
 }
 
-// TreatAsClean notes that the File should be considered as not Dirty
+// TreatAsClean notes that the OldEditableBuffer should be considered as not Dirty
 // until its next modification.
-func (f *File) TreatAsClean() {
+func (f *OldEditableBuffer) TreatAsClean() {
 	f.treatasclean = true
 }
 
-// Modded marks the File if we know that its backing is different from
+// Modded marks the OldEditableBuffer if we know that its backing is different from
 // its contents. This is needed to track when Edwood has modified the
-// backing without changing the File (e.g. via the Edit w command.
-func (f *File) Modded() {
+// backing without changing the OldEditableBuffer (e.g. via the Edit w command.
+func (f *OldEditableBuffer) Modded() {
 	f.mod = true
 	f.treatasclean = false
 }
 
-// Clean marks File as being non-dirty: the backing is the same as File.
-func (f *File) Clean() {
+// Clean marks OldEditableBuffer as being non-dirty: the backing is the same as OldEditableBuffer.
+func (f *OldEditableBuffer) Clean() {
 	f.mod = false
 	f.treatasclean = false
 	f.SnapshotSeq()

@@ -17,7 +17,7 @@ import (
 func emptyText() *Text {
 	w := &Window{
 		body: Text{
-			file: &File{},
+			file: &OldEditableBuffer{},
 		},
 	}
 	t := &w.body
@@ -133,7 +133,7 @@ func TestClickHTMLMatch(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: &File{
+				file: &OldEditableBuffer{
 					b: RuneArray(r),
 				},
 			}
@@ -237,7 +237,7 @@ func TestGetDirNames(t *testing.T) {
 func TestGetDirNamesNil(t *testing.T) {
 	_, err := getDirNames(nil)
 	if err == nil {
-		t.Errorf("getDirNames was successful on nil File")
+		t.Errorf("getDirNames was successful on nil OldEditableBuffer")
 	}
 }
 
@@ -256,7 +256,7 @@ func (fr *textFillMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
 
 func TestTextFill(t *testing.T) {
 	text := &Text{
-		file: &File{},
+		file: &OldEditableBuffer{},
 	}
 	err := text.fill(&textFillMockFrame{})
 	wantErr := "fill: negative slice length -100"
@@ -338,7 +338,7 @@ func TestTextAbsDirName(t *testing.T) {
 func windowWithTag(tag string) *Window {
 	return &Window{
 		tag: Text{
-			file: &File{
+			file: &OldEditableBuffer{
 				b: RuneArray([]rune(tag)),
 			},
 		},
@@ -368,7 +368,7 @@ func TestBackNL(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: &File{
+			file: &OldEditableBuffer{
 				b: RuneArray(tc.buf),
 			},
 		}
@@ -401,7 +401,7 @@ func TestTextBsInsert(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			text := &Text{
 				what: tc.what,
-				file: &File{
+				file: &OldEditableBuffer{
 					b: RuneArray(tc.buf),
 				},
 			}
@@ -445,7 +445,7 @@ func TestTextTypeTabInBody(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
 		w := &Window{
 			body: Text{
-				file:      &File{},
+				file:      &OldEditableBuffer{},
 				tabexpand: tabexpand,
 				tabstop:   tabstop,
 			},
@@ -459,7 +459,7 @@ func TestTextTypeTabInBody(t *testing.T) {
 func TestTextTypeTabInTag(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
 		return &Text{
-			file:      &File{},
+			file:      &OldEditableBuffer{},
 			tabexpand: tabexpand,
 			tabstop:   tabstop,
 		}

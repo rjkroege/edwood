@@ -59,7 +59,7 @@ func TestExpand(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: &File{
+				file: &OldEditableBuffer{
 					b: r,
 				},
 				q0: 0,
@@ -99,7 +99,7 @@ func TestExpandJump(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: &File{
+			file: &OldEditableBuffer{
 				b: []rune("chicken"),
 			},
 			q0:   0,
@@ -186,5 +186,5 @@ func textSetSelection(t *Text, buf string) {
 
 	t.q0 = popRune('«')
 	t.q1 = popRune('»')
-	t.file = &File{b: RuneArray(b)}
+	t.file = &OldEditableBuffer{b: RuneArray(b)}
 }

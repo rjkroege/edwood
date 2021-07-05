@@ -159,7 +159,7 @@ func TestXfidreadQWrdsel(t *testing.T) {
 		body: Text{fr: &MockFrame{}},
 		tag: Text{
 			fr:   &MockFrame{},
-			file: &File{},
+			file: &OldEditableBuffer{},
 		},
 		col: new(Column),
 	}
@@ -992,7 +992,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	defer func() { w.nopen[QWevent]-- }()
 	w.tag = Text{
 		w: w,
-		file: &File{
+		file: &OldEditableBuffer{
 			b:    RuneArray("Send"),
 			text: []*Text{&w.tag},
 		},
@@ -1001,7 +1001,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	}
 	w.body = Text{
 		w: w,
-		file: &File{
+		file: &OldEditableBuffer{
 			b:    RuneArray(""),
 			text: []*Text{&w.body},
 		},

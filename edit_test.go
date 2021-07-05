@@ -120,7 +120,7 @@ func TestEdit(t *testing.T) {
 
 		n, _ := w.body.ReadB(0, buf[:])
 		if string(buf[:n]) != test.expected {
-			t.Errorf("test %d: File.b contents expected \n%#v\nbut got \n%#v\n", i, test.expected, string(buf[:n]))
+			t.Errorf("test %d: OldEditableBuffer.b contents expected \n%#v\nbut got \n%#v\n", i, test.expected, string(buf[:n]))
 		}
 
 		warningsMu.Lock()
@@ -235,10 +235,10 @@ func TestEditCmdWithFile(t *testing.T) {
 
 		// For e identical.
 		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
-			t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			t.Errorf("test %d: OldEditableBuffer bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
 		}
 		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
-			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			t.Errorf("test %d: OldEditableBuffer bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
 		}
 
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
@@ -391,7 +391,7 @@ func TestEditMultipleWindows(t *testing.T) {
 			w := row.col[0].w[j]
 			n, _ := w.body.ReadB(0, buf[:])
 			if string(buf[:n]) != exp {
-				t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
+				t.Errorf("test %d: Window %d OldEditableBuffer.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
 			}
 
 		}

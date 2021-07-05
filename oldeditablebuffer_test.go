@@ -11,7 +11,7 @@ import (
 )
 
 func TestDelText(t *testing.T) {
-	f := &File{
+	f := &OldEditableBuffer{
 		text: []*Text{{}, {}, {}, {}, {}},
 	}
 	t.Run("Nonexistent", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestFileInsertAt(t *testing.T) {
 		&fileStateSummary{false, true, false, true, s1 + s2})
 }
 
-func readwholefile(t *testing.T, f *File) string {
+func readwholefile(t *testing.T, f *OldEditableBuffer) string {
 	var sb strings.Builder
 
 	// Currently ReadAtRune does not return runes in the cache.
@@ -99,7 +99,7 @@ func readwholefile(t *testing.T, f *File) string {
 
 	targetbuffer := make([]rune, f.Nr())
 	if _, err := f.ReadAtRune(targetbuffer, 0); err != nil {
-		t.Fatalf("readwhole could not read File %v", f)
+		t.Fatalf("readwhole could not read OldEditableBuffer %v", f)
 	}
 
 	for _, r := range targetbuffer {
@@ -149,7 +149,7 @@ type fileStateSummary struct {
 	filecontents         string
 }
 
-func check(t *testing.T, testname string, f *File, fss *fileStateSummary) {
+func check(t *testing.T, testname string, f *OldEditableBuffer, fss *fileStateSummary) {
 	if got, want := f.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
 		t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
 	}
@@ -163,7 +163,7 @@ func check(t *testing.T, testname string, f *File, fss *fileStateSummary) {
 		t.Errorf("%s: SaveableAndDirty failed. got %v want %v", testname, got, want)
 	}
 	if got, want := readwholefile(t, f), fss.filecontents; got != want {
-		t.Errorf("%s: File contents not expected. got «%#v» want «%#v»", testname, got, want)
+		t.Errorf("%s: OldEditableBuffer contents not expected. got «%#v» want «%#v»", testname, got, want)
 	}
 }
 
@@ -251,7 +251,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	check(t, "TestFileLoadUndoHash after Mark", f,
 		&fileStateSummary{false, false, false, true, s2 + s2})
 
-	// SaveableAndDirty should return true if the File is plausibly writable
+	// SaveableAndDirty should return true if the OldEditableBuffer is plausibly writable
 	// to f.name and has changes that might require writing it out.
 	f.SetName("plan9")
 	check(t, "TestFileLoadUndoHash after SetName", f,
@@ -274,7 +274,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 func TestFileInsertDeleteUndo(t *testing.T) {
 	f := NewFile("edwood")
 
-	// Empty File is an Undo point and considered clean.
+	// Empty OldEditableBuffer is an Undo point and considered clean.
 	f.Mark(1)
 	f.Clean()
 
@@ -308,7 +308,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 
 func TestFileRedoSeq(t *testing.T) {
 	f := NewFile("edwood")
-	// Empty File is an Undo point and considered clean
+	// Empty OldEditableBuffer is an Undo point and considered clean
 
 	f.Mark(1)
 	f.InsertAt(0, []rune(s1))
@@ -353,7 +353,7 @@ func TestFileUpdateInfo(t *testing.T) {
 	f.info = nil
 	f.UpdateInfo(filename, d)
 	if f.info != nil {
-		t.Errorf("File info is %v; want nil", f.info)
+		t.Errorf("OldEditableBuffer info is %v; want nil", f.info)
 	}
 
 	h, err := file.HashFor(filename)
@@ -364,7 +364,7 @@ func TestFileUpdateInfo(t *testing.T) {
 	f.info = nil
 	f.UpdateInfo(filename, d)
 	if f.info != d {
-		t.Errorf("File info is %v; want %v", f.info, d)
+		t.Errorf("OldEditableBuffer info is %v; want %v", f.info, d)
 	}
 }
 
@@ -374,13 +374,13 @@ func TestFileUpdateInfoError(t *testing.T) {
 	err := f.UpdateInfo(filename, nil)
 	want := "failed to compute hash for"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
-		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
+		t.Errorf("OldEditableBuffer.UpdateInfo returned error %q; want prefix %q", err, want)
 	}
 }
 
 func TestFileNameSettingWithScratch(t *testing.T) {
 	f := NewFile("edwood")
-	// Empty File is an Undo point and considered clean
+	// Empty OldEditableBuffer is an Undo point and considered clean
 
 	if got, want := f.name, "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
