@@ -62,7 +62,7 @@ Have thoughts? Questions? Want to talk about Edwood (or Acme and other related P
 Edwood has reached the *useful* milestone (v0.1) and should
 serve as drop-in replacement for Plan9 Port Acme. (But probably with
 different bugs.) Please file issues if Acme client apps don't work
-with Edwood or if your favourite Acme feature doesn't work.
+with Edwood or if your favorite Acme feature doesn't work.
 
 # Roadmap
 

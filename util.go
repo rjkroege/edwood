@@ -347,7 +347,7 @@ func needsQuote(s string) bool {
 }
 
 // Quote adds single quotes to s in the style of rc(1) if they are needed.
-// The behaviour should be identical to Plan 9's quote(3).
+// The behavior should be identical to Plan 9's quote(3).
 func quote(s string) string {
 	if s == "" {
 		return "''"

@@ -34,8 +34,8 @@ func (f *frameimpl) Option(opts ...OptionClosure) *optioncontext {
 	return ctx
 }
 
-// OptColors sets the default colours.
-func OptColors(cols [NumColours]draw.Image) OptionClosure {
+// OptColors sets the default colors.
+func OptColors(cols [Numcolors]draw.Image) OptionClosure {
 	return func(f *frameimpl, ctx *optioncontext) {
 		f.cols = cols
 		// TODO(rjk): I think so. Make sure that this is required.

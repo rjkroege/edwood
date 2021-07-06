@@ -88,7 +88,7 @@ func (t *Text) getfont() draw.Font {
 	return fontget(t.font, t.display)
 }
 
-func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Image, dis draw.Display) *Text {
+func (t *Text) Init(r image.Rectangle, rf string, cols [frame.Numcolors]draw.Image, dis draw.Display) *Text {
 	// log.Println("Text.Init start")
 	// defer log.Println("Text.Init end")
 	if t == nil {

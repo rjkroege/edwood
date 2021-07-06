@@ -7,14 +7,14 @@ import (
 	"github.com/rjkroege/edwood/internal/draw"
 )
 
-// TODO(rjk): Make this into a struct of colours?
+// TODO(rjk): Make this into a struct of colors?
 const (
 	ColBack = iota
 	ColHigh
 	ColBord
 	ColText
 	ColHText
-	NumColours
+	Numcolors
 
 	frtickw = 3
 )
@@ -71,7 +71,7 @@ type Frame interface {
 	GetMaxtab() int
 
 	// Init prepares the Frame for the display of text in rectangle r.
-	// Frame f will reuse previously set font, colours, tab width and
+	// Frame f will reuse previously set font, colors, tab width and
 	// destination image for drawing unless these are overridden with
 	// one or more instances of the OptColors, OptBackground
 	// OptFont or OptMaxTab option settings.
@@ -135,7 +135,7 @@ type Frame interface {
 	Select(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int)) (int, int)
 
 	// SelectOpt makes a selection in the same fashion as Select but does it in a
-	// temporary way with the specified text colours fg, bg.
+	// temporary way with the specified text colors fg, bg.
 	SelectOpt(*draw.Mousectl, *draw.Mouse, func(SelectScrollUpdater, int), draw.Image, draw.Image) (int, int)
 
 	// DrawSel repaints a section of the frame, delimited by rune
@@ -256,10 +256,10 @@ type frameimpl struct {
 	// lk debugginglock
 
 	font       draw.Font
-	display    draw.Display           // on which the frame is displayed
-	background draw.Image             // on which the frame appears
-	cols       [NumColours]draw.Image // background and text colours
-	rect       image.Rectangle        // in which the text appears
+	display    draw.Display          // on which the frame is displayed
+	background draw.Image            // on which the frame appears
+	cols       [Numcolors]draw.Image // background and text colors
+	rect       image.Rectangle       // in which the text appears
 
 	defaultfontheight int // height of default font
 
@@ -286,9 +286,9 @@ type frameimpl struct {
 	tickscale int // tick scaling factor
 }
 
-// NewFrame creates a new Frame with Font ft, background image b, colours cols, and
+// NewFrame creates a new Frame with Font ft, background image b, colors cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft draw.Font, b draw.Image, cols [NumColours]draw.Image) Frame {
+func NewFrame(r image.Rectangle, ft draw.Font, b draw.Image, cols [Numcolors]draw.Image) Frame {
 	f := new(frameimpl)
 	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8))
 	return f
