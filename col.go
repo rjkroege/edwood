@@ -50,8 +50,9 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
-	tagfile := NewFile("")
-	c.tag.file = tagfile.AddText(&c.tag)
+	tagfile := MakeObservableEditableBuffer("", nil)
+	tagfile.AddObserver(&c.tag)
+	c.tag.file = tagfile
 	c.tag.Init(r1, tagfont, tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
@@ -312,7 +313,7 @@ func (c *Column) Resize(r image.Rectangle) {
 }
 
 func (c *Column) Sort() {
-	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.name < c.w[j].body.file.name })
+	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.Name() < c.w[j].body.file.Name() })
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
