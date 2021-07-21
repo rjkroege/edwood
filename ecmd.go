@@ -265,7 +265,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror("%v unreadable", name)
 	}
 	runes, _, nulls := cvttorunes(d, len(d))
-	err = f.elog.Replace(q0, q1, runes)
+	err = file.elog.Replace(q0, q1, runes)
 	if err != nil {
 		warning(nil, err.Error())
 	}
@@ -273,7 +273,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	if nulls {
 		warning(nil, "%v: NUL bytes elided\n", name)
 	} else if allreplaced && samename {
-		f.Editclean = true
+		file.Editclean = true
 	}
 	return true
 }
