@@ -171,7 +171,7 @@ func allelogterm(w *Window) {
 func alleditinit(w *Window) {
 	w.tag.Commit()
 	w.body.Commit()
-	w.body.file.elog.Editclean = false
+	w.body.file.Editclean = false
 }
 
 func allupdate(w *Window) {
@@ -186,7 +186,7 @@ func allupdate(w *Window) {
 		// Set an undo point before applying accumulated Edit actions.
 		f.Mark(seq)
 		f.elog.Apply(t)
-		if f.elog.Editclean {
+		if f.Editclean {
 			f.Clean()
 		}
 		t.w.owner = owner
