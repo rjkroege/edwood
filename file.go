@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -365,18 +364,7 @@ func (f *File) SetName(name string) {
 	if f.seq > 0 {
 		f.UnsetName(&f.delta)
 	}
-	f.setnameandisscratch(name)
-}
-
-// setnameandisscratch updates the File.name and isscratch bit
-// at the same time.
-func (f *File) setnameandisscratch(name string) {
-	f.oeb.details.Name = name
-	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
-		f.isscratch = true
-	} else {
-		f.isscratch = false
-	}
+	f.oeb.Setnameandisscratch(name)
 }
 
 func (f *File) UnsetName(delta *[]*Undo) {
@@ -386,8 +374,8 @@ func (f *File) UnsetName(delta *[]*Undo) {
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = 0 // unused
-	u.n = len(f.oeb.details.Name)
-	u.buf = []rune(f.oeb.details.Name)
+	u.n = len(f.oeb.Name())
+	u.buf = []rune(f.oeb.Name())
 	*delta = append(*delta, &u)
 }
 
@@ -516,7 +504,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			f.mod = u.mod
 			f.treatasclean = false
 			newfname := string(u.buf)
-			f.setnameandisscratch(newfname)
+			f.oeb.Setnameandisscratch(newfname)
 		}
 		*delta = (*delta)[0 : len(*delta)-1]
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 // The ObservableEditableBuffer is used by the main program
@@ -321,4 +322,15 @@ func (e *ObservableEditableBuffer) Equal(s []rune) bool {
 // Nbyte is a forwarding function for rune_array.Nbyte.
 func (e *ObservableEditableBuffer) Nbyte() int {
 	return e.f.b.Nbyte()
+}
+
+// Setnameandisscratch updates the oeb.details.name and isscratch bit
+// at the same time.
+func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
+	e.details.Name = name
+	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
+		e.f.isscratch = true
+	} else {
+		e.f.isscratch = false
+	}
 }
