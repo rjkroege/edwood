@@ -318,7 +318,7 @@ func (e *ObservableEditableBuffer) Equal(s []rune) bool {
 	return e.f.b.Equal(s)
 }
 
-// Nbyte is a forwaring function for rune_array.Nbyte.
+// Nbyte is a forwarding function for rune_array.Nbyte.
 func (e *ObservableEditableBuffer) Nbyte() int {
 	return e.f.b.Nbyte()
 }
