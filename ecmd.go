@@ -683,7 +683,7 @@ func pfilename(f *ObservableEditableBuffer) {
 		dirtychar = '\''
 	}
 	fc := ' '
-	if curtext != nil && curtext.file.Equal([]rune(f.String())) {
+	if curtext != nil && curtext.file == f {
 		fc = '.'
 	}
 	warning(nil, "%c%c%c %s\n", dirtychar,
