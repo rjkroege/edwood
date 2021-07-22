@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rjkroege/edwood/internal/file"
 	"io"
+	"io/ioutil"
 	"os"
 )
 
@@ -167,7 +168,15 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 
 // Load is a forwarding function for file.Load.
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
-	return e.f.Load(q0, fd, sethash)
+	d, err := ioutil.ReadAll(fd)
+	if err != nil {
+		warning(nil, "read error in RuneArray.Load")
+	}
+	if sethash {
+		e.SetHash(file.CalcHash(d))
+	}
+
+	return e.f.Load(q0, d)
 }
 
 // Dirty is a forwarding function for file.Dirty.

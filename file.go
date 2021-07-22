@@ -2,11 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"strings"
-
-	"github.com/rjkroege/edwood/internal/file"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
@@ -224,16 +220,9 @@ type Undo struct {
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
-	d, err := ioutil.ReadAll(fd)
-	if err != nil {
-		warning(nil, "read error in RuneArray.Load")
-	}
-	runes, _, hasNulls := cvttorunes(d, len(d))
+func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool, err error) {
 
-	if sethash {
-		f.oeb.SetHash(file.CalcHash(d))
-	}
+	runes, _, hasNulls := cvttorunes(d, len(d))
 
 	// Would appear to require a commit operation.
 	// NB: Runs the observers.
