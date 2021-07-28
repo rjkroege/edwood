@@ -11,8 +11,8 @@ const (
 	DeleteType ElogType = iota
 	InsertType
 	FilenameType
-	Wsequence     = "warning: changes out of sequence\n"
-	WsequenceDire = "warning: changes out of sequence, edit result probably wrong\n"
+	Wsequence     = "warning: changes out of sequence"
+	WsequenceDire = "warning: changes out of sequence, edit result probably wrong"
 	Delete        = 'd'
 	Insert        = 'i'
 	Filename      = 'f'
