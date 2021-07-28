@@ -50,8 +50,7 @@ type File struct {
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
 
-	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
-	isdir     bool // Used to track if this File is populated from a directory list. [private]
+	isdir bool // Used to track if this File is populated from a directory list. [private]
 
 	// cache holds  that are not yet part of an undo record.
 	cache []rune // [private]
@@ -101,7 +100,7 @@ func (f *File) HasRedoableChanges() bool {
 // a directory listing or has a name pattern that excludes it from
 // being saved under typical circumstances.
 func (f *File) IsDirOrScratch() bool {
-	return f.isscratch || f.isdir
+	return f.oeb.isscratch || f.isdir
 }
 
 // IsDir returns true if the File has a synthetic backing of

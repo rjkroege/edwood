@@ -17,6 +17,7 @@ type ObservableEditableBuffer struct {
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
 	details      *file.DiskDetails
+	isscratch    bool // Used to track if this File should warn on unsaved deletion. [private]
 }
 
 // Set is a forwarding function for file_hash.Set
@@ -329,8 +330,8 @@ func (e *ObservableEditableBuffer) Nbyte() int {
 func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
 	e.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
-		e.f.isscratch = true
+		e.isscratch = true
 	} else {
-		e.f.isscratch = false
+		e.isscratch = false
 	}
 }
