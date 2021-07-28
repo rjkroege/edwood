@@ -4,11 +4,6 @@ import (
 	"fmt"
 	"github.com/rjkroege/edwood/internal/elog"
 	"github.com/rjkroege/edwood/internal/util"
-	"io"
-	"io/ioutil"
-	"strings"
-
-	"github.com/rjkroege/edwood/internal/file"
 )
 
 // File is an editable text buffer with undo. Many Text can share one
