@@ -399,7 +399,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
-	if got, want := f.f.isscratch, false; got != want {
+	if got, want := f.isscratch, false; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 
@@ -412,7 +412,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.Name(), "/hello/+Errors"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
-	if got, want := f.f.isscratch, true; got != want {
+	if got, want := f.isscratch, true; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 
@@ -421,7 +421,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.Name(), "/guide"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
-	if got, want := f.f.isscratch, true; got != want {
+	if got, want := f.isscratch, true; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 
@@ -429,7 +429,7 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 	}
-	if got, want := f.f.isscratch, false; got != want {
+	if got, want := f.isscratch, false; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 }
