@@ -25,7 +25,7 @@ type ObservableEditableBuffer struct {
 	// implementation code to let multiple Inserts be grouped together?
 	// Figure out how this inter-operates with seq.
 	Editclean bool
-	details      *file.DiskDetails
+	details   *file.DiskDetails
 }
 
 // Set is a forwarding function for file_hash.Set
