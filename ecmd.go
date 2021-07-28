@@ -153,7 +153,7 @@ func a_cmd(t *Text, cp *Cmd) bool {
 func b_cmd(t *Text, cp *Cmd) bool {
 	file := toOEB(cp.text)
 	if nest == 0 {
-		pfilename(file.f)
+		pfilename(file)
 	}
 	curtext = file.GetCurObserver().(*Text)
 	return true
@@ -273,13 +273,13 @@ func f_cmd(t *Text, cp *Cmd) bool {
 		str = cp.text
 	}
 	cmdname(t.file, str, true)
-	pfilename(t.file.f)
+	pfilename(t.file)
 	return true
 }
 
 func g_cmd(t *Text, cp *Cmd) bool {
-	if t.file.f != addr.file.f {
-		warning(nil, "internal error: g_cmd file.f !=addr.file.f\n")
+	if t.file != addr.file {
+		warning(nil, "internal error: g_cmd f!=addr.f\n")
 		return false
 	}
 	are, err := rxcompile(cp.re)
@@ -677,17 +677,17 @@ func pdisplay(file *ObservableEditableBuffer) bool {
 	return true
 }
 
-func pfilename(f *File) {
+func pfilename(f *ObservableEditableBuffer) {
 	dirtychar := ' '
 	if f.SaveableAndDirty() {
 		dirtychar = '\''
 	}
 	fc := ' '
-	if curtext != nil && curtext.file.f == f {
+	if curtext != nil && curtext.file == f {
 		fc = '.'
 	}
 	warning(nil, "%c%c%c %s\n", dirtychar,
-		'+', fc, f.details.Name)
+		'+', fc, f.Name())
 }
 
 func loopcmd(file *ObservableEditableBuffer, cp *Cmd, rp []Range) {
@@ -800,7 +800,7 @@ func alllooper(w *Window, lp *Looper) {
 	if cp.re == "" && t.file.Name() == "" {
 		return
 	}
-	if cp.re == "" || filematch(t.file.f, cp.re) == lp.XY {
+	if cp.re == "" || filematch(t.file, cp.re) == lp.XY {
 		lp.w = append(lp.w, w)
 	}
 }
@@ -1064,28 +1064,28 @@ func allmatchfile(w *Window, tp *ToOEB) {
 	}
 	//	if w.nopen[QWevent] > 0   {
 	//		return;
-	if filematch(w.body.file.f, tp.r) {
-		if tp.oeb.f != nil {
+	if filematch(w.body.file, tp.r) {
+		if tp.oeb != nil {
 			editerror("too many files match \"%v\"", tp.r)
 		}
-		tp.oeb.f = w.body.file.f
+		tp.oeb = w.body.file
 	}
 }
 
 func matchfile(r string) *ObservableEditableBuffer {
 	var tf ToOEB
 
-	tf.oeb.f = nil
+	tf.oeb = nil
 	tf.r = r
 	row.AllWindows(func(w *Window) { allmatchfile(w, &tf) })
 
-	if tf.oeb.f == nil {
+	if tf.oeb == nil {
 		editerror("no file matches \"%v\"", r)
 	}
 	return tf.oeb
 }
 
-func filematch(f *File, r string) bool {
+func filematch(f *ObservableEditableBuffer, r string) bool {
 	// compile expr first so if we get an error, we haven't allocated anything  {
 	are, err := rxcompile(r)
 	if err != nil {
@@ -1096,10 +1096,10 @@ func filematch(f *File, r string) bool {
 		dmark = '\''
 	}
 	fmark := ' '
-	if curtext != nil && curtext.file.f == f {
+	if curtext != nil && curtext.file == f {
 		fmark = '.'
 	}
-	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.details.Name)
+	buf := fmt.Sprintf("%c%c%c %s\n", dmark, '+', fmark, f.Name())
 
 	s := are.rxexecute(nil, []rune(buf), 0, len([]rune(buf)), 1)
 	return len(s) > 0
@@ -1198,16 +1198,16 @@ func lineaddr(l int, addr Address, sign int) Address {
 }
 
 type Filecheck struct {
-	f *File
+	f *ObservableEditableBuffer
 	r string
 }
 
 func allfilecheck(w *Window, fp *Filecheck) {
-	f := w.body.file.f
-	if w.body.file.f == fp.f {
+	f := w.body.file
+	if f == fp.f {
 		return
 	}
-	if fp.r == f.details.Name {
+	if fp.r == f.Name() {
 		warning(nil, "warning: duplicate file name \"%s\"\n", fp.r)
 	}
 }
@@ -1233,7 +1233,7 @@ func cmdname(oeb *ObservableEditableBuffer, str string, set bool) string {
 	} else {
 		r = cur.DirName(s)
 	}
-	fc.f = oeb.f
+	fc.f = oeb
 	fc.r = r
 	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) })
 	if oeb.Name() == "" {

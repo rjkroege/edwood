@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/file"
 	"io"
+	"io/ioutil"
+	"os"
+	"strings"
 )
 
 // The ObservableEditableBuffer is used by the main program
@@ -12,6 +16,16 @@ type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
+	details      *file.DiskDetails
+}
+
+// Set is a forwarding function for file_hash.Set
+func (e *ObservableEditableBuffer) Set(hash []byte) {
+	e.details.Hash.Set(hash)
+}
+
+func (e *ObservableEditableBuffer) SetInfo(info os.FileInfo) {
+	e.details.Info = info
 }
 
 // AddObserver adds e as an observer for edits to this File.
@@ -67,12 +81,13 @@ func (e *ObservableEditableBuffer) HasMultipleObservers() bool {
 
 // MakeObservableEditableBuffer is a constructor wrapper for NewFile() to abstract File from the main program.
 func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEditableBuffer {
-	f := NewFile(filename)
+	f := NewFile()
 	f.b = b
 	oeb := &ObservableEditableBuffer{
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
+		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
 	}
 	oeb.f.oeb = oeb
 	return oeb
@@ -86,6 +101,7 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
+		details:      &file.DiskDetails{Hash: file.Hash{}},
 	}
 	oeb.f.oeb = oeb
 	return oeb
@@ -148,12 +164,20 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 
 // SaveableAndDirty is a forwarding function for file.SaveableAndDirty.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
-	return e.f.SaveableAndDirty()
+	return e.details.Name != "" && e.f.SaveableAndDirty()
 }
 
 // Load is a forwarding function for file.Load.
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
-	return e.f.Load(q0, fd, sethash)
+	d, err := ioutil.ReadAll(fd)
+	if err != nil {
+		warning(nil, "read error in RuneArray.Load")
+	}
+	if sethash {
+		e.SetHash(file.CalcHash(d))
+	}
+
+	return e.f.Load(q0, d)
 }
 
 // Dirty is a forwarding function for file.Dirty.
@@ -193,7 +217,27 @@ func (e *ObservableEditableBuffer) Modded() {
 
 // Name is a getter for file.details.Name.
 func (e *ObservableEditableBuffer) Name() string {
-	return e.f.details.Name
+	return e.details.Name
+}
+
+// Info is a Getter for e.details.Info
+func (e *ObservableEditableBuffer) Info() os.FileInfo {
+	return e.details.Info
+}
+
+// UpdateInfo is a forwarding function for file.UpdateInfo
+func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) error {
+	return e.details.UpdateInfo(filename, d)
+}
+
+// Hash is a getter for DiskDetails.Hash
+func (e *ObservableEditableBuffer) Hash() file.Hash {
+	return e.details.Hash
+}
+
+// SetHash is a setter for DiskDetails.Hash
+func (e *ObservableEditableBuffer) SetHash(hash file.Hash) {
+	e.details.Hash = hash
 }
 
 // Seq is a getter for file.details.Seq.
@@ -275,7 +319,18 @@ func (e *ObservableEditableBuffer) Equal(s []rune) bool {
 	return e.f.b.Equal(s)
 }
 
-// Nbyte is a forwaring function for rune_array.Nbyte.
+// Nbyte is a forwarding function for rune_array.Nbyte.
 func (e *ObservableEditableBuffer) Nbyte() int {
 	return e.f.b.Nbyte()
+}
+
+// Setnameandisscratch updates the oeb.details.name and isscratch bit
+// at the same time.
+func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
+	e.details.Name = name
+	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
+		e.f.isscratch = true
+	} else {
+		e.f.isscratch = false
+	}
 }

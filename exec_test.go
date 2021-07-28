@@ -127,7 +127,7 @@ func TestPutfile(t *testing.T) {
 	cur.w = w
 	file.SetCurObserver(cur)
 	increaseMtime := func(t *testing.T, duration time.Duration) {
-		tm := f.details.Info.ModTime().Add(duration)
+		tm := file.Info().ModTime().Add(duration)
 		if err := os.Chtimes(filename, tm, tm); err != nil {
 			t.Fatalf("Chtimes failed: %v", err)
 		}

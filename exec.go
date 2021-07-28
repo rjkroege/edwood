@@ -499,21 +499,21 @@ func putfile(oeb *ObservableEditableBuffer, q0 int, q1 int, name string) error {
 
 	// Putting to the same file that we already read from.
 	if err == nil && name == oeb.Name() {
-		if !os.SameFile(oeb.f.details.Info, d) || d.ModTime().Sub(oeb.f.details.Info.ModTime()) > time.Millisecond {
-			oeb.f.details.UpdateInfo(name, d)
+		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
+			oeb.UpdateInfo(name, d)
 		}
-		if !os.SameFile(oeb.f.details.Info, d) || d.ModTime().Sub(oeb.f.details.Info.ModTime()) > time.Millisecond {
+		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
-			oeb.f.details.Info = d
+			oeb.SetInfo(d)
 
-			if oeb.f.details.Hash == file.EmptyHash {
+			if oeb.Hash() == file.EmptyHash {
 				// Edwood created the File but a disk file with the same name exists.
 				return warnError(nil, "%s not written; file already exists", name)
 			}
 
 			// Edwood loaded the disk file to File but the disk file has been modified since.
-			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, oeb.f.details.Info.ModTime(), d.ModTime())
+			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, oeb.Info().ModTime(), d.ModTime())
 		}
 	}
 
@@ -548,8 +548,8 @@ func putfile(oeb *ObservableEditableBuffer, q0 int, q1 int, name string) error {
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
-			oeb.f.details.Info = d
-			oeb.f.details.Hash.Set(h.Sum(nil))
+			oeb.SetInfo(d)
+			oeb.Set(h.Sum(nil))
 			oeb.Clean()
 		}
 	}

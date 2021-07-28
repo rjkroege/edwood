@@ -1002,6 +1002,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 		fr:      &MockFrame{},
 		display: d,
 	}
+	w.body.file.AddObserver(&w.body)
 
 	// Put something in the snarf buffer.
 	const snarfbuf = "Hello, 世界\n"
