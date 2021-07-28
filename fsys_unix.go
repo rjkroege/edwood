@@ -5,13 +5,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"net"
 	"os"
 	"path/filepath"
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 func newPipe() (net.Conn, net.Conn, error) {

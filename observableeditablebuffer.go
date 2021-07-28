@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/elog"
-	"github.com/rjkroege/edwood/internal/file"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/rjkroege/edwood/internal/elog"
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 // The ObservableEditableBuffer is used by the main program

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/elog"
 	"strings"
+
+	"github.com/rjkroege/edwood/internal/elog"
 )
 
 // These constants indicates the direction of regular expresssion search.

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"io"
 	"log"
@@ -18,6 +17,7 @@ import (
 	"github.com/rjkroege/edwood/internal/draw/drawutil"
 	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 const (

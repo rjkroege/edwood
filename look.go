@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (
@@ -299,8 +299,8 @@ func search(ct *Text, r []rune) bool {
 				}
 				continue
 			}
-			q += (bi + ci - bi)
-			nb -= (bi + ci - bi)
+			q += bi + ci - bi
+			nb -= bi + ci - bi
 			bi = bi + ci
 		}
 		// reload if buffer covers neither string nor rest of file

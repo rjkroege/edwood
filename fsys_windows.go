@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"net"
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (

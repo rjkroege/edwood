@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/internal/elog"
 )
 
 func TestAddr(t *testing.T) {
