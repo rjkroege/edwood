@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
 
 	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/internal/sam"
 )
 
 // TestWindowUndoSelection checks text selection change after undo/redo.
@@ -16,7 +16,7 @@ func TestWindowUndoSelection(t *testing.T) {
 		word = RuneArray("hello")
 		p0   = 3
 		undo = &Undo{
-			t:   elog.Insert,
+			t:   sam.Insert,
 			buf: word,
 			p0:  p0,
 			n:   word.nc(),

@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/elog"
 	"github.com/rjkroege/edwood/internal/file"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/rjkroege/edwood/internal/sam"
 )
 
 // The ObservableEditableBuffer is used by the main program
@@ -17,7 +18,7 @@ type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
-	elog         elog.Elog
+	elog         sam.Elog
 	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.RuneArray context, these two ops
@@ -98,7 +99,7 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 		observers:    nil,
 		f:            f,
 		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
-		elog:         elog.MakeElog(),
+		elog:         sam.MakeElog(),
 		Editclean:    true,
 	}
 	oeb.f.oeb = oeb
@@ -113,7 +114,7 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
-		elog:         elog.MakeElog(),
+		elog:         sam.MakeElog(),
 		details:      &file.DiskDetails{Hash: file.Hash{}},
 		Editclean:    true,
 	}
