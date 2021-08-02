@@ -484,7 +484,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			q0 = u.p0
 			q1 = u.p0 + u.n
 			ok = true
-		case Filename:
+		case elog.Filename:
 			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
 			// TODO(rjk): If I have a zerox, does undo a filename change update?
 			f.seq = u.seq
