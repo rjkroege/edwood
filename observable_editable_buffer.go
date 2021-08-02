@@ -25,8 +25,8 @@ type ObservableEditableBuffer struct {
 	// implementation code to let multiple Inserts be grouped together?
 	// Figure out how this inter-operates with seq.
 	Editclean bool
-	details      *file.DiskDetails
-	isscratch    bool // Used to track if this File should warn on unsaved deletion. [private]
+	details   *file.DiskDetails
+	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
 }
 
 // Set is a forwarding function for file_hash.Set
