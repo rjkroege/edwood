@@ -840,7 +840,7 @@ func TestXfidwriteQWeditout(t *testing.T) {
 	}
 }
 
-/*func TestXfidwriteQWctl(t *testing.T) {
+func TestXfidwriteQWctl(t *testing.T) {
 	configureGlobals()
 	warnings = nil
 	cwarn = nil
@@ -906,10 +906,10 @@ func TestXfidwriteQWeditout(t *testing.T) {
 			row.display = display
 
 			// mark window dirty
-			f := w.body.file.f
+			f := w.body.file
 			f.InsertAt(0, []rune(strings.Repeat("ha", 100)))
-			f.seq = 0
-			f.putseq = 1
+			f.SetSeq(0)
+			f.SetPutseq(1)
 
 			x := &Xfid{
 				fcall: plan9.Fcall{
@@ -938,7 +938,7 @@ func TestXfidwriteQWeditout(t *testing.T) {
 			}
 		})
 	}
-}*/
+}
 
 func TestXfidwriteQWevent(t *testing.T) {
 	for _, tc := range []struct {

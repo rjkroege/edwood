@@ -350,3 +350,13 @@ func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
 		e.isscratch = false
 	}
 }
+
+// SetSeq is a setter for file.seq
+func (e *ObservableEditableBuffer) SetSeq(seq int) {
+	e.f.seq = seq
+}
+
+// SetPutseq is a setter for file.putseq
+func (e *ObservableEditableBuffer) SetPutseq(putseq int) {
+	e.f.putseq = putseq
+}
