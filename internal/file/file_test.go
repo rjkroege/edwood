@@ -8,16 +8,16 @@ import (
 	"testing"
 )
 
-/*func TestDelText(t *testing.T) {
+func TestDelObserver(t *testing.T) {
 	f := MakeObservableEditableBufferTag(RuneArray{})
 
-	testData := []*main.Text{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
+	testData := []*testText{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
 		{file: MakeObservableEditableBuffer("Willowbrook Association Handbook: 2011", nil)},
 		{file: MakeObservableEditableBuffer("Weakest in the Nation", nil)},
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&main.Text{
+		err := f.DelObserver(&testText{
 			file: MakeObservableEditableBuffer("HowToExitVim.txt", nil),
 		})
 		if err == nil {
@@ -39,14 +39,14 @@ import (
 			t.Fatalf("DelObserver resulted in observers of length %v; expected %v", got, want)
 		}
 		f.AllObservers(func(i interface{}) {
-			inText := i.(*main.Text)
+			inText := i.(*testText)
 			if inText == text {
 				t.Fatalf("DelObserver did not delete correctly at index %v", i)
 			}
 
 		})
 	}
-}*/
+}
 
 func TestFileInsertAtWithoutCommit(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
@@ -431,3 +431,14 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 }
+
+type testText struct {
+	file *ObservableEditableBuffer
+	b    RuneArray
+}
+
+// Inserted is implemented to satisfy the BufferObserver interface
+func (t testText) Inserted(q0 int, r []rune) {}
+
+// Deleted is implemented to satisfy the BufferObserver interface
+func (t testText) Deleted(q0, q1 int) {}
