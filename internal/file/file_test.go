@@ -1,4 +1,4 @@
-package main
+package file
 
 import (
 	"bytes"
@@ -6,20 +6,18 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/rjkroege/edwood/internal/file"
 )
 
-func TestDelText(t *testing.T) {
+/*func TestDelText(t *testing.T) {
 	f := MakeObservableEditableBufferTag(RuneArray{})
 
-	testData := []*Text{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
+	testData := []*main.Text{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
 		{file: MakeObservableEditableBuffer("Willowbrook Association Handbook: 2011", nil)},
 		{file: MakeObservableEditableBuffer("Weakest in the Nation", nil)},
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&Text{
+		err := f.DelObserver(&main.Text{
 			file: MakeObservableEditableBuffer("HowToExitVim.txt", nil),
 		})
 		if err == nil {
@@ -41,14 +39,14 @@ func TestDelText(t *testing.T) {
 			t.Fatalf("DelObserver resulted in observers of length %v; expected %v", got, want)
 		}
 		f.AllObservers(func(i interface{}) {
-			inText := i.(*Text)
+			inText := i.(*main.Text)
 			if inText == text {
 				t.Fatalf("DelObserver did not delete correctly at index %v", i)
 			}
 
 		})
 	}
-}
+}*/
 
 func TestFileInsertAtWithoutCommit(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
@@ -235,7 +233,7 @@ func TestFileLoadNoUndo(t *testing.T) {
 
 func TestFileLoadUndoHash(t *testing.T) {
 	hashOfS2nS2 :=
-		file.Hash{0xf0, 0x21, 0xb5, 0x73, 0x6a, 0xb5, 0x21, 0x6d, 0x29, 0x1b, 0x19, 0xfb, 0xe, 0xa8, 0x53, 0x4a, 0x59, 0x7e, 0xb3, 0xfa}
+		Hash{0xf0, 0x21, 0xb5, 0x73, 0x6a, 0xb5, 0x21, 0x6d, 0x29, 0x1b, 0x19, 0xfb, 0xe, 0xa8, 0x53, 0x4a, 0x59, 0x7e, 0xb3, 0xfa}
 
 	f := MakeObservableEditableBuffer("edwood", nil)
 	if got, want := f.Name(), "edwood"; got != want {
@@ -362,7 +360,7 @@ func TestFileUpdateInfo(t *testing.T) {
 		t.Fatalf("stat failed: %v", err)
 	}
 	f := MakeObservableEditableBuffer(filename, nil).f
-	f.oeb.SetHash(file.EmptyHash)
+	f.oeb.SetHash(EmptyHash)
 	f.oeb.SetInfo(nil)
 
 	f.oeb.UpdateInfo(filename, d)
@@ -370,7 +368,7 @@ func TestFileUpdateInfo(t *testing.T) {
 		t.Errorf("File info is %v; want nil", f.oeb.Info())
 	}
 
-	h, err := file.HashFor(filename)
+	h, err := HashFor(filename)
 	if err != nil {
 		t.Fatalf("HashFor(%v) failed: %v", filename, err)
 	}

@@ -1,4 +1,4 @@
-package main
+package file
 
 import (
 	"fmt"
@@ -120,7 +120,7 @@ func (f *File) SetDir(flag bool) {
 // TODO(rjk): Switch all callers to Nr() as would be the number of
 // bytes when backed by undo.RuneArray.
 func (f *File) Size() int {
-	return int(f.b.nc()) + len(f.cache)
+	return int(f.b.Nc()) + len(f.cache)
 }
 
 // Nr returns the number of valid runes in the RuneArray.
@@ -179,7 +179,7 @@ func (f *File) Commit() {
 		return
 	}
 
-	if f.cq0 > f.b.nc() {
+	if f.cq0 > f.b.Nc() {
 		// TODO(rjk): Generate a better error message.
 		panic("internal error: File.Commit")
 	}
@@ -194,12 +194,12 @@ func (f *File) Commit() {
 }
 
 type Undo struct {
-	t   int
+	T   int
 	mod bool
 	seq int
-	p0  int
-	n   int
-	buf []rune
+	P0  int
+	N   int
+	Buf []rune
 }
 
 // Load inserts fd's contents into File at location q0. Load will always
@@ -214,7 +214,7 @@ type Undo struct {
 // UTF-8 -> []rune reader on top of the os.File instead.
 func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool, err error) {
 
-	runes, _, hasNulls := cvttorunes(d, len(d))
+	runes, _, hasNulls := util.Cvttorunes(d, len(d))
 
 	// Would appear to require a commit operation.
 	// NB: Runs the observers.
@@ -246,7 +246,7 @@ func (f *File) Dirty() bool {
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune) {
 	f.treatasclean = false
-	if p0 > f.b.nc() {
+	if p0 > f.b.Nc() {
 		panic("internal error: fileinsert")
 	}
 	if f.seq > 0 {
@@ -267,7 +267,7 @@ func (f *File) InsertAt(p0 int, s []rune) {
 // character insertions.
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	f.treatasclean = false
-	if p0 > f.b.nc()+len(f.cache) {
+	if p0 > f.b.Nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
 
@@ -288,12 +288,12 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
-	u.t = sam.Delete
+	u.T = sam.Delete
 
 	u.mod = f.mod
 	u.seq = f.seq
-	u.p0 = q0
-	u.n = ns
+	u.P0 = q0
+	u.N = ns
 	*delta = append(*delta, &u)
 }
 
@@ -304,7 +304,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 // that makes it not match with undo.RuneArray.Delete
 func (f *File) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
-	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
+	if !(p0 <= p1 && p0 <= f.b.Nc() && p1 <= f.b.Nc()) {
 		util.AcmeError("internal error: DeleteAt", nil)
 	}
 	if len(f.cache) > 0 {
@@ -328,13 +328,13 @@ func (f *File) DeleteAt(p0, p1 int) {
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting
 	var u Undo
-	u.t = sam.Insert
+	u.T = sam.Insert
 	u.mod = f.mod
 	u.seq = f.seq
-	u.p0 = p0
-	u.n = p1 - p0
-	u.buf = make([]rune, u.n)
-	f.b.Read(p0, u.buf)
+	u.P0 = p0
+	u.N = p1 - p0
+	u.Buf = make([]rune, u.N)
+	f.b.Read(p0, u.Buf)
 	*delta = append(*delta, &u)
 }
 
@@ -363,18 +363,18 @@ func (f *File) SetName(name string) {
 func (f *File) UnsetName(delta *[]*Undo) {
 	var u Undo
 	// undo a file name change by restoring old name
-	u.t = sam.Filename
+	u.T = sam.Filename
 	u.mod = f.mod
 	u.seq = f.seq
-	u.p0 = 0 // unused
-	u.n = len(f.oeb.Name())
-	u.buf = []rune(f.oeb.Name())
+	u.P0 = 0 // unused
+	u.N = len(f.oeb.Name())
+	u.Buf = []rune(f.oeb.Name())
 	*delta = append(*delta, &u)
 }
 
 func NewFile() *File {
 	return &File{
-		b:       NewBuffer(),
+		b:       NewRuneArray(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
 		//	seq       int
@@ -386,7 +386,7 @@ func NewFile() *File {
 func NewTagFile() *File {
 
 	return &File{
-		b:       NewBuffer(),
+		b:       NewRuneArray(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
 		//	qidpath   uint64
@@ -462,28 +462,28 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 				return
 			}
 		}
-		switch u.t {
+		switch u.T {
 		default:
 			panic(fmt.Sprintf("undo: 0x%x\n", u.t))
 		case sam.Delete:
 			f.seq = u.seq
-			f.Undelete(epsilon, u.p0, u.p0+u.n)
+			f.Undelete(epsilon, u.P0, u.P0+u.N)
 			f.mod = u.mod
 			f.treatasclean = false
-			f.b.Delete(u.p0, u.p0+u.n)
-			f.oeb.deleted(u.p0, u.p0+u.n)
-			q0 = u.p0
-			q1 = u.p0
+			f.b.Delete(u.P0, u.P0+u.N)
+			f.oeb.deleted(u.P0, u.P0+u.N)
+			q0 = u.P0
+			q1 = u.P0
 			ok = true
 		case sam.Insert:
 			f.seq = u.seq
-			f.Uninsert(epsilon, u.p0, u.n)
+			f.Uninsert(epsilon, u.P0, u.N)
 			f.mod = u.mod
 			f.treatasclean = false
-			f.b.Insert(u.p0, u.buf)
-			f.oeb.inserted(u.p0, u.buf)
-			q0 = u.p0
-			q1 = u.p0 + u.n
+			f.b.Insert(u.P0, u.Buf)
+			f.oeb.inserted(u.P0, u.Buf)
+			q0 = u.P0
+			q1 = u.P0 + u.N
 			ok = true
 		case sam.Filename:
 			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
@@ -492,7 +492,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			f.UnsetName(epsilon)
 			f.mod = u.mod
 			f.treatasclean = false
-			newfname := string(u.buf)
+			newfname := string(u.Buf)
 			f.oeb.Setnameandisscratch(newfname)
 		}
 		*delta = (*delta)[0 : len(*delta)-1]

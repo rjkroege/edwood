@@ -1,6 +1,7 @@
 package main
 
 import (
+	file2 "github.com/rjkroege/edwood/internal/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -118,10 +119,10 @@ func TestPutfile(t *testing.T) {
 	want := "Hello, 世界\n"
 	w := &Window{
 		body: Text{
-			file: MakeObservableEditableBuffer(filename, RuneArray(want)),
+			file: file2.MakeObservableEditableBuffer(filename, file2.RuneArray(want)),
 		},
 	}
-	f := w.body.file.f
+	f := w.body.file
 	file := w.body.file
 	cur := &w.body
 	cur.w = w
@@ -168,7 +169,7 @@ func TestExpandtabToggle(t *testing.T) {
 	want := true
 	w := &Window{
 		body: Text{
-			file:      MakeObservableEditableBuffer("", nil),
+			file:      file2.MakeObservableEditableBuffer("", nil),
 			tabexpand: false,
 			tabstop:   4,
 		},

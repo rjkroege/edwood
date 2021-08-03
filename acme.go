@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"log"
 	"net/http"
@@ -672,15 +673,15 @@ func (w errorWriter) Close() error {
 const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-	r := make([]rune, snarfbuf.nc())
-	snarfbuf.Read(0, r[:snarfbuf.nc()])
+	r := make([]rune, snarfbuf.Nc())
+	snarfbuf.Read(0, r[:snarfbuf.Nc()])
 	row.display.WriteSnarf([]byte(string(r)))
 }
 
 func acmegetsnarf() {
 	b := make([]byte, MAXSNARF)
 	n, _, _ := row.display.ReadSnarf(b)
-	r, _, _ := cvttorunes(b, n)
+	r, _, _ := util.Cvttorunes(b, n)
 	snarfbuf.Reset()
 	snarfbuf.Insert(0, r)
 }

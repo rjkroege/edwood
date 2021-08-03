@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/edwoodtest"
 	"github.com/rjkroege/edwood/internal/sam"
 )
@@ -70,12 +71,12 @@ func TestSetTag1(t *testing.T) {
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    MakeObservableEditableBuffer(name, nil),
+			file:    file.MakeObservableEditableBuffer(name, nil),
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    MakeObservableEditableBuffer("", nil),
+			file:    file.MakeObservableEditableBuffer("", nil),
 		}
 
 		w.setTag1()
@@ -96,18 +97,18 @@ func TestSetTag1(t *testing.T) {
 }
 
 func TestWindowClampAddr(t *testing.T) {
-	buf := RuneArray("Hello, 世界")
+	buf := file.RuneArray("Hello, 世界")
 
 	for _, tc := range []struct {
 		addr, want Range
 	}{
 		{Range{-1, -1}, Range{0, 0}},
-		{Range{100, 100}, Range{buf.nc(), buf.nc()}},
+		{Range{100, 100}, Range{buf.Nc(), buf.Nc()}},
 	} {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: MakeObservableEditableBufferTag(buf),
+				file: file.MakeObservableEditableBufferTag(buf),
 			},
 		}
 		w.ClampAddr()
@@ -130,7 +131,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: MakeObservableEditableBufferTag(RuneArray(tc.tag)),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray(tc.tag)),
 			},
 		}
 		if got, want := w.ParseTag(), tc.filename; got != want {
@@ -144,7 +145,7 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: MakeObservableEditableBufferTag(RuneArray(tag)),
+			file: file.MakeObservableEditableBufferTag(file.RuneArray(tag)),
 		},
 	}
 	w.ClearTag()

@@ -248,10 +248,10 @@ func plumbshow(m *plumb.Message) {
 		name = filepath.Join(m.Dir, name)
 	}
 	name = filepath.Clean(name)
-	r, _, _ := cvttorunes([]byte(name), len(name)) // remove nulls
+	r, _, _ := util.Cvttorunes([]byte(name), len(name)) // remove nulls
 	name = string(r)
 	w.SetName(name)
-	r, _, _ = cvttorunes(m.Data, len(m.Data))
+	r, _, _ = util.Cvttorunes(m.Data, len(m.Data))
 	w.body.Insert(0, r, true)
 	w.body.file.Clean()
 	w.SetTag()
@@ -348,7 +348,7 @@ func isfilec(r rune) bool {
 // Runestr wrapper for cleanname
 func cleanrname(rs []rune) []rune {
 	s := filepath.Clean(string(rs))
-	r, _, _ := cvttorunes([]byte(s), len(s))
+	r, _, _ := util.Cvttorunes([]byte(s), len(s))
 	return r
 }
 

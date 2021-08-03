@@ -1,4 +1,4 @@
-package main
+package file
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
-	elog         sam.Elog
+	Elog         sam.Elog
 	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.RuneArray context, these two ops
@@ -26,7 +26,7 @@ type ObservableEditableBuffer struct {
 	// implementation code to let multiple Inserts be grouped together?
 	// Figure out how this inter-operates with seq.
 	EditClean bool
-	details   *file.DiskDetails
+	details   *DiskDetails
 	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
 }
 
@@ -98,8 +98,8 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
-		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
-		elog:         sam.MakeElog(),
+		details:      &DiskDetails{Name: filename, Hash: Hash{}},
+		Elog:         sam.MakeElog(),
 		EditClean:    true,
 	}
 	oeb.f.oeb = oeb
@@ -114,8 +114,8 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		currobserver: nil,
 		observers:    nil,
 		f:            f,
-		elog:         sam.MakeElog(),
-		details:      &file.DiskDetails{Hash: file.Hash{}},
+		Elog:         sam.MakeElog(),
+		details:      &DiskDetails{Hash: Hash{}},
 		EditClean:    true,
 	}
 	oeb.f.oeb = oeb
@@ -186,10 +186,11 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
 	d, err := ioutil.ReadAll(fd)
 	if err != nil {
-		warning(nil, "read error in RuneArray.Load")
+		// TODO(sn0w): Catch this on the receiver side.
+		//warning(nil, "read error in RuneArray.Load")
 	}
 	if sethash {
-		e.SetHash(file.CalcHash(d))
+		e.SetHash(CalcHash(d))
 	}
 
 	return e.f.Load(q0, d)
@@ -246,12 +247,12 @@ func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) er
 }
 
 // Hash is a getter for DiskDetails.Hash
-func (e *ObservableEditableBuffer) Hash() file.Hash {
+func (e *ObservableEditableBuffer) Hash() Hash {
 	return e.details.Hash
 }
 
 // SetHash is a setter for DiskDetails.Hash
-func (e *ObservableEditableBuffer) SetHash(hash file.Hash) {
+func (e *ObservableEditableBuffer) SetHash(hash Hash) {
 	e.details.Hash = hash
 }
 
@@ -268,14 +269,14 @@ func (e *ObservableEditableBuffer) RedoSeq() int {
 // inserted is a forwarding function for text.inserted.
 func (e *ObservableEditableBuffer) inserted(q0 int, r []rune) {
 	for observer := range e.observers {
-		observer.inserted(q0, r)
+		observer.Inserted(q0, r)
 	}
 }
 
 // deleted is a forwarding function for text.deleted.
 func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 	for observer := range e.observers {
-		observer.deleted(q0, q1)
+		observer.Deleted(q0, q1)
 	}
 }
 

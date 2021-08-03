@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/rjkroege/edwood/internal/util"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -26,9 +27,9 @@ func TestCvttorunes(t *testing.T) {
 		{[]byte("\x96界 hello"), 1 + 3 + 6, []rune("\uFFFD界 hello"), 1 + 3 + 6, false},
 	}
 	for _, tc := range testCases {
-		r, nb, nulls := cvttorunes(tc.p, tc.n)
+		r, nb, nulls := util.Cvttorunes(tc.p, tc.n)
 		if !reflect.DeepEqual(r, tc.r) || nb != tc.nb || nulls != tc.nulls {
-			t.Errorf("cvttorunes of (%q, %v) returned %q, %v, %v; expected %q, %v, %v\n",
+			t.Errorf("util.Cvttorunes of (%q, %v) returned %q, %v, %v; expected %q, %v, %v\n",
 				tc.p, tc.n, r, nb, nulls, tc.r, tc.nb, tc.nulls)
 		}
 	}

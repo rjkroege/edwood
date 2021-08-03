@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/rjkroege/edwood/internal/file"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -213,7 +214,7 @@ func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
 	row = Row{
 		display: edwoodtest.NewDisplay(),
 		tag: Text{
-			file: MakeObservableEditableBuffer("", nil),
+			file: file.MakeObservableEditableBuffer("", nil),
 		},
 	}
 	ch := make(chan struct{})
