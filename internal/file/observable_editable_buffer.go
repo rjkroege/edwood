@@ -351,27 +351,27 @@ func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
 	}
 }
 
-// SetSeq is a setter for file.seq for use in tests
+// SetSeq is a setter for file.seq for use in tests.
 func (e *ObservableEditableBuffer) SetSeq(seq int) {
 	e.f.seq = seq
 }
 
-// SetPutseq is a setter for file.putseq for use in tests
+// SetPutseq is a setter for file.putseq for use in tests.
 func (e *ObservableEditableBuffer) SetPutseq(putseq int) {
 	e.f.putseq = putseq
 }
 
-// SetDelta is a setter for file.delta for use in tests
+// SetDelta is a setter for file.delta for use in tests.
 func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 	e.f.delta = delta
 }
 
-// SetEpsilon is a setter for file.epsilon for use in tests
+// SetEpsilon is a setter for file.epsilon for use in tests.
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
 }
 
-// GetCache is a Getter for file.cache for use in tests
+// GetCache is a Getter for file.cache for use in tests.
 func (e *ObservableEditableBuffer) GetCache() []rune {
 	return e.f.cache
 }
