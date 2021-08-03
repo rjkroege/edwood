@@ -14,9 +14,9 @@ import (
 // using nil delta/epsilon, which fixes https://github.com/rjkroege/edwood/issues/230.
 func TestWindowUndoSelection(t *testing.T) {
 	var (
-		word = RuneArray("hello")
+		word = file.RuneArray("hello")
 		p0   = 3
-		undo = &Undo{
+		undo = &file.Undo{
 			t:   sam.Insert,
 			buf: word,
 			p0:  p0,
@@ -42,8 +42,8 @@ func TestWindowUndoSelection(t *testing.T) {
 				file: MakeObservableEditableBufferTag(RuneArray("This is an example sentence.\n")),
 			},
 		}
-		w.body.file.f.delta = tc.delta
-		w.body.file.f.epsilon = tc.epsilon
+		w.body.file.SetDelta(tc.delta)
+		w.body.file.SetEpsilon(tc.epsilon)
 		w.Undo(tc.isundo)
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
