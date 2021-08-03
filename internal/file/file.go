@@ -212,7 +212,7 @@ type Undo struct {
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool, err error) {
+func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool) {
 
 	runes, _, hasNulls := util.Cvttorunes(d, len(d))
 
@@ -220,7 +220,7 @@ func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool, err error) {
 	// NB: Runs the observers.
 	f.InsertAt(q0, runes)
 
-	return len(runes), hasNulls, err
+	return len(runes), hasNulls
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
