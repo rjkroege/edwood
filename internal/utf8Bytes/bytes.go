@@ -17,10 +17,8 @@ import (
 // O(N) in the length of the string, but the overhead is less than always
 // scanning from the beginning.
 // If the string is ASCII, random access is O(1).
-// Unlike the built-in string type, Bytes has internal mutable state and
-// is not thread-safe.
 type Bytes struct {
-	str      string
+	b        []byte
 	numRunes int
 	// If width > 0, the rune at runePos starts at bytePos and has the specified width.
 	width    int
@@ -29,92 +27,92 @@ type Bytes struct {
 	nonASCII int // byte index of the first non-ASCII rune.
 }
 
-// NewString returns a new UTF-8 string with the provided contents.
-func NewBytes(contents string) *Bytes {
+// NewBytes returns a new UTF-8 Bytes with the provided contents.
+func NewBytes(contents []byte) *Bytes {
 	return new(Bytes).Init(contents)
 }
 
 // Init initializes an existing Bytes to hold the provided contents.
 // It returns a pointer to the initialized Bytes.
-func (s *Bytes) Init(contents string) *Bytes {
-	s.str = contents
-	s.bytePos = 0
-	s.runePos = 0
+func (bytes *Bytes) Init(contents []byte) *Bytes {
+	bytes.b = contents
+	bytes.bytePos = 0
+	bytes.runePos = 0
 	for i := 0; i < len(contents); i++ {
 		if contents[i] >= utf8.RuneSelf {
 			// Not ASCII.
-			s.numRunes = utf8.RuneCountInString(contents)
-			_, s.width = utf8.DecodeRuneInString(contents)
-			s.nonASCII = i
-			return s
+			bytes.numRunes = utf8.RuneCount(contents)
+			_, bytes.width = utf8.DecodeRune(contents)
+			bytes.nonASCII = i
+			return bytes
 		}
 	}
 	// ASCII is simple.  Also, the empty string is ASCII.
-	s.numRunes = len(contents)
-	s.width = 0
-	s.nonASCII = len(contents)
-	return s
+	bytes.numRunes = len(contents)
+	bytes.width = 0
+	bytes.nonASCII = len(contents)
+	return bytes
 }
 
 // Bytes returns the contents of the Bytes.  This method also means the
 // Bytes is directly printable by fmt.Print.
-func (s *Bytes) String() string {
-	return s.str
+func (bytes *Bytes) Byte() []byte {
+	return bytes.b
 }
 
 // RuneCount returns the number of runes (Unicode code points) in the Bytes.
-func (s *Bytes) RuneCount() int {
-	return s.numRunes
+func (bytes *Bytes) RuneCount() int {
+	return bytes.numRunes
 }
 
 // IsASCII returns a boolean indicating whether the Bytes contains only ASCII bytes.
-func (s *Bytes) IsASCII() bool {
-	return s.width == 0
+func (bytes *Bytes) IsASCII() bool {
+	return bytes.width == 0
 }
 
 // Slice returns the string sliced at rune positions [i:j].
-func (s *Bytes) Slice(i, j int) string {
+func (bytes *Bytes) Slice(i, j int) []byte {
 	// ASCII is easy.  Let the compiler catch the indexing error if there is one.
-	if j < s.nonASCII {
-		return s.str[i:j]
+	if j < bytes.nonASCII {
+		return bytes.b[i:j]
 	}
-	if i < 0 || j > s.numRunes || i > j {
+	if i < 0 || j > bytes.numRunes || i > j {
 		panic(sliceOutOfRange)
 	}
 	if i == j {
-		return ""
+		return []byte("")
 	}
 	// For non-ASCII, after At(i), bytePos is always the position of the indexed character.
 	var low, high int
 	switch {
-	case i < s.nonASCII:
+	case i < bytes.nonASCII:
 		low = i
-	case i == s.numRunes:
-		low = len(s.str)
+	case i == bytes.numRunes:
+		low = len(bytes.b)
 	default:
-		s.At(i)
-		low = s.bytePos
+		bytes.At(i)
+		low = bytes.bytePos
 	}
 	switch {
-	case j == s.numRunes:
-		high = len(s.str)
+	case j == bytes.numRunes:
+		high = len(bytes.b)
 	default:
-		s.At(j)
-		high = s.bytePos
+		bytes.At(j)
+		high = bytes.bytePos
 	}
-	return s.str[low:high]
+	return bytes.b[low:high]
 }
 
 // At returns the rune with index i in the Bytes.  The sequence of runes is the same
 // as iterating over the contents with a "for range" clause.
-func (s *Bytes) At(i int) rune {
+func (bytes *Bytes) At(i int) rune {
 	// ASCII is easy.  Let the compiler catch the indexing error if there is one.
-	if i < s.nonASCII {
-		return rune(s.str[i])
+	if i < bytes.nonASCII {
+		return rune(bytes.b[i])
 	}
 
 	// Now we do need to know the index is valid.
-	if i < 0 || i >= s.numRunes {
+	if i < 0 || i >= bytes.numRunes {
 		panic(outOfRange)
 	}
 
@@ -124,28 +122,28 @@ func (s *Bytes) At(i int) rune {
 	// With these cases, all scans from beginning or end work in O(1) time per rune.
 	switch {
 
-	case i == s.runePos-1: // backing up one rune
-		r, s.width = utf8.DecodeLastRuneInString(s.str[0:s.bytePos])
-		s.runePos = i
-		s.bytePos -= s.width
+	case i == bytes.runePos-1: // backing up one rune
+		r, bytes.width = utf8.DecodeLastRune(bytes.b[0:bytes.bytePos])
+		bytes.runePos = i
+		bytes.bytePos -= bytes.width
 		return r
-	case i == s.runePos+1: // moving ahead one rune
-		s.runePos = i
-		s.bytePos += s.width
+	case i == bytes.runePos+1: // moving ahead one rune
+		bytes.runePos = i
+		bytes.bytePos += bytes.width
 		fallthrough
-	case i == s.runePos:
-		r, s.width = utf8.DecodeRuneInString(s.str[s.bytePos:])
+	case i == bytes.runePos:
+		r, bytes.width = utf8.DecodeRune(bytes.b[bytes.bytePos:])
 		return r
 	case i == 0: // start of string
-		r, s.width = utf8.DecodeRuneInString(s.str)
-		s.runePos = 0
-		s.bytePos = 0
+		r, bytes.width = utf8.DecodeRune(bytes.b)
+		bytes.runePos = 0
+		bytes.bytePos = 0
 		return r
 
-	case i == s.numRunes-1: // last rune in string
-		r, s.width = utf8.DecodeLastRuneInString(s.str)
-		s.runePos = i
-		s.bytePos = len(s.str) - s.width
+	case i == bytes.numRunes-1: // last rune in string
+		r, bytes.width = utf8.DecodeLastRune(bytes.b)
+		bytes.runePos = i
+		bytes.bytePos = len(bytes.b) - bytes.width
 		return r
 	}
 
@@ -155,43 +153,43 @@ func (s *Bytes) At(i int) rune {
 	// 3) The end
 	// Choose the closest in rune count, scanning backwards if necessary.
 	forward := true
-	if i < s.runePos {
+	if i < bytes.runePos {
 		// Between beginning and pos.  Which is closer?
-		// Since both i and runePos are guaranteed >= nonASCII, that's the
+		// Since both i and runePos are guaranteed >= nonASCII, that'bytes the
 		// lowest location we need to start from.
-		if i < (s.runePos-s.nonASCII)/2 {
+		if i < (bytes.runePos-bytes.nonASCII)/2 {
 			// Scan forward from beginning
-			s.bytePos, s.runePos = s.nonASCII, s.nonASCII
+			bytes.bytePos, bytes.runePos = bytes.nonASCII, bytes.nonASCII
 		} else {
 			// Scan backwards from where we are
 			forward = false
 		}
 	} else {
 		// Between pos and end.  Which is closer?
-		if i-s.runePos < (s.numRunes-s.runePos)/2 {
+		if i-bytes.runePos < (bytes.numRunes-bytes.runePos)/2 {
 			// Scan forward from pos
 		} else {
 			// Scan backwards from end
-			s.bytePos, s.runePos = len(s.str), s.numRunes
+			bytes.bytePos, bytes.runePos = len(bytes.b), bytes.numRunes
 			forward = false
 		}
 	}
 	if forward {
 		// TODO: Is it much faster to use a range loop for this scan?
 		for {
-			r, s.width = utf8.DecodeRuneInString(s.str[s.bytePos:])
-			if s.runePos == i {
+			r, bytes.width = utf8.DecodeRune(bytes.b[bytes.bytePos:])
+			if bytes.runePos == i {
 				break
 			}
-			s.runePos++
-			s.bytePos += s.width
+			bytes.runePos++
+			bytes.bytePos += bytes.width
 		}
 	} else {
 		for {
-			r, s.width = utf8.DecodeLastRuneInString(s.str[0:s.bytePos])
-			s.runePos--
-			s.bytePos -= s.width
-			if s.runePos == i {
+			r, bytes.width = utf8.DecodeLastRune(bytes.b[0:bytes.bytePos])
+			bytes.runePos--
+			bytes.bytePos -= bytes.width
+			if bytes.runePos == i {
 				break
 			}
 		}
