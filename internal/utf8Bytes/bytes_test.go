@@ -5,6 +5,7 @@
 package utf8Bytes
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"unicode/utf8"
@@ -22,13 +23,13 @@ var testStrings = []string{
 func TestScanForwards(t *testing.T) {
 	for _, s := range testStrings {
 		runes := []rune(s)
-		str := NewString(s)
-		if str.RuneCount() != len(runes) {
-			t.Errorf("%s: expected %d runes; got %d", s, len(runes), str.RuneCount())
+		bytes := NewBytes([]byte(s))
+		if bytes.RuneCount() != len(runes) {
+			t.Errorf("%s: expected %d runes; got %d", s, len(runes), bytes.RuneCount())
 			break
 		}
 		for i, expect := range runes {
-			got := str.At(i)
+			got := bytes.At(i)
 			if got != expect {
 				t.Errorf("%s[%d]: expected %c (%U); got %c (%U)", s, i, expect, expect, got, got)
 			}
@@ -39,14 +40,14 @@ func TestScanForwards(t *testing.T) {
 func TestScanBackwards(t *testing.T) {
 	for _, s := range testStrings {
 		runes := []rune(s)
-		str := NewString(s)
-		if str.RuneCount() != len(runes) {
-			t.Errorf("%s: expected %d runes; got %d", s, len(runes), str.RuneCount())
+		bytes := NewBytes([]byte(s))
+		if bytes.RuneCount() != len(runes) {
+			t.Errorf("%s: expected %d runes; got %d", s, len(runes), bytes.RuneCount())
 			break
 		}
 		for i := len(runes) - 1; i >= 0; i-- {
 			expect := runes[i]
-			got := str.At(i)
+			got := bytes.At(i)
 			if got != expect {
 				t.Errorf("%s[%d]: expected %c (%U); got %c (%U)", s, i, expect, expect, got, got)
 			}
@@ -67,15 +68,15 @@ func TestRandomAccess(t *testing.T) {
 			continue
 		}
 		runes := []rune(s)
-		str := NewString(s)
-		if str.RuneCount() != len(runes) {
-			t.Errorf("%s: expected %d runes; got %d", s, len(runes), str.RuneCount())
+		bytes := NewBytes([]byte(s))
+		if bytes.RuneCount() != len(runes) {
+			t.Errorf("%s: expected %d runes; got %d", s, len(runes), bytes.RuneCount())
 			break
 		}
 		for j := 0; j < randCount(); j++ {
 			i := rand.Intn(len(runes))
 			expect := runes[i]
-			got := str.At(i)
+			got := bytes.At(i)
 			if got != expect {
 				t.Errorf("%s[%d]: expected %c (%U); got %c (%U)", s, i, expect, expect, got, got)
 			}
@@ -89,9 +90,9 @@ func TestRandomSliceAccess(t *testing.T) {
 			continue
 		}
 		runes := []rune(s)
-		str := NewString(s)
-		if str.RuneCount() != len(runes) {
-			t.Errorf("%s: expected %d runes; got %d", s, len(runes), str.RuneCount())
+		bytes := NewBytes([]byte(s))
+		if bytes.RuneCount() != len(runes) {
+			t.Errorf("%s: expected %d runes; got %d", s, len(runes), bytes.RuneCount())
 			break
 		}
 		for k := 0; k < randCount(); k++ {
@@ -101,7 +102,7 @@ func TestRandomSliceAccess(t *testing.T) {
 				continue
 			}
 			expect := string(runes[i:j])
-			got := str.Slice(i, j)
+			got := string(bytes.Slice(i, j))
 			if got != expect {
 				t.Errorf("%s[%d:%d]: expected %q got %q", s, i, j, expect, got)
 			}
@@ -111,13 +112,25 @@ func TestRandomSliceAccess(t *testing.T) {
 
 func TestLimitSliceAccess(t *testing.T) {
 	for _, s := range testStrings {
-		str := NewString(s)
-		if str.Slice(0, 0) != "" {
+		bytes := NewBytes([]byte(s))
+
+		if string(bytes.Slice(0, 0)) != "" {
 			t.Error("failure with empty slice at beginning")
+			t.Error("Failed with string: ", s)
+
+			stuffsBegin := bytes.Slice(0, 0)
+			if stuffsBegin != nil {
+				println("salkdjaslkdj")
+			}
+			fmt.Printf("StuffsBegin: %v\n", stuffsBegin)
 		}
 		nr := utf8.RuneCountInString(s)
-		if str.Slice(nr, nr) != "" {
+
+		if string(bytes.Slice(nr, nr)) != "" {
 			t.Error("failure with empty slice at end")
+
+			stuffsEnd := bytes.Slice(nr, nr)
+			fmt.Printf("StuffsEnd: %v\n", stuffsEnd)
 		}
 	}
 }
