@@ -10,16 +10,16 @@ import (
 	"unicode/utf8"
 )
 
-// Byte wraps a regular bytes with a small structure that provides more
+// Bytes wraps a regular bytes with a small structure that provides more
 // efficient indexing by code point index, as opposed to byte index.
 // Scanning incrementally forwards or backwards is O(1) per index operation
 // (although not as fast a range clause going forwards).  Random access is
 // O(N) in the length of the string, but the overhead is less than always
 // scanning from the beginning.
 // If the string is ASCII, random access is O(1).
-// Unlike the built-in string type, Byte has internal mutable state and
+// Unlike the built-in string type, Bytes has internal mutable state and
 // is not thread-safe.
-type Byte struct {
+type Bytes struct {
 	str      string
 	numRunes int
 	// If width > 0, the rune at runePos starts at bytePos and has the specified width.
@@ -30,13 +30,13 @@ type Byte struct {
 }
 
 // NewString returns a new UTF-8 string with the provided contents.
-func NewString(contents string) *Byte {
-	return new(Byte).Init(contents)
+func NewBytes(contents string) *Bytes {
+	return new(Bytes).Init(contents)
 }
 
-// Init initializes an existing Byte to hold the provided contents.
-// It returns a pointer to the initialized Byte.
-func (s *Byte) Init(contents string) *Byte {
+// Init initializes an existing Bytes to hold the provided contents.
+// It returns a pointer to the initialized Bytes.
+func (s *Bytes) Init(contents string) *Bytes {
 	s.str = contents
 	s.bytePos = 0
 	s.runePos = 0
@@ -56,24 +56,24 @@ func (s *Byte) Init(contents string) *Byte {
 	return s
 }
 
-// Byte returns the contents of the Byte.  This method also means the
-// Byte is directly printable by fmt.Print.
-func (s *Byte) String() string {
+// Bytes returns the contents of the Bytes.  This method also means the
+// Bytes is directly printable by fmt.Print.
+func (s *Bytes) String() string {
 	return s.str
 }
 
-// RuneCount returns the number of runes (Unicode code points) in the Byte.
-func (s *Byte) RuneCount() int {
+// RuneCount returns the number of runes (Unicode code points) in the Bytes.
+func (s *Bytes) RuneCount() int {
 	return s.numRunes
 }
 
-// IsASCII returns a boolean indicating whether the Byte contains only ASCII bytes.
-func (s *Byte) IsASCII() bool {
+// IsASCII returns a boolean indicating whether the Bytes contains only ASCII bytes.
+func (s *Bytes) IsASCII() bool {
 	return s.width == 0
 }
 
 // Slice returns the string sliced at rune positions [i:j].
-func (s *Byte) Slice(i, j int) string {
+func (s *Bytes) Slice(i, j int) string {
 	// ASCII is easy.  Let the compiler catch the indexing error if there is one.
 	if j < s.nonASCII {
 		return s.str[i:j]
@@ -105,9 +105,9 @@ func (s *Byte) Slice(i, j int) string {
 	return s.str[low:high]
 }
 
-// At returns the rune with index i in the Byte.  The sequence of runes is the same
+// At returns the rune with index i in the Bytes.  The sequence of runes is the same
 // as iterating over the contents with a "for range" clause.
-func (s *Byte) At(i int) rune {
+func (s *Bytes) At(i int) rune {
 	// ASCII is easy.  Let the compiler catch the indexing error if there is one.
 	if i < s.nonASCII {
 		return rune(s.str[i])
