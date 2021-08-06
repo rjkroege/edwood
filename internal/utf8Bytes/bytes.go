@@ -197,5 +197,15 @@ func (bytes *Bytes) At(i int) rune {
 	return r
 }
 
+// HasNull returns true if Bytes contains a null rune.
+func (b *Bytes) HasNull() bool {
+	for i := 0; i < b.numRunes; i++ {
+		if b.At(i) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 var outOfRange = errors.New("utf8Bytes: index out of range")
 var sliceOutOfRange = errors.New("utf8Bytes: slice index out of range")
