@@ -28,6 +28,6 @@ func Abs(x int) int {
 	return x
 }
 
-func Acmeerror(s string, err error) {
+func AcmeError(s string, err error) {
 	log.Panicf("acme: %s: %v\n", s, err)
 }

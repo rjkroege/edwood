@@ -32,7 +32,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		err := mux9p.Listen("unix", addr, conn, nil)
 		if err != nil {
-			util.Acmeerror("9P multiplexer failed", err)
+			util.AcmeError("9P multiplexer failed", err)
 		}
 	}()
 	return nil

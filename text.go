@@ -191,7 +191,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 func (t *Text) Close() {
 	t.fr.Clear(true)
 	if err := t.file.DelObserver(t); err != nil {
-		util.Acmeerror(err.Error(), nil)
+		util.AcmeError(err.Error(), nil)
 	}
 	t.file = nil
 	if argtext == t {
@@ -931,7 +931,7 @@ func (t *Text) Type(r rune) {
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		if t.file.HasUncommitedChanges() {
-			util.Acmeerror("text.type", nil)
+			util.AcmeError("text.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0

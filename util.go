@@ -96,7 +96,7 @@ func errorwin1(dir string, incl []string) *Window {
 	if w == nil {
 		if len(row.col) == 0 {
 			if row.Add(nil, -1) == nil {
-				util.Acmeerror("can't create column to make error window", nil)
+				util.AcmeError("can't create column to make error window", nil)
 			}
 		}
 		w = row.col[len(row.col)-1].Add(nil, nil, -1)
@@ -175,7 +175,7 @@ func makenewwindow(t *Text) *Window {
 		c = t.col
 	default:
 		if len(row.col) == 0 && row.Add(nil, -1) == nil {
-			util.Acmeerror("can't make column", nil)
+			util.AcmeError("can't make column", nil)
 		}
 		c = row.col[len(row.col)-1]
 	}

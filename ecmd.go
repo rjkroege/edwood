@@ -1039,7 +1039,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 				a = lineaddr(1, a, sign)
 			}
 		default:
-			util.Acmeerror("cmdaddress", nil)
+			util.AcmeError("cmdaddress", nil)
 			return a
 		}
 		ap = ap.next

@@ -28,7 +28,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		defer l.Close()
 		if err := mux9p.Do(l, conn, nil); err != nil {
-			util.Acmeerror("9P multiplexer failed", err)
+			util.AcmeError("9P multiplexer failed", err)
 		}
 	}()
 	fsysAddr = l.Addr()

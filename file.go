@@ -276,7 +276,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	} else {
 		if p0 != f.cq0+len(f.cache) {
 			// TODO(rjk): actually print something useful here
-			util.Acmeerror("File.InsertAtWithoutCommit cq0", nil)
+			util.AcmeError("File.InsertAtWithoutCommit cq0", nil)
 		}
 	}
 	f.cache = append(f.cache, s...)
@@ -305,10 +305,10 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 func (f *File) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
-		util.Acmeerror("internal error: DeleteAt", nil)
+		util.AcmeError("internal error: DeleteAt", nil)
 	}
 	if len(f.cache) > 0 {
-		util.Acmeerror("internal error: DeleteAt", nil)
+		util.AcmeError("internal error: DeleteAt", nil)
 	}
 
 	if f.seq > 0 {
