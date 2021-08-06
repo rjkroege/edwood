@@ -275,7 +275,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	if nulls {
 		warning(nil, "%v: NUL bytes elided\n", name)
 	} else if allreplaced && samename {
-		file.Editclean = true
+		file.EditClean = true
 	}
 	return true
 }

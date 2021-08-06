@@ -25,7 +25,7 @@ type ObservableEditableBuffer struct {
 	// don't have an implicit Commit. We set editclean in the Edit cmd
 	// implementation code to let multiple Inserts be grouped together?
 	// Figure out how this inter-operates with seq.
-	Editclean bool
+	EditClean bool
 	details   *file.DiskDetails
 	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
 }
@@ -100,7 +100,7 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 		f:            f,
 		details:      &file.DiskDetails{Name: filename, Hash: file.Hash{}},
 		elog:         sam.MakeElog(),
-		Editclean:    true,
+		EditClean:    true,
 	}
 	oeb.f.oeb = oeb
 	return oeb
@@ -116,7 +116,7 @@ func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
 		f:            f,
 		elog:         sam.MakeElog(),
 		details:      &file.DiskDetails{Hash: file.Hash{}},
-		Editclean:    true,
+		EditClean:    true,
 	}
 	oeb.f.oeb = oeb
 	return oeb
