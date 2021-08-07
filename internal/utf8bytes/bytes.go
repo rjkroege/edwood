@@ -4,7 +4,7 @@
 
 // Package utf8Bytes provides an efficient way to index bytes by rune rather than by byte.
 // utf8Bytes is a modified version of utf8string found at "https://cs.opensource.google/go/x/exp/+/master:utf8string/"
-package utf8Bytes // import "golang.org/x/exp/utf8Bytes"
+package utf8bytes // import "golang.org/x/exp/utf8Bytes"
 
 import (
 	"errors"
