@@ -208,5 +208,11 @@ func (b *Bytes) HasNull() bool {
 	return false
 }
 
+// Read implements the io.Reader interface
+func (b *Bytes) Read(buf []byte) (n int, err error) {
+	n = copy(buf, b.Byte())
+	return n, nil
+}
+
 var outOfRange = errors.New("utf8Bytes: index out of range")
 var sliceOutOfRange = errors.New("utf8Bytes: slice index out of range")
