@@ -117,20 +117,11 @@ func TestLimitSliceAccess(t *testing.T) {
 		if string(bytes.Slice(0, 0)) != "" {
 			t.Error("failure with empty slice at beginning")
 			t.Error("Failed with string: ", s)
-
-			stuffsBegin := bytes.Slice(0, 0)
-			if stuffsBegin != nil {
-				println("salkdjaslkdj")
-			}
-			fmt.Printf("StuffsBegin: %v\n", stuffsBegin)
 		}
 		nr := utf8.RuneCountInString(s)
 
 		if string(bytes.Slice(nr, nr)) != "" {
 			t.Error("failure with empty slice at end")
-
-			stuffsEnd := bytes.Slice(nr, nr)
-			fmt.Printf("StuffsEnd: %v\n", stuffsEnd)
 		}
 	}
 }
