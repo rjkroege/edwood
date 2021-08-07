@@ -5,6 +5,7 @@
 package utf8bytes
 
 import (
+	"bytes"
 	"math/rand"
 	"testing"
 	"unicode/utf8"
@@ -121,6 +122,30 @@ func TestLimitSliceAccess(t *testing.T) {
 
 		if string(b.Slice(nr, nr)) != "" {
 			t.Error("failure with empty slice at end")
+		}
+	}
+}
+
+func TestBytes_Read(t *testing.T) {
+	for _, s := range testStrings {
+		b := NewBytes([]byte(s))
+		strLen := len(s)
+		var readTo int
+		if strLen == 0 {
+			readTo = 0
+		} else {
+			readTo = rand.Intn(strLen)
+		}
+
+		got := make([]byte, readTo)
+		b.Read(got)
+
+		reader := bytes.NewReader(b.Byte())
+		wanted := make([]byte, readTo)
+		reader.Read(wanted)
+
+		if string(got) != string(wanted) {
+			t.Errorf("Expected: %s, got: %s\n", got, wanted)
 		}
 	}
 }
