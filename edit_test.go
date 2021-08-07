@@ -127,7 +127,7 @@ func TestEdit(t *testing.T) {
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
 			t.Errorf("text %d: expected %d warnings but got %d warnings", i, want, got)
 			for i := range warnings {
-				t.Errorf("Warning #%d recieved: %s\n", i, warnings[i].buf.String())
+				t.Errorf("Warning #%d received: %s\n", i, warnings[i].buf.String())
 			}
 			break
 		}
