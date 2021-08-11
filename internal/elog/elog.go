@@ -124,7 +124,7 @@ func (e *Elog) Replace(q0, q1 int, r []rune) error {
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
 		if err != nil {
-			err = errors.New(err.Error() + Wsequence)
+			err = errors.New(err.Error() + "\n" + Wsequence)
 		} else {
 			err = errors.New(Wsequence)
 		}
@@ -165,7 +165,7 @@ func (e *Elog) Insert(q0 int, r []rune) error {
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
 		if err != nil {
-			err = errors.New(err.Error() + WsequenceDire)
+			err = errors.New(err.Error() + "\n" + WsequenceDire)
 		} else {
 			err = errors.New(WsequenceDire)
 		}
@@ -202,7 +202,7 @@ func (e *Elog) Delete(q0, q1 int) error {
 	if eo.q0 < e.secondlast().q0 {
 		e.warned = true
 		if err != nil {
-			err = errors.New(err.Error() + WsequenceDire)
+			err = errors.New(err.Error() + "\n" + WsequenceDire)
 		} else {
 			err = errors.New(WsequenceDire)
 		}
