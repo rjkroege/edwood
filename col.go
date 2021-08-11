@@ -221,7 +221,7 @@ func (c *Column) Close(w *Window, dofree bool) {
 			goto Found
 		}
 	}
-	util.Acmeerror("can't find window", nil)
+	util.AcmeError("can't find window", nil)
 Found:
 	r = w.r
 	w.tag.col = nil
@@ -348,7 +348,7 @@ func (c *Column) Grow(w *Window, but int) {
 		}
 	}
 	if windex == len(c.w) {
-		util.Acmeerror("can't find window", nil)
+		util.AcmeError("can't find window", nil)
 	}
 
 	cr := c.r
@@ -531,7 +531,7 @@ func (c *Column) DragWin(w *Window, but int) {
 			goto Found
 		}
 	}
-	util.Acmeerror("can't find window", nil)
+	util.AcmeError("can't find window", nil)
 
 Found:
 	if w.tagexpand { // force recomputation of window tag size

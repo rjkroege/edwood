@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/elog"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/internal/sam"
 )
 
 func TestAddr(t *testing.T) {
@@ -50,7 +51,7 @@ func TestAddr(t *testing.T) {
 		{Range{0, 0}, "#X", Range{0, 0}, true, 1},
 	}
 
-	text := elog.NewTextBuffer(0, 0, []rune("This is a\nshort text\nto try addressing\n"))
+	text := sam.NewTextBuffer(0, 0, []rune("This is a\nshort text\nto try addressing\n"))
 
 	for i, test := range testtab {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {

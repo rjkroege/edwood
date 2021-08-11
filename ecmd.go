@@ -274,7 +274,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	if nulls {
 		warning(nil, "%v: NUL bytes elided\n", name)
 	} else if allreplaced && samename {
-		file.Editclean = true
+		file.EditClean = true
 	}
 	return true
 }
@@ -1038,7 +1038,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 				a = lineaddr(1, a, sign)
 			}
 		default:
-			util.Acmeerror("cmdaddress", nil)
+			util.AcmeError("cmdaddress", nil)
 			return a
 		}
 		ap = ap.next

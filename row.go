@@ -161,7 +161,7 @@ func (row *Row) DragCol(c *Column, _ int) {
 			goto Found
 		}
 	}
-	util.Acmeerror("can't find column", nil)
+	util.AcmeError("can't find column", nil)
 
 Found:
 	p = mouse.Point
@@ -218,7 +218,7 @@ func (row *Row) Close(c *Column, dofree bool) {
 			goto Found
 		}
 	}
-	util.Acmeerror("can't find column", nil)
+	util.AcmeError("can't find column", nil)
 Found:
 	r = c.r
 	if dofree {

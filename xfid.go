@@ -859,7 +859,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		} else {
 			if boff+uint64(nb) > off {
 				if n != 0 {
-					util.Acmeerror("bad count in utfrune", nil)
+					util.AcmeError("bad count in utfrune", nil)
 				}
 				m := nb - int(off-boff)
 				if m > int(x.fcall.Count) {

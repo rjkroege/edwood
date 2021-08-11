@@ -668,7 +668,7 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 		return
 	}
 	if w.owner == 0 {
-		util.Acmeerror("no window owner", nil)
+		util.AcmeError("no window owner", nil)
 	}
 	b := []byte(fmt.Sprintf(format, args...))
 	w.events = append(w.events, byte(w.owner))

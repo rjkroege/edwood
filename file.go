@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/elog"
+
+	"github.com/rjkroege/edwood/internal/sam"
 	"github.com/rjkroege/edwood/internal/util"
 )
 
@@ -275,7 +276,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 	} else {
 		if p0 != f.cq0+len(f.cache) {
 			// TODO(rjk): actually print something useful here
-			util.Acmeerror("File.InsertAtWithoutCommit cq0", nil)
+			util.AcmeError("File.InsertAtWithoutCommit cq0", nil)
 		}
 	}
 	f.cache = append(f.cache, s...)
@@ -287,7 +288,7 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 	var u Undo
 	// undo an insertion by deleting
-	u.t = elog.Delete
+	u.t = sam.Delete
 
 	u.mod = f.mod
 	u.seq = f.seq
@@ -304,10 +305,10 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns int) {
 func (f *File) DeleteAt(p0, p1 int) {
 	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.nc() && p1 <= f.b.nc()) {
-		util.Acmeerror("internal error: DeleteAt", nil)
+		util.AcmeError("internal error: DeleteAt", nil)
 	}
 	if len(f.cache) > 0 {
-		util.Acmeerror("internal error: DeleteAt", nil)
+		util.AcmeError("internal error: DeleteAt", nil)
 	}
 
 	if f.seq > 0 {
@@ -327,7 +328,7 @@ func (f *File) DeleteAt(p0, p1 int) {
 func (f *File) Undelete(delta *[]*Undo, p0, p1 int) {
 	// undo a deletion by inserting
 	var u Undo
-	u.t = elog.Insert
+	u.t = sam.Insert
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = p0
@@ -362,7 +363,7 @@ func (f *File) SetName(name string) {
 func (f *File) UnsetName(delta *[]*Undo) {
 	var u Undo
 	// undo a file name change by restoring old name
-	u.t = elog.Filename
+	u.t = sam.Filename
 	u.mod = f.mod
 	u.seq = f.seq
 	u.p0 = 0 // unused
@@ -464,7 +465,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 		switch u.t {
 		default:
 			panic(fmt.Sprintf("undo: 0x%x\n", u.t))
-		case elog.Delete:
+		case sam.Delete:
 			f.seq = u.seq
 			f.Undelete(epsilon, u.p0, u.p0+u.n)
 			f.mod = u.mod
@@ -474,7 +475,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			q0 = u.p0
 			q1 = u.p0
 			ok = true
-		case elog.Insert:
+		case sam.Insert:
 			f.seq = u.seq
 			f.Uninsert(epsilon, u.p0, u.n)
 			f.mod = u.mod
@@ -484,7 +485,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 			q0 = u.p0
 			q1 = u.p0 + u.n
 			ok = true
-		case elog.Filename:
+		case sam.Filename:
 			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
 			// TODO(rjk): If I have a zerox, does undo a filename change update?
 			f.seq = u.seq

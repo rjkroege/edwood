@@ -51,15 +51,15 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 		// hasn't been started yet.
 		err := syscall.Mount(cfd, -1, mtpt, plan9.MREPL, "")
 		if err != nil {
-			util.Acmeerror("mount failed", err)
+			util.AcmeError("mount failed", err)
 		}
 		err = syscall.Bind(mtpt, "/mnt/wsys", MREPL)
 		if err != nil {
-			util.Acmeerror("bind /mnt/wsys filed", err)
+			util.AcmeError("bind /mnt/wsys filed", err)
 		}
 		err = syscall.Bind(mtpt, "/dev", MBEFORE)
 		if err != nil {
-			util.Acmeerror("bind /dev filed", err)
+			util.AcmeError("bind /dev filed", err)
 		}
 	}()
 	return nil
