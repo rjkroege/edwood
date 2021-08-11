@@ -208,7 +208,7 @@ func (b *Bytes) HasNull() bool {
 	return false
 }
 
-// Read implements the io.Reader interface
+// Read implements the io.Reader interface.
 func (b *Bytes) Read(buf []byte) (n int, err error) {
 	n = copy(buf, b.Byte())
 	return n, nil
