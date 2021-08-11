@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"io/ioutil"
 	"os"
 	"path/filepath"
