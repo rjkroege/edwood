@@ -78,7 +78,7 @@ func (bytes *Bytes) Slice(i, j int) []byte {
 		return bytes.b[i:j]
 	}
 	if i < 0 || j > bytes.numRunes || i > j {
-		panic(sliceOutOfRange)
+		panic(errSliceOutOfRange)
 	}
 	if i == j {
 		return []byte("")
@@ -114,7 +114,7 @@ func (bytes *Bytes) At(i int) rune {
 
 	// Now we do need to know the index is valid.
 	if i < 0 || i >= bytes.numRunes {
-		panic(outOfRange)
+		panic(errOutOfRange)
 	}
 
 	var r rune
@@ -214,5 +214,5 @@ func (b *Bytes) Read(buf []byte) (n int, err error) {
 	return n, nil
 }
 
-var outOfRange = errors.New("utf8Bytes: index out of range")
-var sliceOutOfRange = errors.New("utf8Bytes: slice index out of range")
+var errOutOfRange = errors.New("utf8Bytes: index out of range")
+var errSliceOutOfRange = errors.New("utf8Bytes: slice index out of range")
