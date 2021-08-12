@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (

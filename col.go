@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"sort"
 
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (
