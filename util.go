@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"path/filepath"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (

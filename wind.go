@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/runes"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"os"
 	"path/filepath"
@@ -12,6 +10,8 @@ import (
 
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 type Window struct {
