@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/sam"
 )
 
@@ -17,10 +17,10 @@ func TestWindowUndoSelection(t *testing.T) {
 		word = file.RuneArray("hello")
 		p0   = 3
 		undo = &file.Undo{
-			t:   sam.Insert,
-			buf: word,
-			p0:  p0,
-			n:   word.nc(),
+			T:   sam.Insert,
+			Buf: word,
+			P0:  p0,
+			N:   word.Nc(),
 		}
 	)
 	for _, tc := range []struct {
@@ -28,10 +28,10 @@ func TestWindowUndoSelection(t *testing.T) {
 		isundo         bool
 		q0, q1         int
 		wantQ0, wantQ1 int
-		delta, epsilon []*Undo
+		delta, epsilon []*file.Undo
 	}{
-		{"undo", true, 14, 17, p0, p0 + word.nc(), []*Undo{undo}, nil},
-		{"redo", false, 14, 17, p0, p0 + word.nc(), nil, []*Undo{undo}},
+		{"undo", true, 14, 17, p0, p0 + word.Nc(), []*file.Undo{undo}, nil},
+		{"redo", false, 14, 17, p0, p0 + word.Nc(), nil, []*file.Undo{undo}},
 		{"undo (nil delta)", true, 14, 17, 14, 17, nil, nil},
 		{"redo (nil epsilon)", false, 14, 17, 14, 17, nil, nil},
 	} {
@@ -39,7 +39,7 @@ func TestWindowUndoSelection(t *testing.T) {
 			body: Text{
 				q0:   tc.q0,
 				q1:   tc.q1,
-				file: MakeObservableEditableBufferTag(RuneArray("This is an example sentence.\n")),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray("This is an example sentence.\n")),
 			},
 		}
 		w.body.file.SetDelta(tc.delta)

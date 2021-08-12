@@ -464,7 +464,7 @@ func (f *File) Undo(isundo bool) (q0, q1 int, ok bool) {
 		}
 		switch u.T {
 		default:
-			panic(fmt.Sprintf("undo: 0x%x\n", u.t))
+			panic(fmt.Sprintf("undo: 0x%x\n", u.T))
 		case sam.Delete:
 			f.seq = u.seq
 			f.Undelete(epsilon, u.P0, u.P0+u.N)

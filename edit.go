@@ -188,7 +188,7 @@ func allupdate(w *Window) {
 		// Set an undo point before applying accumulated Edit actions.
 		f.Mark(seq)
 		f.Elog.Apply(t)
-		if f.Editclean {
+		if f.EditClean {
 			f.Clean()
 		}
 		t.w.owner = owner

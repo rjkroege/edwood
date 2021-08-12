@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/sam"
 )
 
