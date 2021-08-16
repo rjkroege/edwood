@@ -15,10 +15,10 @@ import (
 	"github.com/rjkroege/edwood/internal/complete"
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/draw/drawutil"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/rjkroege/edwood/internal/runes"
 	"github.com/rjkroege/edwood/internal/util"
-	file2 "github.com/rjkroege/edwood/internal/file"
 )
 
 const (
@@ -44,7 +44,7 @@ var (
 		left3,
 	}
 
-	_ file2.BufferObserver = (*Text)(nil) // Enforce at compile time that Text implements BufferObserver
+	_ file.BufferObserver = (*Text)(nil) // Enforce at compile time that Text implements BufferObserver
 )
 
 type TextKind byte
@@ -60,7 +60,7 @@ const (
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
 	display draw.Display
-	file    *file2.ObservableEditableBuffer
+	file    *file.ObservableEditableBuffer
 	fr      frame.Frame
 	font    string
 
