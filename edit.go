@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	file2 "github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 var (
@@ -41,7 +41,7 @@ type Addr struct {
 
 type Address struct {
 	r    Range
-	file *file2.ObservableEditableBuffer
+	file *file.ObservableEditableBuffer
 }
 
 type Cmd struct {
