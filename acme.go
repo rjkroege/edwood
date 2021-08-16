@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/util"
 	"image"
 	"log"
 	"net/http"
@@ -22,6 +21,7 @@ import (
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/dumpfile"
 	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/internal/util"
 )
 
 var (
