@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/runes"
