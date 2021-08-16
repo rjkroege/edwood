@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/frame"
 )
 
