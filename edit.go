@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	"github.com/rjkroege/edwood/internal/file"
 )
 
 var (
@@ -39,7 +41,7 @@ type Addr struct {
 
 type Address struct {
 	r    Range
-	file *ObservableEditableBuffer
+	file *file.ObservableEditableBuffer
 }
 
 type Cmd struct {
@@ -165,7 +167,7 @@ func editthread(cp *cmdParser) {
 }
 
 func allelogterm(w *Window) {
-	w.body.file.elog.Term()
+	w.body.file.Elog.Term()
 }
 
 func alleditinit(w *Window) {
@@ -178,14 +180,14 @@ func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
 
-	if !f.elog.Empty() {
+	if !f.Elog.Empty() {
 		owner := t.w.owner
 		if owner == 0 {
 			t.w.owner = 'E'
 		}
 		// Set an undo point before applying accumulated Edit actions.
 		f.Mark(seq)
-		f.elog.Apply(t)
+		f.Elog.Apply(t)
 		if f.EditClean {
 			f.Clean()
 		}

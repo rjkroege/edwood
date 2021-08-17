@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/frame"
 	"github.com/rjkroege/edwood/internal/util"
 )
@@ -51,7 +52,7 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
-	tagfile := MakeObservableEditableBuffer("", nil)
+	tagfile := file.MakeObservableEditableBuffer("", nil)
 	tagfile.AddObserver(&c.tag)
 	c.tag.file = tagfile
 	c.tag.Init(r1, tagfont, tagcolors, c.display)

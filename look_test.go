@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rjkroege/edwood/internal/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -59,7 +60,7 @@ func TestExpand(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: MakeObservableEditableBufferTag(RuneArray(r)),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray(r)),
 				q0:   0,
 				q1:   tc.sel1,
 			}
@@ -97,7 +98,7 @@ func TestExpandJump(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: MakeObservableEditableBufferTag([]rune("chicken")),
+			file: file.MakeObservableEditableBufferTag([]rune("chicken")),
 			q0:   0,
 			q1:   5,
 			what: tc.kind,
@@ -182,5 +183,5 @@ func textSetSelection(t *Text, buf string) {
 
 	t.q0 = popRune('«')
 	t.q1 = popRune('»')
-	t.file = MakeObservableEditableBuffer("", b)
+	t.file = file.MakeObservableEditableBuffer("", b)
 }

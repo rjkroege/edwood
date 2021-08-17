@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/sam"
 )
 
@@ -94,7 +95,7 @@ func TestAcmeregexp(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warnings = nil
 			text := &Text{
-				file: MakeObservableEditableBufferTag(RuneArray([]rune("abcd αβξδ\n"))),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray([]rune("abcd αβξδ\n"))),
 			}
 			lim := Range{
 				0,

@@ -4,6 +4,7 @@ package main
 // row/column/window model.
 
 import (
+	"github.com/rjkroege/edwood/internal/file"
 	"image"
 	"strings"
 
@@ -50,7 +51,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		display: display,
 		tag: *updateText(&Text{
 			what: Rowtag,
-			file: MakeObservableEditableBufferTag(nil),
+			file: file.MakeObservableEditableBufferTag(nil),
 		}, &content.RowTag, display),
 	}
 
@@ -59,7 +60,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		col := &Column{
 			tag: *updateText(&Text{
 				what: Columntag,
-				file: MakeObservableEditableBufferTag(nil),
+				file: file.MakeObservableEditableBufferTag(nil),
 			}, &sercol.Tag, display),
 			display: display,
 			fortest: true,

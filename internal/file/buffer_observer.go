@@ -1,4 +1,4 @@
-package main
+package file
 
 // BufferObserver implementations can register themselves
 // with an ObservableEditableBuffer so the observers can be
@@ -6,8 +6,8 @@ package main
 type BufferObserver interface {
 
 	// inserted informs the implementer that rune array r was inserted at position q0.
-	inserted(q0 int, r []rune)
+	Inserted(q0 int, r []rune)
 
 	// deleted informs the implementer that character range [q0,q1) was deleted.
-	deleted(q0, q1 int)
+	Deleted(q0, q1 int)
 }

@@ -298,7 +298,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		snarfbuf.Delete(0, snarfbuf.nc())
+		snarfbuf.Delete(0, snarfbuf.Nc())
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
@@ -306,7 +306,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 				n = RBUFSIZE
 			}
 			t.file.Read(q0, r[:n])
-			snarfbuf.Insert(snarfbuf.nc(), r[:n])
+			snarfbuf.Insert(snarfbuf.Nc(), r[:n])
 			q0 += n
 		}
 		acmeputsnarf()
@@ -366,7 +366,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 
 	acmegetsnarf()
-	if t == nil || snarfbuf.nc() == 0 {
+	if t == nil || snarfbuf.Nc() == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -380,7 +380,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	cut(t, t, nil, false, true, "")
 	q = 0
 	q0 = t.q0
-	q1 = t.q0 + snarfbuf.nc()
+	q1 = t.q0 + snarfbuf.Nc()
 	r := make([]rune, RBUFSIZE)
 	for q0 < q1 {
 		n = q1 - q0
@@ -493,7 +493,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 // putfile writes File to disk, if it's safe to do so.
 //
 // TODO(flux): Write this in terms of the various cases.
-func putfile(oeb *ObservableEditableBuffer, q0 int, q1 int, name string) error {
+func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) error {
 	w := oeb.GetCurObserver().(*Text).w
 	d, err := os.Stat(name)
 
@@ -562,7 +562,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		return
 	}
 	w := et.w
-	f := w.body.file.f
+	f := w.body.file
 	name := getname(&w.body, argt, arg, true)
 	if name == "" {
 		warning(nil, "no file name\n")

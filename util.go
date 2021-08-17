@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/runes"
 	"github.com/rjkroege/edwood/internal/util"
 )
@@ -36,7 +36,7 @@ func restoremouse(w *Window) bool {
 }
 
 func bytetorune(s []byte) []rune {
-	r, _, _ := cvttorunes(s, len(s))
+	r, _, _ := util.Cvttorunes(s, len(s))
 	return r
 }
 
@@ -55,35 +55,6 @@ func isalnum(c rune) bool {
 		return false
 	}
 	return true
-}
-
-// Cvttorunes decodes runes r from p. It's guaranteed that first n
-// bytes of p will be interpreted without worrying about partial runes.
-// This may mean reading up to UTFMax-1 more bytes than n; the caller
-// must ensure p is large enough. Partial runes and invalid encodings
-// are converted to RuneError. Nb (always >= n) is the number of bytes
-// interpreted.
-//
-// If any U+0000 rune is present in r, they are elided and nulls is set
-// to true.
-func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
-	for nb < n {
-		var w int
-		var ru rune
-		if p[nb] < utf8.RuneSelf {
-			w = 1
-			ru = rune(p[nb])
-		} else {
-			ru, w = utf8.DecodeRune(p[nb:])
-		}
-		if ru != 0 {
-			r = append(r, ru)
-		} else {
-			nulls = true
-		}
-		nb += w
-	}
-	return
 }
 
 func errorwin1Name(dir string) string {
@@ -218,7 +189,7 @@ func makenewwindow(t *Text) *Window {
 
 type Warning struct {
 	md  *MntDir
-	buf RuneArray
+	buf file.RuneArray
 }
 
 var warnings = []*Warning{}
@@ -247,9 +218,9 @@ func flushwarnings() {
 		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)
-		// TODO(rjk): Figure out why Warning doesn't use a File.
-		for n = 0; n < warn.buf.nc(); n += nr {
-			nr = warn.buf.nc() - n
+		// TODO(rjk): Figure out why Warning doesn't use an file.ObservableEditableBuffer.
+		for n = 0; n < warn.buf.Nc(); n += nr {
+			nr = warn.buf.Nc() - n
 			if nr > RBUFSIZE {
 				nr = RBUFSIZE
 			}
@@ -287,7 +258,7 @@ func addwarningtext(md *MntDir, r []rune) {
 
 	for _, warn := range warnings {
 		if warn.md == md {
-			warn.buf.Insert(warn.buf.nc(), r)
+			warn.buf.Insert(warn.buf.Nc(), r)
 			return
 		}
 	}

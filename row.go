@@ -11,6 +11,7 @@ import (
 
 	"github.com/rjkroege/edwood/internal/draw"
 	"github.com/rjkroege/edwood/internal/dumpfile"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/util"
 )
 
@@ -35,7 +36,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	r1 := r
 	r1.Max.Y = r1.Min.Y + fontget(tagfont, row.display).Height()
 	t := &row.tag
-	f := MakeObservableEditableBuffer("", nil)
+	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(t)
 	t.file = f
 	t.Init(r1, tagfont, tagcolors, row.display)
@@ -352,7 +353,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 		Windows: nil,
 	}
 
-	dumpid := make(map[*File]int)
+	dumpid := make(map[*file.ObservableEditableBuffer]int)
 
 	for i, c := range r.col {
 		dump.Columns[i] = dumpfile.Column{
@@ -366,7 +367,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 		for _, w := range c.w {
 			if w.nopen[QWevent] != 0 {
 				// Mark zeroxes of external windows specially.
-				dumpid[w.body.file.f] = -1
+				dumpid[w.body.file] = -1
 			}
 		}
 	}
@@ -385,7 +386,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 			}
 
 			// zeroxes of external windows are tossed
-			if dumpid[t.file.f] < 0 && w.nopen[QWevent] == 0 {
+			if dumpid[t.file] < 0 && w.nopen[QWevent] == 0 {
 				continue
 			}
 
@@ -405,7 +406,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 			dw := dump.Windows[len(dump.Windows)-1]
 
 			switch {
-			case dumpid[t.file.f] > 0:
+			case dumpid[t.file] > 0:
 				dw.Type = dumpfile.Zerox
 
 			case w.dumpstr != "":
@@ -414,11 +415,11 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 				dw.ExecCommand = w.dumpstr
 
 			case !w.body.file.Dirty() && access(t.file.Name()) || w.body.file.IsDir():
-				dumpid[t.file.f] = w.id
+				dumpid[t.file] = w.id
 				dw.Type = dumpfile.Saved
 
 			default:
-				dumpid[t.file.f] = w.id
+				dumpid[t.file] = w.id
 				// TODO(rjk): Conceivably this is a bit of a layering violation?
 				dw.Type = dumpfile.Unsaved
 				dw.Body.Buffer = t.file.String()
@@ -475,7 +476,8 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
 	}
 	w.ClearTag()
-	w.tag.Insert(len(w.tag.file.f.b), []rune(afterbar[1]), true)
+
+	w.tag.Insert(w.tag.file.Size(), []rune(afterbar[1]), true)
 	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
 
 	if win.Type == dumpfile.Unsaved {
@@ -495,7 +497,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 
 	q0 := win.Body.Q0
 	q1 := win.Body.Q1
-	if q0 > len(w.body.file.f.b) || q1 > len(w.body.file.f.b) || q0 > q1 {
+	if q0 > w.body.file.Size() || q1 > w.body.file.Size() || q0 > q1 {
 		q0 = 0
 		q1 = 0
 	}

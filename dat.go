@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/rjkroege/edwood/internal/file"
 	"math"
 	"os"
 	"unicode/utf8"
@@ -94,7 +95,7 @@ var (
 
 	activewin  *Window
 	activecol  *Column
-	snarfbuf   RuneArray
+	snarfbuf   file.RuneArray
 	home       string
 	acmeshell  string
 	tagcolors  [frame.NumColours]draw.Image

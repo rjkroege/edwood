@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/internal/file"
 	"github.com/rjkroege/edwood/internal/sam"
 )
 
@@ -13,13 +14,13 @@ import (
 // using nil delta/epsilon, which fixes https://github.com/rjkroege/edwood/issues/230.
 func TestWindowUndoSelection(t *testing.T) {
 	var (
-		word = RuneArray("hello")
+		word = file.RuneArray("hello")
 		p0   = 3
-		undo = &Undo{
-			t:   sam.Insert,
-			buf: word,
-			p0:  p0,
-			n:   word.nc(),
+		undo = &file.Undo{
+			T:   sam.Insert,
+			Buf: word,
+			P0:  p0,
+			N:   word.Nc(),
 		}
 	)
 	for _, tc := range []struct {
@@ -27,10 +28,10 @@ func TestWindowUndoSelection(t *testing.T) {
 		isundo         bool
 		q0, q1         int
 		wantQ0, wantQ1 int
-		delta, epsilon []*Undo
+		delta, epsilon []*file.Undo
 	}{
-		{"undo", true, 14, 17, p0, p0 + word.nc(), []*Undo{undo}, nil},
-		{"redo", false, 14, 17, p0, p0 + word.nc(), nil, []*Undo{undo}},
+		{"undo", true, 14, 17, p0, p0 + word.Nc(), []*file.Undo{undo}, nil},
+		{"redo", false, 14, 17, p0, p0 + word.Nc(), nil, []*file.Undo{undo}},
 		{"undo (nil delta)", true, 14, 17, 14, 17, nil, nil},
 		{"redo (nil epsilon)", false, 14, 17, 14, 17, nil, nil},
 	} {
@@ -38,11 +39,11 @@ func TestWindowUndoSelection(t *testing.T) {
 			body: Text{
 				q0:   tc.q0,
 				q1:   tc.q1,
-				file: MakeObservableEditableBufferTag(RuneArray("This is an example sentence.\n")),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray("This is an example sentence.\n")),
 			},
 		}
-		w.body.file.f.delta = tc.delta
-		w.body.file.f.epsilon = tc.epsilon
+		w.body.file.SetDelta(tc.delta)
+		w.body.file.SetEpsilon(tc.epsilon)
 		w.Undo(tc.isundo)
 		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
 			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
@@ -70,12 +71,12 @@ func TestSetTag1(t *testing.T) {
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    MakeObservableEditableBuffer(name, nil),
+			file:    file.MakeObservableEditableBuffer(name, nil),
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    MakeObservableEditableBuffer("", nil),
+			file:    file.MakeObservableEditableBuffer("", nil),
 		}
 
 		w.setTag1()
@@ -96,18 +97,18 @@ func TestSetTag1(t *testing.T) {
 }
 
 func TestWindowClampAddr(t *testing.T) {
-	buf := RuneArray("Hello, 世界")
+	buf := file.RuneArray("Hello, 世界")
 
 	for _, tc := range []struct {
 		addr, want Range
 	}{
 		{Range{-1, -1}, Range{0, 0}},
-		{Range{100, 100}, Range{buf.nc(), buf.nc()}},
+		{Range{100, 100}, Range{buf.Nc(), buf.Nc()}},
 	} {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: MakeObservableEditableBufferTag(buf),
+				file: file.MakeObservableEditableBufferTag(buf),
 			},
 		}
 		w.ClampAddr()
@@ -130,7 +131,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: MakeObservableEditableBufferTag(RuneArray(tc.tag)),
+				file: file.MakeObservableEditableBufferTag(file.RuneArray(tc.tag)),
 			},
 		}
 		if got, want := w.ParseTag(), tc.filename; got != want {
@@ -144,7 +145,7 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: MakeObservableEditableBufferTag(RuneArray(tag)),
+			file: file.MakeObservableEditableBufferTag(file.RuneArray(tag)),
 		},
 	}
 	w.ClearTag()

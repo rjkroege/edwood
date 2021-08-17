@@ -1,4 +1,4 @@
-package main
+package file
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 // RuneArray is a mutable array of runes.
 type RuneArray []rune
 
-func NewBuffer() RuneArray { return []rune{} }
+func NewRuneArray() RuneArray { return []rune{} }
 
 func (b *RuneArray) Insert(q0 int, r []rune) {
 	if q0 > len(*b) {
@@ -51,7 +51,7 @@ func (b *RuneArray) Reset() {
 }
 
 // nc returns the number of characters in the RuneArray.
-func (b *RuneArray) nc() int {
+func (b *RuneArray) Nc() int {
 	return len(*b)
 }
 
