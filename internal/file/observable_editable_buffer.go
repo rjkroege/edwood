@@ -157,14 +157,14 @@ func (e ObservableEditableBuffer) HasUndoableChanges() bool {
 	return e.f.HasUndoableChanges()
 }
 
-// IsDir is a forwarding function for file.IsDir.
+// IsDir is a forwarding function for DiskDetails.IsDir.
 func (e *ObservableEditableBuffer) IsDir() bool {
-	return e.f.IsDir()
+	return e.details.IsDir()
 }
 
-// SetDir is a forwarding function for file.SetDir.
+// SetDir is a forwarding function for DiskDetails.SetDir.
 func (e *ObservableEditableBuffer) SetDir(flag bool) {
-	e.f.SetDir(flag)
+	e.details.SetDir(flag)
 }
 
 // Nr is a forwarding function for file.Nr.
@@ -289,9 +289,11 @@ func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	e.f.InsertAtWithoutCommit(p0, s)
 }
 
-// IsDirOrScratch is a forwarding function for file.IsDirOrScratch.
+// IsDirOrScratch returns true if the File has a synthetic backing of
+// a directory listing or has a name pattern that excludes it from
+// being saved under typical circumstances.
 func (e *ObservableEditableBuffer) IsDirOrScratch() bool {
-	return e.f.IsDirOrScratch()
+	return e.isscratch || e.IsDir()
 }
 
 // TreatAsDirty is a forwarding function for file.TreatAsDirty.
