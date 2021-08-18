@@ -289,9 +289,11 @@ func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	e.f.InsertAtWithoutCommit(p0, s)
 }
 
-// IsDirOrScratch is a forwarding function for file.IsDirOrScratch.
+// IsDirOrScratch returns true if the File has a synthetic backing of
+// a directory listing or has a name pattern that excludes it from
+// being saved under typical circumstances.
 func (e *ObservableEditableBuffer) IsDirOrScratch() bool {
-	return e.f.IsDirOrScratch()
+	return e.isscratch || e.IsDir()
 }
 
 // TreatAsDirty is a forwarding function for file.TreatAsDirty.
