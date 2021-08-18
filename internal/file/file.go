@@ -320,20 +320,6 @@ const (
 	plusErrors = "+Errors"
 )
 
-// SetName sets the name of the backing for this file.
-// Some backings that opt them out of typically being persisted.
-// Resetting a file name to a new value does not have any effect.
-func (f *File) SetName(name string) {
-	if f.oeb.Name() == name {
-		return
-	}
-
-	if f.seq > 0 {
-		f.UnsetName(&f.delta)
-	}
-	f.oeb.Setnameandisscratch(name)
-}
-
 func (f *File) UnsetName(delta *[]*Undo) {
 	var u Undo
 	// undo a file name change by restoring old name
