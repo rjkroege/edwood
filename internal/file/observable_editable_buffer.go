@@ -157,14 +157,14 @@ func (e ObservableEditableBuffer) HasUndoableChanges() bool {
 	return e.f.HasUndoableChanges()
 }
 
-// IsDir is a forwarding function for file.IsDir.
+// IsDir is a forwarding function for DiskDetails.IsDir.
 func (e *ObservableEditableBuffer) IsDir() bool {
-	return e.f.IsDir()
+	return e.details.IsDir()
 }
 
-// SetDir is a forwarding function for file.SetDir.
+// SetDir is a forwarding function for DiskDetails.SetDir.
 func (e *ObservableEditableBuffer) SetDir(flag bool) {
-	e.f.SetDir(flag)
+	e.details.SetDir(flag)
 }
 
 // Nr is a forwarding function for file.Nr.
