@@ -9,7 +9,7 @@ type DiskDetails struct {
 	Name  string
 	Info  os.FileInfo
 	Hash  Hash // Used to check if the file has changed on disk since loaded.
-	isdir bool
+	isdir bool // Used to track if this File is populated from a directory list. [private]
 }
 
 // IsDir returns true if the File has a synthetic backing of
