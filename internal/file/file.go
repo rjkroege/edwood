@@ -44,8 +44,6 @@ type File struct {
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
 
-	isdir bool // Used to track if this File is populated from a directory list. [private]
-
 	// cache holds  that are not yet part of an undo record.
 	cache []rune // [private]
 
@@ -88,30 +86,6 @@ func (f *File) HasUndoableChanges() bool {
 // Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
-}
-
-// IsDirOrScratch returns true if the File has a synthetic backing of
-// a directory listing or has a name pattern that excludes it from
-// being saved under typical circumstances.
-func (f *File) IsDirOrScratch() bool {
-	return f.oeb.isscratch || f.isdir
-}
-
-// IsDir returns true if the File has a synthetic backing of
-// a directory.
-// TODO(rjk): File is a facade that subsumes the entire Model
-// of an Edwood MVC. As such, it should look like a text buffer for
-// view/controller code. isdir is true for a specific kind of File innards
-// where we automatically alter the contents in various ways.
-// Automatically altering the contents should be expressed differently.
-// Directory listings should not be special cased throughout.
-func (f *File) IsDir() bool {
-	return f.isdir
-}
-
-// SetDir updates the setting of the isdir flag.
-func (f *File) SetDir(flag bool) {
-	f.isdir = flag
 }
 
 // Size returns the complete size of the buffer including both committed
@@ -167,7 +141,7 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (f *File) SaveableAndDirty() bool {
-	return (f.mod || f.Dirty() || len(f.cache) > 0) && !f.IsDirOrScratch()
+	return (f.mod || f.Dirty() || len(f.cache) > 0) && !f.oeb.IsDirOrScratch()
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
