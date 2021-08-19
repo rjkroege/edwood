@@ -18,7 +18,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/ninep"
+	"github.com/rjkroege/edwood/ninep"
 )
 
 func TestMain(m *testing.M) {

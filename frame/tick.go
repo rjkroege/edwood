@@ -3,7 +3,7 @@ package frame
 import (
 	"image"
 
-	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/draw"
 )
 
 // InitTick sets up the TickImage (e.g. cursor)

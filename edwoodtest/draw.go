@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/draw"
 )
 
 var _ = draw.Display((*mockDisplay)(nil))

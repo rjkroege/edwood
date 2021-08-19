@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/runes"
 )
 
 // RuneArray is a mutable array of runes.
