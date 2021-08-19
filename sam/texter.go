@@ -1,7 +1,7 @@
 package sam
 
 import (
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/util"
 )
 
 // Texter abstracts the buffering side of Text, allowing testing of Elog Apply

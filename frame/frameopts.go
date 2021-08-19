@@ -1,7 +1,7 @@
 package frame
 
 import (
-	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/draw"
 )
 
 // optioncontext is context passed into each option function

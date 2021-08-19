@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rjkroege/edwood/internal/sam"
+	"github.com/rjkroege/edwood/sam"
 )
 
 func TestRegexpForward(t *testing.T) {

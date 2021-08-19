@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/util"
 )
 
 var (

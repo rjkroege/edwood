@@ -9,10 +9,10 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/dumpfile"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/util"
 )
 
 const RowTag = "Newcol Kill Putall Dump Exit"

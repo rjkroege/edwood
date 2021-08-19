@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/file"
 )
 
 var (

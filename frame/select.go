@@ -3,7 +3,7 @@ package frame
 import (
 	"image"
 
-	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/draw"
 )
 
 func (f *frameimpl) GetSelectionExtent() (int, int) {

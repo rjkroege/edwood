@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/internal/complete"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/draw/drawutil"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/rjkroege/edwood/internal/runes"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/complete"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/draw/drawutil"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/util"
 )
 
 const (

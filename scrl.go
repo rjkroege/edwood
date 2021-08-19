@@ -5,8 +5,8 @@ import (
 	"image"
 	"time"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/frame"
 )
 
 var scrtmp draw.Image

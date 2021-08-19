@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/file"
 	"os/exec"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/edwoodtest"
 )
 
 func TestIsmtpt(t *testing.T) {

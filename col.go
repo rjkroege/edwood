@@ -4,10 +4,10 @@ import (
 	"image"
 	"sort"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/util"
 )
 
 var (

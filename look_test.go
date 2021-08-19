@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,7 +11,7 @@ import (
 
 	"9fans.net/go/plumb"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/runes"
 )
 
 func TestExpand(t *testing.T) {

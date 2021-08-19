@@ -4,7 +4,7 @@ import (
 	"image"
 	"sync"
 
-	"github.com/rjkroege/edwood/internal/draw"
+	"github.com/rjkroege/edwood/draw"
 )
 
 // TODO(rjk): Make this into a struct of colours?
