@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/dumpfile"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/dumpfile"
+	"github.com/rjkroege/edwood/pkg/frame"
 )
 
 type teststimulus struct {

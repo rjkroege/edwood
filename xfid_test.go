@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/pkg/file"
 	"image"
 	"io/ioutil"
 	"os"
@@ -17,8 +17,8 @@ import (
 
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/edwoodtest"
 )
 
 func TestXfidallocthread(t *testing.T) {

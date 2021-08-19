@@ -18,10 +18,10 @@ import (
 	"time"
 
 	"9fans.net/go/plumb"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/dumpfile"
-	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/dumpfile"
+	"github.com/rjkroege/edwood/pkg/frame"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 var (

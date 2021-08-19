@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"9fans.net/go/plan9"
-	"github.com/rjkroege/edwood/internal/ninep"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/ninep"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 type fileServer struct {

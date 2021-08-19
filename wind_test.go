@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rjkroege/edwood/internal/edwoodtest"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/sam"
+	"github.com/rjkroege/edwood/pkg/edwoodtest"
+	"github.com/rjkroege/edwood/pkg/file"
+	"github.com/rjkroege/edwood/pkg/sam"
 )
 
 // TestWindowUndoSelection checks text selection change after undo/redo.

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/sam"
+	"github.com/rjkroege/edwood/pkg/sam"
 )
 
 // The ObservableEditableBuffer is used by the main program

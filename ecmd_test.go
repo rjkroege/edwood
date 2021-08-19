@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/pkg/file"
 	"testing"
 )
 

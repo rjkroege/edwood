@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/regexp"
-	"github.com/rjkroege/edwood/internal/sam"
+	"github.com/rjkroege/edwood/pkg/regexp"
+	"github.com/rjkroege/edwood/pkg/sam"
 )
 
 // AcmeRegexp is the representation of a compiled regular expression for acme.

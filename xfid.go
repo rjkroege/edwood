@@ -11,10 +11,10 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/ninep"
-	"github.com/rjkroege/edwood/internal/runes"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/ninep"
+	"github.com/rjkroege/edwood/pkg/runes"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 const Ctlsize = 5 * 12

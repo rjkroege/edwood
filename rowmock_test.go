@@ -4,13 +4,13 @@ package main
 // row/column/window model.
 
 import (
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/pkg/file"
 	"image"
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/dumpfile"
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/dumpfile"
+	"github.com/rjkroege/edwood/pkg/edwoodtest"
 )
 
 // configureGlobals setups global variables so that Edwood can operate on

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/util"
 	"path/filepath"
 	"reflect"
 	"testing"

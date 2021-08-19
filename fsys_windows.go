@@ -7,7 +7,7 @@ import (
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 var (

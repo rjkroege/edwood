@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/pkg/file"
+	"github.com/rjkroege/edwood/pkg/frame"
 )
 
 func emptyText() *Text {

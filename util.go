@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/runes"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/file"
+	"github.com/rjkroege/edwood/pkg/runes"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 var (

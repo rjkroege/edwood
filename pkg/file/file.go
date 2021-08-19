@@ -3,8 +3,8 @@ package file
 import (
 	"fmt"
 
-	"github.com/rjkroege/edwood/internal/sam"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/sam"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 // File is an editable text buffer with undo. Many Text can share one

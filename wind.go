@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/rjkroege/edwood/internal/runes"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/file"
+	"github.com/rjkroege/edwood/pkg/frame"
+	"github.com/rjkroege/edwood/pkg/runes"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 type Window struct {

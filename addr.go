@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/rjkroege/edwood/internal/sam"
+	"github.com/rjkroege/edwood/pkg/sam"
 )
 
 // These constants indicates the direction of regular expresssion search.

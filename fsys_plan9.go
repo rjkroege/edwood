@@ -9,7 +9,7 @@ import (
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
-	"github.com/rjkroege/edwood/internal/util"
+	"github.com/rjkroege/edwood/pkg/util"
 )
 
 // These constants are from /sys/include/libc.h

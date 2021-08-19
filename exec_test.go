@@ -1,7 +1,7 @@
 package main
 
 import (
-	file2 "github.com/rjkroege/edwood/internal/file"
+	file2 "github.com/rjkroege/edwood/pkg/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"

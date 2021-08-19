@@ -1,15 +1,15 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/internal/file"
+	"github.com/rjkroege/edwood/pkg/file"
 	"math"
 	"os"
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plumb"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/frame"
 )
 
 // These constants are used to identify a file in the file server.

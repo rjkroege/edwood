@@ -16,9 +16,9 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/dumpfile"
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/pkg/draw"
+	"github.com/rjkroege/edwood/pkg/dumpfile"
+	"github.com/rjkroege/edwood/pkg/edwoodtest"
 )
 
 const gopherEdwoodDir = "/home/gopher/go/src/edwood"
