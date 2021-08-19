@@ -205,9 +205,18 @@ func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
 	e.f.InsertAt(p0, s)
 }
 
-// SetName is a forwarding function for file.SetName.
+// SetName sets the name of the backing for this file.
+// Some backings that opt them out of typically being persisted.
+// Resetting a file name to a new value does not have any effect.
 func (e *ObservableEditableBuffer) SetName(name string) {
-	e.f.SetName(name)
+	if e.Name() == name {
+		return
+	}
+
+	if e.f.seq > 0 {
+		e.f.UnsetName(&e.f.delta)
+	}
+	e.Setnameandisscratch(name)
 }
 
 // Undo is a forwarding function for file.Undo.
