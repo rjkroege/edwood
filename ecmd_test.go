@@ -6,7 +6,8 @@ import (
 )
 
 // Test for https://github.com/rjkroege/edwood/issues/291
-func TestXCmdPipeMultipleWindows(t *testing.T) {
+// {gh issue view 291}
+func DISABLED_TestXCmdPipeMultipleWindows(t *testing.T) {
 	cedit = make(chan int)
 	ccommand = make(chan *Command)
 	cwait = make(chan ProcessState)
