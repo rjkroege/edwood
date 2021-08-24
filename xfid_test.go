@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/rjkroege/edwood/file"
 	"image"
 	"io/ioutil"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/rjkroege/edwood/file"
 
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"

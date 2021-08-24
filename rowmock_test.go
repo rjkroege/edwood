@@ -4,9 +4,10 @@ package main
 // row/column/window model.
 
 import (
-	"github.com/rjkroege/edwood/file"
 	"image"
 	"strings"
+
+	"github.com/rjkroege/edwood/file"
 
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"

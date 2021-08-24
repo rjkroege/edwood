@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/file"
 	"math"
 	"os"
 	"unicode/utf8"
+
+	"github.com/rjkroege/edwood/file"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plumb"
