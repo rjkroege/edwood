@@ -1,7 +1,6 @@
 package main
 
 import (
-	file2 "github.com/rjkroege/edwood/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	file2 "github.com/rjkroege/edwood/file"
 )
 
 func acmeTestingMain() {

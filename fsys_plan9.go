@@ -7,7 +7,6 @@ import (
 	"path"
 	"syscall"
 
-	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/util"
 )
@@ -49,7 +48,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		// We need to do this within a new goroutine because the file server
 		// hasn't been started yet.
-		err := syscall.Mount(cfd, -1, mtpt, plan9.MREPL, "")
+		err := syscall.Mount(cfd, -1, mtpt, MREPL, "")
 		if err != nil {
 			util.AcmeError("mount failed", err)
 		}

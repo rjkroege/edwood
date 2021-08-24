@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/rjkroege/edwood/file"
 	"os/exec"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/rjkroege/edwood/file"
 
 	"github.com/rjkroege/edwood/edwoodtest"
 )

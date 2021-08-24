@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/rjkroege/edwood/file"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/rjkroege/edwood/file"
 
 	"9fans.net/go/plumb"
 	"github.com/google/go-cmp/cmp"

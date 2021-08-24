@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/util"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/util"
 )
 
 func TestCvttorunes(t *testing.T) {

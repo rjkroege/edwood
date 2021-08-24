@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/rjkroege/edwood/file"
 	"testing"
+
+	"github.com/rjkroege/edwood/file"
 )
 
 // Test for https://github.com/rjkroege/edwood/issues/291
