@@ -89,7 +89,7 @@ import (
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
 
 // A Buffer is a structure capable of two operations: inserting or deleting.
-// All operations could be unlimitedly undone or redone.
+// All operations could be ultimately undone or redone.
 type Buffer struct {
 	piecesCnt   int    // number of pieces allocated
 	begin, end  *piece // sentinel nodes which always exists but don't hold any data
@@ -306,7 +306,7 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 }
 
 // Undo reverts the last performed action. It returns the offset in bytes
-// at which the first change of the action occured and the number of bytes
+// at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
 func (b *Buffer) Undo() (off, n int64) {
