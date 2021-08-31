@@ -22,6 +22,7 @@
 // The package is based on the text manipulation in the vis editor. (Some parts are
 // pure ports.) For further information please visit
 // 	https://github.com/martanne/vis.
+// This package was taken from https://github.com/mibk/syd/tree/master/undo for use in edwood.
 //
 //
 // Insertion
@@ -338,7 +339,7 @@ func (b *Buffer) unshiftAction() *action {
 }
 
 // Redo repeats the last undone action. It returns the offset in bytes
-// at which the last change of the action occured and the number of bytes
+// at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
 func (b *Buffer) Redo() (off, n int64) {
@@ -436,10 +437,10 @@ type action struct {
 type change struct {
 	old span  // all pieces which are being modified/swapped out by the change
 	new span  // all pieces which are introduced/swapped int by the change
-	off int64 // absolute offset at which the change occured
+	off int64 // absolute offset at which the change occurred
 }
 
-// span holds a certain range of pieces. Changes to the document are allways
+// span holds a certain range of pieces. Changes to the document are always
 // performed by swapping out an existing span with a new one.
 type span struct {
 	start, end *piece // start/end of the span
