@@ -15,8 +15,6 @@
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-//
-// And under a license that can be found in the undo.LICENSE file.
 
 // Package undo provides methods for undoable/redoable text manipulation.
 // Modifications are made by two operations: insert or delete.
@@ -150,9 +148,9 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
-		before := b.newPiece(p.data[:offset], p.prev, nil)
+		before := b.newPiece(p.data.Byte()[:offset], p.prev, nil)
 		pnew = b.newPiece(data, before, nil)
-		after := b.newPiece(p.data[offset:], pnew, p.next)
+		after := b.newPiece(p.data.Byte()[offset:], pnew, p.next)
 		before.next = pnew
 		pnew.next = after
 		c.new = newSpan(before, after)
@@ -221,17 +219,17 @@ func (b *Buffer) Delete(off, length int64) error {
 		end = p
 
 		beg := p.len() + int(length-cur)
-		newBuf := make([]byte, len(p.data[beg:]))
-		copy(newBuf, p.data[beg:])
+		newBuf := make([]byte, len(p.data.Byte()[beg:]))
+		copy(newBuf, p.data.Byte()[beg:])
 		after = b.newPiece(newBuf, before, p.next)
 	}
 
 	var newStart, newEnd *piece
 	if midwayStart {
 		// we finally know which piece follows our newly allocated before piece
-		newBuf := make([]byte, len(start.data[:offset]))
-		copy(newBuf, start.data[:offset])
-		before.data = newBuf
+		newBuf := make([]byte, len(start.data.Byte()[:offset]))
+		copy(newBuf, start.data.Byte()[:offset])
+		before.data = *NewBytes(newBuf)
 		before.prev, before.next = start.prev, after
 
 		newStart = before
@@ -283,7 +281,7 @@ func (b *Buffer) newPiece(data []byte, prev, next *piece) *piece {
 		id:   b.piecesCnt,
 		prev: prev,
 		next: next,
-		data: data,
+		data: *NewBytes(data),
 	}
 }
 
@@ -406,7 +404,7 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 	}
 
 	for n < len(data) && p != nil {
-		n += copy(data[n:], p.data[off:])
+		n += copy(data[n:], p.data.Byte()[off:])
 		p = p.next
 		off = 0
 	}
@@ -484,21 +482,22 @@ func swapSpans(old, new span) {
 type piece struct {
 	id         int
 	prev, next *piece
-	data       []byte
+	data       Bytes
 }
 
 func (p *piece) len() int {
-	return len(p.data)
+	return p.data.Size()
 }
 
 func (p *piece) insert(off int, data []byte) {
-	p.data = append(p.data[:off], append(data, p.data[off:]...)...)
+
+	p.data.Init(append(p.data.Byte()[:off], append(data, p.data.Byte()[off:]...)...))
 }
 
 func (p *piece) delete(off int, length int64) bool {
-	if int64(off)+length > int64(len(p.data)) {
+	if int64(off)+length > int64(p.data.Size()) {
 		return false
 	}
-	p.data = append(p.data[:off], p.data[off+int(length):]...)
+	p.data.Init(append(p.data.Byte()[:off], p.data.Byte()[off+int(length):]...))
 	return true
 }
