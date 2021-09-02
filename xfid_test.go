@@ -758,7 +758,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.tag.file = file.MakeObservableEditableBufferTag(file.RuneArray("/home/gopher/edwood/row.go Del Snarf | Look "))
+	w.tag.file = file.MakeObservableEditableBufferTag([]rune("/home/gopher/edwood/row.go Del Snarf | Look "))
 	w.tag.fr = &MockFrame{}
 	w.body.fr = &MockFrame{}
 	x := &Xfid{
