@@ -218,8 +218,8 @@ func (w *Window) TagLines(r image.Rectangle) int {
 
 	// if tag ends with \n, include empty line at end for typing
 	n := w.tag.fr.GetFrameFillStatus().Nlines
-	if w.tag.file.Size() > 0 {
-		c := w.tag.file.ReadC(w.tag.file.Size() - 1)
+	if w.tag.file.Nr() > 0 {
+		c := w.tag.file.ReadC(w.tag.file.Nr() - 1)
 		if c == '\n' {
 			n++
 		}
@@ -542,7 +542,7 @@ func (w *Window) setTag1() {
 		}
 	}
 	w.tag.file.Clean()
-	n := w.tag.file.Size()
+	n := w.tag.file.Nr()
 	if w.tag.q0 > n {
 		w.tag.q0 = n
 	}

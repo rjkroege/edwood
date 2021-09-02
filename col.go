@@ -63,7 +63,7 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 		c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.Point{})
 	}
 	c.tag.Insert(0, Lheader, true)
-	c.tag.SetSelect(c.tag.file.Size(), c.tag.file.Size())
+	c.tag.SetSelect(c.tag.file.Nr(), c.tag.file.Nr())
 	if c.display != nil {
 		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
 		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt

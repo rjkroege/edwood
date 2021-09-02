@@ -1184,7 +1184,7 @@ func lineaddr(l int, addr Address, sign int) Address {
 			}
 			for n < l {
 				// TODO(rjk) utf8 buffer issue p
-				if p >= file.Size() {
+				if p >= file.Nr() {
 					editerror("address out of range")
 				}
 				if f.ReadC(p) == '\n' {
@@ -1194,7 +1194,7 @@ func lineaddr(l int, addr Address, sign int) Address {
 			}
 			a.r.q0 = p
 		}
-		for p < f.Size() && f.ReadC(p) != '\n' {
+		for p < f.Nr() && f.ReadC(p) != '\n' {
 			p++
 		}
 		a.r.q1 = p

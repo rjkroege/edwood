@@ -132,7 +132,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			q0 = t.q0
 			q1 = t.q1
 		} else {
-			for q1 < t.file.Size() {
+			for q1 < t.file.Nr() {
 				c := t.file.ReadC(q1)
 				if isexecc(c) && c != ':' {
 					q1++
@@ -438,7 +438,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	}
 
 	isclean := et.w.Clean(true)
-	if et.w.body.file.Size() > 0 && !isclean {
+	if et.w.body.file.Nr() > 0 && !isclean {
 		return
 	}
 	w := et.w
@@ -538,7 +538,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 
 	// Putting to the same file as the one that we originally read from.
 	if name == oeb.Name() {
-		if q0 != 0 || q1 != oeb.Size() {
+		if q0 != 0 || q1 != oeb.Nr() {
 			// The backing disk file contents now differ from File because
 			// we've over-written the disk file with part of File.
 			oeb.Modded()
@@ -568,7 +568,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	putfile(w.body.file, 0, f.Size(), name)
+	putfile(w.body.file, 0, f.Nr(), name)
 	xfidlog(w, "put")
 }
 
@@ -661,11 +661,11 @@ func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
-	t.SetSelect(t.file.Size(), t.file.Size())
+	t.SetSelect(t.file.Nr(), t.file.Nr())
 	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.Size()-1) != '\n' {
-		t.Insert(t.file.Size(), []rune("\n"), true)
-		t.SetSelect(t.file.Size(), t.file.Size())
+	if t.ReadC(t.file.Nr()-1) != '\n' {
+		t.Insert(t.file.Nr(), []rune("\n"), true)
+		t.SetSelect(t.file.Nr(), t.file.Nr())
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)
