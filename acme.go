@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -27,7 +25,6 @@ import (
 var (
 	command []*Command
 
-	debugAddr         = flag.String("debug", "", "Serve debug information on the supplied address")
 	globalAutoIndent  = flag.Bool("a", false, "Start each window in autoindent mode")
 	barflag           = flag.Bool("b", false, "Click to focus window instead of focus follows mouse (Bart's flag)")
 	varfontflag       = flag.String("f", defaultVarFont, "Variable-width font")
@@ -51,11 +48,7 @@ func main() {
 	flag.StringVar(&loadfile, "l", "", "Load state from file generated with Dump command")
 	flag.Parse()
 
-	if *debugAddr != "" {
-		go func() {
-			log.Println(http.ListenAndServe(*debugAddr, nil))
-		}()
-	}
+	startProfiler()
 
 	var err error
 	home, err = os.UserHomeDir()
