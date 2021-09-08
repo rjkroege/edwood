@@ -148,9 +148,9 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
-		before := b.newPiece(p.data.Byte()[:offset], p.prev, nil)
+		before := b.newPiece(p.data.b[:offset], p.prev, nil)
 		pnew = b.newPiece(data, before, nil)
-		after := b.newPiece(p.data.Byte()[offset:], pnew, p.next)
+		after := b.newPiece(p.data.b[offset:], pnew, p.next)
 		before.next = pnew
 		pnew.next = after
 		c.new = newSpan(before, after)
@@ -219,16 +219,16 @@ func (b *Buffer) Delete(off, length int64) error {
 		end = p
 
 		beg := p.len() + int(length-cur)
-		newBuf := make([]byte, len(p.data.Byte()[beg:]))
-		copy(newBuf, p.data.Byte()[beg:])
+		newBuf := make([]byte, len(p.data.b[beg:]))
+		copy(newBuf, p.data.b[beg:])
 		after = b.newPiece(newBuf, before, p.next)
 	}
 
 	var newStart, newEnd *piece
 	if midwayStart {
 		// we finally know which piece follows our newly allocated before piece
-		newBuf := make([]byte, len(start.data.Byte()[:offset]))
-		copy(newBuf, start.data.Byte()[:offset])
+		newBuf := make([]byte, len(start.data.b[:offset]))
+		copy(newBuf, start.data.b[:offset])
 		before.data = *NewBytes(newBuf)
 		before.prev, before.next = start.prev, after
 
@@ -404,7 +404,7 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 	}
 
 	for n < len(data) && p != nil {
-		n += copy(data[n:], p.data.Byte()[off:])
+		n += copy(data[n:], p.data.b[off:])
 		p = p.next
 		off = 0
 	}
@@ -491,13 +491,13 @@ func (p *piece) len() int {
 
 func (p *piece) insert(off int, data []byte) {
 
-	p.data.Init(append(p.data.Byte()[:off], append(data, p.data.Byte()[off:]...)...))
+	p.data.Init(append(p.data.b[:off], append(data, p.data.b[off:]...)...))
 }
 
 func (p *piece) delete(off int, length int64) bool {
 	if int64(off)+length > int64(p.data.Size()) {
 		return false
 	}
-	p.data.Init(append(p.data.Byte()[:off], p.data.Byte()[off+int(length):]...))
+	p.data.Init(append(p.data.b[:off], p.data.b[off+int(length):]...))
 	return true
 }

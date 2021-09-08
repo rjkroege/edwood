@@ -345,7 +345,7 @@ func (t *Buffer) printPieces() {
 		if p.next != nil {
 			next = p.next.id
 		}
-		fmt.Printf("%d, p:%d, n:%d = %s\n", p.id, prev, next, string(p.data.Byte()))
+		fmt.Printf("%d, p:%d, n:%d = %s\n", p.id, prev, next, string(p.data.b))
 	}
 	fmt.Println()
 }
@@ -364,7 +364,7 @@ func (t *Buffer) allContent() string {
 	var data []byte
 	p := t.begin.next
 	for p != t.end {
-		data = append(data, p.data.Byte()...)
+		data = append(data, p.data.b...)
 		p = p.next
 	}
 	return string(data)

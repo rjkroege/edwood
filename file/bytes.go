@@ -55,12 +55,6 @@ func (bytes *Bytes) Init(contents []byte) *Bytes {
 	return bytes
 }
 
-// Byte returns the contents of the Bytes.  This method also means the
-// Bytes is directly printable by fmt.Print.
-func (bytes *Bytes) Byte() []byte {
-	return bytes.b
-}
-
 // RuneCount returns the number of runes (Unicode code points) in the Bytes.
 func (bytes *Bytes) RuneCount() int {
 	return bytes.numRunes
@@ -210,7 +204,7 @@ func (b *Bytes) HasNull() bool {
 
 // Read implements the io.Reader interface.
 func (b *Bytes) Read(buf []byte) (n int, err error) {
-	n = copy(buf, b.Byte())
+	n = copy(buf, b.b)
 	return n, nil
 }
 
