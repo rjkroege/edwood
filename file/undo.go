@@ -15,6 +15,8 @@
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// And under a license that can be found in the undo.LICENSE file.
 
 // Package undo provides methods for undoable/redoable text manipulation.
 // Modifications are made by two operations: insert or delete.
@@ -78,7 +80,7 @@
 // and deletions). An action is represented by any operations between two calls of
 // Commit method. Anything that happens between these two calls is a part of that
 // particular action.
-package undo
+package file
 
 import (
 	"errors"
