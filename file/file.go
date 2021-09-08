@@ -91,8 +91,6 @@ func (f *File) HasRedoableChanges() bool {
 // Size returns the complete size of the buffer including both committed
 // and uncommitted runes.
 // NB: naturally forwards to undo.RuneArray.Size()
-// TODO(rjk): Switch all callers to Nr() as would be the number of
-// bytes when backed by undo.RuneArray.
 func (f *File) Size() int {
 	return int(f.b.Nc()) + len(f.cache)
 }

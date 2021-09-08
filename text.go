@@ -114,7 +114,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 }
 
 func (t *Text) Nc() int {
-	return t.file.Size()
+	return t.file.Nr()
 }
 
 // String returns a string representation of the TextKind.
@@ -274,7 +274,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 }
 
 func (t *Text) checkSafeToLoad(filename string) error {
-	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
+	if t.file.HasUncommitedChanges() || t.file.Nr() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 
@@ -350,7 +350,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 := t.file.Size()
+		q1 := t.file.Nr()
 		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
@@ -517,10 +517,10 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 		t.TypeCommit()
 	}
 	for {
-		n := t.file.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
+		n := t.file.Nr() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n < 0 {
 			log.Printf("Text.fill: negative slice length %v (file size %v, t.org %v, frame nchars %v)\n",
-				n, t.file.Size(), t.org, fr.GetFrameFillStatus().Nchars)
+				n, t.file.Nr(), t.org, fr.GetFrameFillStatus().Nchars)
 			return fmt.Errorf("fill: negative slice length %v", n)
 		}
 		if n == 0 {
@@ -625,14 +625,14 @@ func (t *Text) logInsertDelete(q0, q1 int) {
 
 func (t *Text) View(q0, q1 int) []rune                   { return t.file.View(q0, q1) }
 func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.Read(q, r); return }
-func (t *Text) nc() int                                  { return t.file.Size() }
+func (t *Text) nc() int                                  { return t.file.Nr() }
 func (t *Text) Q0() int                                  { return t.q0 }
 func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = util.Min(q0, t.file.Size())
-	p1 = util.Min(q1, t.file.Size())
+	p0 = util.Min(q0, t.file.Nr())
+	p1 = util.Min(q1, t.file.Nr())
 	return p0, p1
 }
 
@@ -787,7 +787,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyRight:
 		t.TypeCommit()
-		if t.q1 < t.file.Size() {
+		if t.q1 < t.file.Nr() {
 			// This is a departure from the plan9/plan9port acme
 			// Instead of always going right one char from q1, it
 			// collapses multi-character selections first, behaving
@@ -854,14 +854,14 @@ func (t *Text) Type(r rune) {
 	case draw.KeyEnd:
 		t.TypeCommit()
 		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.Size() {
+			if t.iq1 > t.file.Nr() {
 				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.Size()
+				t.iq1 = t.file.Nr()
 			}
 			q0 = t.BackNL(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
-			t.Show(t.file.Size(), t.file.Size(), false)
+			t.Show(t.file.Nr(), t.file.Nr(), false)
 		}
 		return
 	case '\t': // ^I (TAB)
@@ -883,7 +883,7 @@ func (t *Text) Type(r rune) {
 	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.Size() && t.file.ReadC(q0) != '\n' {
+		for q0 < t.file.Nr() && t.file.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
@@ -1061,7 +1061,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	if dl < 0 {
 		q0 = t.BackNL(t.org, -dl)
 	} else {
-		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
+		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Nr() {
 			return
 		}
 		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
@@ -1122,7 +1122,7 @@ func (t *Text) Select() {
 		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		// horrible botch: while asleep, may have lost selection altogether
-		if selectq > t.file.Size() {
+		if selectq > t.file.Nr() {
 			selectq = t.org + sP0
 		}
 		if selectq < t.org {
@@ -1216,7 +1216,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false // do we call textscrdraw?
-	nc = t.file.Size()
+	nc = t.file.Nr()
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
@@ -1349,7 +1349,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			return
 		}
 		// try matching character to right, looking left
-		if q == t.file.Size() {
+		if q == t.file.Nr() {
 			c = '\n'
 		} else {
 			c = t.file.ReadC(q)
@@ -1358,7 +1358,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0
-				if q0 < t.file.Size() && c == '\n' {
+				if q0 < t.file.Nr() && c == '\n' {
 					q1++
 				}
 				q0 = q
@@ -1371,7 +1371,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	}
 	// try filling out word to right
 	q1 = inq0
-	for q1 < t.file.Size() && isalnum(t.file.ReadC(q1)) {
+	for q1 < t.file.Nr() && isalnum(t.file.ReadC(q1)) {
 		q1++
 	}
 	// try filling out word to left
@@ -1387,7 +1387,7 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	var c rune
 	for {
 		if dir > 0 {
-			if inq == t.file.Size() {
+			if inq == t.file.Nr() {
 				break
 			}
 			c = t.file.ReadC(inq)
@@ -1417,7 +1417,7 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 // Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
 // Returned q1 is the location after the tag.
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-	if q+2 > t.file.Size() {
+	if q+2 > t.file.Nr() {
 		return 0, 0
 	}
 	if t.file.ReadC(q) != '<' {
@@ -1429,7 +1429,7 @@ func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
 	c1 := c
 	c2 := c
 	for c != '>' {
-		if q >= t.file.Size() {
+		if q >= t.file.Nr() {
 			return 0, 0
 		}
 		c2 = c
@@ -1485,7 +1485,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	if _, stat := t.ishtmlend(q0); stat == 1 {
 		depth := 1
 		q := q1
-		for q < t.file.Size() {
+		for q < t.file.Nr() {
 			nq, n := t.ishtmlstart(q)
 			if n != 0 {
 				depth += n
@@ -1563,7 +1563,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	if org > 0 && !exact && t.file.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
-		for i = 0; i < 256 && org < t.file.Size(); i++ {
+		for i = 0; i < 256 && org < t.file.Nr(); i++ {
 			if t.file.ReadC(org) == '\n' {
 				org++
 				break
@@ -1607,7 +1607,7 @@ func (t *Text) dirName(name string) string {
 	if t == nil || t.w == nil || filepath.IsAbs(name) {
 		return name
 	}
-	nt := t.w.tag.file.Size()
+	nt := t.w.tag.file.Nr()
 	if nt == 0 {
 		return name
 	}

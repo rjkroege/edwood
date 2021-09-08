@@ -189,7 +189,7 @@ func look3Message(t *Text, q0, q1 int) (*plumb.Message, error) {
 				}
 				q0--
 			}
-			for q1 < t.file.Size() {
+			for q1 < t.file.Nr() {
 				// TODO(rjk): utf8 conversion change point.
 				c := t.ReadC(q1)
 				if !(c != ' ' && c != '\t' && c != '\n') {
@@ -357,7 +357,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	if q1 == q0 {
 		colon := int(-1)
 		// TODO(rjk): utf8 conversion work.
-		for q1 < t.file.Size() {
+		for q1 < t.file.Nr() {
 			c := t.ReadC(q1)
 			if !isfilec(c) {
 				break
@@ -382,11 +382,11 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		// otherwise terminate expansion at :
 		if colon >= 0 {
 			q1 = colon
-			if colon < t.file.Size()-1 {
+			if colon < t.file.Nr()-1 {
 				c := t.ReadC(colon + 1)
 				if isaddrc(c) {
 					q1 = colon + 1
-					for q1 < t.file.Size() {
+					for q1 < t.file.Nr() {
 						c := t.ReadC(q1)
 						if !isaddrc(c) {
 							break
@@ -398,14 +398,14 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		}
 		if q1 > q0 {
 			if colon >= 0 { // stop at white space
-				for amax = colon + 1; amax < t.file.Size(); amax++ {
+				for amax = colon + 1; amax < t.file.Nr(); amax++ {
 					c := t.ReadC(amax)
 					if c == ' ' || c == '\t' || c == '\n' {
 						break
 					}
 				}
 			} else {
-				amax = t.file.Size()
+				amax = t.file.Nr()
 			}
 		}
 	}
@@ -423,7 +423,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	nname := -1
 	for i, c := range rb {
 		if c == ':' && nname < 0 {
-			if q0+i+1 >= t.file.Size() {
+			if q0+i+1 >= t.file.Nr() {
 				return false
 			}
 			if i != n-1 {
@@ -496,7 +496,7 @@ func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
 	}
 
 	if q0 == q1 {
-		for q1 < t.file.Size() && isalnum(t.ReadC(q1)) {
+		for q1 < t.file.Nr() && isalnum(t.ReadC(q1)) {
 			q1++
 		}
 		for q0 > 0 && isalnum(t.ReadC(q0-1)) {
@@ -577,7 +577,7 @@ func openfile(t *Text, e *Expand) *Window {
 		t.Load(0, e.name, true)
 		t.file.Clean()
 		t.w.SetTag()
-		t.w.tag.SetSelect(t.w.tag.file.Size(), t.w.tag.file.Size())
+		t.w.tag.SetSelect(t.w.tag.file.Nr(), t.w.tag.file.Nr())
 		if ow != nil {
 			for _, inc := range ow.incl {
 				w.AddIncl(inc)

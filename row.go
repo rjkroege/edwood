@@ -48,7 +48,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	r1.Max.Y += row.display.ScaleSize(Border)
 	row.display.ScreenImage().Draw(r1, row.display.Black(), nil, image.Point{})
 	t.Insert(0, []rune(RowTag+" "), true)
-	t.SetSelect(t.file.Size(), t.file.Size())
+	t.SetSelect(t.file.Nr(), t.file.Nr())
 	return row
 }
 
@@ -477,7 +477,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	}
 	w.ClearTag()
 
-	w.tag.Insert(w.tag.file.Size(), []rune(afterbar[1]), true)
+	w.tag.Insert(w.tag.file.Nr(), []rune(afterbar[1]), true)
 	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
 
 	if win.Type == dumpfile.Unsaved {
@@ -497,7 +497,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 
 	q0 := win.Body.Q0
 	q1 := win.Body.Q1
-	if q0 > w.body.file.Size() || q1 > w.body.file.Size() || q0 > q1 {
+	if q0 > w.body.file.Nr() || q1 > w.body.file.Nr() || q0 > q1 {
 		q0 = 0
 		q1 = 0
 	}
@@ -600,7 +600,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	}
 
 	// Set row tag
-	row.tag.Delete(0, row.tag.file.Size(), true)
+	row.tag.Delete(0, row.tag.file.Nr(), true)
 	row.tag.Insert(0, []rune(dump.RowTag.Buffer), true)
 	row.tag.Show(dump.RowTag.Q0, dump.RowTag.Q1, true)
 
@@ -609,7 +609,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 		// Acme's handling of column headers is perplexing. It is conceivable
 		// that this code does not do the right thing even if it replicates Acme
 		// correctly.
-		row.col[i].tag.Delete(0, row.col[i].tag.file.Size(), true)
+		row.col[i].tag.Delete(0, row.col[i].tag.file.Nr(), true)
 		row.col[i].tag.Insert(0, []rune(col.Tag.Buffer), true)
 		row.col[i].tag.Show(col.Tag.Q0, col.Tag.Q1, true)
 	}
