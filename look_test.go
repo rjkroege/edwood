@@ -8,10 +8,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/rjkroege/edwood/file"
-
 	"9fans.net/go/plumb"
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/runes"
 )
 

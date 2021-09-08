@@ -7,11 +7,10 @@ import (
 	"image"
 	"strings"
 
-	"github.com/rjkroege/edwood/file"
-
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/file"
 )
 
 // configureGlobals setups global variables so that Edwood can operate on

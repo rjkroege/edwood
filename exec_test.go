@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	file2 "github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/file"
 )
 
 func acmeTestingMain() {
@@ -120,7 +120,7 @@ func TestPutfile(t *testing.T) {
 	want := "Hello, 世界\n"
 	w := &Window{
 		body: Text{
-			file: file2.MakeObservableEditableBuffer(filename, []rune(want)),
+			file: file.MakeObservableEditableBuffer(filename, []rune(want)),
 		},
 	}
 	f := w.body.file
@@ -170,7 +170,7 @@ func TestExpandtabToggle(t *testing.T) {
 	want := true
 	w := &Window{
 		body: Text{
-			file:      file2.MakeObservableEditableBuffer("", nil),
+			file:      file.MakeObservableEditableBuffer("", nil),
 			tabexpand: false,
 			tabstop:   4,
 		},

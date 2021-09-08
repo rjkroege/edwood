@@ -14,12 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rjkroege/edwood/file"
-
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/file"
 )
 
 func TestXfidallocthread(t *testing.T) {

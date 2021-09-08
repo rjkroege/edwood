@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rjkroege/edwood/file"
-
 	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/file"
 )
 
 func TestIsmtpt(t *testing.T) {
