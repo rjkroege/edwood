@@ -39,7 +39,7 @@ func TestWindowUndoSelection(t *testing.T) {
 			body: Text{
 				q0:   tc.q0,
 				q1:   tc.q1,
-				file: file.MakeObservableEditableBufferTag(file.RuneArray("This is an example sentence.\n")),
+				file: file.MakeObservableEditableBufferTag([]rune("This is an example sentence.\n")),
 			},
 		}
 		w.body.file.SetDelta(tc.delta)
@@ -131,7 +131,7 @@ func TestWindowParseTag(t *testing.T) {
 	} {
 		w := &Window{
 			tag: Text{
-				file: file.MakeObservableEditableBufferTag(file.RuneArray(tc.tag)),
+				file: file.MakeObservableEditableBufferTag([]rune(tc.tag)),
 			},
 		}
 		if got, want := w.ParseTag(), tc.filename; got != want {
@@ -145,7 +145,7 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: file.MakeObservableEditableBufferTag(file.RuneArray(tag)),
+			file: file.MakeObservableEditableBufferTag([]rune(tag)),
 		},
 	}
 	w.ClearTag()

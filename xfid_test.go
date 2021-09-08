@@ -158,10 +158,10 @@ func TestXfidreadQWrdsel(t *testing.T) {
 	const wantSel = "εxαmple"
 
 	w := &Window{
-		body: Text{fr: &MockFrame{}, file: file.MakeObservableEditableBuffer("", file.NewRuneArray())},
+		body: Text{fr: &MockFrame{}, file: file.MakeObservableEditableBuffer("", []rune{})},
 		tag: Text{
 			fr:   &MockFrame{},
-			file: file.MakeObservableEditableBuffer("", file.NewRuneArray()),
+			file: file.MakeObservableEditableBuffer("", []rune{}),
 		},
 		col: new(Column),
 	}
@@ -631,7 +631,7 @@ func TestXfidwriteQWtag(t *testing.T) {
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
 	w.body.file = file.MakeObservableEditableBuffer("", nil)
-	w.tag.file = file.MakeObservableEditableBuffer("", file.RuneArray(prevTag))
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(prevTag))
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  []byte(extra),
@@ -759,7 +759,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.tag.file = file.MakeObservableEditableBufferTag(file.RuneArray("/home/gopher/edwood/row.go Del Snarf | Look "))
+	w.tag.file = file.MakeObservableEditableBufferTag([]rune("/home/gopher/edwood/row.go Del Snarf | Look "))
 	w.tag.fr = &MockFrame{}
 	w.body.fr = &MockFrame{}
 	x := &Xfid{
@@ -993,7 +993,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	defer func() { w.nopen[QWevent]-- }()
 	w.tag = Text{
 		w:       w,
-		file:    file.MakeObservableEditableBuffer("", file.RuneArray("Send")),
+		file:    file.MakeObservableEditableBuffer("", []rune("Send")),
 		fr:      &MockFrame{},
 		display: d,
 	}

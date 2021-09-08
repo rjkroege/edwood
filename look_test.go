@@ -61,7 +61,7 @@ func TestExpand(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: file.MakeObservableEditableBufferTag(file.RuneArray(r)),
+				file: file.MakeObservableEditableBufferTag(r),
 				q0:   0,
 				q1:   tc.sel1,
 			}

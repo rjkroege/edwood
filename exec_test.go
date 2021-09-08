@@ -120,7 +120,7 @@ func TestPutfile(t *testing.T) {
 	want := "Hello, 世界\n"
 	w := &Window{
 		body: Text{
-			file: file2.MakeObservableEditableBuffer(filename, file2.RuneArray(want)),
+			file: file2.MakeObservableEditableBuffer(filename, []rune(want)),
 		},
 	}
 	f := w.body.file

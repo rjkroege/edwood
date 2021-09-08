@@ -91,7 +91,7 @@ func (e *ObservableEditableBuffer) HasMultipleObservers() bool {
 }
 
 // MakeObservableEditableBuffer is a constructor wrapper for NewFile() to abstract File from the main program.
-func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEditableBuffer {
+func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditableBuffer {
 	f := NewFile()
 	f.b = b
 	oeb := &ObservableEditableBuffer{
@@ -107,7 +107,7 @@ func MakeObservableEditableBuffer(filename string, b RuneArray) *ObservableEdita
 }
 
 // MakeObservableEditableBufferTag is a constructor wrapper for NewTagFile() to abstract File from the main program.
-func MakeObservableEditableBufferTag(b RuneArray) *ObservableEditableBuffer {
+func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
 	f := NewTagFile()
 	f.b = b
 	oeb := &ObservableEditableBuffer{
