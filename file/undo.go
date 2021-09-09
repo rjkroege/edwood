@@ -428,14 +428,14 @@ func (b *Buffer) Size() int64 {
 // IsAscii returns true if the buffer contains only Ascii characters and when true
 // it returns the offset of the first nonAscii character.
 func (b *Buffer) IsAscii() (bool, int) {
-    var off int
-    for p := b.begin; p != nil; p = p.next {
-        if !p.data.IsASCII() {
-            return false, off + p.data.nonASCII
-        }
-        off += p.data.RuneCount()
-    }
-    return true, -1
+	var off int
+	for p := b.begin; p != nil; p = p.next {
+		if !p.data.IsASCII() {
+			return false, off + p.data.nonASCII
+		}
+		off += p.data.RuneCount()
+	}
+	return true, -1
 }
 
 // action is a list of changes which are used to undo/redo all modifications.
