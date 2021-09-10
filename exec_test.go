@@ -184,32 +184,43 @@ func TestExpandtabToggle(t *testing.T) {
 	if te != want {
 		t.Errorf("tabexpand is set to %v; expected %v", te, want)
 	}
+}
 
+// Observation: making this particular test useful requires multiple
+// refactorings to fully exercise all code paths through cut.
+// I expect that this observation applies to almost all of the functions
+// noted in exectab.
 func TestCut(t *testing.T) {
 	prefix := "Hello "
-	suffix  := "世界\n"
+	suffix := "世界\n"
 	w := &Window{
 		body: Text{
-			file: &File{
-				b:    Buffer(prefix + suffix),
-				name: "cuttest",
-			},
+			file: file.MakeObservableEditableBuffer("cuttest", []rune(prefix+suffix)),
 		},
 	}
 
-	f := w.body.file
-	f.curtext = &w.body
-	f.curtext.w = w
+	bodytext := &w.body
+
+	// TODO(rjk): Setting this will cause the test to crash because it
+	// requires bodytext to have a valid frame. But without setting this,
+	// it's impossible to get good test coverage.
+	// bodytext.w = w
 
 	w.body.q0 = 0
 	w.body.q1 = len(prefix)
 
-	cut(&w.body, nil, nil, true, true, "")
+	cut(bodytext, bodytext, nil, false, true, "")
 
-	// TODO(rjk): vector of tests
-	// stimulate this more aggressively.
-	if got, want := string(w.body.file.b), suffix; got != want {
-		t.Errorf("buffer not cut got %v, want %v", got, want)
+	if got, want := w.body.file.String(), suffix; got != want {
+		t.Errorf("text not cut got %q, want %q", got, want)
 	}
 
+	if got, want := w.body.q0, 0; got != want {
+		t.Errorf("text q0 wrong after cut got %v, want %v", got, want)
+	}
+	if got, want := w.body.q1, 0; got != want {
+		t.Errorf("text q0 wrong after cut got %v, want %v", got, want)
+	}
 }
+
+// TODO(rjk): test undo.
