@@ -17,14 +17,14 @@ import (
 // a scaffold model.
 func configureGlobals() {
 	// TODO(rjk): Make a proper mock draw.Mouse in edwoodtest.
-	mouse = new(draw.Mouse)
-	button = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	modbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	colbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+	global.mouse = new(draw.Mouse)
+	global.button = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+	global.modbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+	global.colbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
 
 	// Set up Undo to make sure that we see undoable results.
 	// By default, post-load, file.seq, file.putseq = 0, 0.
-	seq = 1
+	global.seq = 1
 }
 
 // updateText creates a minimal mock Text object from data embedded inside
@@ -45,9 +45,9 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // file.
 func MakeWindowScaffold(content *dumpfile.Content) {
 	display := edwoodtest.NewDisplay()
-	seq = 0
+	global.seq = 0
 
-	row = Row{
+	global.row = Row{
 		display: display,
 		tag: *updateText(&Text{
 			what: Rowtag,
@@ -85,7 +85,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		w.tag.col = wincol
 	}
 
-	row.col = cols
+	global.row.col = cols
 	configureGlobals()
 }
 
@@ -93,7 +93,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 // update the selection.
 func InsertString(w *Window, s string) {
 	// Set an undo point before the insertion. (So that the insertion is undoable)
-	w.body.file.Mark(seq)
-	seq++
+	w.body.file.Mark(global.seq)
+	global.seq++
 	w.body.Insert(0, []rune(s), true)
 }

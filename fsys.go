@@ -139,8 +139,8 @@ func (fs *fileServer) fsysproc() {
 			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
 		}
 		if x == nil {
-			cxfidalloc <- nil
-			x = <-cxfidalloc
+			global.cxfidalloc <- nil
+			x = <-global.cxfidalloc
 		}
 		x.fcall = *fc
 		x.fs = fs
@@ -203,7 +203,7 @@ func (mnt *Mnt) DecRef(idm *MntDir) {
 		return
 	}
 	if _, ok := mnt.md[idm.id]; !ok {
-		cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
+		global.cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
 		return
 	}
 	delete(mnt.md, idm.id)
@@ -428,14 +428,14 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 			id64, _ := strconv.ParseInt(wname, 10, 32)
 			id = int(id64)
 		}
-		row.lk.Lock()
-		f.w = row.LookupWin(id)
+		global.row.lk.Lock()
+		f.w = global.row.LookupWin(id)
 		if f.w == nil {
-			row.lk.Unlock()
+			global.row.lk.Unlock()
 			return false, nil
 		}
 		f.w.ref.Inc() // we'll drop reference at end if there's an error
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 
 		f.dir = dirtabw[0] // '.'
 		f.qid.Type = plan9.QTDIR
@@ -450,8 +450,8 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 		if f.w != nil {
 			util.AcmeError("w set in walk to new", nil)
 		}
-		cnewwindow <- nil  // signal newwindowthread
-		f.w = <-cnewwindow // receive new window
+		global.cnewwindow <- nil  // signal newwindowthread
+		f.w = <-global.cnewwindow // receive new window
 		f.w.ref.Inc()
 		f.dir = dirtabw[0]
 		f.qid.Type = plan9.QTDIR
@@ -531,13 +531,13 @@ func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 
 		var ids []int // for window sub-directories
 		if id == 0 {
-			row.lk.Lock()
-			for _, c := range row.col {
+			global.row.lk.Lock()
+			for _, c := range global.row.col {
 				for _, w := range c.w {
 					ids = append(ids, w.id)
 				}
 			}
-			row.lk.Unlock()
+			global.row.lk.Unlock()
 			sort.Ints(ids)
 		}
 

@@ -116,7 +116,7 @@ func cmdexec(t *Text, cp *Cmd) bool {
 }
 
 func edittext(w *Window, q int, r []rune) error {
-	switch editing {
+	switch global.editing {
 	case Inactive:
 		return ErrPermission
 	case Inserting:
@@ -467,7 +467,7 @@ func u_cmd(t *Text, cp *Cmd) bool {
 
 func w_cmd(t *Text, cp *Cmd) bool {
 	file := t.file
-	if file.Seq() == seq {
+	if file.Seq() == global.seq {
 		editerror("can't write file with pending modifications")
 	}
 	r := cmdname(t.file, cp.text, false)
@@ -524,7 +524,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	s = append([]rune{cmd}, r...)
 
 	dir := t.DirName("") // exec.Cmd.Dir
-	editing = state
+	global.editing = state
 	if t != nil && t.w != nil {
 		t.w.ref.Inc()
 	}
@@ -532,8 +532,8 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	if t != nil && t.w != nil {
 		t.w.Unlock()
 	}
-	row.lk.Unlock()
-	<-cedit
+	global.row.lk.Unlock()
+	<-global.cedit
 	//
 	// The editoutlk exists only so that we can tell when
 	// the editout file has been closed.  It can get closed *after*
@@ -545,14 +545,14 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 	// 9P transactions.  This process might still have a couple
 	// writes left to copy after the original process has exited.
 	//
-	q := editoutlk
+	q := global.editoutlk
 	if w != nil {
 		q = w.editoutlk
 	}
 	q <- true // wait for file to close
 	<-q
-	row.lk.Lock()
-	editing = Inactive
+	global.row.lk.Lock()
+	global.editing = Inactive
 	if t != nil && t.w != nil {
 		t.w.Lock('M')
 	}
@@ -860,14 +860,14 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 	loopstruct.cp = cp
 	loopstruct.XY = XY
 	loopstruct.w = []*Window{}
-	row.AllWindows(func(w *Window) { alllooper(w, &loopstruct) })
+	global.row.AllWindows(func(w *Window) { alllooper(w, &loopstruct) })
 
 	// add a ref to all windows to keep safe windows accessed by X
 	// that would not otherwise have a ref to hold them up during
 	// the shenanigans.  note this with globalincref so that any
 	// newly created windows start with an extra reference.
-	row.AllWindows(func(w *Window) { alllocker(w, true) })
-	globalincref = true
+	global.row.AllWindows(func(w *Window) { alllocker(w, true) })
+	global.globalincref = true
 
 	// Unlock the window running the X command.
 	// We'll need to lock and unlock each target window in turn.
@@ -890,8 +890,8 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 		t.w.Lock(int(cp.cmdc))
 	}
 
-	row.AllWindows(func(w *Window) { alllocker(w, false) })
-	globalincref = false
+	global.row.AllWindows(func(w *Window) { alllocker(w, false) })
+	global.globalincref = false
 	loopstruct.w = nil
 
 	Glooping--
@@ -1079,7 +1079,7 @@ func toOEB(r string) *file.ObservableEditableBuffer {
 
 	t.r = strings.TrimLeft(r, " \t\n")
 	t.oeb = nil
-	row.AllWindows(func(w *Window) { alltofile(w, &t) })
+	global.row.AllWindows(func(w *Window) { alltofile(w, &t) })
 	if t.oeb == nil {
 		editerror("no such file\"%v\"", t.r)
 	}
@@ -1110,7 +1110,7 @@ func matchfile(r string) *file.ObservableEditableBuffer {
 
 	tf.oeb = nil
 	tf.r = r
-	row.AllWindows(func(w *Window) { allmatchfile(w, &tf) })
+	global.row.AllWindows(func(w *Window) { allmatchfile(w, &tf) })
 
 	if tf.oeb == nil {
 		editerror("no file matches \"%v\"", r)
@@ -1268,14 +1268,14 @@ func cmdname(oeb *file.ObservableEditableBuffer, str string, set bool) string {
 	}
 	fc.f = oeb
 	fc.r = r
-	row.AllWindows(func(w *Window) { allfilecheck(w, &fc) })
+	global.row.AllWindows(func(w *Window) { allfilecheck(w, &fc) })
 	if oeb.Name() == "" {
 		set = true
 	}
 
 Return:
 	if set && !(r == oeb.Name()) {
-		oeb.Mark(seq)
+		oeb.Mark(global.seq)
 		oeb.Modded()
 		cur.w.SetName(r)
 	}

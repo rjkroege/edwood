@@ -13,11 +13,11 @@ import (
 )
 
 func acmeTestingMain() {
-	acmeshell = os.Getenv("acmeshell")
-	cwait = make(chan ProcessState)
-	cerr = make(chan error)
+	global.acmeshell = os.Getenv("acmeshell")
+	global.cwait = make(chan ProcessState)
+	global.cerr = make(chan error)
 	go func() {
-		for range cerr {
+		for range global.cerr {
 			// Do nothing with command output.
 		}
 	}()
@@ -60,9 +60,9 @@ func TestRunproc(t *testing.T) {
 		// runproc goes into Hard path if acmeshell is non-empty.
 		// Unset acmeshell for non-hard cases.
 		if tc.hard {
-			acmeshell = os.Getenv("acmeshell")
+			global.acmeshell = os.Getenv("acmeshell")
 		} else {
-			acmeshell = ""
+			global.acmeshell = ""
 		}
 
 		cpid := make(chan *os.Process)
@@ -82,7 +82,7 @@ func TestRunproc(t *testing.T) {
 			t.Errorf("nil proc for command %v", tc.s)
 		}
 		if proc != nil {
-			status := <-cwait
+			status := <-global.cwait
 			if tc.waitfail && status.Success() {
 				t.Errorf("command %q exited with status %v", tc.s, status)
 			}

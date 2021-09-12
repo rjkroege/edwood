@@ -41,7 +41,7 @@ func xfidctl(x *Xfid, d draw.Display) {
 		if d != nil {
 			d.Flush()
 		} // d here is for testability.
-		cxfidfree <- x
+		global.cxfidfree <- x
 	}
 }
 
@@ -52,9 +52,9 @@ func xfidflush(x *Xfid) {
 	xfidlogflush(x)
 
 	// search windows for matching tag
-	row.lk.Lock()
-	defer row.lk.Unlock()
-	for _, c := range row.col {
+	global.row.lk.Lock()
+	defer global.row.lk.Unlock()
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			w.Lock('E')
 			wx := w.eventx
@@ -136,13 +136,13 @@ func xfidopen(x *Xfid) {
 			w.rdselfd = tmp
 		case QWwrsel:
 			w.nopen[q]++
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 			cut(t, t, nil, false, true, "")
 			w.wrselrange = Range{t.q1, t.q1}
 			w.nomark = true
 		case QWeditout:
-			if editing == Inactive {
+			if global.editing == Inactive {
 				w.Unlock()
 				x.respond(&fc, ErrPermission)
 				return
@@ -163,7 +163,7 @@ func xfidopen(x *Xfid) {
 			xfidlogopen(x)
 		case Qeditout:
 			select {
-			case editoutlk <- true:
+			case global.editoutlk <- true:
 			default:
 				x.respond(&fc, ErrInUse)
 				return
@@ -198,7 +198,7 @@ func xfidclose(x *Xfid) {
 		// We need to lock row here before locking window (just like mousethread)
 		// in order to synchronize mousetext with mousethread: mousetext is
 		// set to nil when the associated window is closed.
-		row.lk.Lock()
+		global.row.lk.Lock()
 		w.Lock('E')
 		switch q {
 		case QWctl:
@@ -239,11 +239,11 @@ func xfidclose(x *Xfid) {
 		}
 		w.Close()
 		w.Unlock()
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 	} else {
 		switch q {
 		case Qeditout:
-			<-editoutlk
+			<-global.editoutlk
 		}
 	}
 	x.respond(&fc, nil)
@@ -413,8 +413,8 @@ func xfidwrite(x *Xfid) {
 				t.Insert(q0, r, true)
 			} else {
 				if !w.nomark {
-					seq++
-					t.file.Mark(seq)
+					global.seq++
+					t.file.Mark(global.seq)
 				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
@@ -497,8 +497,8 @@ func xfidwrite(x *Xfid) {
 		}
 		r, _, _ := util.Cvttorunes(x.fcall.Data, int(x.fcall.Count))
 		if !w.nomark {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		q0 := a.q0
 		if a.q1 > q0 {
@@ -606,8 +606,8 @@ forloop:
 					break forloop
 				}
 			}
-			seq++
-			w.body.file.Mark(seq)
+			global.seq++
+			w.body.file.Mark(global.seq)
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
@@ -663,8 +663,8 @@ forloop:
 		case "nomark": // turn off automatic marking
 			w.nomark = true
 		case "mark": // mark file
-			seq++
-			w.body.file.Mark(seq)
+			global.seq++
+			w.body.file.Mark(global.seq)
 			settag = true
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
@@ -719,12 +719,12 @@ func xfideventwrite(x *Xfid, w *Window) {
 	rowLock := func() {
 		defer w.Lock(w.owner)
 		w.Unlock() // sets w.owner to 0
-		row.lk.Lock()
+		global.row.lk.Lock()
 	}
 	rowUnlock := func() {
 		defer w.Lock(w.owner)
 		w.Unlock() // sets w.owner to 0
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 	}
 
 	// The messages have a fixed format: a character indicating the
@@ -958,9 +958,9 @@ func xfidindexread(x *Xfid) {
 	// read using a very small buffer and we create/delete windows
 	// in-between the requests.
 
-	row.lk.Lock()
+	global.row.lk.Lock()
 	nmax := 0
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			nmax += Ctlsize + w.tag.Nc()*utf8.UTFMax + 1
 		}
@@ -968,7 +968,7 @@ func xfidindexread(x *Xfid) {
 
 	nmax++
 	var sb strings.Builder
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
 			if w.body.file.GetCurObserver().(*Text) != &w.body {
@@ -987,7 +987,7 @@ func xfidindexread(x *Xfid) {
 			sb.WriteString("\n")
 		}
 	}
-	row.lk.Unlock()
+	global.row.lk.Unlock()
 
 	var fc plan9.Fcall
 	ninep.ReadString(&fc, &x.fcall, sb.String())

@@ -205,9 +205,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		return
 	}
 	if e != nil {
-		if (e.mark && seltext != nil) && seltext.what == Body {
-			seq++
-			seltext.w.body.file.Mark(seq)
+		if (e.mark && global.seltext != nil) && global.seltext.what == Body {
+			global.seq++
+			global.seltext.w.body.file.Mark(global.seq)
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
@@ -216,7 +216,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if len(words) > 1 {
 			arg = strings.TrimLeft(words[1], " \t\n")
 		}
-		e.fn(t, seltext, argt, e.flag1, e.flag2, arg)
+		e.fn(t, global.seltext, argt, e.flag1, e.flag2, arg)
 		return
 	}
 
@@ -235,7 +235,7 @@ func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 	r, _ := getarg(argt, false, true)
 
-	seq++
+	global.seq++
 	if r != "" {
 		editcmd(et, []rune(r))
 	} else {
@@ -244,8 +244,8 @@ func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 }
 
 func xexit(*Text, *Text, *Text, bool, bool, string) {
-	if row.Clean() {
-		close(cexit)
+	if global.row.Clean() {
+		close(global.cexit)
 		//	threadexits(nil);
 	}
 }
@@ -271,7 +271,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark(seq) // seq has been incremented by execute
+				t.file.Mark(global.seq) // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -298,7 +298,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		snarfbuf.Delete(0, snarfbuf.Nc())
+		global.snarfbuf.Delete(0, global.snarfbuf.Nc())
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
@@ -306,7 +306,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 				n = RBUFSIZE
 			}
 			t.file.Read(q0, r[:n])
-			snarfbuf.Insert(snarfbuf.Nc(), r[:n])
+			global.snarfbuf.Insert(global.snarfbuf.Nc(), r[:n])
 			q0 += n
 		}
 		acmeputsnarf()
@@ -321,7 +321,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		}
 	} else {
 		if dosnarf { // Snarf command
-			argtext = t
+			global.argtext = t
 		}
 	}
 }
@@ -359,14 +359,14 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark(seq) // seq has been incremented by execute
+		t.file.Mark(global.seq) // seq has been incremented by execute
 	}
 	if t == nil {
 		return
 	}
 
 	acmegetsnarf()
-	if t == nil || snarfbuf.Nc() == 0 {
+	if t == nil || global.snarfbuf.Nc() == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -380,14 +380,14 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	cut(t, t, nil, false, true, "")
 	q = 0
 	q0 = t.q0
-	q1 = t.q0 + snarfbuf.Nc()
+	q1 = t.q0 + global.snarfbuf.Nc()
 	r := make([]rune, RBUFSIZE)
 	for q0 < q1 {
 		n = q1 - q0
 		if n > RBUFSIZE {
 			n = RBUFSIZE
 		}
-		snarfbuf.Read(q, r[:n])
+		global.snarfbuf.Read(q, r[:n])
 		t.Insert(q0, r[:n], true)
 		q += n
 		q0 += n
@@ -480,7 +480,7 @@ func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
 		xkill(nil, nil, nil, false, false, r)
 	}
 	for _, cmd := range strings.Fields(args) {
-		ckill <- cmd
+		global.ckill <- cmd
 	}
 }
 
@@ -573,7 +573,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 }
 
 func putall(et, _, _ *Text, _, _ bool, arg string) {
-	for _, col := range row.col {
+	for _, col := range global.row.col {
 		for _, w := range col.w {
 			if w.nopen[QWevent] > 0 {
 				continue
@@ -620,7 +620,7 @@ func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	// in the same file will not call show() and jump to a different location in the file.
 	// Simultaneous changes to other files will be chaotic, however.
 	et.w.Undo(flag1)
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			if w == et.w {
 				continue
@@ -766,11 +766,11 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		}
 	}
 
-	if newfont := fontget(file, row.display); newfont != nil {
+	if newfont := fontget(file, global.row.display); newfont != nil {
 		// TODO(rjk): maybe Frame should know how to clear itself on init?
-		row.display.ScreenImage().Draw(t.w.r, textcolors[frame.ColBack], nil, image.Point{})
+		global.row.display.ScreenImage().Draw(t.w.r, global.textcolors[frame.ColBack], nil, image.Point{})
 		t.font = file
-		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage()))
+		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(global.row.display.ScreenImage()))
 
 		if t.w.body.file.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!
@@ -816,10 +816,10 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 
 	if c.proc != nil { // successful exec
 		c.pid = c.proc.Pid
-		ccommand <- c
+		global.ccommand <- c
 	} else {
 		if c.iseditcommand {
-			cedit <- 0
+			global.cedit <- 0
 		}
 	}
 	cpid = nil
@@ -866,7 +866,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			t = s
 			c.text = s
 		}
-		shell = acmeshell
+		shell = global.acmeshell
 		if shell == "" {
 			shell = "rc"
 		}
@@ -885,7 +885,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		go func() {
 			cmd.Wait()
 			Closeall()
-			cwait <- cmd.ProcessState
+			global.cwait <- cmd.ProcessState
 		}()
 		return nil
 	}
@@ -915,8 +915,8 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		} else {
 			filename = ""
 			winid = 0
-			if activewin != nil {
-				winid = activewin.id
+			if global.activewin != nil {
+				winid = global.activewin.id
 			}
 		}
 		// 	rfork(RFNAMEG|RFENVG|RFFDG|RFNOTEG); TODO(flux): I'm sure these settings are important
@@ -972,7 +972,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	if argaddr != "" {
 		os.Setenv("acmeaddr", argaddr)
 	}
-	if acmeshell != "" {
+	if global.acmeshell != "" {
 		return Hard()
 	}
 	for _, r := range t {
@@ -1009,7 +1009,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	go func() {
 		cmd.Wait()
 		Closeall()
-		cwait <- cmd.ProcessState
+		global.cwait <- cmd.ProcessState
 	}()
 	return nil
 }
@@ -1056,7 +1056,7 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		autoindent = indentval(strings.SplitN(arg, " ", 2)[0])
 	}
 	if autoindent == IGlobal {
-		row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
+		global.row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
 	} else {
 		if w != nil && autoindent >= 0 {
 			w.autoindent = autoindent == Ion
@@ -1075,8 +1075,8 @@ func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 	}
 
 	if isdump {
-		row.Dump(name)
+		global.row.Dump(name)
 	} else {
-		row.Load(nil, name, false)
+		global.row.Load(nil, name, false)
 	}
 }

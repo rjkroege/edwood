@@ -186,7 +186,7 @@ func allupdate(w *Window) {
 			t.w.owner = 'E'
 		}
 		// Set an undo point before applying accumulated Edit actions.
-		f.Mark(seq)
+		f.Mark(global.seq)
 		f.Elog.Apply(t)
 		if f.EditClean {
 			f.Clean()
@@ -198,7 +198,7 @@ func allupdate(w *Window) {
 
 func editerror(format string, args ...interface{}) {
 	s := fmt.Errorf(format, args...)
-	row.AllWindows(allelogterm) // truncate the edit logs
+	global.row.AllWindows(allelogterm) // truncate the edit logs
 	editerrc <- s
 	runtime.Goexit()
 }
@@ -213,7 +213,7 @@ func editcmd(ct *Text, r []rune) {
 		return
 	}
 
-	row.AllWindows(alleditinit)
+	global.row.AllWindows(alleditinit)
 	cp := newCmdParser(r)
 	if ct.w == nil {
 		curtext = nil
@@ -229,12 +229,12 @@ func editcmd(ct *Text, r []rune) {
 	// but block here.
 	go editthread(cp)
 	err := <-editerrc
-	editing = Inactive
+	global.editing = Inactive
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
 	}
 	// update everyone whose edit log has data
-	row.AllWindows(allupdate)
+	global.row.AllWindows(allupdate)
 }
 
 func newCmdParser(r []rune) *cmdParser {

@@ -90,10 +90,10 @@ func TestWaitthreadCommandCycle(t *testing.T) {
 		}
 	}
 
-	ccommand <- c[3]
-	ccommand <- c[2]
-	ccommand <- c[1]
-	ccommand <- c[0]
+	global.ccommand <- c[3]
+	global.ccommand <- c[2]
+	global.ccommand <- c[1]
+	global.ccommand <- c[0]
 	waitthreadSync()
 
 	// command is 0 -> 1 -> 2 -> 3
@@ -101,10 +101,10 @@ func TestWaitthreadCommandCycle(t *testing.T) {
 		t.Errorf("command is length is %v; want %v", got, want)
 	}
 
-	cwait <- w[2] // delete 2, command is 0 -> 1 -> 3, lc = 1 -> 3
-	cwait <- w[0] // delete 0, command is 1 -> 1 -> 1 -> ...
-	cwait <- w[3] // try to delete 2: infinite loop
-	cwait <- w[1]
+	global.cwait <- w[2] // delete 2, command is 0 -> 1 -> 3, lc = 1 -> 3
+	global.cwait <- w[0] // delete 0, command is 1 -> 1 -> 1 -> ...
+	global.cwait <- w[3] // try to delete 2: infinite loop
+	global.cwait <- w[1]
 	waitthreadSync()
 
 	if got, want := len(command), 0; got != want {
@@ -131,20 +131,20 @@ func TestWaitthreadEarlyExit(t *testing.T) {
 	}
 
 	// simulate command exit before adding it to command list
-	cwait <- w
+	global.cwait <- w
 	waitthreadSync()
 
-	ccommand <- c
-	<-cedit
+	global.ccommand <- c
+	<-global.cedit
 	waitthreadSync()
 
 	if got, want := len(command), 0; got != want {
 		t.Errorf("command is length is %v; want %v", got, want)
 	}
 
-	row.lk.Lock()
+	global.row.lk.Lock()
 	got := string(warnings[0].buf)
-	row.lk.Unlock()
+	global.row.lk.Unlock()
 	want := "pid 42, success true\n"
 	if got != want {
 		t.Fatalf("warnings is %q; want %q", got, want)
@@ -166,7 +166,7 @@ func TestWaitthreadKill(t *testing.T) {
 	waitDone := make(chan struct{})
 	go func() {
 		cmd.Wait()
-		cwait <- cmd.ProcessState
+		global.cwait <- cmd.ProcessState
 		waitthreadSync()
 		close(waitDone)
 	}()
@@ -176,25 +176,25 @@ func TestWaitthreadKill(t *testing.T) {
 		proc: cmd.Process,
 		name: "sleep ",
 	}
-	ccommand <- c
+	global.ccommand <- c
 	waitthreadSync()
 
 	if got, want := command, []*Command{c}; !reflect.DeepEqual(got, want) {
 		t.Errorf("command is %v; want %v", got, want)
 	}
 
-	ckill <- "unknown_cmd"
+	global.ckill <- "unknown_cmd"
 	waitthreadSync()
 
-	row.lk.Lock()
+	global.row.lk.Lock()
 	got := string(warnings[0].buf)
-	row.lk.Unlock()
+	global.row.lk.Unlock()
 	want := "Kill: no process unknown_cmd\n"
 	if got != want {
 		t.Fatalf("warnings is %q; want %q", got, want)
 	}
 
-	ckill <- "sleep"
+	global.ckill <- "sleep"
 	waitthreadSync()
 	<-waitDone
 
@@ -204,14 +204,14 @@ func TestWaitthreadKill(t *testing.T) {
 }
 
 func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
-	ccommand = make(chan *Command)
-	cwait = make(chan ProcessState)
-	ckill = make(chan string)
+	global.ccommand = make(chan *Command)
+	global.cwait = make(chan ProcessState)
+	global.ckill = make(chan string)
 	command = nil
-	cerr = make(chan error)
-	cedit = make(chan int)
+	global.cerr = make(chan error)
+	global.cedit = make(chan int)
 	warnings = nil
-	row = Row{
+	global.row = Row{
 		display: edwoodtest.NewDisplay(),
 		tag: Text{
 			file: file.MakeObservableEditableBuffer("", nil),
@@ -219,22 +219,22 @@ func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
 	}
 	ch := make(chan struct{})
 	go func() {
-		waitthread(ctx)
-		ccommand = nil
-		cwait = nil
-		ckill = nil
+		waitthread(global, ctx)
+		global.ccommand = nil
+		global.cwait = nil
+		global.ckill = nil
 		command = nil
-		cerr = nil
-		cedit = nil
+		global.cerr = nil
+		global.cedit = nil
 		warnings = nil
-		row = Row{}
+		global.row = Row{}
 		close(ch)
 	}()
 	return ch
 }
 
 // waitthreadSync waits until a select case in waitthread finishes.
-func waitthreadSync() { cerr <- fmt.Errorf("") }
+func waitthreadSync() { global.cerr <- fmt.Errorf("") }
 
 type mockProcessState struct {
 	pid     int

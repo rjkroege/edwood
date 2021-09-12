@@ -9,9 +9,9 @@ import (
 // Test for https://github.com/rjkroege/edwood/issues/291
 // {gh issue view 291}
 func DISABLED_TestXCmdPipeMultipleWindows(t *testing.T) {
-	cedit = make(chan int)
-	ccommand = make(chan *Command)
-	cwait = make(chan ProcessState)
+	global.cedit = make(chan int)
+	global.ccommand = make(chan *Command)
+	global.cwait = make(chan ProcessState)
 
 	newWindow := func(name string) *Window {
 		w := NewWindow()
@@ -26,7 +26,7 @@ func DISABLED_TestXCmdPipeMultipleWindows(t *testing.T) {
 		w.editoutlk = make(chan bool, 1)
 		return w
 	}
-	row = Row{
+	global.row = Row{
 		col: []*Column{
 			{
 				w: []*Window{
@@ -37,10 +37,10 @@ func DISABLED_TestXCmdPipeMultipleWindows(t *testing.T) {
 		},
 	}
 	defer func() {
-		cedit = nil
-		ccommand = nil
-		cwait = nil
-		row = Row{}
+		global.cedit = nil
+		global.ccommand = nil
+		global.cwait = nil
+		global.row = Row{}
 
 		warningsMu.Lock()
 		defer warningsMu.Unlock()
@@ -50,8 +50,8 @@ func DISABLED_TestXCmdPipeMultipleWindows(t *testing.T) {
 
 	// All middle button commands including Edit run inside a lock discipline
 	// set up by MovedMouse.
-	row.lk.Lock()
-	defer row.lk.Unlock()
+	global.row.lk.Lock()
+	defer global.row.lk.Unlock()
 
 	cp := &cmdParser{
 		buf: []rune("X |cat\n"),

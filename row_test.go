@@ -157,7 +157,7 @@ func TestRowLoad(t *testing.T) {
 
 			setGlobalsForLoadTesting()
 
-			err := row.Load(nil, filename, true)
+			err := global.row.Load(nil, filename, true)
 			if err != nil {
 				t.Fatalf("Row.Load failed: %v", err)
 			}
@@ -165,7 +165,7 @@ func TestRowLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to load dump file %v: %v", tc, err)
 			}
-			got, err := row.dump()
+			got, err := global.row.dump()
 			if err != nil {
 				t.Fatalf("dump failed: %v", err)
 			}
@@ -227,7 +227,7 @@ func TestRowDumpError(t *testing.T) {
 		t.Errorf("Row.Dump returned error %v; want nil", err)
 	}
 
-	home = ""
+	global.home = ""
 	r = Row{
 		col: make([]*Column, 2),
 	}
@@ -247,7 +247,7 @@ func TestRowLoadError(t *testing.T) {
 		t.Errorf("Row.Load returned error %q; want prefix %q", err, want)
 	}
 
-	home = ""
+	global.home = ""
 	err = r.Load(nil, "", true)
 	want = "can't find file for load: can't find home directory"
 	if err == nil || err.Error() != want {
@@ -256,13 +256,13 @@ func TestRowLoadError(t *testing.T) {
 }
 
 func TestDefaultDumpFile(t *testing.T) {
-	home = ""
+	global.home = ""
 	_, err := defaultDumpFile()
 	if err == nil {
 		t.Errorf("defaultDumpFile returned nil error for unknown home directory")
 	}
 
-	home = "/home/gopher"
+	global.home = "/home/gopher"
 	got, err := defaultDumpFile()
 	if err != nil {
 		t.Fatalf("defaultDumpFile failed: %v", err)
@@ -432,16 +432,16 @@ func jsonEscapePath(s string) string {
 }
 
 func setGlobalsForLoadTesting() {
-	WinID = 0 // reset
-	colbutton = edwoodtest.NewImage(image.Rectangle{})
-	button = edwoodtest.NewImage(image.Rectangle{})
-	modbutton = edwoodtest.NewImage(image.Rectangle{})
-	mouse = &draw.Mouse{}
-	maxtab = 4
+	global.WinID = 0 // reset
+	global.colbutton = edwoodtest.NewImage(image.Rectangle{})
+	global.button = edwoodtest.NewImage(image.Rectangle{})
+	global.modbutton = edwoodtest.NewImage(image.Rectangle{})
+	global.mouse = &draw.Mouse{}
+	global.maxtab = 4
 
 	display := edwoodtest.NewDisplay()
-	row = Row{} // reset
-	row.Init(display.ScreenImage().R(), display)
+	global.row = Row{} // reset
+	global.row.Init(display.ScreenImage().R(), display)
 }
 
 func replacePathsForTesting(t *testing.T, b []byte, isJSON bool) []byte {
