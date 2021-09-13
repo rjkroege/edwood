@@ -233,8 +233,6 @@ func (b *Buffer) Delete(off, length int64) error {
 			break
 		}
 		p = p.next
-		if p == nil {
-		}
 		cur += int64(p.len())
 	}
 
