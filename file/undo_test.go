@@ -9,7 +9,7 @@ import (
 )
 
 func TestOverall(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	b.checkPiecesCnt(t, 2)
 	b.checkContent("#0", t, "")
 
@@ -52,7 +52,7 @@ func TestOverall(t *testing.T) {
 }
 
 func TestCacheInsertAndDelete(t *testing.T) {
-	b := NewBuffer([]byte("testing insertation"))
+	b := NewBufferNoNr([]byte("testing insertation"))
 	b.checkPiecesCnt(t, 3)
 	b.checkContent("#0", t, "testing insertation")
 
@@ -74,7 +74,7 @@ func TestCacheInsertAndDelete(t *testing.T) {
 }
 
 func TestSimulateBackspace(t *testing.T) {
-	b := NewBuffer([]byte("apples and oranges"))
+	b := NewBufferNoNr([]byte("apples and oranges"))
 	for i := 5; i > 0; i-- {
 		b.cacheDelete(i, 1)
 	}
@@ -84,7 +84,7 @@ func TestSimulateBackspace(t *testing.T) {
 }
 
 func TestSimulateDeleteKey(t *testing.T) {
-	b := NewBuffer([]byte("apples and oranges"))
+	b := NewBufferNoNr([]byte("apples and oranges"))
 	for i := 0; i < 4; i++ {
 		b.cacheDelete(7, 1)
 	}
@@ -94,7 +94,7 @@ func TestSimulateDeleteKey(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	b := NewBuffer([]byte("and what is a dream?"))
+	b := NewBufferNoNr([]byte("and what is a dream?"))
 	b.insertString(9, "exactly ")
 	b.checkContent("#0", t, "and what exactly is a dream?")
 
@@ -122,7 +122,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteAtTheEndOfCachedPiece(t *testing.T) {
-	b := NewBuffer([]byte("Original data."))
+	b := NewBufferNoNr([]byte("Original data."))
 	b.cacheInsertString(8, ",")
 	b.cacheDelete(9, 1)
 	b.checkContent("#0", t, "Original,data.")
@@ -131,7 +131,7 @@ func TestDeleteAtTheEndOfCachedPiece(t *testing.T) {
 }
 
 func TestGroupChanges(t *testing.T) {
-	b := NewBuffer([]byte("group 1, group 2, group 3"))
+	b := NewBufferNoNr([]byte("group 1, group 2, group 3"))
 	b.checkPiecesCnt(t, 3)
 	// b.GroupChanges()
 
@@ -156,7 +156,7 @@ func TestGroupChanges(t *testing.T) {
 }
 
 func TestSaving(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 
 	b.checkModified(t, 1, false)
 	b.insertString(0, "stars can frighten")
@@ -181,7 +181,7 @@ func TestSaving(t *testing.T) {
 	b.Clean()
 	b.checkModified(t, 9, false)
 
-	b = NewBuffer([]byte("my book is closed"))
+	b = NewBufferNoNr([]byte("my book is closed"))
 	b.checkModified(t, 10, false)
 
 	b.insertString(17, ", I read no more")
@@ -199,7 +199,7 @@ func TestSaving(t *testing.T) {
 }
 
 func TestReader(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	b.insertString(0, "So many")
 	b.insertString(7, " books,")
 	b.insertString(14, " so little")
@@ -233,7 +233,7 @@ func TestReader(t *testing.T) {
 }
 
 func TestBufferSize(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	tests := []struct {
 		action func()
 		want   int64
@@ -257,7 +257,7 @@ func TestBufferSize(t *testing.T) {
 }
 
 func TestUndoRedoReturnedOffsets(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	insert := func(off, len int) {
 		b.insertString(off, strings.Repeat(".", len))
 	}
@@ -270,29 +270,30 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
-		op      func(*Buffer) (off, n int64)
+		op      func(*Buffer) ChangeInfo
 		wantOff int64
 		wantN   int64
 	}{
 		0:  {redo, -1, 0},
 		1:  {undo, 0, 20},
-		2:  {undo, 3, 0},
+		2:  {undo, 3, -19},
 		3:  {undo, 8, 8},
-		4:  {undo, 12, 0},
-		5:  {undo, 7, 0},
-		6:  {undo, 0, 0},
+		4:  {undo, 12, -9},
+		5:  {undo, 7, -5},
+		6:  {undo, 0, -7},
 		7:  {undo, -1, 0},
 		8:  {redo, 0, 7},
 		9:  {redo, 7, 5},
 		10: {redo, 12, 9},
-		11: {redo, 8, 0},
+		11: {redo, 8, -8},
 		12: {redo, 3, 19},
-		13: {redo, 0, 0},
+		13: {redo, 0, -20},
 		14: {redo, -1, 0},
 	}
 
 	for i, tt := range tests {
-		off, n := tt.op(b)
+		info := tt.op(b)
+		off, n := info.Off, int64(info.Size)
 		if off != tt.wantOff {
 			t.Errorf("%d: got offset %d, want %d", i, off, tt.wantOff)
 		}
@@ -321,7 +322,7 @@ func (t *Buffer) insertString(off int, data string) {
 }
 
 func (t *Buffer) cacheInsertString(off int, data string) {
-	err := t.Insert(int64(off), []byte(data))
+	err := t.InsertNoNr(int64(off), []byte(data))
 	if err != nil {
 		panic(err)
 	}
