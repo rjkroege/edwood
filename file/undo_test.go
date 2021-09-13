@@ -6,10 +6,11 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestOverall(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	b.checkPiecesCnt(t, 2)
 	b.checkContent("#0", t, "")
 
@@ -28,7 +29,7 @@ func TestOverall(t *testing.T) {
 	b.Commit()
 	// Also check that multiple change commits don't create empty changes.
 	b.Commit()
-	b.Delete(20, 14)
+	b.deleteCreateOffsetTuple(20, 14)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
 	b.insertString(20, " makes Jack")
@@ -52,7 +53,7 @@ func TestOverall(t *testing.T) {
 }
 
 func TestCacheInsertAndDelete(t *testing.T) {
-	b := NewBuffer([]byte("testing insertation"))
+	b := NewBufferNoNr([]byte("testing insertation"))
 	b.checkPiecesCnt(t, 3)
 	b.checkContent("#0", t, "testing insertation")
 
@@ -74,7 +75,7 @@ func TestCacheInsertAndDelete(t *testing.T) {
 }
 
 func TestSimulateBackspace(t *testing.T) {
-	b := NewBuffer([]byte("apples and oranges"))
+	b := NewBufferNoNr([]byte("apples and oranges"))
 	for i := 5; i > 0; i-- {
 		b.cacheDelete(i, 1)
 	}
@@ -84,7 +85,7 @@ func TestSimulateBackspace(t *testing.T) {
 }
 
 func TestSimulateDeleteKey(t *testing.T) {
-	b := NewBuffer([]byte("apples and oranges"))
+	b := NewBufferNoNr([]byte("apples and oranges"))
 	for i := 0; i < 4; i++ {
 		b.cacheDelete(7, 1)
 	}
@@ -94,7 +95,7 @@ func TestSimulateDeleteKey(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	b := NewBuffer([]byte("and what is a dream?"))
+	b := NewBufferNoNr([]byte("and what is a dream?"))
 	b.insertString(9, "exactly ")
 	b.checkContent("#0", t, "and what exactly is a dream?")
 
@@ -122,7 +123,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteAtTheEndOfCachedPiece(t *testing.T) {
-	b := NewBuffer([]byte("Original data."))
+	b := NewBufferNoNr([]byte("Original data."))
 	b.cacheInsertString(8, ",")
 	b.cacheDelete(9, 1)
 	b.checkContent("#0", t, "Original,data.")
@@ -131,7 +132,7 @@ func TestDeleteAtTheEndOfCachedPiece(t *testing.T) {
 }
 
 func TestGroupChanges(t *testing.T) {
-	b := NewBuffer([]byte("group 1, group 2, group 3"))
+	b := NewBufferNoNr([]byte("group 1, group 2, group 3"))
 	b.checkPiecesCnt(t, 3)
 	// b.GroupChanges()
 
@@ -156,7 +157,7 @@ func TestGroupChanges(t *testing.T) {
 }
 
 func TestSaving(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 
 	b.checkModified(t, 1, false)
 	b.insertString(0, "stars can frighten")
@@ -181,7 +182,7 @@ func TestSaving(t *testing.T) {
 	b.Clean()
 	b.checkModified(t, 9, false)
 
-	b = NewBuffer([]byte("my book is closed"))
+	b = NewBufferNoNr([]byte("my book is closed"))
 	b.checkModified(t, 10, false)
 
 	b.insertString(17, ", I read no more")
@@ -199,7 +200,7 @@ func TestSaving(t *testing.T) {
 }
 
 func TestReader(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	b.insertString(0, "So many")
 	b.insertString(7, " books,")
 	b.insertString(14, " so little")
@@ -233,7 +234,7 @@ func TestReader(t *testing.T) {
 }
 
 func TestBufferSize(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	tests := []struct {
 		action func()
 		want   int64
@@ -257,7 +258,7 @@ func TestBufferSize(t *testing.T) {
 }
 
 func TestUndoRedoReturnedOffsets(t *testing.T) {
-	b := NewBuffer(nil)
+	b := NewBufferNoNr(nil)
 	insert := func(off, len int) {
 		b.insertString(off, strings.Repeat(".", len))
 	}
@@ -270,24 +271,24 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
-		op      func(*Buffer) (off, n int64)
+		op      func(*Buffer) (int64, int64)
 		wantOff int64
 		wantN   int64
 	}{
 		0:  {redo, -1, 0},
 		1:  {undo, 0, 20},
-		2:  {undo, 3, 0},
+		2:  {undo, 3, -19},
 		3:  {undo, 8, 8},
-		4:  {undo, 12, 0},
-		5:  {undo, 7, 0},
-		6:  {undo, 0, 0},
+		4:  {undo, 12, -9},
+		5:  {undo, 7, -5},
+		6:  {undo, 0, -7},
 		7:  {undo, -1, 0},
 		8:  {redo, 0, 7},
 		9:  {redo, 7, 5},
 		10: {redo, 12, 9},
-		11: {redo, 8, 0},
+		11: {redo, 8, -8},
 		12: {redo, 3, 19},
-		13: {redo, 0, 0},
+		13: {redo, 0, -20},
 		14: {redo, -1, 0},
 	}
 
@@ -302,6 +303,66 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 	}
 }
 
+func TestPieceNr(t *testing.T) {
+	b := NewBufferNoNr(nil)
+	manderianBytes := []byte("痛苦本身可能是很多痛苦, 但主要的原因是痛苦, 但我给它时间陷入这种痛苦, 以至于有些巨大的痛苦")
+	eng1 := []byte("Lorem ipsum in Mandarin")
+	eng2 := []byte("This is the")
+	eng3 := []byte("In the midst")
+
+	b.insertCreateOffsetTuple(0, manderianBytes)
+	b.checkContent("TestPieceNr: First insert", t, string(manderianBytes))
+
+	b.insertCreateOffsetTuple(b.Nr(), eng1)
+	b.checkContent("TestPieceNr: Second insert", t, string(manderianBytes)+string(eng1))
+
+	b.insertCreateOffsetTuple(0, eng2)
+	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
+	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
+
+	fmt.Printf("Before delete: %v\n", string(b.Bytes()))
+	b.deleteCreateOffsetTuple(13, 10) // Currently, the offset translates to 17 (should be 20). Should be deleting a total of 25 bytes
+	buffAfterDelete := []rune(buffAfterInserts)
+	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
+	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
+
+	b.insertCreateOffsetTuple(8, eng3)
+	buffAfterDelete = append(buffAfterDelete[:8], append([]rune(string(eng3)), buffAfterDelete[8:]...)...)
+	b.checkContent("TestPieceNr: after everything", t, string(buffAfterDelete))
+
+	undo, redo := (*Buffer).Undo, (*Buffer).Redo
+	tests := []struct {
+		op func(*Buffer) (int64, int64)
+	}{
+		0:  {redo},
+		1:  {undo},
+		2:  {undo},
+		3:  {undo},
+		4:  {undo},
+		5:  {undo},
+		6:  {undo},
+		7:  {undo},
+		8:  {redo},
+		9:  {redo},
+		10: {redo},
+		11: {redo},
+		12: {redo},
+		13: {redo},
+		14: {redo},
+	}
+
+	for i, tt := range tests {
+		t.Run("TestPieceNr #"+fmt.Sprint(i), func(t *testing.T) {
+			tt.op(b)
+			nr := b.Nr()
+			wantNr := countRunes(b)
+			if nr != wantNr {
+				t.Errorf("%d: got n %d, want %d", i, nr, wantNr)
+			}
+		})
+	}
+}
+
 func (b *Buffer) checkPiecesCnt(t *testing.T, expected int) {
 	if b.piecesCnt != expected {
 		t.Errorf("got %d pieces, want %d", b.piecesCnt, expected)
@@ -313,6 +374,12 @@ func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
 	if c != expected {
 		t.Errorf("%s: got '%s', want '%s'", name, c, expected)
 	}
+
+	actualNr := b.Nr()
+	expectedNr := int64(utf8.RuneCountInString(expected))
+	if actualNr != expectedNr {
+		t.Errorf("%v: got '%v' runes, expected '%v' runes", name, actualNr, expectedNr)
+	}
 }
 
 func (t *Buffer) insertString(off int, data string) {
@@ -321,7 +388,7 @@ func (t *Buffer) insertString(off int, data string) {
 }
 
 func (t *Buffer) cacheInsertString(off int, data string) {
-	err := t.Insert(int64(off), []byte(data))
+	err := t.insertCreateOffsetTuple(int64(off), []byte(data))
 	if err != nil {
 		panic(err)
 	}
@@ -333,7 +400,7 @@ func (t *Buffer) delete(off, length int) {
 }
 
 func (t *Buffer) cacheDelete(off, length int) {
-	t.Delete(int64(off), int64(length))
+	t.deleteCreateOffsetTuple(int64(off), int64(length))
 }
 
 func (t *Buffer) printPieces() {
@@ -348,6 +415,85 @@ func (t *Buffer) printPieces() {
 		fmt.Printf("%d, p:%d, n:%d = %s\n", p.id, prev, next, string(p.data))
 	}
 	fmt.Println()
+}
+
+func TestRuneTuple(t *testing.T) {
+	tt := []struct {
+		name  string
+		buf   []string
+		roff  int
+		bwant int
+	}{
+		{
+			name:  "one buf, start",
+			buf:   []string{"foo"},
+			roff:  0,
+			bwant: 0,
+		},
+		{
+			name:  "one buf, middle",
+			buf:   []string{"foo"},
+			roff:  1,
+			bwant: 1,
+		},
+		{
+			name:  "one buf, end",
+			buf:   []string{"foo"},
+			roff:  2,
+			bwant: 2,
+		},
+		{
+			name:  "one buf, not-ASCII, mid",
+			buf:   []string{"痛苦本身"},
+			roff:  2,
+			bwant: len("痛苦"),
+		},
+		{
+			name:  "one buf, not-ASCII, end",
+			buf:   []string{"痛苦本身"},
+			roff:  3,
+			bwant: len("痛苦本"),
+		},
+		{
+			name:  "three bufs, not-ASCII, start of middle piece",
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
+			roff:  5,
+			bwant: len("痛苦本身痛"),
+		},
+		{
+			name:  "one buf, not-ASCII, end of middle piece",
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
+			roff:  7,
+			bwant: len("痛苦本身痛苦本"),
+		},
+		{
+			name:  "one buf, not-ASCII, start of end piece",
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
+			roff:  8,
+			bwant: len("痛苦本身痛苦本痛"),
+		},
+		{
+			name:  "one buf, not-ASCII, end of end piece",
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
+			roff:  13,
+			bwant: len("痛苦本身痛苦本痛苦痛苦本身"),
+		},
+	}
+	for _, tv := range tt {
+		t.Run(tv.name, func(t *testing.T) {
+			b := NewBufferNoNr(nil)
+			for _, s := range tv.buf {
+				b.insertString(int(b.Nr()), s)
+			}
+			gt := b.RuneTuple(int64(tv.roff))
+			if got, want := gt.b, tv.bwant; got != int64(want) {
+				t.Errorf("%s got %d != want %d", "byte", got, want)
+			}
+			if got, want := gt.r, tv.roff; got != int64(want) {
+				t.Errorf("%s got %d != want %d", "rune", got, want)
+			}
+		})
+	}
 }
 
 func (b *Buffer) checkModified(t *testing.T, id int, expected bool) {
@@ -369,4 +515,20 @@ func (t *Buffer) allContent() string {
 
 	}
 	return string(data)
+}
+
+func countRunes(b *Buffer) int64 {
+	return int64(utf8.RuneCount(b.Bytes()))
+}
+
+func NewBufferNoNr(content []byte) *Buffer {
+	return NewBuffer(content, utf8.RuneCount(content))
+}
+
+func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
+	return b.Insert(b.RuneTuple(off), content)
+}
+
+func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
+	return b.Delete(b.RuneTuple(off), b.RuneTuple(off+length))
 }

@@ -84,8 +84,10 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
+	"unicode/utf8"
 )
 
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
@@ -103,37 +105,47 @@ type Buffer struct {
 	savedAction   *action
 }
 
+type ChangeInfo struct {
+	Off      int64 // Location of the change, in bytes (always positive)
+	Size     int   // Size of change in bytes (can be negative)
+	Nr       int   // Number of runes in change (can be negative)
+	NonAscii int   // Byte index of of the first non-ascii character
+	Width    int   // Width in bytes of the first non-ascii character
+}
+
 // NewBuffer initializes a new buffer with the given content as a starting point.
 // To start with an empty buffer pass nil as a content.
-func NewBuffer(content []byte) *Buffer {
+func NewBuffer(content []byte, nr int) *Buffer {
 	// give the actions stack some default capacity
 	t := &Buffer{actions: make([]*action, 0, 100)}
 
 	t.begin = t.newEmptyPiece()
-	t.end = t.newPiece(nil, t.begin, nil)
+	t.end = t.newPiece(nil, t.begin, nil, 0)
 	t.begin.next = t.end
 
 	if content != nil {
-		p := t.newPiece(content, t.begin, t.end)
+		p := t.newPiece(content, t.begin, t.end, nr)
 		t.begin.next = p
 		t.end.prev = p
 	}
 	return t
 }
 
-// Insert inserts the data at the given offset in the buffer. An error is return when the
+// InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) Insert(off int64, data []byte) error {
+func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
+	off := start.b
 	if len(data) == 0 {
 		return nil
 	}
 
 	p, offset := b.findPiece(off)
 	if p == nil {
+		fmt.Printf("Failed with: %v", string(data))
 		return ErrWrongOffset
 	} else if p == b.cachedPiece {
 		// just update the last inserted piece
-		p.insert(offset, data)
+		p.insert(offset, data, nr)
 		return nil
 	}
 
@@ -142,7 +154,7 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
 		// remove, just add a new piece holding the extra text.
-		pnew = b.newPiece(data, p, p.next)
+		pnew = b.newPiece(data, p, p.next, nr)
 		c.new = newSpan(pnew, pnew)
 		c.old = newSpan(nil, nil)
 	} else {
@@ -150,9 +162,11 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
-		before := b.newPiece(p.data[:offset], p.prev, nil)
-		pnew = b.newPiece(data, before, nil)
-		after := b.newPiece(p.data[offset:], pnew, p.next)
+		beforeNr := utf8.RuneCount(p.data[:offset])
+		before := b.newPiece(p.data[:offset], p.prev, nil, beforeNr)
+		pnew = b.newPiece(data, before, nil, nr)
+		afterNr := utf8.RuneCount(p.data[offset:])
+		after := b.newPiece(p.data[offset:], pnew, p.next, afterNr)
 		before.next = pnew
 		pnew.next = after
 		c.new = newSpan(before, after)
@@ -164,11 +178,18 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 	return nil
 }
 
+func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
+	return b.InsertWithNr(off, data, utf8.RuneCount(data))
+}
+
 // Delete deletes the portion of the length at the given offset. An error is returned
 // if the portion isn't in the range of the buffer size. If the length exceeds the
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
-func (b *Buffer) Delete(off, length int64) error {
+func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
+	off := startOff.b
+	length := endOff.b - startOff.b //b.RuneTuple(endOff.r - startOff.r).r
+	fmt.Printf("Length is: %v\n deleting at: %v\n", length, off)
 	if length <= 0 {
 		return nil
 	}
@@ -176,7 +197,7 @@ func (b *Buffer) Delete(off, length int64) error {
 	p, offset := b.findPiece(off)
 	if p == nil {
 		return ErrWrongOffset
-	} else if p == b.cachedPiece && p.delete(offset, length) {
+	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.r-startOff.r)) {
 		// try to update the last inserted piece if the length doesn't exceed
 		return nil
 	}
@@ -220,10 +241,11 @@ func (b *Buffer) Delete(off, length int64) error {
 		midwayEnd = true
 		end = p
 
-		beg := p.len() + int(length-cur)
+		beg := int64(p.len() + int(length-cur))
 		newBuf := make([]byte, len(p.data[beg:]))
 		copy(newBuf, p.data[beg:])
-		after = b.newPiece(newBuf, before, p.next)
+		nr := utf8.RuneCount(newBuf)
+		after = b.newPiece(newBuf, before, p.next, nr)
 	}
 
 	var newStart, newEnd *piece
@@ -233,6 +255,7 @@ func (b *Buffer) Delete(off, length int64) error {
 		copy(newBuf, start.data[:offset])
 		before.data = newBuf
 		before.prev, before.next = start.prev, after
+		before.nr = utf8.RuneCount(newBuf)
 
 		newStart = before
 		if !midwayEnd {
@@ -277,18 +300,19 @@ func (b *Buffer) newChange(off int64) *change {
 	return c
 }
 
-func (b *Buffer) newPiece(data []byte, prev, next *piece) *piece {
+func (b *Buffer) newPiece(data []byte, prev, next *piece, nr int) *piece {
 	b.piecesCnt++
 	return &piece{
 		id:   b.piecesCnt,
 		prev: prev,
 		next: next,
 		data: data,
+		nr:   nr,
 	}
 }
 
 func (b *Buffer) newEmptyPiece() *piece {
-	return b.newPiece(nil, nil, nil)
+	return b.newPiece(nil, nil, nil, 0)
 }
 
 // findPiece returns the piece holding the text at the byte offset. If off happens
@@ -311,23 +335,24 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 // at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
-func (b *Buffer) Undo() (off, n int64) {
+func (b *Buffer) Undo() (int64, int64) {
 	b.Commit()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0
 	}
 
+	var off, size int64
+	var nR int
+
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
-		off = c.off
-		n = c.old.len - c.new.len
+		off = b.RuneTuple(c.off).b
+		size = c.old.len - c.new.len
+		nR -= c.new.Nr() - c.old.Nr()
 	}
-	if n < 0 {
-		n = 0
-	}
-	return
+	return off, size
 }
 
 func (b *Buffer) unshiftAction() *action {
@@ -342,22 +367,23 @@ func (b *Buffer) unshiftAction() *action {
 // at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
-func (b *Buffer) Redo() (off, n int64) {
+func (b *Buffer) Redo() (int64, int64) {
 	b.Commit()
 	a := b.shiftAction()
 	if a == nil {
 		return -1, 0
 	}
 
+	var nR int
+	var off, size int64
+
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
 		off = c.off
-		n = c.new.len - c.old.len
+		nR -= c.new.Nr() - c.old.Nr()
+		size = c.new.len - c.old.len
 	}
-	if n < 0 {
-		n = 0
-	}
-	return
+	return off, size
 }
 
 func (b *Buffer) shiftAction() *action {
@@ -421,10 +447,19 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 // Delete, Undo and Redo modify the size.
 func (b *Buffer) Size() int64 {
 	var size int64
-	for p := b.begin; p != nil; p = p.next {
+	for p := b.begin; p != b.end; p = p.next {
 		size += int64(p.len())
 	}
 	return size
+}
+
+// Nr returns the sum of the Nr for each piece in the buffer.
+func (b *Buffer) Nr() int64 {
+	var nr int
+	for p := b.begin; p != b.end; p = p.next {
+		nr += p.nr
+	}
+	return int64(nr)
 }
 
 // action is a list of changes which are used to undo/redo all modifications.
@@ -485,20 +520,94 @@ type piece struct {
 	id         int
 	prev, next *piece
 	data       []byte
+	nr         int
 }
 
 func (p *piece) len() int {
 	return len(p.data)
 }
 
-func (p *piece) insert(off int, data []byte) {
+func (p *piece) insert(off int, data []byte, nr int) {
 	p.data = append(p.data[:off], append(data, p.data[off:]...)...)
+	p.nr += nr
 }
 
-func (p *piece) delete(off int, length int64) bool {
+func (p *piece) delete(off int, length int64, nr int) bool {
 	if int64(off)+length > int64(len(p.data)) {
 		return false
 	}
 	p.data = append(p.data[:off], p.data[off+int(length):]...)
+	p.nr -= nr
 	return true
+}
+
+// Bytes returns the byte representation of the internal buffer.
+func (b *Buffer) Bytes() []byte {
+	byteBuf := make([]byte, 0, b.Size())
+	for p := b.begin; p != b.end; p = p.next {
+		byteBuf = append(byteBuf, p.data...)
+	}
+	return byteBuf
+}
+
+// GetCache returns the data of the cached piece or nil if it does not exist.
+func (b *Buffer) GetCache() []byte {
+	if b.cachedPiece == nil {
+		return nil
+	}
+	return b.cachedPiece.data
+}
+
+func (b *Buffer) HasUncommitedChanges() bool {
+	return b.cachedPiece != nil || b.currentAction != nil
+}
+
+func (b *Buffer) HasUndoableChanges() bool {
+	return b.head != 0
+}
+
+func (b *Buffer) HasRedoableChanges() bool {
+	return b.head <= len(b.actions)-1
+}
+
+func (b *Buffer) TreatAsDirty() bool {
+	return b.Dirty()
+}
+
+func (b *Buffer) RuneTuple(off int64) OffSetTuple {
+	offsets := OffSetTuple{
+		b: 0,
+		r: off,
+	}
+	for p := b.begin; p != b.end && off > 0; p = p.next {
+		isAscii := p.len() == p.nr
+
+		if isAscii {
+			if off-int64(p.nr) > 0 {
+				off -= int64(p.nr)
+				offsets.b += int64(p.nr)
+			} else {
+				offsets.b += off
+				off -= off
+			}
+		} else {
+			i := 0
+			for _, rSize := utf8.DecodeRune(p.data[i:]); i < p.len() && off > 0; i += rSize {
+				offsets.b += int64(rSize)
+				off -= 1
+			}
+		}
+	}
+
+	return offsets
+
+}
+
+func (s *span) Nr() int {
+	var nr int
+
+	for p := s.start; p != s.end; p = p.next {
+		nr += p.nr
+	}
+	return nr
 }
