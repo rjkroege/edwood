@@ -86,6 +86,8 @@ import (
 	"errors"
 	"io"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
@@ -101,29 +103,45 @@ type Buffer struct {
 	head          int       // index for the next action to add
 	currentAction *action   // action for the current change group
 	savedAction   *action
+	mod           bool // true if the file has been changed. [private]
+	treatasclean  bool // Window Clean tests should succeed if set. [private]
+}
+
+type ChangeInfo struct {
+	Off      int64 // Location of the change, in bytes (always positive)
+	Size     int   // Size of change in bytes (can be negative)
+	Nr       int   // Number of runes in change (can be negative)
+	NonAscii int   // Byte index of of the first non-ascii character
+	Width    int   // Width in bytes of the first non-ascii character
 }
 
 // NewBuffer initializes a new buffer with the given content as a starting point.
 // To start with an empty buffer pass nil as a content.
-func NewBuffer(content []byte) *Buffer {
+func NewBuffer(content []byte, nr int) *Buffer {
 	// give the actions stack some default capacity
 	t := &Buffer{actions: make([]*action, 0, 100)}
 
 	t.begin = t.newEmptyPiece()
-	t.end = t.newPiece(nil, t.begin, nil)
+	t.end = t.newPiece(nil, t.begin, nil, 0)
 	t.begin.next = t.end
 
 	if content != nil {
-		p := t.newPiece(content, t.begin, t.end)
+		p := t.newPiece(content, t.begin, t.end, nr)
 		t.begin.next = p
 		t.end.prev = p
 	}
+	t.mod = false
 	return t
+}
+
+func NewBufferNoNr(content []byte) *Buffer {
+	return NewBuffer(content, utf8.RuneCount(content))
 }
 
 // Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) Insert(off int64, data []byte) error {
+func (b *Buffer) Insert(off int64, data []byte, nr int) error {
+	b.treatasclean = false
 	if len(data) == 0 {
 		return nil
 	}
@@ -133,7 +151,7 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 		return ErrWrongOffset
 	} else if p == b.cachedPiece {
 		// just update the last inserted piece
-		p.insert(offset, data)
+		p.insert(offset, data, nr)
 		return nil
 	}
 
@@ -142,7 +160,7 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
 		// remove, just add a new piece holding the extra text.
-		pnew = b.newPiece(data, p, p.next)
+		pnew = b.newPiece(data, p, p.next, nr)
 		c.new = newSpan(pnew, pnew)
 		c.old = newSpan(nil, nil)
 	} else {
@@ -150,9 +168,11 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
-		before := b.newPiece(p.data[:offset], p.prev, nil)
-		pnew = b.newPiece(data, before, nil)
-		after := b.newPiece(p.data[offset:], pnew, p.next)
+		beforeNr := utf8.RuneCount(p.data[:offset])
+		before := b.newPiece(p.data[:offset], p.prev, nil, beforeNr)
+		pnew = b.newPiece(data, before, nil, nr)
+		afterNr := utf8.RuneCount(p.data[offset:])
+		after := b.newPiece(p.data[offset:], pnew, p.next, afterNr)
 		before.next = pnew
 		pnew.next = after
 		c.new = newSpan(before, after)
@@ -164,11 +184,16 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 	return nil
 }
 
+func (b *Buffer) InsertNoNr(off int64, data []byte) error {
+	return b.Insert(off, data, utf8.RuneCount(data))
+}
+
 // Delete deletes the portion of the length at the given offset. An error is returned
 // if the portion isn't in the range of the buffer size. If the length exceeds the
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
 func (b *Buffer) Delete(off, length int64) error {
+	b.treatasclean = false
 	if length <= 0 {
 		return nil
 	}
@@ -208,6 +233,8 @@ func (b *Buffer) Delete(off, length int64) error {
 			break
 		}
 		p = p.next
+		if p == nil {
+		}
 		cur += int64(p.len())
 	}
 
@@ -223,7 +250,8 @@ func (b *Buffer) Delete(off, length int64) error {
 		beg := p.len() + int(length-cur)
 		newBuf := make([]byte, len(p.data[beg:]))
 		copy(newBuf, p.data[beg:])
-		after = b.newPiece(newBuf, before, p.next)
+		nr := utf8.RuneCount(newBuf)
+		after = b.newPiece(newBuf, before, p.next, nr)
 	}
 
 	var newStart, newEnd *piece
@@ -277,18 +305,19 @@ func (b *Buffer) newChange(off int64) *change {
 	return c
 }
 
-func (b *Buffer) newPiece(data []byte, prev, next *piece) *piece {
+func (b *Buffer) newPiece(data []byte, prev, next *piece, nr int) *piece {
 	b.piecesCnt++
 	return &piece{
 		id:   b.piecesCnt,
 		prev: prev,
 		next: next,
 		data: data,
+		nr:   nr,
 	}
 }
 
 func (b *Buffer) newEmptyPiece() *piece {
-	return b.newPiece(nil, nil, nil)
+	return b.newPiece(nil, nil, nil, 0)
 }
 
 // findPiece returns the piece holding the text at the byte offset. If off happens
@@ -311,23 +340,25 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 // at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
-func (b *Buffer) Undo() (off, n int64) {
+func (b *Buffer) Undo() ChangeInfo {
 	b.Commit()
 	a := b.unshiftAction()
 	if a == nil {
-		return -1, 0
+		return ChangeInfo{Off: -1, Size: 0}
 	}
+
+	var off, size int64
+	var nR int
 
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
 		off = c.off
-		n = c.old.len - c.new.len
+		size = c.old.len - c.new.len
+		nR -= c.new.Nr() - c.old.Nr()
 	}
-	if n < 0 {
-		n = 0
-	}
-	return
+	nonAscii, width := b.FindNewNonAscii()
+	return ChangeInfo{Off: off, Size: int(size), Nr: nR, NonAscii: nonAscii, Width: width}
 }
 
 func (b *Buffer) unshiftAction() *action {
@@ -342,22 +373,24 @@ func (b *Buffer) unshiftAction() *action {
 // at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
-func (b *Buffer) Redo() (off, n int64) {
+func (b *Buffer) Redo() ChangeInfo {
 	b.Commit()
 	a := b.shiftAction()
 	if a == nil {
-		return -1, 0
+		return ChangeInfo{Off: -1, Size: 0}
 	}
+
+	var nR int
+	var off, size int64
 
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
 		off = c.off
-		n = c.new.len - c.old.len
+		nR -= c.new.Nr() - c.old.Nr()
+		size = c.new.len - c.old.len
 	}
-	if n < 0 {
-		n = 0
-	}
-	return
+	nonAscii, width := b.FindNewNonAscii()
+	return ChangeInfo{Off: off, Size: int(size), Nr: nR, NonAscii: nonAscii, Width: width}
 }
 
 func (b *Buffer) shiftAction() *action {
@@ -381,6 +414,7 @@ func (b *Buffer) Clean() {
 	} else {
 		b.savedAction = nil
 	}
+	b.mod = false
 }
 
 // Dirty reports whether the current state of the buffer is different from the
@@ -485,14 +519,16 @@ type piece struct {
 	id         int
 	prev, next *piece
 	data       []byte
+	nr         int
 }
 
 func (p *piece) len() int {
 	return len(p.data)
 }
 
-func (p *piece) insert(off int, data []byte) {
+func (p *piece) insert(off int, data []byte, nr int) {
 	p.data = append(p.data[:off], append(data, p.data[off:]...)...)
+	p.nr += nr
 }
 
 func (p *piece) delete(off int, length int64) bool {
@@ -501,4 +537,85 @@ func (p *piece) delete(off int, length int64) bool {
 	}
 	p.data = append(p.data[:off], p.data[off+int(length):]...)
 	return true
+}
+
+// Bytes returns the byte representation of the internal buffer.
+func (b *Buffer) Bytes() []byte {
+	byteBuf := make([]byte, 0, b.Size())
+	for p := b.begin; p != nil; p = p.next {
+		byteBuf = append(byteBuf, p.data...)
+	}
+	return byteBuf
+}
+
+// GetCache returns the data of the cached piece or nil if it does not exist.
+func (b *Buffer) GetCache() []byte {
+	if b.cachedPiece == nil {
+		return nil
+	}
+	return b.cachedPiece.data
+}
+
+func (b *Buffer) HasUncommitedChanges() bool {
+	return b.cachedPiece != nil || b.currentAction != nil
+}
+
+func (b *Buffer) HasUndoableChanges() bool {
+	return b.head != 0
+}
+
+func (b *Buffer) HasRedoableChanges() bool {
+	return b.head <= len(b.actions)-1
+}
+func (b *Buffer) Mod() bool {
+	return b.mod
+}
+func (b *Buffer) Modded() {
+	b.mod = true
+	b.treatasclean = false
+}
+
+func (b *Buffer) TreatAsDirty() bool {
+	return !b.treatasclean && b.Dirty()
+}
+
+func (b *Buffer) TreatAsClean() {
+	b.treatasclean = true
+}
+
+func (b *Buffer) MarkUnclean() {
+	b.treatasclean = false
+}
+
+func (s *span) Nr() int {
+	var nr int
+
+	for p := s.start; p != nil; p = p.next {
+		nr += utf8.RuneCount(p.data)
+		if p == s.end {
+			break
+		}
+	}
+	return nr
+}
+
+func (b *Buffer) FindNewNonAscii() (int, int) {
+	for p := b.begin; p != nil; p = p.next {
+		if p.len() > p.nr {
+			return p.FirstNonAscii()
+		}
+	}
+	return -1, 1
+}
+
+func (p *piece) FirstNonAscii() (int, int) {
+	var nonAscii, width int
+	for i := range p.data {
+		if p.data[i] > unicode.MaxASCII {
+			_, width = utf8.DecodeRune(p.data[i:])
+			nonAscii = i
+			return nonAscii, width
+		}
+	}
+	return -1, 1
 }
