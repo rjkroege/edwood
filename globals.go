@@ -1,10 +1,10 @@
 package main
 
 import (
-	"os"
-	"log"
-	"strconv"
 	"image"
+	"log"
+	"os"
+	"strconv"
 
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
@@ -14,7 +14,6 @@ import (
 
 // TODO(rjk): Document what each of these are.
 type globals struct {
-// var (
 	globalincref bool
 	seq          int
 	maxtab       uint // size of a tab, in units of the '0' character
@@ -67,7 +66,6 @@ type globals struct {
 
 	WinID int
 }
-// )
 
 // Singleton global object.
 var global *globals
@@ -80,29 +78,29 @@ func init() {
 
 func makeglobals() *globals {
 	g := &globals{
-		acmeshell: os.Getenv("acmeshell"),
-		editing: Inactive,
-		editoutlk: make(chan bool, 1),
-		cwait: make(chan ProcessState),
-		ccommand: make(chan *Command),
-		ckill: make(chan string),
+		acmeshell:  os.Getenv("acmeshell"),
+		editing:    Inactive,
+		editoutlk:  make(chan bool, 1),
+		cwait:      make(chan ProcessState),
+		ccommand:   make(chan *Command),
+		ckill:      make(chan string),
 		cxfidalloc: make(chan *Xfid),
-		cxfidfree: make(chan *Xfid),
+		cxfidfree:  make(chan *Xfid),
 		cnewwindow: make(chan *Window),
-		csignal: make(chan os.Signal, 1),
-		cerr: make(chan error),
-		cedit: make(chan int),
-		cexit: make(chan struct{}),
-		cwarn: make(chan uint),
+		csignal:    make(chan os.Signal, 1),
+		cerr:       make(chan error),
+		cedit:      make(chan int),
+		cexit:      make(chan struct{}),
+		cwarn:      make(chan uint),
 	}
 
-	if home, err := os.UserHomeDir();  err == nil {
+	if home, err := os.UserHomeDir(); err == nil {
 		g.home = home
 	} else {
 		log.Fatalf("could not get user home directory: %v", err)
 	}
 
-	if pwd, err := os.Getwd();  err == nil {
+	if pwd, err := os.Getwd(); err == nil {
 		g.wdir = pwd
 	} else {
 		log.Fatalf("could not get working directory: %v", err)
