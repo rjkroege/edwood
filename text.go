@@ -106,8 +106,8 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
 	t.font = rf
-	t.tabstop = int(maxtab)
-	t.tabexpand = tabexpand
+	t.tabstop = int(global.maxtab)
+	t.tabexpand = global.tabexpand
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage(), cols)
 	t.Redraw(r, -1, false /* noredraw */)
 	return t
@@ -136,10 +136,10 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.what)
 	// defer log.Println("--- Text Redraw end")
 	// use no wider than 3-space tabs in a directory
-	maxt := int(maxtab)
+	maxt := int(global.maxtab)
 	if t.what == Body {
 		if t.file.IsDir() {
-			maxt = util.Min(TABDIR, int(maxtab))
+			maxt = util.Min(TABDIR, int(global.maxtab))
 		} else {
 			maxt = t.tabstop
 		}
@@ -195,20 +195,20 @@ func (t *Text) Close() {
 		util.AcmeError(err.Error(), nil)
 	}
 	t.file = nil
-	if argtext == t {
-		argtext = nil
+	if global.argtext == t {
+		global.argtext = nil
 	}
-	if typetext == t {
-		typetext = nil
+	if global.typetext == t {
+		global.typetext = nil
 	}
-	if seltext == t {
-		seltext = nil
+	if global.seltext == t {
+		global.seltext = nil
 	}
-	if mousetext == t {
-		mousetext = nil
+	if global.mousetext == t {
+		global.mousetext = nil
 	}
-	if barttext == t {
-		barttext = nil
+	if global.barttext == t {
+		global.barttext = nil
 	}
 }
 
@@ -224,7 +224,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
-	t.fr.Maxtab(util.Min(int(maxtab), TABDIR) * mint)
+	t.fr.Maxtab(util.Min(int(global.maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
 		if maxt-w%maxt < mint || w%maxt == 0 {
@@ -903,16 +903,16 @@ func (t *Text) Type(r rune) {
 
 	}
 	if t.what == Body {
-		seq++
-		t.file.Mark(seq)
+		global.seq++
+		t.file.Mark(global.seq)
 	}
 	// cut/paste must be done after the seq++/filemark
 	switch r {
 	case draw.KeyCmd + 'x': // %X: cut
 		t.TypeCommit()
 		if t.what == Body {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		cut(t, t, nil, true, true, "")
 		t.Show(t.q0, t.q0, true)
@@ -921,8 +921,8 @@ func (t *Text) Type(r rune) {
 	case draw.KeyCmd + 'v': // %V: paste
 		t.TypeCommit()
 		if t.what == Body {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		paste(t, t, nil, true, false, "")
 		t.Show(t.q0, t.q1, true)
@@ -1092,34 +1092,34 @@ func (t *Text) Select() {
 
 	// To have double-clicking and chording, we double-click
 	// immediately if it might make sense.
-	b := mouse.Buttons
+	b := global.mouse.Buttons
 	q0 := t.q0
 	q1 := t.q1
-	selectq = t.org + t.fr.Charofpt(mouse.Point)
+	selectq = t.org + t.fr.Charofpt(global.mouse.Point)
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
-	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
+	if (clicktext == t && global.mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0, q1)
 		t.SetSelect(q0, q1)
 		t.display.Flush()
-		x := mouse.Point.X
-		y := mouse.Point.Y
+		x := global.mouse.Point.X
+		y := global.mouse.Point.Y
 		// stay here until something interesting happens
 		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
-			mousectl.Read()
-			if !(mouse.Buttons == b && util.Abs(mouse.Point.X-x) < 3 && util.Abs(mouse.Point.Y-y) < 3) {
+			global.mousectl.Read()
+			if !(global.mouse.Buttons == b && util.Abs(global.mouse.Point.X-x) < 3 && util.Abs(global.mouse.Point.Y-y) < 3) {
 				break
 			}
 		}
-		mouse.Point.X = x // in case we're calling frselect
-		mouse.Point.Y = y
+		global.mouse.Point.X = x // in case we're calling frselect
+		global.mouse.Point.Y = y
 		q0 = t.q0 // may have changed
 		q1 = t.q1
 		selectq = q0
 	}
-	if mouse.Buttons == b {
-		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
+	if global.mouse.Buttons == b {
+		sP0, sP1 := t.fr.Select(global.mousectl, global.mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		// horrible botch: while asleep, may have lost selection altogether
 		if selectq > t.file.Nr() {
@@ -1137,12 +1137,12 @@ func (t *Text) Select() {
 		}
 	}
 	if q0 == q1 {
-		if q0 == t.q0 && clicktext == t && mouse.Msec-clickmsec < 500 {
+		if q0 == t.q0 && clicktext == t && global.mouse.Msec-clickmsec < 500 {
 			q0, q1 = t.DoubleClick(q0, q1)
 			clicktext = nil
 		} else {
 			clicktext = t
-			clickmsec = mouse.Msec
+			clickmsec = global.mouse.Msec
 		}
 	} else {
 		clicktext = nil
@@ -1150,13 +1150,13 @@ func (t *Text) Select() {
 	t.SetSelect(q0, q1)
 	t.display.Flush()
 	state := None // what we've done; undo when possible
-	for mouse.Buttons != 0 {
-		mouse.Msec = 0
-		b := mouse.Buttons
+	for global.mouse.Buttons != 0 {
+		global.mouse.Msec = 0
+		b := global.mouse.Buttons
 		if (b&1) != 0 && (b&6) != 0 {
 			if state == None && t.what == Body {
-				seq++
-				t.w.body.file.Mark(seq)
+				global.seq++
+				t.w.body.file.Mark(global.seq)
 			}
 			if b&2 != 0 {
 				if state == Paste && t.what == Body {
@@ -1185,8 +1185,8 @@ func (t *Text) Select() {
 			clearmouse()
 		}
 		t.display.Flush()
-		for mouse.Buttons == b {
-			mousectl.Read()
+		for global.mouse.Buttons == b {
+			global.mousectl.Read()
 		}
 		clicktext = nil
 	}
@@ -1293,32 +1293,32 @@ func (t *Text) SetSelect(q0, q1 int) {
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
 func (t *Text) Select23(high draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White(), high)
+	p0, p1 := t.fr.SelectOpt(global.mousectl, global.mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White(), high)
 
-	buts = uint(mousectl.Mouse.Buttons)
+	buts = uint(global.mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
 		q0 = p0 + t.org
 		q1 = p1 + t.org
 	}
-	for mousectl.Mouse.Buttons != 0 {
-		mousectl.Read()
+	for global.mousectl.Mouse.Buttons != 0 {
+		global.mousectl.Read()
 	}
 	return q0, q1, buts
 }
 
 func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
-	q0, q1, buts := t.Select23(but2col, 4)
+	q0, q1, buts := t.Select23(global.but2col, 4)
 	if (buts & 4) != 0 {
 		return q0, q1, nil, false
 	}
 	if (buts & 1) != 0 { // pick up argument
-		return q0, q1, argtext, true
+		return q0, q1, global.argtext, true
 	}
 	return q0, q1, nil, true
 }
 
 func (t *Text) Select3() (q0, q1 int, r bool) {
-	q0, q1, buts := t.Select23(but3col, 1|2)
+	q0, q1, buts := t.Select23(global.but3col, 1|2)
 	return q0, q1, buts == 0
 }
 
@@ -1629,7 +1629,7 @@ func (t *Text) DirName(name string) string {
 func (t *Text) AbsDirName(name string) string {
 	d := t.dirName(name)
 	if !filepath.IsAbs(d) {
-		return filepath.Join(wdir, d)
+		return filepath.Join(global.wdir, d)
 	}
 	return filepath.Clean(d)
 }

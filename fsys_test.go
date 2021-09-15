@@ -573,9 +573,9 @@ func TestMntDecRef(t *testing.T) {
 	mnt.DecRef(nil) // no-op
 
 	md := &MntDir{id: 42}
-	cerr = make(chan error)
+	global.cerr = make(chan error)
 	go mnt.DecRef(md)
-	err := <-cerr
+	err := <-global.cerr
 	wantErr := fmt.Sprintf("Mnt.DecRef: can't find id %d", md.id)
 	if err == nil || err.Error() != wantErr {
 		t.Errorf("mnt.DecRef invalid id %d generated error %v; expected %q", md.id, err, wantErr)
@@ -790,8 +790,8 @@ func TestFileServerAttach(t *testing.T) {
 }
 
 func TestFileServerWalk(t *testing.T) {
-	WinID = 0
-	row = Row{
+	global.WinID = 0
+	global.row = Row{
 		col: []*Column{
 			{
 				w: []*Window{
@@ -801,18 +801,18 @@ func TestFileServerWalk(t *testing.T) {
 		},
 	}
 	defer func() {
-		WinID = 0
-		row = Row{}
+		global.WinID = 0
+		global.row = Row{}
 	}()
 
 	newwindowSetup := func(t *testing.T, fs *fileServer, x *Xfid) <-chan struct{} {
-		cnewwindow = make(chan *Window)
+		global.cnewwindow = make(chan *Window)
 		done := make(chan struct{})
 		go func() {
-			<-cnewwindow                                // request for window
-			cnewwindow <- NewWindow().initHeadless(nil) // response
+			<-global.cnewwindow                                // request for window
+			global.cnewwindow <- NewWindow().initHeadless(nil) // response
 
-			cnewwindow = nil
+			global.cnewwindow = nil
 			close(done)
 		}()
 		return done
@@ -1043,7 +1043,7 @@ func TestFileServerWalk(t *testing.T) {
 					Path: QID(1, Qdir),
 					Type: plan9.QTDIR,
 				}
-				x.f.w = row.col[0].w[0]
+				x.f.w = global.row.col[0].w[0]
 				return nil
 			},
 			plan9.Fcall{
@@ -1253,8 +1253,8 @@ func TestFileServerReadQacme(t *testing.T) {
 
 func TestFileServerRead(t *testing.T) {
 	useFixedClock = true
-	WinID = 0
-	row.col = []*Column{
+	global.WinID = 0
+	global.row.col = []*Column{
 		{
 			w: []*Window{
 				NewWindow().initHeadless(nil),
@@ -1265,15 +1265,15 @@ func TestFileServerRead(t *testing.T) {
 	}
 	defer func() {
 		useFixedClock = false
-		WinID = 0
-		row = Row{}
+		global.WinID = 0
+		global.row = Row{}
 	}()
 
 	var rootDirs []plan9.Dir
 	for _, dt := range dirtab[1:] { // skip "."
 		rootDirs = append(rootDirs, *dt.Dir(0, "gopher", fixedClockValue))
 	}
-	for id := 1; id <= WinID; id++ {
+	for id := 1; id <= global.WinID; id++ {
 		rootDirs = append(rootDirs, *windowDirTab(id).Dir(0, "gopher", fixedClockValue))
 	}
 

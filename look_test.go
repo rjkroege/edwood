@@ -111,13 +111,13 @@ func TestExpandJump(t *testing.T) {
 }
 
 func TestLook3Message(t *testing.T) {
-	wdir = "/home/gopher"
+	global.wdir = "/home/gopher"
 	winDir := "/a/b/c"
 	if runtime.GOOS == "windows" {
-		wdir = `C:\User\gopher`
+		global.wdir = `C:\User\gopher`
 		winDir = `C:\a\b\c`
 	}
-	defer func() { wdir = "" }()
+	defer func() { global.wdir = "" }()
 
 	for _, tc := range []struct {
 		name         string
@@ -126,9 +126,9 @@ func TestLook3Message(t *testing.T) {
 		text         string
 		hasClickAttr bool
 	}{
-		{"NilWindow", nil, wdir, " hello.go ", true},
-		{"Error", nil, wdir, "          ", true},
-		{"InSelection", nil, wdir, " «hello.go» ", false},
+		{"NilWindow", nil, global.wdir, " hello.go ", true},
+		{"Error", nil, global.wdir, "          ", true},
+		{"InSelection", nil, global.wdir, " «hello.go» ", false},
 		{
 			"NonNilWindow",
 			windowWithTag(winDir + string(filepath.Separator) + " Del Snarf | Look"),

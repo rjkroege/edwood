@@ -22,7 +22,7 @@ func clearmouse() {
 }
 
 func savemouse(w *Window) {
-	prevmouse = mouse.Point
+	prevmouse = global.mouse.Point
 	mousew = w
 }
 
@@ -65,12 +65,12 @@ func errorwin1(dir string, incl []string) *Window {
 	r := errorwin1Name(dir)
 	w := lookfile(r)
 	if w == nil {
-		if len(row.col) == 0 {
-			if row.Add(nil, -1) == nil {
+		if len(global.row.col) == 0 {
+			if global.row.Add(nil, -1) == nil {
 				util.AcmeError("can't create column to make error window", nil)
 			}
 		}
-		w = row.col[len(row.col)-1].Add(nil, nil, -1)
+		w = global.row.col[len(global.row.col)-1].Add(nil, nil, -1)
 		w.filemenu = false
 		w.SetName(r)
 		xfidlog(w, "new")
@@ -130,6 +130,9 @@ func errorwinforwin(w *Window) *Window {
 }
 
 // Heuristic city.
+// TODO(rjk): There are multiple places in this file where we access a
+// global row without any locking discipline. I presume that that this
+// can lead to crashes and incorrect behaviour.
 func makenewwindow(t *Text) *Window {
 	var (
 		c               *Column
@@ -138,19 +141,19 @@ func makenewwindow(t *Text) *Window {
 		i, y, el        int
 	)
 	switch {
-	case activecol != nil:
-		c = activecol
-	case seltext != nil && seltext.col != nil:
-		c = seltext.col
+	case global.activecol != nil:
+		c = global.activecol
+	case global.seltext != nil && global.seltext.col != nil:
+		c = global.seltext.col
 	case t != nil && t.col != nil:
 		c = t.col
 	default:
-		if len(row.col) == 0 && row.Add(nil, -1) == nil {
+		if len(global.row.col) == 0 && global.row.Add(nil, -1) == nil {
 			util.AcmeError("can't make column", nil)
 		}
-		c = row.col[len(row.col)-1]
+		c = global.row.col[len(global.row.col)-1]
 	}
-	activecol = c
+	global.activecol = c
 	if t == nil || t.w == nil || len(c.w) == 0 {
 		return c.Add(nil, nil, -1)
 	}
@@ -172,7 +175,7 @@ func makenewwindow(t *Text) *Window {
 	el = emptyb.fr.GetFrameFillStatus().Maxlines - emptyb.fr.GetFrameFillStatus().Nlines
 	// if empty space is big, use it
 	if el > 15 || (el > 3 && el > (bigw.body.fr.GetFrameFillStatus().Maxlines-1)/2) {
-		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(tagfont, t.display).Height()
+		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(global.tagfont, t.display).Height()
 	} else {
 		// if this window is in column and isn't much smaller, split it
 		if t.col == c && t.w.r.Dy() > 2*bigw.r.Dy()/3 {
@@ -270,7 +273,7 @@ func addwarningtext(md *MntDir, r []rune) {
 	warn.buf.Insert(0, r)
 	warnings = append(warnings, &warn)
 	select {
-	case cwarn <- 0:
+	case global.cwarn <- 0:
 	default:
 	}
 }

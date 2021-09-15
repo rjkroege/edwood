@@ -51,12 +51,12 @@ func handlePlumb(fsys plumbClient) {
 		if err != nil {
 			return
 		}
-		cplumb <- &m
+		global.cplumb <- &m
 	}
 }
 
 func startplumbing() {
-	cplumb = make(chan *plumb.Message)
+	global.cplumb = make(chan *plumb.Message)
 	go plumbthread()
 }
 
@@ -69,9 +69,9 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		//dir string
 	)
 
-	ct = seltext
+	ct = global.seltext
 	if ct == nil {
-		seltext = t
+		global.seltext = t
 	}
 	e, expanded := expand(t, q0, q1)
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
@@ -161,7 +161,7 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		r = make([]rune, n)
 		t.file.Read(e.q0, r)
 		if search(ct, r[:n]) && e.jump {
-			row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
+			global.row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
 		}
 	}
 }
@@ -321,7 +321,7 @@ func search(ct *Text, r []rune) bool {
 				ct.q0 = q
 				ct.q1 = q + n
 			}
-			seltext = ct
+			global.seltext = ct
 			return true
 		}
 		nb--
@@ -511,7 +511,7 @@ func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
 func lookfile(s string) *Window {
 	// avoid terminal slash on directories
 	s = strings.TrimRight(s, "/")
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			k := strings.TrimRight(w.body.file.Name(), "/")
 			if k == s {
@@ -555,7 +555,7 @@ func openfile(t *Text, e *Expand) *Window {
 			// be configured to accept plumbed directories.
 			// Make the name a full path, just like we would if
 			// opening via the plumber.
-			rp := filepath.Join(wdir, e.name)
+			rp := filepath.Join(global.wdir, e.name)
 			rs = string(cleanrname([]rune(rp)))
 			e.name = rs
 			w = lookfile(e.name)
@@ -607,9 +607,9 @@ func openfile(t *Text, e *Expand) *Window {
 	}
 	t.Show(r.q0, r.q1, true)
 	t.w.SetTag()
-	seltext = t
+	global.seltext = t
 	if e.jump {
-		row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(tagfont, row.display).Height()-4)))
+		global.row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(global.tagfont, global.row.display).Height()-4)))
 	} else {
 		debug.PrintStack()
 	}

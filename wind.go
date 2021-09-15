@@ -72,10 +72,10 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.tagexpand = true
 	w.body.w = w
 	w.incl = []string{}
-	WinID++
-	w.id = WinID
+	global.WinID++
+	w.id = global.WinID
 	w.ref.Inc()
-	if globalincref {
+	if global.globalincref {
 		w.ref.Inc()
 	}
 
@@ -110,10 +110,10 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	r1 := r
 
 	w.tagtop = r
-	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height()
-	r1.Max.Y = r1.Min.Y + w.taglines*fontget(tagfont, w.display).Height()
+	w.tagtop.Max.Y = r.Min.Y + fontget(global.tagfont, w.display).Height()
+	r1.Max.Y = r1.Min.Y + w.taglines*fontget(global.tagfont, w.display).Height()
 
-	w.tag.Init(r1, tagfont, tagcolors, w.display)
+	w.tag.Init(r1, global.tagfont, global.tagcolors, w.display)
 	w.tag.what = Tag
 
 	// tag is a copy of the contents, not a tracked image
@@ -126,7 +126,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 		w.tag.SetSelect(w.tag.file.Nbyte(), w.tag.file.Nbyte())
 	}
 	r1 = r
-	r1.Min.Y += w.taglines*fontget(tagfont, w.display).Height() + 1
+	r1.Min.Y += w.taglines*fontget(global.tagfont, w.display).Height() + 1
 	if r1.Max.Y < r1.Min.Y {
 		r1.Max.Y = r1.Min.Y
 	}
@@ -135,23 +135,23 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	if clone != nil {
 		rf = clone.body.font
 	} else {
-		rf = tagfont
+		rf = global.tagfont
 	}
-	w.body.Init(r1, rf, textcolors, w.display)
+	w.body.Init(r1, rf, global.textcolors, w.display)
 	w.body.what = Body
 	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
-		w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
+		w.display.ScreenImage().Draw(r1, global.tagcolors[frame.ColBord], nil, image.Point{})
 	}
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
-	br.Max.X = br.Min.X + button.R().Dx()
-	br.Max.Y = br.Min.Y + button.R().Dy()
+	br.Max.X = br.Min.X + global.button.R().Dx()
+	br.Max.Y = br.Min.Y + global.button.R().Dy()
 	if w.display != nil {
-		w.display.ScreenImage().Draw(br, button, nil, button.R().Min)
+		w.display.ScreenImage().Draw(br, global.button, nil, global.button.R().Min)
 	}
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	if clone != nil {
@@ -161,9 +161,9 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 }
 
 func (w *Window) DrawButton() {
-	b := button
+	b := global.button
 	if w.body.file.SaveableAndDirty() {
-		b = modbutton
+		b = global.modbutton
 	}
 	var br image.Rectangle
 	br.Min = w.tag.scrollr.Min
@@ -240,20 +240,20 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	// defer log.Println("Window.Resize End\n")
 
 	// TODO(rjk): Do not leak global event state into this function.
-	mouseintag := mouse.Point.In(w.tag.all)
-	mouseinbody := mouse.Point.In(w.body.all)
+	mouseintag := global.mouse.Point.In(w.tag.all)
+	mouseinbody := global.mouse.Point.In(w.body.all)
 
 	// Tagtop is a rectangle corresponding to one line of tag.
 	w.tagtop = r
-	w.tagtop.Max.Y = r.Min.Y + fontget(tagfont, w.display).Height()
+	w.tagtop.Max.Y = r.Min.Y + fontget(global.tagfont, w.display).Height()
 
 	r1 := r
-	r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
+	r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
 
 	// If needed, recompute number of lines in tag.
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
-		r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(tagfont, w.display).Height())
+		r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
 	}
 
 	// Resize/redraw tag TODO(flux)
@@ -265,16 +265,16 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.tagsafe = true
 
 		// If mouse is in tag, pull up as tag closes.
-		if mouseintag && !mouse.Point.In(w.tag.all) {
-			p := mouse.Point
+		if mouseintag && !global.mouse.Point.In(w.tag.all) {
+			p := global.mouse.Point
 			p.Y = w.tag.all.Max.Y - 3
 			if w.display != nil {
 				w.display.MoveTo(p)
 			}
 		}
 		// If mouse is in body, push down as tag expands.
-		if mouseinbody && mouse.Point.In(w.tag.all) {
-			p := mouse.Point
+		if mouseinbody && global.mouse.Point.In(w.tag.all) {
+			p := global.mouse.Point
 			p.Y = w.tag.all.Max.Y + 3
 			if w.display != nil {
 				w.display.MoveTo(p)
@@ -290,7 +290,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
-				w.display.ScreenImage().Draw(r1, tagcolors[frame.ColBord], nil, image.Point{})
+				w.display.ScreenImage().Draw(r1, global.tagcolors[frame.ColBord], nil, image.Point{})
 			}
 			y++
 			r1.Min.Y = util.Min(y, r.Max.Y)
@@ -354,7 +354,7 @@ func (w *Window) Unlock() {
 func (w *Window) MouseBut() {
 	if w.display != nil {
 		w.display.MoveTo(w.tag.scrollr.Min.Add(
-			image.Pt(w.tag.scrollr.Dx(), fontget(tagfont, w.display).Height()).Div(2)))
+			image.Pt(w.tag.scrollr.Dx(), fontget(global.tagfont, w.display).Height()).Div(2)))
 	}
 }
 
@@ -370,8 +370,8 @@ func (w *Window) Close() {
 		//		w.DirFree()
 		w.tag.Close()
 		w.body.Close()
-		if activewin == w {
-			activewin = nil
+		if global.activewin == w {
+			global.activewin = nil
 		}
 	}
 }
@@ -568,8 +568,8 @@ func (w *Window) Commit(t *Text) {
 	}
 	filename := w.ParseTag()
 	if filename != w.body.file.Name() {
-		seq++
-		w.body.file.Mark(seq)
+		global.seq++
+		w.body.file.Mark(global.seq)
 		w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()

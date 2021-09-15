@@ -206,7 +206,7 @@ func TestGetDirNames(t *testing.T) {
 	}
 	want = append(want, name)
 
-	cwarn = nil
+	global.cwarn = nil
 	warnings = nil
 	defer func() {
 		warnings = nil
@@ -311,8 +311,8 @@ func TestTextAbsDirName(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
-	wdir = "/home/gopher"
-	defer func() { wdir = "" }()
+	global.wdir = "/home/gopher"
+	defer func() { global.wdir = "" }()
 
 	for _, tc := range []struct {
 		name          string

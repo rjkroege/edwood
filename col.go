@@ -49,13 +49,13 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	c.r = r
 	c.tag.col = c
 	r1 := r
-	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
+	r1.Max.Y = r1.Min.Y + fontget(global.tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
 	tagfile := file.MakeObservableEditableBuffer("", nil)
 	tagfile.AddObserver(&c.tag)
 	c.tag.file = tagfile
-	c.tag.Init(r1, tagfont, tagcolors, c.display)
+	c.tag.Init(r1, global.tagfont, global.tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
@@ -65,7 +65,7 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	c.tag.Insert(0, Lheader, true)
 	c.tag.SetSelect(c.tag.file.Nr(), c.tag.file.Nr())
 	if c.display != nil {
-		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, global.colbutton, nil, global.colbutton.R().Min)
 		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
 		// perf.
 		c.display.Flush()
@@ -161,7 +161,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r = v.r
 		r.Max.Y = ymax
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 		}
 		r1 := r
 		y = util.Min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
@@ -181,7 +181,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		w = NewWindow()
 		w.col = c
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 		}
 		w.Init(clone, r, c.display)
 	} else {
@@ -203,7 +203,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	if c.display != nil {
 		c.display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3, 3)))
 	}
-	barttext = &w.body
+	global.barttext = &w.body
 	return w
 }
 
@@ -251,7 +251,7 @@ Found:
 		r.Max.Y = w.r.Max.Y
 	}
 	if c.display != nil {
-		c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 	}
 	if c.safe && !c.fortest {
 		if !didmouse && up {
@@ -265,8 +265,8 @@ Found:
 }
 
 func (c *Column) CloseAll() {
-	if c == activecol {
-		activecol = nil
+	if c == global.activecol {
+		global.activecol = nil
 	}
 	c.tag.Close()
 	for _, w := range c.w {
@@ -287,7 +287,7 @@ func (c *Column) Resize(r image.Rectangle) {
 	r1.Max.Y = r1.Min.Y + c.tag.fr.DefaultFontHeight()
 	c.tag.Resize(r1, true, false)
 	if c.display != nil {
-		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, global.colbutton, nil, global.colbutton.R().Min)
 	}
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
@@ -304,7 +304,7 @@ func (c *Column) Resize(r image.Rectangle) {
 				r1.Max.Y += (w.r.Dy() + c.display.ScaleSize(Border)) * r.Dy() / c.r.Dy()
 			}
 		}
-		r1.Max.Y = util.Max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height())
+		r1.Max.Y = util.Max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(global.tagfont, c.display).Height())
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
 		c.display.ScreenImage().Draw(r2, c.display.Black(), nil, image.Point{})
@@ -319,7 +319,7 @@ func (c *Column) Sort() {
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
-	c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+	c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 	y := r.Min.Y
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
@@ -371,7 +371,7 @@ func (c *Column) Grow(w *Window, but int) {
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		c.display.ScreenImage().Draw(cr, textcolors[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(cr, global.textcolors[frame.ColBack], nil, image.Point{})
 		w.Resize(cr, false, true)
 		for i := 1; i < c.nw(); i++ {
 			ffs := c.w[i].body.fr.GetFrameFillStatus()
@@ -513,15 +513,15 @@ func (c *Column) DragWin(w *Window, but int) {
 	)
 	clearmouse()
 	c.display.SetCursor(&boxcursor)
-	b = mouse.Buttons
-	op = mouse.Point
-	for mouse.Buttons == b {
-		mousectl.Read()
+	b = global.mouse.Buttons
+	op = global.mouse.Point
+	for global.mouse.Buttons == b {
+		global.mousectl.Read()
 	}
 	c.display.SetCursor(nil)
-	if mouse.Buttons != 0 {
-		for mouse.Buttons != 0 {
-			mousectl.Read()
+	if global.mouse.Buttons != 0 {
+		for global.mouse.Buttons != 0 {
+			global.mousectl.Read()
 		}
 		return
 	}
@@ -538,7 +538,7 @@ Found:
 	if w.tagexpand { // force recomputation of window tag size
 		w.taglines = 1
 	}
-	p = mouse.Point
+	p = global.mouse.Point
 	if util.Abs(p.X-op.X) < 5 && util.Abs(p.Y-op.Y) < 5 {
 		c.Grow(w, but)
 		w.MouseBut()

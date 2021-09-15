@@ -24,7 +24,7 @@ type teststimulus struct {
 func TestEdit(t *testing.T) {
 	runfunc = mockrun
 	defer func() { runfunc = run }()
-	cedit = make(chan int)
+	global.cedit = make(chan int)
 
 	testtab := []teststimulus{
 		// 0
@@ -112,11 +112,11 @@ func TestEdit(t *testing.T) {
 		// All middle button commands including Edit run inside a lock discipline
 		// set up by MovedMouse. We need to mirror this for external process
 		// accessing Edit commands.
-		row.lk.Lock()
+		global.row.lk.Lock()
 		w.Lock('M')
 		editcmd(&w.body, []rune(test.expr))
 		w.Unlock()
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 
 		n, _ := w.body.ReadB(0, buf[:])
 		if string(buf[:n]) != test.expected {
@@ -175,7 +175,7 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 		},
 	})
 
-	return row.col[0].w[0]
+	return global.row.col[0].w[0]
 }
 
 func makeTempFile(contents string) (string, func(), error) {
@@ -373,25 +373,25 @@ func TestEditMultipleWindows(t *testing.T) {
 		// TODO(rjk): Make this nicer.
 		if i == 11 || i == 12 {
 			// special setup for undo
-			InsertString(row.col[0].w[0], "hello")
+			InsertString(global.row.col[0].w[0], "hello")
 			if i == 12 {
 				// Undo the above insertion.
-				row.col[0].w[0].Undo(true)
+				global.row.col[0].w[0].Undo(true)
 			}
 		}
 
-		w := row.col[0].w[0]
+		w := global.row.col[0].w[0]
 		w.Lock('M')
 		editcmd(&w.body, []rune(test.expr))
 		w.Unlock()
 
-		if got, want := len(row.col[0].w), len(test.expected); got != want {
+		if got, want := len(global.row.col[0].w), len(test.expected); got != want {
 			t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
 			break
 		}
 
 		for j, exp := range test.expected {
-			w := row.col[0].w[j]
+			w := global.row.col[0].w[j]
 			n, _ := w.body.ReadB(0, buf[:])
 			if string(buf[:n]) != exp {
 				t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
@@ -698,13 +698,13 @@ func mockrun(win *Window, s string, rdir string, newns bool, argaddr string, xar
 		ds := fmt.Sprintf("{%#v %#v %#v %#v %#v %#v}", s, rdir, newns, argaddr, xarg, iseditcmd)
 
 		if s[0] != '>' {
-			row.lk.Lock()
+			global.row.lk.Lock()
 			win.Lock('M')
 			edittext(win, 4, []rune(ds))
 			win.Unlock()
-			row.lk.Unlock()
+			global.row.lk.Unlock()
 		}
 
-		cedit <- 0
+		global.cedit <- 0
 	}()
 }
