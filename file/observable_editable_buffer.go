@@ -128,6 +128,7 @@ func (e *ObservableEditableBuffer) Clean() {
 }
 
 // Size is a forwarding function for file.Size.
+// This is in runes. 
 func (e *ObservableEditableBuffer) Size() int {
 	return e.f.Size()
 }
@@ -143,6 +144,7 @@ func (e *ObservableEditableBuffer) Reset() {
 }
 
 // HasUncommitedChanges is a forwarding function for file.HasUncommitedChanges.
+// Should be a nop with file.Buffer
 func (e *ObservableEditableBuffer) HasUncommitedChanges() bool {
 	return e.f.HasUncommitedChanges()
 }
@@ -201,6 +203,7 @@ func (e *ObservableEditableBuffer) Dirty() bool {
 }
 
 // InsertAt is a forwarding function for file.InsertAt.
+// p0 is position in runes.
 func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
 	e.f.InsertAt(p0, s)
 }
@@ -225,6 +228,7 @@ func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
 }
 
 // DeleteAt is a forwarding function for file.DeleteAt.
+// q0, q1 are in runes.
 func (e *ObservableEditableBuffer) DeleteAt(q0, q1 int) {
 	e.f.DeleteAt(q0, q1)
 }
@@ -311,6 +315,9 @@ func (e *ObservableEditableBuffer) TreatAsDirty() bool {
 }
 
 // Read is a forwarding function for rune_array.Read.
+// q0 is in runes
+// ReadC can be implemented in terms of Read when using file.Buffer
+// because the "cache" concept is not germane.
 func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 	return e.f.b.Read(q0, r)
 }
