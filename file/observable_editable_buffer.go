@@ -127,12 +127,6 @@ func (e *ObservableEditableBuffer) Clean() {
 	e.f.Clean()
 }
 
-// Size is a forwarding function for file.Size.
-// This is in runes.
-func (e *ObservableEditableBuffer) Size() int {
-	return e.f.Size()
-}
-
 // Mark is a forwarding function for file.Mark.
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark(seq)
