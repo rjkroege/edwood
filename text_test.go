@@ -428,7 +428,12 @@ func checkTabexpand(t *testing.T, getText func(tabexpand bool, tabstop int) *Tex
 		for _, r := range tc.input {
 			text.Type(r)
 		}
-		if got := string(text.file.GetCache()); got != tc.want {
+		text.file.Commit()
+
+		gr := make([]rune, text.file.Nr())
+		text.file.Read(0, gr[:text.file.Nr()])
+
+		if got := string(gr); got != tc.want {
 			t.Errorf("loaded editor %q; expected %q", got, tc.want)
 		}
 	}

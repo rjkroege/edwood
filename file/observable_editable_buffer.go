@@ -382,8 +382,3 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
 }
-
-// GetCache is a Getter for file.cache for use in tests.
-func (e *ObservableEditableBuffer) GetCache() []rune {
-	return e.f.cache
-}
