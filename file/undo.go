@@ -259,6 +259,7 @@ func (b *Buffer) Delete(off, length int64) error {
 		copy(newBuf, start.data[:offset])
 		before.data = newBuf
 		before.prev, before.next = start.prev, after
+		before.nr = utf8.RuneCount(start.data[:offset])
 
 		newStart = before
 		if !midwayEnd {
