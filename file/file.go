@@ -357,10 +357,11 @@ func NewTagFile() *File {
 }
 
 // RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
-// analog in undo.RuneArray. The value of seq is used to track intra and
+// analog in file.Buffer. The value of seq is used to track intra and
 // inter File edit actions so that cross-File changes via Edit X can be
-// undone with a single action. An implementation of File that wraps
-// undo.RuneArray will need to to preserve seq tracking.
+// undone with a single action. An implementation of
+// ObservableEditableBuffer that wraps file.Buffer will need to to
+// preserve seq tracking.
 func (f *File) RedoSeq() int {
 	delta := &f.epsilon
 	if len(*delta) == 0 {

@@ -65,16 +65,6 @@ func (b *RuneArray) Nbyte() int {
 	return bc
 }
 
-// TODO(flux): This is another design constraint of RuneArray - we want to efficiently
-// present contiguous segments of bytes, possibly by merging/flattening our tree
-// when a view is requested. This should be a rare operation...
-func (b *RuneArray) View(q0, q1 int) []rune {
-	if q1 > len(*b) {
-		q1 = len(*b)
-	}
-	return (*b)[q0:q1]
-}
-
 func (b RuneArray) IndexRune(r rune) int {
 	return runes.IndexRune(b, r)
 }

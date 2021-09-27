@@ -505,11 +505,13 @@ func (w *Window) setTag1() {
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
-	old := w.tag.file.View(0, w.tag.file.Nbyte()) // TODO(sn0w) find another way to do this without using View.
 	oldbarIndex := w.tag.file.IndexRune('|')
 	if oldbarIndex >= 0 {
+		// TODO(rjk): Update for file.Buffer representation.
+		oldsuffix := make([]rune, w.tag.file.Nr()-oldbarIndex)
+		w.tag.file.Read(oldbarIndex, oldsuffix)
 		sb.WriteString(" ")
-		sb.WriteString(string(old[oldbarIndex:]))
+		sb.WriteString(string(oldsuffix))
 	} else {
 		sb.WriteString(Lpipe)
 		sb.WriteString(Llook)

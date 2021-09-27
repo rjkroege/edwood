@@ -7,6 +7,7 @@ import (
 // Texter abstracts the buffering side of Text, allowing testing of Elog Apply
 // TODO(flux): This is probably lame and will get re-done when I understand
 // how Text stores its text.
+// TODO(rjk): Make this into a streaming interface.
 type Texter interface {
 	Constrain(q0, q1 int) (p0, p1 int)
 	Delete(q0, q1 int, tofile bool)
@@ -15,10 +16,11 @@ type Texter interface {
 	SetQ0(int)
 	Q1() int // End of selelection
 	SetQ1(int)
+	// TODO(rjk): Please call this Nr().
 	Nc() int
+	// TODO(rjk): Rename this to Read
 	ReadB(q int, r []rune) (n int, err error)
 	ReadC(q int) rune
-	View(q0, q1 int) []rune // Return a "read only" slice
 }
 
 // TextBuffer implements Texter around a buffer.
@@ -36,13 +38,6 @@ func (t TextBuffer) Constrain(q0, q1 int) (p0, p1 int) {
 	p0 = util.Min(q0, len(t.buf))
 	p1 = util.Min(q1, len(t.buf))
 	return p0, p1
-}
-
-func (t *TextBuffer) View(q0, q1 int) []rune {
-	if q1 > len(t.buf) {
-		q1 = len(t.buf)
-	}
-	return t.buf[q0:q1]
 }
 
 func (t *TextBuffer) Delete(q0, q1 int, tofile bool) {

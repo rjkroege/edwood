@@ -127,12 +127,6 @@ func (e *ObservableEditableBuffer) Clean() {
 	e.f.Clean()
 }
 
-// Size is a forwarding function for file.Size.
-// This is in runes.
-func (e *ObservableEditableBuffer) Size() int {
-	return e.f.Size()
-}
-
 // Mark is a forwarding function for file.Mark.
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark(seq)
@@ -278,14 +272,18 @@ func (e *ObservableEditableBuffer) RedoSeq() int {
 	return e.f.RedoSeq()
 }
 
-// inserted is a forwarding function for text.inserted.
+// inserted is a package-only entry point from the underlying
+// buffer (file.Buffer or file.File) to run the registered observers
+// on a change in the buffer.
 func (e *ObservableEditableBuffer) inserted(q0 int, r []rune) {
 	for observer := range e.observers {
 		observer.Inserted(q0, r)
 	}
 }
 
-// deleted is a forwarding function for text.deleted.
+// deleted is a package-only entry point from the underlying
+// buffer (file.Buffer or file.File) to run the registered observers
+// on a change in the buffer.
 func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 	for observer := range e.observers {
 		observer.Deleted(q0, q1)
@@ -293,11 +291,13 @@ func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 }
 
 // Commit is a forwarding function for file.Commit.
+// nop with file.Buffer.
 func (e *ObservableEditableBuffer) Commit() {
 	e.f.Commit()
 }
 
 // InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
+// forwards to InsertAt for file.Buffer.
 func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	e.f.InsertAtWithoutCommit(p0, s)
 }
@@ -322,12 +322,8 @@ func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 	return e.f.b.Read(q0, r)
 }
 
-// View is a forwarding function for rune_array.View.
-func (e *ObservableEditableBuffer) View(q0 int, q1 int) []rune {
-	return e.f.b.View(q0, q1)
-}
-
 // String is a forwarding function for rune_array.String.
+// Returns the entire buffer as a string.
 func (e *ObservableEditableBuffer) String() string {
 	return e.f.b.String()
 }
@@ -381,9 +377,4 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 // SetEpsilon is a setter for file.epsilon for use in tests.
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
-}
-
-// GetCache is a Getter for file.cache for use in tests.
-func (e *ObservableEditableBuffer) GetCache() []rune {
-	return e.f.cache
 }
