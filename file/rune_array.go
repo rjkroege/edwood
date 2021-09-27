@@ -15,7 +15,7 @@ func NewRuneArray() RuneArray { return []rune{} }
 
 func (b *RuneArray) Insert(q0 int, r []rune) {
 	if q0 > len(*b) {
-		panic("internal error: buffer.Insert: Out of range insertion")
+		panic("internal error: buffer.InsertWithNr: Out of range insertion")
 	}
 	*b = append((*b)[:q0], append(r, (*b)[q0:]...)...)
 }

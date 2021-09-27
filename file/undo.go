@@ -138,9 +138,9 @@ func NewBufferNoNr(content []byte) *Buffer {
 	return NewBuffer(content, utf8.RuneCount(content))
 }
 
-// Insert inserts the data at the given offset in the buffer. An error is return when the
+// InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) Insert(off int64, data []byte, nr int) error {
+func (b *Buffer) InsertWithNr(off int64, data []byte, nr int) error {
 	b.treatasclean = false
 	if len(data) == 0 {
 		return nil
@@ -158,13 +158,13 @@ func (b *Buffer) Insert(off int64, data []byte, nr int) error {
 	c := b.newChange(off)
 	var pnew *piece
 	if offset == p.len() {
-		// Insert between two existing pieces, hence there is nothing to
+		// InsertWithNr between two existing pieces, hence there is nothing to
 		// remove, just add a new piece holding the extra text.
 		pnew = b.newPiece(data, p, p.next, nr)
 		c.new = newSpan(pnew, pnew)
 		c.old = newSpan(nil, nil)
 	} else {
-		// Insert into middle of an existing piece, therefore split the old
+		// InsertWithNr into middle of an existing piece, therefore split the old
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
@@ -184,8 +184,8 @@ func (b *Buffer) Insert(off int64, data []byte, nr int) error {
 	return nil
 }
 
-func (b *Buffer) InsertNoNr(off int64, data []byte) error {
-	return b.Insert(off, data, utf8.RuneCount(data))
+func (b *Buffer) Insert(off int64, data []byte) error {
+	return b.InsertWithNr(off, data, utf8.RuneCount(data))
 }
 
 // Delete deletes the portion of the length at the given offset. An error is returned

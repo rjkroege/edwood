@@ -132,9 +132,9 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")
-	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
-	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
-	f.validateinputs(r, "Frame.Insert Start")
+	f.validateboxmodel("Frame.InsertWithNr Start p0=%d, «%s»", p0, string(r))
+	defer f.validateboxmodel("Frame.InsertWithNr End p0=%d, «%s»", p0, string(r))
+	f.validateinputs(r, "Frame.InsertWithNr Start")
 
 	if p0 > f.nchars || len(r) == 0 || f.background == nil {
 		return f.lastlinefull
@@ -189,7 +189,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 		pt1 = f.cklinewrap0(pt1, b)
 		if pt1.Y > f.rect.Max.Y {
 			f.Logboxes("-- pt1 violated invariant at box --")
-			panic(fmt.Sprint("frame.Insert pt1 too far", " pt1=", pt1, " box=", b))
+			panic(fmt.Sprint("frame.InsertWithNr pt1 too far", " pt1=", pt1, " box=", b))
 		}
 
 		if b.Nrune > 0 {
@@ -215,8 +215,8 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	}
 
 	if pt1.Y > f.rect.Max.Y {
-		nframe.validateboxmodel("frame.Insert pt1 too far, nframe validation, %v", pt1)
-		panic("frame.Insert pt1 too far")
+		nframe.validateboxmodel("frame.InsertWithNr pt1 too far, nframe validation, %v", pt1)
+		panic("frame.InsertWithNr pt1 too far")
 	}
 	if pt1.Y == f.rect.Max.Y && n0 < len(f.box) {
 		f.nchars -= f.strlen(n0)
@@ -365,7 +365,7 @@ func (f *frameimpl) validateinputs(runes []rune, format string, args ...interfac
 		if r == 0x00 { // Nulls in input string are forbidden.
 			log.Printf(format, args...)
 			log.Printf("r[%d] null", i)
-			panic("-- invalid input to Frame.Insert --")
+			panic("-- invalid input to Frame.InsertWithNr --")
 		}
 	}
 }

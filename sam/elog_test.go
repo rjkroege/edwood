@@ -43,7 +43,7 @@ func TestInsert(t *testing.T) {
 		tb := test.tb
 		tb.Insert(test.q0, []rune(test.insert), true)
 		if string(tb.buf) != test.expected {
-			t.Errorf("Insert Failed.  Expected %v, got %v", test.expected, string(tb.buf))
+			t.Errorf("InsertWithNr Failed.  Expected %v, got %v", test.expected, string(tb.buf))
 		}
 	}
 }

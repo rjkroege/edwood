@@ -303,6 +303,40 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 	}
 }
 
+func TestPieceNr(t *testing.T) {
+	b := NewBufferNoNr(nil)
+
+	undo, redo := (*Buffer).Undo, (*Buffer).Redo
+	tests := []struct {
+		op func(*Buffer) ChangeInfo
+	}{
+		0:  {redo},
+		1:  {undo},
+		2:  {undo},
+		3:  {undo},
+		4:  {undo},
+		5:  {undo},
+		6:  {undo},
+		7:  {undo},
+		8:  {redo},
+		9:  {redo},
+		10: {redo},
+		11: {redo},
+		12: {redo},
+		13: {redo},
+		14: {redo},
+	}
+
+	for i, tt := range tests {
+		info := tt.op(b)
+		off, n := info.Off, int64(info.Size)
+		wantNr := countRunes(off, b)
+		if n != wantNr {
+			t.Errorf("%d: got n %d, want %d", i, n, wantNr)
+		}
+	}
+}
+
 func (b *Buffer) checkPiecesCnt(t *testing.T, expected int) {
 	if b.piecesCnt != expected {
 		t.Errorf("got %d pieces, want %d", b.piecesCnt, expected)
@@ -322,7 +356,7 @@ func (t *Buffer) insertString(off int, data string) {
 }
 
 func (t *Buffer) cacheInsertString(off int, data string) {
-	err := t.InsertNoNr(int64(off), []byte(data))
+	err := t.Insert(int64(off), []byte(data))
 	if err != nil {
 		panic(err)
 	}
@@ -370,4 +404,12 @@ func (t *Buffer) allContent() string {
 
 	}
 	return string(data)
+}
+
+func countRunes(off int64, b *Buffer) int64 {
+	p, _ := b.findPiece(off)
+	if p == nil {
+		return 0
+	}
+	return int64(utf8.RuneCount(p.data))
 }
