@@ -459,6 +459,15 @@ func (b *Buffer) Size() int64 {
 	return size
 }
 
+// Nr returns the sum of the Nr for each piece in the buffer.
+func (b *Buffer) Nr() int64 {
+	var nr int
+	for p := b.begin; p != nil; p = p.next {
+		nr += p.nr
+	}
+	return int64(nr)
+}
+
 // action is a list of changes which are used to undo/redo all modifications.
 type action struct {
 	changes []*change
