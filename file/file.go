@@ -55,18 +55,18 @@ type File struct {
 // a scrawny wrapper around the Undo implementation. As a result, we should
 // expect to see the following entry points:
 //
-// func (b *RuneArray) Clean()
-//func (b *RuneArray) Commit()
-//func (b *RuneArray) Delete(off, length int64) error
-//func (b *RuneArray) Dirty() bool
-//func (b *RuneArray) Insert(off int64, data []byte) error
-//func (b *RuneArray) ReadAt(data []byte, off int64) (n int, err error)
-//func (b *RuneArray) Redo() (off, n int64)
-//func (b *RuneArray) Size() int64
-//func (b *RuneArray) Undo() (off, n int64)
+// func (b *Buffer) Clean()
+//func (b *Buffer) Commit()
+//func (b *Buffer) Delete(off, length int64) error
+//func (b *Buffer) Dirty() bool
+//func (b *Buffer) Insert(off int64, data []byte) error
+//func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error)
+//func (b *Buffer) Redo() (off, n int64)
+//func (b *Buffer) Size() int64
+//func (b *Buffer) Undo() (off, n int64)
 //
-// NB how the cache is folded into RuneArray.
-//TODO(rjk): make undo.RuneArray implement Reader and Writer.
+// NB how the cache is folded into Buffer.
+//TODO(rjk): make undo.Buffer implement Reader and Writer.
 
 // HasUncommitedChanges returns true if there are changes that
 // have been made to the File after the last Commit.
@@ -90,15 +90,12 @@ func (f *File) HasRedoableChanges() bool {
 
 // Size returns the complete size of the buffer including both committed
 // and uncommitted runes.
-// NB: naturally forwards to undo.RuneArray.Size()
+// This is currently in runes. Note that undo.Buffer.Size() is in bytes.
 func (f *File) Size() int {
 	return int(f.b.Nc()) + len(f.cache)
 }
 
-// Nr returns the number of valid runes in the RuneArray.
-// At the moment, this is the same as Size. But when File is backed
-// with utf8, this will require adjustment.
-// TODO(rjk): utf8 adjustment
+// Nr returns the number of valid runes in the File.
 func (f *File) Nr() int {
 	return f.Size()
 }
