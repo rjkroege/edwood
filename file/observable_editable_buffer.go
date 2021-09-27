@@ -272,14 +272,18 @@ func (e *ObservableEditableBuffer) RedoSeq() int {
 	return e.f.RedoSeq()
 }
 
-// inserted is a forwarding function for text.inserted.
+// inserted is a package-only entry point from the underlying
+// buffer (file.Buffer or file.File) to run the registered observers
+// on a change in the buffer.
 func (e *ObservableEditableBuffer) inserted(q0 int, r []rune) {
 	for observer := range e.observers {
 		observer.Inserted(q0, r)
 	}
 }
 
-// deleted is a forwarding function for text.deleted.
+// deleted is a package-only entry point from the underlying
+// buffer (file.Buffer or file.File) to run the registered observers
+// on a change in the buffer.
 func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 	for observer := range e.observers {
 		observer.Deleted(q0, q1)
@@ -319,6 +323,7 @@ func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 }
 
 // String is a forwarding function for rune_array.String.
+// Returns the entire buffer as a string.
 func (e *ObservableEditableBuffer) String() string {
 	return e.f.b.String()
 }
