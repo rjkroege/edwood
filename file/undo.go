@@ -339,11 +339,11 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 // at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
-func (b *Buffer) Undo() ChangeInfo {
+func (b *Buffer) Undo() (int64, int64) {
 	b.Commit()
 	a := b.unshiftAction()
 	if a == nil {
-		return ChangeInfo{Off: -1, Size: 0}
+		return -1, 0
 	}
 
 	var off, size int64
@@ -356,8 +356,7 @@ func (b *Buffer) Undo() ChangeInfo {
 		size = c.old.len - c.new.len
 		nR -= c.new.Nr() - c.old.Nr()
 	}
-	nonAscii, width := b.FindNewNonAscii()
-	return ChangeInfo{Off: off, Size: int(size), Nr: nR, NonAscii: nonAscii, Width: width}
+	return off, size
 }
 
 func (b *Buffer) unshiftAction() *action {
@@ -372,11 +371,11 @@ func (b *Buffer) unshiftAction() *action {
 // at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
-func (b *Buffer) Redo() ChangeInfo {
+func (b *Buffer) Redo() (int64, int64) {
 	b.Commit()
 	a := b.shiftAction()
 	if a == nil {
-		return ChangeInfo{Off: -1, Size: 0}
+		return -1, 0
 	}
 
 	var nR int
@@ -388,8 +387,7 @@ func (b *Buffer) Redo() ChangeInfo {
 		nR -= c.new.Nr() - c.old.Nr()
 		size = c.new.len - c.old.len
 	}
-	nonAscii, width := b.FindNewNonAscii()
-	return ChangeInfo{Off: off, Size: int(size), Nr: nR, NonAscii: nonAscii, Width: width}
+	return off, size
 }
 
 func (b *Buffer) shiftAction() *action {
