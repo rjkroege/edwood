@@ -128,7 +128,7 @@ func (e *ObservableEditableBuffer) Clean() {
 }
 
 // Size is a forwarding function for file.Size.
-// This is in runes. 
+// This is in runes.
 func (e *ObservableEditableBuffer) Size() int {
 	return e.f.Size()
 }
