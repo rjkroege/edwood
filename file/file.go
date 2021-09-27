@@ -38,9 +38,6 @@ type File struct {
 
 	oeb *ObservableEditableBuffer
 
-	// Tracks the Edit sequence.
-	seq          int  // undo sequencing [private]
-	putseq       int  // seq on last put [private]
 	mod          bool // true if the file has been changed. [private]
 	treatasclean bool // Window Clean tests should succeed if set. [private]
 
@@ -142,7 +139,7 @@ func (f *File) SaveableAndDirty() bool {
 // Commit writes the in-progress edits to the real buffer instead of
 // keeping them in the cache. Does not map to undo.RuneArray.Commit (that
 // method is Mark). Remove this method.
-func (f *File) Commit() {
+func (f *File) Commit(seq int) {
 	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
@@ -152,7 +149,7 @@ func (f *File) Commit() {
 		// TODO(rjk): Generate a better error message.
 		panic("internal error: File.Commit")
 	}
-	if f.seq > 0 {
+	if seq > 0 {
 		f.Uninsert(&f.delta, f.cq0, len(f.cache))
 	}
 	f.b.Insert(f.cq0, f.cache)
@@ -192,23 +189,7 @@ func (f *File) Load(q0 int, d []byte) (n int, hasNulls bool) {
 	return len(runes), hasNulls
 }
 
-// SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-// TODO(rjk): switching to undo.RuneArray will require removing use of seq
-// TODO(rjk): This function maps to undo.RuneArray.Clean()
-func (f *File) SnapshotSeq() {
-	f.putseq = f.seq
-}
-
-// Dirty reports whether the current state of the File is different from
-// the initial state or from the one at the time of calling Clean.
-//
-// TODO(rjk): switching to undo.RuneArray will require removing external uses
-// of seq.
-func (f *File) Dirty() bool {
-	return f.seq != f.putseq
-}
-
-// InsertAt inserts s runes at rune address p0.
+/ InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
 // TODO(rjk): In terms of the undo.RuneArray conversion, this correponds
 // to undo.RuneArray.Insert.

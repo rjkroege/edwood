@@ -28,6 +28,10 @@ type ObservableEditableBuffer struct {
 	EditClean bool
 	details   *DiskDetails
 	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
+
+	// Tracks the editing sequence.
+	seq          int  // undo sequencing [private]
+	putseq       int  // seq on last put [private]
 }
 
 // Set is a forwarding function for file_hash.Set
@@ -377,4 +381,23 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 // SetEpsilon is a setter for file.epsilon for use in tests.
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
+}
+
+
+// ------------
+
+
+// SnapshotSeq saves the current seq to putseq. Call this on Put actions.
+// TODO(rjk): adjust as needed for file.Buffer.
+func (f *ObservableEditableBuffer) SnapshotSeq() {
+	f.putseq = f.seq
+}
+
+// Dirty reports whether the current state of the File is different from
+// the initial state or from the one at the time of calling Clean.
+//
+// TODO(rjk): switching to file.Buffer will require adjusting how we
+// use seq.
+func (f *ObservableEditableBuffer) Dirty() bool {
+	return f.seq != f.putseq
 }
