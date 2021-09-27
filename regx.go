@@ -5,6 +5,8 @@ import (
 	"github.com/rjkroege/edwood/sam"
 )
 
+// TODO(rjk): Regexps should stream. We need a forward/back Rune streaming interface.
+
 // AcmeRegexp is the representation of a compiled regular expression for acme.
 type AcmeRegexp struct {
 	*regexp.Regexp
@@ -26,7 +28,9 @@ func rxcompile(r string) (*AcmeRegexp, error) {
 // and returns at most n matches. If r is nil, it is derived from t.
 func (re *AcmeRegexp) rxexecute(t sam.Texter, r []rune, start int, end int, n int) []RangeSet {
 	if r == nil {
-		r = t.View(0, t.Nc())
+		// TODO(rjk): This is horrible. Stream here instead.
+		r = make([]rune, t.Nc())
+		t.ReadB(0, r[:t.Nc()])
 	}
 	return matchesToRangeSets(re.FindForward(r, start, end, n))
 }
@@ -34,7 +38,9 @@ func (re *AcmeRegexp) rxexecute(t sam.Texter, r []rune, start int, end int, n in
 // rxbexecute derives the full rune slice r from t and searches backwards in r[:end]
 // (from end of the slice to the beginning) and returns at most n matches.
 func (re *AcmeRegexp) rxbexecute(t sam.Texter, end int, n int) RangeSet {
-	r := t.View(0, t.Nc())
+	// TODO(rjk): This is horrible. Stream here instead.
+	r := make([]rune, t.Nc())
+	t.ReadB(0, r[:t.Nc()])
 	matches := re.FindBackward(r, 0, end, n)
 	var rs RangeSet
 	for _, m := range matches {

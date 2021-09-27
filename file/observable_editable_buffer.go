@@ -287,11 +287,13 @@ func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 }
 
 // Commit is a forwarding function for file.Commit.
+// nop with file.Buffer.
 func (e *ObservableEditableBuffer) Commit() {
 	e.f.Commit()
 }
 
 // InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
+// forwards to InsertAt for file.Buffer.
 func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	e.f.InsertAtWithoutCommit(p0, s)
 }
@@ -314,11 +316,6 @@ func (e *ObservableEditableBuffer) TreatAsDirty() bool {
 // because the "cache" concept is not germane.
 func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 	return e.f.b.Read(q0, r)
-}
-
-// View is a forwarding function for rune_array.View.
-func (e *ObservableEditableBuffer) View(q0 int, q1 int) []rune {
-	return e.f.b.View(q0, q1)
 }
 
 // String is a forwarding function for rune_array.String.
