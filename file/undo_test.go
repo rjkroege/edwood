@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestOverall(t *testing.T) {
