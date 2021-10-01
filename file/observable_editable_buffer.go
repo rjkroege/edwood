@@ -27,11 +27,14 @@ type ObservableEditableBuffer struct {
 	// Figure out how this inter-operates with seq.
 	EditClean bool
 	details   *DiskDetails
-	isscratch bool // Used to track if this File should warn on unsaved deletion. [private]
 
 	// Tracks the editing sequence.
-	seq          int  // undo sequencing [private]
-	putseq       int  // seq on last put [private]
+	seq          int  // undo sequencing
+	putseq       int  // seq on last put
+
+	// TODO(rjk): 
+	isscratch bool // Used to track if this File should warn on unsaved deletion.
+	treatasclean bool  // Toggle to override the Dirty check on closing a buffer with unsaved changes.
 }
 
 // Set is a forwarding function for file_hash.Set
@@ -128,17 +131,22 @@ func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
 
 // Clean is a forwarding function for file.Clean.
 func (e *ObservableEditableBuffer) Clean() {
+	e.treatasclean = false
 	e.f.Clean()
+	e.SnapshotSeq()
 }
 
 // Mark is a forwarding function for file.Mark.
 func (e *ObservableEditableBuffer) Mark(seq int) {
-	e.f.Mark(seq)
+	e.f.Mark()
+	e.seq = seq
 }
 
+// TODO(rjk): Do we even need this?
 // Reset is a forwarding function for file.Reset.
 func (e *ObservableEditableBuffer) Reset() {
 	e.f.Reset()
+	e.seq = 0
 }
 
 // HasUncommitedChanges is a forwarding function for file.HasUncommitedChanges.
@@ -177,9 +185,25 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 	return e.f.ReadC(q)
 }
 
-// SaveableAndDirty is a forwarding function for file.SaveableAndDirty.
+// SaveableAndDirty returns true if the ObservableEditableBuffer's
+// contents differ from the backing diskfile File.name, and the diskfile
+// is plausibly writable (not a directory or scratch file).
+//
+// When this is true, the tag's button should
+// be drawn in the modified state if appropriate to the window type
+// and Edit commands should treat the file as modified.
+//
+// TODO(rjk): figure out how this overlaps with hash. (hash would appear
+// to be used to determine the "if the contents differ")
+//
+// Latest thought: there are two separate issues: are we at a point marked
+// as clean and is this File writable to a backing. They are combined in this
+// this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
-	return e.details.Name != "" && e.f.SaveableAndDirty()
+//	return e.details.Name != "" && e.f.SaveableAndDirty()
+
+	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
+	return e.details.Name != "" && sad
 }
 
 // Load is a forwarding function for file.Load.
@@ -191,19 +215,21 @@ func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n i
 	if sethash {
 		e.SetHash(CalcHash(d))
 	}
-	n, hasNulls = e.f.Load(q0, d)
+	n, hasNulls = e.f.Load(q0, d, e.seq)
 	return n, hasNulls, err
 }
 
-// Dirty is a forwarding function for file.Dirty.
+// Dirty returns true when the ObservableEditableBuffer differs from its disk
+// backing as tracked by the undo system.
 func (e *ObservableEditableBuffer) Dirty() bool {
-	return e.f.Dirty()
+//	return e.f.Dirty()
+	return e.seq != e.putseq
 }
 
 // InsertAt is a forwarding function for file.InsertAt.
 // p0 is position in runes.
 func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
-	e.f.InsertAt(p0, s)
+	e.f.InsertAt(p0, s, e.seq)
 }
 
 // SetName sets the name of the backing for this file.
@@ -214,31 +240,35 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 		return
 	}
 
-	if e.f.seq > 0 {
-		e.f.UnsetName(&e.f.delta)
+	if e.seq > 0 {
+		e.f.UnsetName(&e.f.delta, e.seq)
 	}
 	e.Setnameandisscratch(name)
 }
 
 // Undo is a forwarding function for file.Undo.
 func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
-	return e.f.Undo(isundo)
+	q0, q1, ok, e.seq = e.f.Undo(isundo, e.seq)
+	return q0, q1, ok
 }
 
 // DeleteAt is a forwarding function for file.DeleteAt.
 // q0, q1 are in runes.
 func (e *ObservableEditableBuffer) DeleteAt(q0, q1 int) {
-	e.f.DeleteAt(q0, q1)
+	e.f.DeleteAt(q0, q1, e.seq)
 }
 
 // TreatAsClean is a forwarding function for file.TreatAsClean.
 func (e *ObservableEditableBuffer) TreatAsClean() {
-	e.f.TreatAsClean()
+	e.treatasclean = true
 }
 
-// Modded is a forwarding function for file.Modded.
+// Modded marks the File if we know that its backing is different from
+// its contents. This is needed to track when Edwood has modified the
+// backing without changing the File (e.g. via the Edit w command.
 func (e *ObservableEditableBuffer) Modded() {
 	e.f.Modded()
+	e.treatasclean = false
 }
 
 // Name is a getter for file.details.Name.
@@ -268,7 +298,7 @@ func (e *ObservableEditableBuffer) SetHash(hash Hash) {
 
 // Seq is a getter for file.details.Seq.
 func (e *ObservableEditableBuffer) Seq() int {
-	return e.f.seq
+	return e.seq
 }
 
 // RedoSeq is a getter for file.details.RedoSeq.
@@ -280,6 +310,7 @@ func (e *ObservableEditableBuffer) RedoSeq() int {
 // buffer (file.Buffer or file.File) to run the registered observers
 // on a change in the buffer.
 func (e *ObservableEditableBuffer) inserted(q0 int, r []rune) {
+	e.treatasclean = false
 	for observer := range e.observers {
 		observer.Inserted(q0, r)
 	}
@@ -289,6 +320,7 @@ func (e *ObservableEditableBuffer) inserted(q0 int, r []rune) {
 // buffer (file.Buffer or file.File) to run the registered observers
 // on a change in the buffer.
 func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
+	e.treatasclean = false
 	for observer := range e.observers {
 		observer.Deleted(q0, q1)
 	}
@@ -297,7 +329,8 @@ func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 // Commit is a forwarding function for file.Commit.
 // nop with file.Buffer.
 func (e *ObservableEditableBuffer) Commit() {
-	e.f.Commit()
+	e.treatasclean = false
+	e.f.Commit(e.seq)
 }
 
 // InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
@@ -313,9 +346,11 @@ func (e *ObservableEditableBuffer) IsDirOrScratch() bool {
 	return e.isscratch || e.IsDir()
 }
 
-// TreatAsDirty is a forwarding function for file.TreatAsDirty.
+// TreatAsDirty returns true if the File should be considered modified
+// for the purpose of warning the user if Del-ing a Dirty() file.
+// TODO(rjk): Consider removing this.
 func (e *ObservableEditableBuffer) TreatAsDirty() bool {
-	return e.f.TreatAsDirty()
+	return !e.treatasclean && e.Dirty()
 }
 
 // Read is a forwarding function for rune_array.Read.
@@ -354,7 +389,10 @@ func (e *ObservableEditableBuffer) Nbyte() int {
 
 // Setnameandisscratch updates the oeb.details.name and isscratch bit
 // at the same time.
+// TODO(rjk): This is a callback from file.go. How to handle file name
+// changes requires attention when forwarding to file.Buffer.
 func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
+	e.treatasclean = false	
 	e.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		e.isscratch = true
@@ -365,12 +403,12 @@ func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
 
 // SetSeq is a setter for file.seq for use in tests.
 func (e *ObservableEditableBuffer) SetSeq(seq int) {
-	e.f.seq = seq
+	e.seq = seq
 }
 
 // SetPutseq is a setter for file.putseq for use in tests.
 func (e *ObservableEditableBuffer) SetPutseq(putseq int) {
-	e.f.putseq = putseq
+	e.putseq = putseq
 }
 
 // SetDelta is a setter for file.delta for use in tests.
@@ -393,11 +431,3 @@ func (f *ObservableEditableBuffer) SnapshotSeq() {
 	f.putseq = f.seq
 }
 
-// Dirty reports whether the current state of the File is different from
-// the initial state or from the one at the time of calling Clean.
-//
-// TODO(rjk): switching to file.Buffer will require adjusting how we
-// use seq.
-func (f *ObservableEditableBuffer) Dirty() bool {
-	return f.seq != f.putseq
-}
