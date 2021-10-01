@@ -37,6 +37,15 @@ type ObservableEditableBuffer struct {
 	treatasclean bool // Toggle to override the Dirty check on closing a buffer with unsaved changes.
 }
 
+// A ObservableEditableBuffer can have a specific file-backing name that
+// permits it to be persisted to disk but typically would not be. These
+// two constants are suffixes of disk-file names that have this property.
+// TODO(rjk): Consider making this a detail of file.Details.
+const (
+	slashguide = "/guide"
+	plusErrors = "+Errors"
+)
+
 // Set is a forwarding function for file_hash.Set
 func (e *ObservableEditableBuffer) Set(hash []byte) {
 	e.details.Hash.Set(hash)
@@ -200,8 +209,6 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
-	//	return e.details.Name != "" && e.f.SaveableAndDirty()
-
 	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
 	return e.details.Name != "" && sad
 }
@@ -222,7 +229,6 @@ func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n i
 // Dirty returns true when the ObservableEditableBuffer differs from its disk
 // backing as tracked by the undo system.
 func (e *ObservableEditableBuffer) Dirty() bool {
-	//	return e.f.Dirty()
 	return e.seq != e.putseq
 }
 
@@ -265,7 +271,7 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 
 // Modded marks the File if we know that its backing is different from
 // its contents. This is needed to track when Edwood has modified the
-// backing without changing the File (e.g. via the Edit w command.
+// backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
 	e.f.Modded()
 	e.treatasclean = false
@@ -420,8 +426,6 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
 }
-
-// ------------
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): adjust as needed for file.Buffer.

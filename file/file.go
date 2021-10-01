@@ -22,35 +22,34 @@ import (
 // the same as its disk backing. A specific point in the undo record is
 // considered clean.
 //
-// TODO(rjk): File will be a facade pattern composing an undo.RuneArray
-// and a wrapping utf8string.String indexing wrapper.
-// TODO(rjk): my version of undo.RuneArray  will implement Reader, Writer,
-// RuneReader, Seeker and I will restructure this code to follow the
-// patterns of the Go I/O libraries. I will probably want to provide a cache
-// around undo.RuneArray.
-// Observe: Character motion routines in Text can be written
-// in terms of any object that is Seeker and RuneReader.
+// TODO(rjk): ObservableEditableBuffer will be a facade pattern wrapping
+// a file.Buffer. This file.go is the legacy implementation and will be
+// removed.
+// 
+// TODO(rjk): The Edwood version of file.Buffer will implement Reader,
+// Writer, RuneReader, Seeker. Observe: Character motion routines in Text
+// can be written in terms of any object that is Seeker and RuneReader.
 // Observe: Frame can report addresses in byte and rune offsets.
 type File struct {
 	b       RuneArray
-	delta   []*Undo // [private]
-	epsilon []*Undo // [private]
+	delta   []*Undo
+	epsilon []*Undo
 
 	oeb *ObservableEditableBuffer
 
-	mod bool // true if the file has been changed. [private]
-	//	treatasclean bool // Window Clean tests should succeed if set. [private]
+	mod bool // true if we know that the file's on-disk backing has changed.
 
-	// cache holds  that are not yet part of an undo record.
-	cache []rune // [private]
+	// cache holds edits that have not yet been Commit-ed to the backing
+	// RuneArray. It's presence should be semantically invisible.
+	cache []rune
 
 	// cq0 tracks the insertion point for the cache.
-	cq0 int // [private]
+	cq0 int
 }
 
-// Remember that the high-level goal is to slowly coerce this into looking like
-// a scrawny wrapper around the Undo implementation. As a result, we should
-// expect to see the following entry points:
+// Remember that the high-level goal is to slowly coerce
+// ObservableEditableBuffer into looking like a scrawny wrapper around
+// the file.Buffer implementation.
 //
 // func (b *Buffer) Clean()
 //func (b *Buffer) Commit()
@@ -62,11 +61,10 @@ type File struct {
 //func (b *Buffer) Size() int64
 //func (b *Buffer) Undo() (off, n int64)
 //
-// NB how the cache is folded into Buffer.
-//TODO(rjk): make undo.Buffer implement Reader and Writer.
+// NB: file.Buffer implements caching internally.
 
 // HasUncommitedChanges returns true if there are changes that
-// have been made to the File after the last Commit.
+// have been made to the File since the last Commit.
 func (t *File) HasUncommitedChanges() bool {
 	return len(t.cache) != 0
 }
@@ -126,7 +124,6 @@ func (f *File) saveableAndDirtyImpl() bool {
 // keeping them in the cache. Does not map to undo.RuneArray.Commit (that
 // method is Mark). Remove this method.
 func (f *File) Commit(seq int) {
-	//	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
 	}
@@ -165,7 +162,6 @@ type Undo struct {
 // but I need the UTF-8 interpretation.  I could fix this by using a
 // UTF-8 -> []rune reader on top of the os.File instead.
 func (f *File) Load(q0 int, d []byte, seq int) (n int, hasNulls bool) {
-
 	runes, _, hasNulls := util.Cvttorunes(d, len(d))
 
 	// Would appear to require a commit operation.
@@ -195,12 +191,8 @@ func (f *File) InsertAt(p0 int, s []rune, seq int) {
 	f.oeb.inserted(p0, s)
 }
 
-// InsertAtWithoutCommit inserts s at p0 without creating
-// an undo record.
-// TODO(rjk): Remove this as a prelude to converting to file.Buffer
-// undo.Buffer
+// InsertAtWithoutCommit inserts s at p0 by only writing to the cache.
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
-	//	f.treatasclean = false
 	if p0 > f.b.Nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
@@ -272,14 +264,6 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1, seq int) {
 	*delta = append(*delta, &u)
 }
 
-// A File can have a spcific name that permit it to be persisted to disk
-// but typically would not be. These two constants are suffixes of File
-// names that have this property.
-const (
-	slashguide = "/guide"
-	plusErrors = "+Errors"
-)
-
 func (f *File) UnsetName(delta *[]*Undo, seq int) {
 	var u Undo
 	// undo a file name change by restoring old name
@@ -338,10 +322,9 @@ func (f *File) RedoSeq() int {
 // It returns the new selection q0, q1 and a bool indicating if the
 // returned selection is meaningful.
 //
-// TODO(rjk): Separate Undo and Redo for better alignment with undo.RuneArray
 // TODO(rjk): This Undo implementation may Undo/Redo multiple changes.
 // The number actually processed is controlled by mutations to File.seq.
-// This does not align with the semantics of undo.RuneArray.
+// This does not align with the semantics of file.Buffer.
 // Each "Mark" needs to have a seq value provided.
 // Returns new q0, q1, ok, new seq
 func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
@@ -386,7 +369,6 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			seq = u.seq
 			f.Undelete(epsilon, u.P0, u.P0+u.N, seq)
 			f.mod = u.mod
-			// f.treatasclean = false
 			f.b.Delete(u.P0, u.P0+u.N)
 			f.oeb.deleted(u.P0, u.P0+u.N)
 			q0 = u.P0
@@ -396,7 +378,6 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			seq = u.seq
 			f.Uninsert(epsilon, u.P0, u.N, seq)
 			f.mod = u.mod
-			// f.treatasclean = false
 			f.b.Insert(u.P0, u.Buf)
 			f.oeb.inserted(u.P0, u.Buf)
 			q0 = u.P0
@@ -404,11 +385,10 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			ok = true
 		case sam.Filename:
 			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
-			// TODO(rjk): If I have a zerox, does undo a filename change update?
+			// TODO(rjk): If I have a zerox, how does Undo work?
 			seq = u.seq
 			f.UnsetName(epsilon, seq)
 			f.mod = u.mod
-			// f.treatasclean = false
 			newfname := string(u.Buf)
 			f.oeb.Setnameandisscratch(newfname)
 		}
@@ -427,7 +407,6 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
 	f.epsilon = f.epsilon[0:0]
-	//	f.seq = 0
 }
 
 // Mark sets an Undo point and
@@ -440,7 +419,6 @@ func (f *File) Reset() {
 // TODO(rjk): Consider renaming to SetUndoPoint
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
-	//	f.seq = seq
 }
 
 // Modded marks the File if we know that its backing is different from
