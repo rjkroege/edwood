@@ -38,8 +38,8 @@ type File struct {
 
 	oeb *ObservableEditableBuffer
 
-	mod          bool // true if the file has been changed. [private]
-//	treatasclean bool // Window Clean tests should succeed if set. [private]
+	mod bool // true if the file has been changed. [private]
+	//	treatasclean bool // Window Clean tests should succeed if set. [private]
 
 	// cache holds  that are not yet part of an undo record.
 	cache []rune // [private]
@@ -126,7 +126,7 @@ func (f *File) saveableAndDirtyImpl() bool {
 // keeping them in the cache. Does not map to undo.RuneArray.Commit (that
 // method is Mark). Remove this method.
 func (f *File) Commit(seq int) {
-//	f.treatasclean = false
+	//	f.treatasclean = false
 	if !f.HasUncommitedChanges() {
 		return
 	}
@@ -181,7 +181,7 @@ func (f *File) Load(q0 int, d []byte, seq int) (n int, hasNulls bool) {
 // to file.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune, seq int) {
-//	f.treatasclean = false
+	//	f.treatasclean = false
 	if p0 > f.b.Nc() {
 		panic("internal error: fileinsert")
 	}
@@ -198,9 +198,9 @@ func (f *File) InsertAt(p0 int, s []rune, seq int) {
 // InsertAtWithoutCommit inserts s at p0 without creating
 // an undo record.
 // TODO(rjk): Remove this as a prelude to converting to file.Buffer
-// undo.Buffer 
+// undo.Buffer
 func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
-//	f.treatasclean = false
+	//	f.treatasclean = false
 	if p0 > f.b.Nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
@@ -237,7 +237,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns, seq int) {
 // TODO(rjk): DeleteAt has an implied Commit operation
 // that makes it not match with file.Buffer.Delete
 func (f *File) DeleteAt(p0, p1, seq int) {
-//	f.treatasclean = false
+	//	f.treatasclean = false
 	if !(p0 <= p1 && p0 <= f.b.Nc() && p1 <= f.b.Nc()) {
 		util.AcmeError("internal error: DeleteAt", nil)
 	}
@@ -297,7 +297,7 @@ func NewFile() *File {
 		b:       NewRuneArray(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
-		mod: false,
+		mod:     false,
 		//	ntext   int
 	}
 }
@@ -344,13 +344,13 @@ func (f *File) RedoSeq() int {
 // This does not align with the semantics of undo.RuneArray.
 // Each "Mark" needs to have a seq value provided.
 // Returns new q0, q1, ok, new seq
-func (f *File) Undo(isundo bool, seq int) (int, int,  bool,  int)  {
+func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 	var (
 		stop           int
 		delta, epsilon *[]*Undo
-		q0 int
-		q1 int
-		ok bool
+		q0             int
+		q1             int
+		ok             bool
 	)
 	if isundo {
 		// undo; reverse delta onto epsilon, seq decreases
@@ -427,7 +427,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int,  bool,  int)  {
 func (f *File) Reset() {
 	f.delta = f.delta[0:0]
 	f.epsilon = f.epsilon[0:0]
-//	f.seq = 0
+	//	f.seq = 0
 }
 
 // Mark sets an Undo point and
@@ -440,7 +440,7 @@ func (f *File) Reset() {
 // TODO(rjk): Consider renaming to SetUndoPoint
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
-//	f.seq = seq
+	//	f.seq = seq
 }
 
 // Modded marks the File if we know that its backing is different from

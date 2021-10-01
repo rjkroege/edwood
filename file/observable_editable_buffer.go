@@ -29,12 +29,12 @@ type ObservableEditableBuffer struct {
 	details   *DiskDetails
 
 	// Tracks the editing sequence.
-	seq          int  // undo sequencing
-	putseq       int  // seq on last put
+	seq    int // undo sequencing
+	putseq int // seq on last put
 
-	// TODO(rjk): 
-	isscratch bool // Used to track if this File should warn on unsaved deletion.
-	treatasclean bool  // Toggle to override the Dirty check on closing a buffer with unsaved changes.
+	// TODO(rjk):
+	isscratch    bool // Used to track if this File should warn on unsaved deletion.
+	treatasclean bool // Toggle to override the Dirty check on closing a buffer with unsaved changes.
 }
 
 // Set is a forwarding function for file_hash.Set
@@ -200,7 +200,7 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // as clean and is this File writable to a backing. They are combined in this
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
-//	return e.details.Name != "" && e.f.SaveableAndDirty()
+	//	return e.details.Name != "" && e.f.SaveableAndDirty()
 
 	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
 	return e.details.Name != "" && sad
@@ -222,7 +222,7 @@ func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n i
 // Dirty returns true when the ObservableEditableBuffer differs from its disk
 // backing as tracked by the undo system.
 func (e *ObservableEditableBuffer) Dirty() bool {
-//	return e.f.Dirty()
+	//	return e.f.Dirty()
 	return e.seq != e.putseq
 }
 
@@ -392,7 +392,7 @@ func (e *ObservableEditableBuffer) Nbyte() int {
 // TODO(rjk): This is a callback from file.go. How to handle file name
 // changes requires attention when forwarding to file.Buffer.
 func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
-	e.treatasclean = false	
+	e.treatasclean = false
 	e.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		e.isscratch = true
@@ -421,13 +421,10 @@ func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
 }
 
-
 // ------------
-
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
 // TODO(rjk): adjust as needed for file.Buffer.
 func (f *ObservableEditableBuffer) SnapshotSeq() {
 	f.putseq = f.seq
 }
-
