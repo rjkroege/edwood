@@ -25,7 +25,7 @@ import (
 // TODO(rjk): ObservableEditableBuffer will be a facade pattern wrapping
 // a file.Buffer. This file.go is the legacy implementation and will be
 // removed.
-// 
+//
 // TODO(rjk): The Edwood version of file.Buffer will implement Reader,
 // Writer, RuneReader, Seeker. Observe: Character motion routines in Text
 // can be written in terms of any object that is Seeker and RuneReader.
