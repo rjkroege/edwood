@@ -76,7 +76,7 @@ func TestFileInsertAt(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
 
 	// Force Undo.
-	f.f.seq = 1
+	f.seq = 1
 
 	f.InsertAtWithoutCommit(0, []rune(s1))
 
@@ -170,7 +170,7 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *fi
 	if got, want := f.HasRedoableChanges(), fss.HasRedoableChanges; got != want {
 		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
 	}
-	if got, want := f.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
+	if got, want := oeb.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
 		t.Errorf("%s: SaveableAndDirty failed. got %v want %v", testname, got, want)
 	}
 	if got, want := readwholefile(t, f), fss.filecontents; got != want {
