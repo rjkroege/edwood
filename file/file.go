@@ -37,7 +37,7 @@ type File struct {
 
 	oeb *ObservableEditableBuffer
 
-	mod bool // true if we know that the file's on-disk backing has changed.
+//	mod bool // true if we know that the file's on-disk backing has changed.
 
 	// cache holds edits that have not yet been Commit-ed to the backing
 	// RuneArray. It's presence should be semantically invisible.
@@ -117,7 +117,8 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 }
 
 func (f *File) saveableAndDirtyImpl() bool {
-	return f.mod || len(f.cache) > 0
+	return len(f.cache) > 0
+//	return f.mod || len(f.cache) > 0
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
@@ -136,15 +137,16 @@ func (f *File) Commit(seq int) {
 		f.Uninsert(&f.delta, f.cq0, len(f.cache), seq)
 	}
 	f.b.Insert(f.cq0, f.cache)
-	if len(f.cache) != 0 {
-		f.Modded()
-	}
+
+//	if len(f.cache) != 0 {
+//		f.Modded()
+//	}
 	f.cache = f.cache[:0]
 }
 
 type Undo struct {
 	T   int
-	mod bool
+//	mod bool
 	seq int
 	P0  int
 	N   int
@@ -185,9 +187,9 @@ func (f *File) InsertAt(p0 int, s []rune, seq int) {
 		f.Uninsert(&f.delta, p0, len(s), seq)
 	}
 	f.b.Insert(p0, s)
-	if len(s) != 0 {
-		f.Modded()
-	}
+//	if len(s) != 0 {
+//		f.Modded()
+//	}
 	f.oeb.inserted(p0, s)
 }
 
@@ -216,7 +218,7 @@ func (f *File) Uninsert(delta *[]*Undo, q0, ns, seq int) {
 	// undo an insertion by deleting
 	u.T = sam.Delete
 
-	u.mod = f.mod
+//	u.mod = f.mod
 	u.seq = seq
 	u.P0 = q0
 	u.N = ns
@@ -243,9 +245,9 @@ func (f *File) DeleteAt(p0, p1, seq int) {
 	f.b.Delete(p0, p1)
 
 	// Validate if this is right.
-	if p1 > p0 {
-		f.Modded()
-	}
+//	if p1 > p0 {
+//		f.Modded()
+//	}
 	f.oeb.deleted(p0, p1)
 }
 
@@ -255,7 +257,7 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1, seq int) {
 	// undo a deletion by inserting
 	var u Undo
 	u.T = sam.Insert
-	u.mod = f.mod
+//	u.mod = f.mod
 	u.seq = seq
 	u.P0 = p0
 	u.N = p1 - p0
@@ -268,7 +270,7 @@ func (f *File) UnsetName(delta *[]*Undo, seq int) {
 	var u Undo
 	// undo a file name change by restoring old name
 	u.T = sam.Filename
-	u.mod = f.mod
+//	u.mod = f.mod
 	u.seq = seq
 	u.P0 = 0 // unused
 	u.N = len(f.oeb.Name())
@@ -281,7 +283,7 @@ func NewFile() *File {
 		b:       NewRuneArray(),
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
-		mod:     false,
+		// mod:     false,
 		//	ntext   int
 	}
 }
@@ -295,7 +297,7 @@ func NewTagFile() *File {
 		//	qidpath   uint64
 		//	mtime     uint64
 		//	dev       int
-		mod: false,
+		// mod: false,
 
 		//	curtext *Text
 		//	text    **Text
@@ -368,7 +370,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 		case sam.Delete:
 			seq = u.seq
 			f.Undelete(epsilon, u.P0, u.P0+u.N, seq)
-			f.mod = u.mod
+//			f.mod = u.mod
 			f.b.Delete(u.P0, u.P0+u.N)
 			f.oeb.deleted(u.P0, u.P0+u.N)
 			q0 = u.P0
@@ -377,7 +379,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 		case sam.Insert:
 			seq = u.seq
 			f.Uninsert(epsilon, u.P0, u.N, seq)
-			f.mod = u.mod
+//			f.mod = u.mod
 			f.b.Insert(u.P0, u.Buf)
 			f.oeb.inserted(u.P0, u.Buf)
 			q0 = u.P0
@@ -388,7 +390,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			// TODO(rjk): If I have a zerox, how does Undo work?
 			seq = u.seq
 			f.UnsetName(epsilon, seq)
-			f.mod = u.mod
+//			f.mod = u.mod
 			newfname := string(u.Buf)
 			f.oeb.Setnameandisscratch(newfname)
 		}
@@ -421,6 +423,7 @@ func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
 }
 
+/*
 // Modded marks the File if we know that its backing is different from
 // its contents. This is needed to track when Edwood has modified the
 // backing without changing the File (e.g. via the Edit w command.
@@ -432,3 +435,4 @@ func (f *File) Modded() {
 func (f *File) Clean() {
 	f.mod = false
 }
+*/
