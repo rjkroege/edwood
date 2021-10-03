@@ -540,7 +540,8 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 	if name == oeb.Name() {
 		if q0 != 0 || q1 != oeb.Nr() {
 			// The backing disk file contents now differ from File because
-			// we've over-written the disk file with part of File.
+			// we've over-written the disk file with part of File. There is no
+			// possible sequence of undo actions that can make the file not modified.
 			oeb.Modded()
 		} else {
 			// A normal put operation of a file modified in Edwood but not

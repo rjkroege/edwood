@@ -19,7 +19,7 @@ type ObservableEditableBuffer struct {
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
 	Elog         sam.Elog
-	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
+	// TODO(rjk): This is probably unnecessary after the transition to file.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.RuneArray context, these two ops
 	// don't have an implicit Commit. We set editclean in the Edit cmd
@@ -273,7 +273,9 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 // its contents. This is needed to track when Edwood has modified the
 // backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
-	e.f.Modded()
+	// e.f.Modded()
+	// I believe that this is 
+	e.putseq = -1
 	e.treatasclean = false
 }
 

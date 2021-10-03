@@ -166,6 +166,8 @@ func TestPutfile(t *testing.T) {
 	}
 }
 
+// TODO(rjk): Add A case here for partial writes.
+
 func TestExpandtabToggle(t *testing.T) {
 	want := true
 	w := &Window{

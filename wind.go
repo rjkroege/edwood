@@ -572,7 +572,8 @@ func (w *Window) Commit(t *Text) {
 	if filename != w.body.file.Name() {
 		global.seq++
 		w.body.file.Mark(global.seq)
-		w.body.file.Modded()
+		// hypothesis: unnecessary. We can skip this.
+		// w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()
 	}
