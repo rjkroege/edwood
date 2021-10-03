@@ -505,6 +505,7 @@ func (w *Window) setTag1() {
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
+	w.tag.file.Commit()
 	oldbarIndex := w.tag.file.IndexRune('|')
 	if oldbarIndex >= 0 {
 		// TODO(rjk): Update for file.Buffer representation.
