@@ -482,16 +482,5 @@ func TestTextTypeTabInTag(t *testing.T) {
 		text.tabstop = tabstop
 
 		return text
-
-		/*
-			return &Text{
-				file:      file.MakeObservableEditableBufferTag([]rune{}),
-				tabexpand: tabexpand,
-				tabstop:   tabstop,
-				what: Tag,
-				fr: &MockFrame{},
-			}
-
-		*/
 	})
 }
