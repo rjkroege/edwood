@@ -8,6 +8,8 @@ import (
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/util"
+
+	"log"
 )
 
 var (
@@ -342,6 +344,8 @@ func (c *Column) Grow(w *Window, but int) {
 	//var nl, ny *int
 
 	var windex int
+
+log.Println(c)
 
 	for windex = 0; windex < len(c.w); windex++ {
 		if c.w[windex] == w {
