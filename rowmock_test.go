@@ -43,7 +43,7 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // row/col/window hierarchy sufficient to run sam commands. It is
 // configured from the intermediate model used by the Edwood JSON dump
 // file.
-// 
+//
 // TODO(rjk): create the global object and return.
 func MakeWindowScaffold(content *dumpfile.Content) {
 	display := edwoodtest.NewDisplay()
