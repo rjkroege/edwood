@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 )
@@ -439,27 +440,47 @@ func checkTabexpand(t *testing.T, getText func(tabexpand bool, tabstop int) *Tex
 	}
 }
 
+func makeTestTextTabexpandState() *Window {
+	MakeWindowScaffold(&dumpfile.Content{
+		Columns: []dumpfile.Column{
+			{},
+		},
+		Windows: []*dumpfile.Window{
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: "",
+				},
+				Body: dumpfile.Text{
+					Buffer: "",
+					Q0:     0,
+					Q1:     0,
+				},
+			},
+		},
+	})
+	return global.row.col[0].w[0]
+}
+
 func TestTextTypeTabInBody(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
-		w := &Window{
-			body: Text{
-				file:      file.MakeObservableEditableBufferTag([]rune{}),
-				tabexpand: tabexpand,
-				tabstop:   tabstop,
-			},
-		}
+
+		w := makeTestTextTabexpandState()
 		text := &w.body
-		text.w = w
+		text.tabexpand = tabexpand
+		text.tabstop = tabstop
+
 		return text
 	})
 }
 
 func TestTextTypeTabInTag(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
-		return &Text{
-			file:      file.MakeObservableEditableBufferTag([]rune{}),
-			tabexpand: tabexpand,
-			tabstop:   tabstop,
-		}
+		w := makeTestTextTabexpandState()
+		text := &w.tag
+		text.tabexpand = tabexpand
+		text.tabstop = tabstop
+
+		return text
 	})
 }

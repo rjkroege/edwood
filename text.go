@@ -452,7 +452,6 @@ func (t *Text) Inserted(q0 int, r []rune) {
 	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
-
 }
 
 // writeEventLog emits an event log for an insertion.
@@ -1025,9 +1024,15 @@ func (t *Text) Type(r rune) {
 	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
 
-	// TODO(rjk): Do we always want to commit if editing a
-	// a tag?
-	if r == '\n' && t.w != nil {
+	// Always commit if the typing is into a tag. The reason to do this is to
+	// be sure to invoke the special logic in Window.Commit() that creates an
+	// undo point for a file name change and updates the file details.
+	//
+	// This doesn't seem ideal. We have subtle logic that spans layers. Can
+	// we clean this up in some fashion so that it's easier to have Text
+	// instances that are editable but have partial auto-generated semantics
+	// (e.g. directories, tags)
+	if r == '\n' && t.w != nil || t.what != Body {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0
