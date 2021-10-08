@@ -274,7 +274,7 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 // backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
 	// e.f.Modded()
-	// I believe that this is 
+	// I believe that this is sufficient.
 	e.putseq = -1
 	e.treatasclean = false
 }
