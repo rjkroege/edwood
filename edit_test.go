@@ -175,8 +175,8 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 		},
 	})
 
-// All of the body texts build here should nominally be Modded() as they
-// have no backing file. Increase fidelity of constructed test data.
+	// All of the body texts build here should nominally be Modded() as they
+	// have no backing file. Increase fidelity of constructed test data.
 	global.row.col[0].w[0].body.file.Modded()
 
 	return global.row.col[0].w[0]
@@ -233,39 +233,39 @@ func TestEditCmdWithFile(t *testing.T) {
 
 	for i, test := range testtab {
 		t.Run(test.expr, func(t *testing.T) {
-		t.Logf("cmd: %q", test.expr)
-		warnings = []*Warning{}
-		w := makeSkeletonWindowModel(test.dot, test.filename)
-		
-		// The filename actually exists so needs to start as if it's saved.
-		w.body.file.SnapshotSeq()
+			t.Logf("cmd: %q", test.expr)
+			warnings = []*Warning{}
+			w := makeSkeletonWindowModel(test.dot, test.filename)
 
-		editcmd(&w.body, []rune(test.expr))
+			// The filename actually exists so needs to start as if it's saved.
+			w.body.file.SnapshotSeq()
 
-		n, _ := w.body.ReadB(0, buf[:])
-		if string(buf[:n]) != test.expected {
-			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
-		}
+			editcmd(&w.body, []rune(test.expr))
 
-		// For e identical.
-		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
-			t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
-		}
-		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
-			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
-		}
-
-		if got, want := len(warnings), len(test.expectedwarns); got != want {
-			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
-			return
-		}
-
-		for j, tw := range test.expectedwarns {
-			n, _ := warnings[j].buf.Read(0, buf[:])
-			if string(buf[:n]) != tw {
-				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			n, _ := w.body.ReadB(0, buf[:])
+			if string(buf[:n]) != test.expected {
+				t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
 			}
-		}
+
+			// For e identical.
+			if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
+				t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			}
+			if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
+				t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			}
+
+			if got, want := len(warnings), len(test.expectedwarns); got != want {
+				t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
+				return
+			}
+
+			for j, tw := range test.expectedwarns {
+				n, _ := warnings[j].buf.Read(0, buf[:])
+				if string(buf[:n]) != tw {
+					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+				}
+			}
 		})
 	}
 }
@@ -360,21 +360,20 @@ func TestEditMultipleWindows(t *testing.T) {
 			" +  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
 		}},
 
-		// This test fails because the 
+		// This test fails because the
 		{Range{0, 0}, "test", "b alt_example_2\ni/inserted/\nb alt_example_2\n", []string{
 			contents,
 			"inserted" + alt_contents,
 		}, []string{
-// This is the value that I'd expect. But each Edit command only updates
-// the Dirty status of the buffers at the end of executing all of the
-// commands in a single invocation. This isn't really correct. But we do
-// it because calling ObservableEditableBuffer.Mark multiple times would
-// result in multiple Undo points for a single Edit command application.
-// And that's more wrong (from a usability perspective.)
+			// This is the value that I'd expect. But each Edit command only updates
+			// the Dirty status of the buffers at the end of executing all of the
+			// commands in a single invocation. This isn't really correct. But we do
+			// it because calling ObservableEditableBuffer.Mark multiple times would
+			// result in multiple Undo points for a single Edit command application.
+			// And that's more wrong (from a usability perspective.)
 			// " +  alt_example_2\n'+. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 			" +  alt_example_2\n +. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 		}},
-
 
 		// u
 		// 10

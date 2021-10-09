@@ -43,7 +43,7 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // row/col/window hierarchy sufficient to run sam commands. It is
 // configured from the intermediate model used by the Edwood JSON dump
 // file.
-// 
+//
 // The built-up global state's bodies will have
 // ObservableEditableBuffer.Dirty() return false. This may not accurately
 // reflect the state of the model under non-test operating conditions.

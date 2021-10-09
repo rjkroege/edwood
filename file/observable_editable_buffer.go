@@ -141,7 +141,7 @@ func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
 // Clean is a forwarding function for file.Clean.
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
-//	e.f.Clean()
+	//	e.f.Clean()
 	e.SnapshotSeq()
 }
 
