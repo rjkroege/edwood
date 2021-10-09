@@ -1276,8 +1276,6 @@ func cmdname(oeb *file.ObservableEditableBuffer, str string, set bool) string {
 Return:
 	if set && !(r == oeb.Name()) {
 		oeb.Mark(global.seq)
-		// Hypothesis: unnecessary.
-		// oeb.Modded()
 		cur.w.SetName(r)
 	}
 	return r

@@ -360,7 +360,6 @@ func TestEditMultipleWindows(t *testing.T) {
 			" +  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
 		}},
 
-		// This test fails because the
 		{Range{0, 0}, "test", "b alt_example_2\ni/inserted/\nb alt_example_2\n", []string{
 			contents,
 			"inserted" + alt_contents,
@@ -370,7 +369,7 @@ func TestEditMultipleWindows(t *testing.T) {
 			// commands in a single invocation. This isn't really correct. But we do
 			// it because calling ObservableEditableBuffer.Mark multiple times would
 			// result in multiple Undo points for a single Edit command application.
-			// And that's more wrong (from a usability perspective.)
+			// And that's more wrong (from a usability perspective.
 			// " +  alt_example_2\n'+. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 			" +  alt_example_2\n +. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 		}},

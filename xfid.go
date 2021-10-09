@@ -581,7 +581,6 @@ forloop:
 			t.eq0 = ^0
 			// TODO(rjk): Is this right?
 			t.file.Reset()
-			// Hypothesis: this is not necessary.
 			t.file.Clean()
 			settag = true
 		case "dirty": // mark window 'dirty'

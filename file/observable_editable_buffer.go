@@ -138,10 +138,12 @@ func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
 	return oeb
 }
 
-// Clean is a forwarding function for file.Clean.
+// Clean marks the ObservableEditableBuffer as being non-dirty: the
+// backing is the same as File.
+//
+// TODO(rjk): Conceivably SnapshotSeq can be replaced with this function.
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
-	//	e.f.Clean()
 	e.SnapshotSeq()
 }
 
@@ -273,8 +275,6 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 // its contents. This is needed to track when Edwood has modified the
 // backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
-	// e.f.Modded()
-	// I believe that this is sufficient.
 	e.putseq = -1
 	e.treatasclean = false
 }
@@ -430,7 +430,6 @@ func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-// TODO(rjk): adjust as needed for file.Buffer.
 func (f *ObservableEditableBuffer) SnapshotSeq() {
 	f.putseq = f.seq
 }

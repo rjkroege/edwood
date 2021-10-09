@@ -81,10 +81,8 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		updateText(&w.tag, &serwin.Tag, display)
 		w.body.file.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
 		w.body.w = w
-		// will probably break stuff...
 		w.body.what = Body
 		w.tag.w = w
-		// will probably break stuff...
 		w.tag.what = Tag
 
 		wincol := cols[serwin.Column]
