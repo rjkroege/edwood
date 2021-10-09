@@ -215,6 +215,8 @@ func TestEditCmdWithFile(t *testing.T) {
 		// r
 		{Range{0, 0}, fname, "r " + fname, contents + contents, []string{}},
 		{Range{0, len(contents)}, fname, "r " + fname, contents, []string{}},
+
+		// TODO(rjk): Test what happens with undo and edit combined.
 	}
 
 	filedirtystates := []struct {
@@ -230,8 +232,13 @@ func TestEditCmdWithFile(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
+		t.Run(test.expr, func(t *testing.T) {
+		t.Logf("cmd: %q", test.expr)
 		warnings = []*Warning{}
 		w := makeSkeletonWindowModel(test.dot, test.filename)
+		
+		// The filename actually exists so needs to start as if it's saved.
+		w.body.file.SnapshotSeq()
 
 		editcmd(&w.body, []rune(test.expr))
 
@@ -250,7 +257,7 @@ func TestEditCmdWithFile(t *testing.T) {
 
 		if got, want := len(warnings), len(test.expectedwarns); got != want {
 			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
-			break
+			return
 		}
 
 		for j, tw := range test.expectedwarns {
@@ -259,6 +266,7 @@ func TestEditCmdWithFile(t *testing.T) {
 				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
 			}
 		}
+		})
 	}
 }
 
