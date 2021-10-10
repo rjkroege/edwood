@@ -138,7 +138,7 @@ func (f *File) Commit(seq int) {
 }
 
 type Undo struct {
-	T int
+	T   int
 	seq int
 	P0  int
 	N   int
