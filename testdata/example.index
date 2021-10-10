@@ -1,5 +1,5 @@
-          1          32         162           0           0 glass Del Snarf Put | Look Edit 
+          1          32         162           0           1 glass Del Snarf Put | Look Edit 
           3          68         183           0           0 /home/gopher/go/src/edwood/testdata/こんにちは.txt Del Snarf | Look Edit 
           4          63         128           1           0 /home/gopher/go/src/edwood/testdata/ Del Snarf Get | Look Edit 
           5          67          70           0           0 /home/gopher/go/src/edwood/testdata/hello.go Del Snarf | Look Edit 
-          6          23          25           0           0  Del Snarf | Look Edit 
+          6          23          25           0           1  Del Snarf | Look Edit 
