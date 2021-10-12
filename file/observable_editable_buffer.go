@@ -210,7 +210,7 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // to be used to determine the "if the contents differ")
 //
 // Latest thought: there are two separate issues: are we at a point marked
-// as clean and is this File writable to a backing. They are combined in 
+// as clean and is this File writable to a backing. They are combined in
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()

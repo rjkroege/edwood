@@ -280,7 +280,6 @@ func TestFileLoadUndoHash(t *testing.T) {
 	}
 }
 
-
 // TODO(rjk): These should enforce observer callback contents in a flexible way.
 type testObserver struct {
 	t *testing.T
@@ -293,7 +292,6 @@ func (to *testObserver) Inserted(q0 int, r []rune) {
 func (to *testObserver) Deleted(q0, q1 int) {
 	to.t.Logf("Deleted range [%d, %d)", q0, q1)
 }
-
 
 // Multiple interleaved actions do the right thing.
 func TestFileInsertDeleteUndo(t *testing.T) {
