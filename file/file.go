@@ -171,7 +171,6 @@ func (f *File) Load(q0 int, d []byte, seq int) (n int, hasNulls bool) {
 // to file.Buffer.Insert.
 // NB: At suffix is to correspond to utf8string.String.At().
 func (f *File) InsertAt(p0 int, s []rune, seq int) {
-	//	f.treatasclean = false
 	if p0 > f.b.Nc() {
 		panic("internal error: fileinsert")
 	}

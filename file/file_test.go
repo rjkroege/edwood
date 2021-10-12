@@ -160,6 +160,7 @@ type fileStateSummary struct {
 }
 
 func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *fileStateSummary) {
+	t.Helper()
 	f := oeb.f
 	if got, want := f.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
 		t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
@@ -224,10 +225,8 @@ func TestFileLoadNoUndo(t *testing.T) {
 		t.Errorf("TestFileLoadNoUndo err wrong. got %v want %v", got, want)
 	}
 
-	// TODO(rjk): The file has been modified because of the insert. But
-	// without undo, SaveableAndDirty and HasSaveableChanges diverge.
 	check(t, "TestFileLoadNoUndo after file load", f,
-		&fileStateSummary{false, false, false, true, s1[0:2] + s2 + s2 + s1[2:]})
+		&fileStateSummary{false, false, false, false, s1[0:2] + s2 + s2 + s1[2:]})
 
 }
 
@@ -281,40 +280,66 @@ func TestFileLoadUndoHash(t *testing.T) {
 	}
 }
 
+
+// TODO(rjk): These should enforce observer callback contents in a flexible way.
+type testObserver struct {
+	t *testing.T
+}
+
+func (to *testObserver) Inserted(q0 int, r []rune) {
+	to.t.Logf("Inserted at %d: %q", q0, string(r))
+}
+
+func (to *testObserver) Deleted(q0, q1 int) {
+	to.t.Logf("Deleted range [%d, %d)", q0, q1)
+}
+
+
 // Multiple interleaved actions do the right thing.
 func TestFileInsertDeleteUndo(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
+	f.AddObserver(&testObserver{t})
 
 	// Empty File is an Undo point and considered clean.
 	f.Mark(1)
 	f.Clean()
+	check(t, "TestFileInsertDeleteUndo after init", f,
+		&fileStateSummary{false, false, false, false, ""})
 
+	f.Mark(2)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(0, []rune(s2))
 	// After inserting two strings is an Undo point:  byehi 海老麺
-	f.Mark(2)
+	check(t, "TestFileInsertDeleteUndo after second Mark", f,
+		&fileStateSummary{false, true, false, true, "byehi 海老麺"})
 
+	f.Mark(3)
 	f.DeleteAt(0, 1) // yehi 海老
 	f.DeleteAt(1, 3) // yi 海老
 	// After deleting is an Undo point.
-	f.Mark(3)
+	check(t, "TestFileInsertDeleteUndo after third Mark", f,
+		&fileStateSummary{false, true, false, true, "yi 海老麺"})
 
+	f.Mark(4)
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
-
 	check(t, "TestFileInsertDeleteUndo after setup", f,
 		&fileStateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
+	t.Logf("after setup seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(true)
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&fileStateSummary{false, true, true, true, "yi 海老麺"})
+	t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(true) // 2 deletes should get removed because they have the same sequence.
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
 		&fileStateSummary{false, true, true, true, "byehi 海老麺"})
+	t.Logf("after 2 Undo seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(false) // 2 deletes should be put back.
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&fileStateSummary{false, true, true, true, "yi 海老麺"})
+	t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
 }
 
 func TestFileRedoSeq(t *testing.T) {

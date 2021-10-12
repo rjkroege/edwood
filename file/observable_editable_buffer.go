@@ -148,6 +148,8 @@ func (e *ObservableEditableBuffer) Clean() {
 }
 
 // Mark is a forwarding function for file.Mark.
+// This sets an undo point. NB: call Mark before mutating the file.
+// seq must be 1 to enable Undo/Redo on the file.
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
@@ -208,7 +210,7 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // to be used to determine the "if the contents differ")
 //
 // Latest thought: there are two separate issues: are we at a point marked
-// as clean and is this File writable to a backing. They are combined in this
+// as clean and is this File writable to a backing. They are combined in 
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
