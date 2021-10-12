@@ -243,14 +243,6 @@ func NewFile() *File {
 	}
 }
 
-func NewTagFile() *File {
-	return &File{
-		b:       NewRuneArray(),
-		delta:   []*Undo{},
-		epsilon: []*Undo{},
-	}
-}
-
 // RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
 // analog in file.Buffer. The value of seq is used to track intra and
 // inter File edit actions so that cross-File changes via Edit X can be

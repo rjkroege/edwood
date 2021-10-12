@@ -123,22 +123,6 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 	return oeb
 }
 
-// MakeObservableEditableBufferTag is a constructor wrapper for NewTagFile() to abstract File from the main program.
-func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
-	f := NewTagFile()
-	f.b = b
-	oeb := &ObservableEditableBuffer{
-		currobserver: nil,
-		observers:    nil,
-		f:            f,
-		Elog:         sam.MakeElog(),
-		details:      &DiskDetails{Hash: Hash{}},
-		EditClean:    true,
-	}
-	oeb.f.oeb = oeb
-	return oeb
-}
-
 // Clean marks the ObservableEditableBuffer as being non-dirty: the
 // backing is the same as File.
 //

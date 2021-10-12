@@ -82,7 +82,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
 
-	f := file.MakeObservableEditableBufferTag(nil)
+	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(&w.tag)
 	w.tag.file = f
 

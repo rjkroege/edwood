@@ -135,7 +135,7 @@ func TestClickHTMLMatch(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: file.MakeObservableEditableBufferTag(r),
+				file: file.MakeObservableEditableBuffer("", r),
 			}
 			q0, q1, ok := text.ClickHTMLMatch(tc.inq0)
 			switch {
@@ -256,7 +256,7 @@ func (fr *textFillMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
 
 func TestTextFill(t *testing.T) {
 	text := &Text{
-		file: file.MakeObservableEditableBufferTag([]rune{}),
+		file: file.MakeObservableEditableBuffer("", []rune{}),
 	}
 	err := text.fill(&textFillMockFrame{})
 	wantErr := "fill: negative slice length -100"
@@ -338,7 +338,7 @@ func TestTextAbsDirName(t *testing.T) {
 func windowWithTag(tag string) *Window {
 	return &Window{
 		tag: Text{
-			file: file.MakeObservableEditableBufferTag([]rune(tag)),
+			file: file.MakeObservableEditableBuffer("", []rune(tag)),
 		},
 	}
 }
@@ -366,7 +366,7 @@ func TestBackNL(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: file.MakeObservableEditableBufferTag([]rune(tc.buf)),
+			file: file.MakeObservableEditableBuffer("", []rune(tc.buf)),
 		}
 		q := text.BackNL(tc.p, tc.n)
 		if got, want := q, tc.q; got != want {
@@ -397,7 +397,7 @@ func TestTextBsInsert(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			text := &Text{
 				what: tc.what,
-				file: file.MakeObservableEditableBufferTag([]rune(tc.buf)),
+				file: file.MakeObservableEditableBuffer("", []rune(tc.buf)),
 			}
 			q, nr := text.BsInsert(tc.q0, []rune(tc.inbuf), true)
 			if nr != tc.nr {
