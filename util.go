@@ -195,6 +195,7 @@ type Warning struct {
 	buf file.RuneArray
 }
 
+// TODO(rjk): Move into the global object.
 var warnings = []*Warning{}
 var warningsMu sync.Mutex
 

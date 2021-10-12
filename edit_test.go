@@ -175,6 +175,10 @@ func makeSkeletonWindowModel(dot Range, filename string) *Window {
 		},
 	})
 
+	// All of the body texts build here should nominally be Modded() as they
+	// have no backing file. Increase fidelity of constructed test data.
+	global.row.col[0].w[0].body.file.Modded()
+
 	return global.row.col[0].w[0]
 }
 
@@ -211,6 +215,8 @@ func TestEditCmdWithFile(t *testing.T) {
 		// r
 		{Range{0, 0}, fname, "r " + fname, contents + contents, []string{}},
 		{Range{0, len(contents)}, fname, "r " + fname, contents, []string{}},
+
+		// TODO(rjk): Test what happens with undo and edit combined.
 	}
 
 	filedirtystates := []struct {
@@ -226,35 +232,41 @@ func TestEditCmdWithFile(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
-		warnings = []*Warning{}
-		w := makeSkeletonWindowModel(test.dot, test.filename)
+		t.Run(test.expr, func(t *testing.T) {
+			t.Logf("cmd: %q", test.expr)
+			warnings = []*Warning{}
+			w := makeSkeletonWindowModel(test.dot, test.filename)
 
-		editcmd(&w.body, []rune(test.expr))
+			// The filename actually exists so needs to start as if it's saved.
+			w.body.file.SnapshotSeq()
 
-		n, _ := w.body.ReadB(0, buf[:])
-		if string(buf[:n]) != test.expected {
-			t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
-		}
+			editcmd(&w.body, []rune(test.expr))
 
-		// For e identical.
-		if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
-			t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
-		}
-		if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
-			t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
-		}
-
-		if got, want := len(warnings), len(test.expectedwarns); got != want {
-			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
-			break
-		}
-
-		for j, tw := range test.expectedwarns {
-			n, _ := warnings[j].buf.Read(0, buf[:])
-			if string(buf[:n]) != tw {
-				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			n, _ := w.body.ReadB(0, buf[:])
+			if string(buf[:n]) != test.expected {
+				t.Errorf("test %d: TestAppend expected \n%v\nbut got \n%v\n", i, test.expected, string(buf[:n]))
 			}
-		}
+
+			// For e identical.
+			if got, want := w.body.file.Dirty(), filedirtystates[i].Dirty; got != want {
+				t.Errorf("test %d: File bad Dirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			}
+			if got, want := w.body.file.SaveableAndDirty(), filedirtystates[i].SaveableAndDirty; got != want {
+				t.Errorf("test %d: File bad SaveableAndDirty state. Got %v, want %v: dump %s", i, got, want /* litter.Sdump(w.body.file) */, "")
+			}
+
+			if got, want := len(warnings), len(test.expectedwarns); got != want {
+				t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
+				return
+			}
+
+			for j, tw := range test.expectedwarns {
+				n, _ := warnings[j].buf.Read(0, buf[:])
+				if string(buf[:n]) != tw {
+					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+				}
+			}
+		})
 	}
 }
 
@@ -332,20 +344,34 @@ func TestEditMultipleWindows(t *testing.T) {
 			contents,
 			"inserted" + alt_contents,
 		}, []string{
-			"'+  alt_example_2\n",
+			" +  alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 		}},
 		{Range{0, 0}, "test", "b alt_example_2\n1 i/1/\n2 i/2/\n", []string{
 			contents,
 			"1A different text\n2With other contents\nSo there!\n",
 		}, []string{
-			"'+  alt_example_2\n",
+			" +  alt_example_2\n",
 		}},
 		// TODO(rjk): the edit result here is wrong. See #236.
 		{Range{0, 0}, "test", "b alt_example_2\n2 i/2/\n1 i/1/\n", []string{
 			contents,
 			"1A different text2\nWith other contents\nSo there!\n",
 		}, []string{
-			"'+  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
+			" +  alt_example_2\nwarning: changes out of sequence\nwarning: changes out of sequence, edit result probably wrong\n",
+		}},
+
+		{Range{0, 0}, "test", "b alt_example_2\ni/inserted/\nb alt_example_2\n", []string{
+			contents,
+			"inserted" + alt_contents,
+		}, []string{
+			// This is the value that I'd expect. But each Edit command only updates
+			// the Dirty status of the buffers at the end of executing all of the
+			// commands in a single invocation. This isn't really correct. But we do
+			// it because calling ObservableEditableBuffer.Mark multiple times would
+			// result in multiple Undo points for a single Edit command application.
+			// And that's more wrong (from a usability perspective.
+			// " +  alt_example_2\n'+. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
+			" +  alt_example_2\n +. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 		}},
 
 		// u
@@ -367,50 +393,53 @@ func TestEditMultipleWindows(t *testing.T) {
 	buf := make([]rune, 8192)
 
 	for i, test := range testtab {
-		warnings = []*Warning{}
-		makeSkeletonWindowModel(test.dot, test.filename)
+		t.Run(test.expr, func(t *testing.T) {
+			t.Logf("[%d] command %q", i, test.expr)
+			warnings = []*Warning{}
+			makeSkeletonWindowModel(test.dot, test.filename)
 
-		// TODO(rjk): Make this nicer.
-		if i == 11 || i == 12 {
-			// special setup for undo
-			InsertString(global.row.col[0].w[0], "hello")
-			if i == 12 {
-				// Undo the above insertion.
-				global.row.col[0].w[0].Undo(true)
-			}
-		}
-
-		w := global.row.col[0].w[0]
-		w.Lock('M')
-		editcmd(&w.body, []rune(test.expr))
-		w.Unlock()
-
-		if got, want := len(global.row.col[0].w), len(test.expected); got != want {
-			t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
-			break
-		}
-
-		for j, exp := range test.expected {
-			w := global.row.col[0].w[j]
-			n, _ := w.body.ReadB(0, buf[:])
-			if string(buf[:n]) != exp {
-				t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
+			// TODO(rjk): Make this nicer.
+			if test.expr == "1,$p\nu" || test.expr == "1,$p\nu-1\n" {
+				// special setup for undo
+				InsertString(global.row.col[0].w[0], "hello")
+				if test.expr == "1,$p\nu-1\n" {
+					// Undo the above insertion.
+					global.row.col[0].w[0].Undo(true)
+				}
 			}
 
-		}
+			w := global.row.col[0].w[0]
+			w.Lock('M')
+			editcmd(&w.body, []rune(test.expr))
+			w.Unlock()
 
-		if got, want := len(warnings), len(test.expectedwarns); got != want {
-			t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
-			break
-		}
-
-		for j, tw := range test.expectedwarns {
-			n, _ := warnings[j].buf.Read(0, buf[:])
-			if string(buf[:n]) != tw {
-				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			if got, want := len(global.row.col[0].w), len(test.expected); got != want {
+				t.Errorf("test %d: expected %d windows but got %d windows", i, want, got)
+				return
 			}
-		}
-		// TODO(rjk): Validate that the files on disk have the correct state.
+
+			for j, exp := range test.expected {
+				w := global.row.col[0].w[j]
+				n, _ := w.body.ReadB(0, buf[:])
+				if string(buf[:n]) != exp {
+					t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
+				}
+
+			}
+
+			if got, want := len(warnings), len(test.expectedwarns); got != want {
+				t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
+				return
+			}
+
+			for j, tw := range test.expectedwarns {
+				n, _ := warnings[j].buf.Read(0, buf[:])
+				if string(buf[:n]) != tw {
+					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+				}
+			}
+			// TODO(rjk): Create backing disk files and enforce their state.
+		})
 	}
 }
 

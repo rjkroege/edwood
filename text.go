@@ -1032,7 +1032,7 @@ func (t *Text) Type(r rune) {
 	// we clean this up in some fashion so that it's easier to have Text
 	// instances that are editable but have partial auto-generated semantics
 	// (e.g. directories, tags)
-	if r == '\n' && t.w != nil || t.what != Body {
+	if t.w != nil && (r == '\n' && t.what == Body || t.what != Body) {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0

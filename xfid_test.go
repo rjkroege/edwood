@@ -1421,7 +1421,9 @@ func TestXfidreadQindex(t *testing.T) {
 		"multi-line-tag",
 	} {
 		t.Run(name, func(t *testing.T) {
-			filename := editDumpFileForTesting(t, filepath.Join("testdata", name+".dump"))
+			origfilename := filepath.Join("testdata", name+".dump")
+			t.Logf("original file: %q", origfilename)
+			filename := editDumpFileForTesting(t, origfilename)
 			defer os.Remove(filename)
 
 			setGlobalsForLoadTesting()

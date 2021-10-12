@@ -44,7 +44,10 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // configured from the intermediate model used by the Edwood JSON dump
 // file.
 //
-// TODO(rjk): create the global object and return.
+// The built-up global state's bodies will have
+// ObservableEditableBuffer.Dirty() return false. This may not accurately
+// reflect the state of the model under non-test operating conditions.
+// Callers of this function should adjust the dirty state externally.
 func MakeWindowScaffold(content *dumpfile.Content) {
 	display := edwoodtest.NewDisplay()
 	global.seq = 0
@@ -78,7 +81,9 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		updateText(&w.tag, &serwin.Tag, display)
 		w.body.file.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
 		w.body.w = w
+		w.body.what = Body
 		w.tag.w = w
+		w.tag.what = Tag
 
 		wincol := cols[serwin.Column]
 		wincol.w = append(wincol.w, w)

@@ -564,7 +564,7 @@ func (w *Window) setTag1() {
 // TODO(rjk): In the future of File's replacement with undo buffer,
 // this method could be renamed to something like "UpdateTag"
 func (w *Window) Commit(t *Text) {
-	t.Commit() // will set the file.mod to true
+	t.Commit()
 	if t.what == Body {
 		return
 	}
@@ -572,7 +572,6 @@ func (w *Window) Commit(t *Text) {
 	if filename != w.body.file.Name() {
 		global.seq++
 		w.body.file.Mark(global.seq)
-		w.body.file.Modded()
 		w.SetName(filename)
 		w.SetTag()
 	}

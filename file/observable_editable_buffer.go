@@ -19,7 +19,7 @@ type ObservableEditableBuffer struct {
 	observers    map[BufferObserver]struct{} // [private I think]
 	f            *File
 	Elog         sam.Elog
-	// TODO(rjk): Remove this when I've inserted undo.RuneArray.
+	// TODO(rjk): This is probably unnecessary after the transition to file.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.RuneArray context, these two ops
 	// don't have an implicit Commit. We set editclean in the Edit cmd
@@ -138,14 +138,18 @@ func MakeObservableEditableBufferTag(b []rune) *ObservableEditableBuffer {
 	return oeb
 }
 
-// Clean is a forwarding function for file.Clean.
+// Clean marks the ObservableEditableBuffer as being non-dirty: the
+// backing is the same as File.
+//
+// TODO(rjk): Conceivably SnapshotSeq can be replaced with this function.
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
-	e.f.Clean()
 	e.SnapshotSeq()
 }
 
 // Mark is a forwarding function for file.Mark.
+// This sets an undo point. NB: call Mark before mutating the file.
+// seq must be 1 to enable Undo/Redo on the file.
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
@@ -206,7 +210,7 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // to be used to determine the "if the contents differ")
 //
 // Latest thought: there are two separate issues: are we at a point marked
-// as clean and is this File writable to a backing. They are combined in this
+// as clean and is this File writable to a backing. They are combined in
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
@@ -273,7 +277,7 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 // its contents. This is needed to track when Edwood has modified the
 // backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
-	e.f.Modded()
+	e.putseq = -1
 	e.treatasclean = false
 }
 
@@ -428,7 +432,6 @@ func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 }
 
 // SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-// TODO(rjk): adjust as needed for file.Buffer.
 func (f *ObservableEditableBuffer) SnapshotSeq() {
 	f.putseq = f.seq
 }
