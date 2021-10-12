@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/rjkroege/edwood/sam"
+	"github.com/rjkroege/edwood/util"
 )
 
 // The ObservableEditableBuffer is used by the main program
@@ -217,17 +218,33 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 	return e.details.Name != "" && sad
 }
 
-// Load is a forwarding function for file.Load.
-func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (n int, hasNulls bool, err error) {
+// Load inserts fd's contents into File at location q0. Typically, follow
+// this up with a call to f.Clean() to indicate that the file corresponds
+// to its disk file backing.
+//
+// TODO(rjk): hypothesis: we can make this API cleaner: we will only
+// compute a hash when the file corresponds to its diskfile right?
+//
+// TODO(rjk): Consider renaming InsertAtFromFd or something similar.
+//
+// TODO(rjk): Read and insert in chunks.
+//
+// TODO(flux): Innefficient to load the file, then copy into the slice,
+// but I need the UTF-8 interpretation. I could fix this by using a UTF-8
+// -> []rune reader on top of the os.File instead.
+func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
 	d, err := ioutil.ReadAll(fd)
+	// TODO(rjk): improve handling of read errors.
 	if err != nil {
 		err = errors.New("read error in RuneArray.Load")
 	}
 	if sethash {
 		e.SetHash(CalcHash(d))
 	}
-	n, hasNulls = e.f.Load(q0, d, e.seq)
-	return n, hasNulls, err
+
+	runes, _, hasNulls := util.Cvttorunes(d, len(d))
+	e.f.InsertAt(q0, runes, e.seq)
+	return len(runes), hasNulls, err
 }
 
 // Dirty returns true when the ObservableEditableBuffer differs from its disk

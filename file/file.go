@@ -145,26 +145,6 @@ type Undo struct {
 	Buf []rune
 }
 
-// Load inserts fd's contents into File at location q0. Load will always
-// mark the file as modified so follow this up with a call to f.Clean() to
-// indicate that the file corresponds to its disk file backing.
-// TODO(rjk): hypothesis: we can make this API cleaner: we will only
-// compute a hash when the file corresponds to its diskfile right?
-// TODO(rjk): Consider renaming InsertAtFromFd or something similar.
-// TODO(rjk): Read and insert in chunks.
-// TODO(flux): Innefficient to load the file, then copy into the slice,
-// but I need the UTF-8 interpretation.  I could fix this by using a
-// UTF-8 -> []rune reader on top of the os.File instead.
-func (f *File) Load(q0 int, d []byte, seq int) (n int, hasNulls bool) {
-	runes, _, hasNulls := util.Cvttorunes(d, len(d))
-
-	// Would appear to require a commit operation.
-	// NB: Runs the observers.
-	f.InsertAt(q0, runes, seq)
-
-	return len(runes), hasNulls
-}
-
 // InsertAt inserts s runes at rune address p0.
 // TODO(rjk): run the observers here to simplify the Text code.
 // TODO(rjk): In terms of the file.Buffer conversion, this corresponds
