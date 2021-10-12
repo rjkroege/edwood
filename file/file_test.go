@@ -9,7 +9,7 @@ import (
 )
 
 func TestDelObserver(t *testing.T) {
-	f := MakeObservableEditableBufferTag(RuneArray{})
+	f := MakeObservableEditableBuffer("", RuneArray{})
 
 	testData := []*testText{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
 		{file: MakeObservableEditableBuffer("Willowbrook Association Handbook: 2011", nil)},

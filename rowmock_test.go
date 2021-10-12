@@ -56,7 +56,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		display: display,
 		tag: *updateText(&Text{
 			what: Rowtag,
-			file: file.MakeObservableEditableBufferTag(nil),
+			file: file.MakeObservableEditableBuffer("", nil),
 		}, &content.RowTag, display),
 	}
 
@@ -65,7 +65,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		col := &Column{
 			tag: *updateText(&Text{
 				what: Columntag,
-				file: file.MakeObservableEditableBufferTag(nil),
+				file: file.MakeObservableEditableBuffer("", nil),
 			}, &sercol.Tag, display),
 			display: display,
 			fortest: true,

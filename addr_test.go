@@ -95,7 +95,7 @@ func TestAcmeregexp(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warnings = nil
 			text := &Text{
-				file: file.MakeObservableEditableBufferTag([]rune("abcd αβξδ\n")),
+				file: file.MakeObservableEditableBuffer("", []rune("abcd αβξδ\n")),
 			}
 			lim := Range{
 				0,

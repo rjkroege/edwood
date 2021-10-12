@@ -220,7 +220,7 @@ func TestXfidwriteQWaddr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
-			w.body.file = file.MakeObservableEditableBufferTag([]rune("abcαβξ\n"))
+			w.body.file = file.MakeObservableEditableBuffer("", []rune("abcαβξ\n"))
 			w.col = new(Column)
 			w.limit = Range{0, w.body.file.Nr()}
 			x := &Xfid{
@@ -758,7 +758,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.tag.file = file.MakeObservableEditableBufferTag([]rune("/home/gopher/edwood/row.go Del Snarf | Look "))
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune("/home/gopher/edwood/row.go Del Snarf | Look "))
 	w.tag.fr = &MockFrame{}
 	w.body.fr = &MockFrame{}
 	x := &Xfid{
@@ -1080,9 +1080,9 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 			w.body.fr = &MockFrame{}
 			switch tc.q {
 			case QWbody:
-				w.body.file = file.MakeObservableEditableBufferTag([]rune(data))
+				w.body.file = file.MakeObservableEditableBuffer("", []rune(data))
 			case QWtag:
-				w.tag.file = file.MakeObservableEditableBufferTag([]rune(data))
+				w.tag.file = file.MakeObservableEditableBuffer("", []rune(data))
 			}
 
 			x := &Xfid{
@@ -1141,7 +1141,7 @@ func TestXfidruneread(t *testing.T) {
 			fs: mr,
 		}
 		w := NewWindow().initHeadless(nil)
-		w.body.file = file.MakeObservableEditableBufferTag(tc.body)
+		w.body.file = file.MakeObservableEditableBuffer("", tc.body)
 		nr := xfidruneread(x, &w.body, tc.q0, tc.q1)
 		if got, want := nr, tc.nr; got != want {
 			t.Errorf("read %v runes from %q (q0=%v, q1=%v); should read %v runes",
@@ -1183,7 +1183,7 @@ func TestXfidreadQWxdataQWdata(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
-			w.body.file = file.MakeObservableEditableBufferTag([]rune(body))
+			w.body.file = file.MakeObservableEditableBuffer("", []rune(body))
 			w.addr = tc.inAddr
 			xfidread(&Xfid{
 				f: &Fid{
@@ -1217,7 +1217,7 @@ func TestXfidreadQWaddr(t *testing.T) {
 	)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.body.file = file.MakeObservableEditableBufferTag([]rune(body))
+	w.body.file = file.MakeObservableEditableBuffer("", []rune(body))
 	w.addr.q0 = 5
 	w.addr.q1 = 12
 
@@ -1246,8 +1246,8 @@ func TestXfidreadQWctl(t *testing.T) {
 	w.col = new(Column)
 	w.display = edwoodtest.NewDisplay()
 	w.body.fr = &MockFrame{}
-	w.tag.file = file.MakeObservableEditableBufferTag([]rune(("/etc/hosts Del Snarf | Look Get ")))
-	w.body.file = file.MakeObservableEditableBufferTag([]rune("Hello, world!\n"))
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(("/etc/hosts Del Snarf | Look Get ")))
+	w.body.file = file.MakeObservableEditableBuffer("", []rune("Hello, world!\n"))
 
 	mr := new(mockResponder)
 	xfidread(&Xfid{

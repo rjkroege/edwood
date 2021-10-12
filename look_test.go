@@ -60,7 +60,7 @@ func TestExpand(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: file.MakeObservableEditableBufferTag(r),
+				file: file.MakeObservableEditableBuffer("", r),
 				q0:   0,
 				q1:   tc.sel1,
 			}
@@ -98,7 +98,7 @@ func TestExpandJump(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: file.MakeObservableEditableBufferTag([]rune("chicken")),
+			file: file.MakeObservableEditableBuffer("", []rune("chicken")),
 			q0:   0,
 			q1:   5,
 			what: tc.kind,
