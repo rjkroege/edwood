@@ -17,9 +17,18 @@ import (
 // Text in turn, implements BufferObserver for the various required callback functions in BufferObserver.
 type ObservableEditableBuffer struct {
 	currobserver BufferObserver
-	observers    map[BufferObserver]struct{} // [private I think]
-	f            *File
-	Elog         sam.Elog
+	observers    map[BufferObserver]struct{}
+
+	// The legacy implementation.
+	f *File
+
+	// The new wip implementation.During the transitional phase file.Buffer is tested,
+	// only one of f or b should be non-nil. The interim forwarding functions can
+	// branch to implementations based on which is not-nil.
+	b *Buffer
+
+	Elog sam.Elog
+
 	// TODO(rjk): This is probably unnecessary after the transition to file.Buffer.
 	// At present, InsertAt and DeleteAt have an implicit Commit operation
 	// associated with them. In an undo.RuneArray context, these two ops

@@ -11,15 +11,14 @@ import (
 func TestDelObserver(t *testing.T) {
 	f := MakeObservableEditableBuffer("", RuneArray{})
 
-	testData := []*testText{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
-		{file: MakeObservableEditableBuffer("Willowbrook Association Handbook: 2011", nil)},
-		{file: MakeObservableEditableBuffer("Weakest in the Nation", nil)},
+	testData := []*testObserver{
+		{t: t},
+		{t: t},
+		{t: t},
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&testText{
-			file: MakeObservableEditableBuffer("HowToExitVim.txt", nil),
-		})
+		err := f.DelObserver(&testObserver{t})
 		if err == nil {
 			t.Errorf("expected panic when deleting nonexistent observers")
 		}
@@ -39,7 +38,7 @@ func TestDelObserver(t *testing.T) {
 			t.Fatalf("DelObserver resulted in observers of length %v; expected %v", got, want)
 		}
 		f.AllObservers(func(i interface{}) {
-			inText := i.(*testText)
+			inText := i.(*testObserver)
 			if inText == text {
 				t.Fatalf("DelObserver did not delete correctly at index %v", i)
 			}
@@ -66,7 +65,7 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 	}
 
 	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
-		&fileStateSummary{true, true, false, true, s1})
+		&stateSummary{true, true, false, true, s1})
 }
 
 const s1 = "hi 海老麺"
@@ -82,43 +81,18 @@ func TestFileInsertAt(t *testing.T) {
 
 	// NB: the read code not include the uncommitted content.
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&fileStateSummary{true, true, false, true, s1})
+		&stateSummary{true, true, false, true, s1})
 
 	f.Commit()
 
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&fileStateSummary{false, true, false, true, s1})
+		&stateSummary{false, true, false, true, s1})
 
 	f.InsertAt(f.Nr(), []rune(s2))
 	f.Commit()
 
 	check(t, "TestFileUndoRedo after InsertAt", f,
-		&fileStateSummary{false, true, false, true, s1 + s2})
-}
-
-func readwholefile(t *testing.T, f *File) string {
-	var sb strings.Builder
-
-	// Currently ReadAtRune does not return runes in the cache.
-	if f.HasUncommitedChanges() {
-		for i := 0; i < f.Nr(); i++ {
-			sb.WriteRune(f.ReadC(i))
-		}
-		return sb.String()
-	}
-
-	targetbuffer := make([]rune, f.Nr())
-	if _, err := f.ReadAtRune(targetbuffer, 0); err != nil {
-		t.Fatalf("readwhole could not read File %v", f)
-	}
-
-	for _, r := range targetbuffer {
-		if _, err := sb.WriteRune(r); err != nil {
-			t.Fatalf("readwhole could not write rune %v to strings.Builder %s", r, sb.String())
-		}
-	}
-
-	return sb.String()
+		&stateSummary{false, true, false, true, s1 + s2})
 }
 
 func TestFileUndoRedo(t *testing.T) {
@@ -126,14 +100,14 @@ func TestFileUndoRedo(t *testing.T) {
 
 	// Validate before.
 	check(t, "TestFileUndoRedo on an empty buffer", f,
-		&fileStateSummary{false, false, false, false, ""})
+		&stateSummary{false, false, false, false, ""})
 
 	f.Mark(1)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedo after 2 inserts", f,
-		&fileStateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{false, true, false, true, s1 + s2})
 
 	// Because of how seq managed the number of Undo actions, this
 	// corresponds to the case of not incrementing seq and undoes every
@@ -141,42 +115,14 @@ func TestFileUndoRedo(t *testing.T) {
 	f.Undo(true)
 
 	check(t, "TestFileUndoRedo after 1 undo", f,
-		&fileStateSummary{false, false, true, false, ""})
+		&stateSummary{false, false, true, false, ""})
 
 	// Redo
 	f.Undo(false)
 
 	// Validate state: we have s1 + s2 inserted.
 	check(t, "TestFileUndoRedo after 1 Redos", f,
-		&fileStateSummary{false, true, false, true, s1 + s2})
-}
-
-type fileStateSummary struct {
-	HasUncommitedChanges bool
-	HasUndoableChanges   bool
-	HasRedoableChanges   bool
-	SaveableAndDirty     bool
-	filecontents         string
-}
-
-func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *fileStateSummary) {
-	t.Helper()
-	f := oeb.f
-	if got, want := f.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
-		t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
-	}
-	if got, want := f.HasUndoableChanges(), fss.HasUndoableChanges; got != want {
-		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
-	}
-	if got, want := f.HasRedoableChanges(), fss.HasRedoableChanges; got != want {
-		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
-	}
-	if got, want := oeb.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
-		t.Errorf("%s: SaveableAndDirty failed. got %v want %v", testname, got, want)
-	}
-	if got, want := readwholefile(t, f), fss.filecontents; got != want {
-		t.Errorf("%s: File contents not expected. got «%#v» want «%#v»", testname, got, want)
-	}
+		&stateSummary{false, true, false, true, s1 + s2})
 }
 
 func TestFileUndoRedoWithMark(t *testing.T) {
@@ -190,19 +136,18 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedoWithMark after 2 inserts", f,
-		&fileStateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{false, true, false, true, s1 + s2})
 
 	f.Undo(true)
 
 	check(t, "TestFileUndoRedoWithMark after 1 undo", f,
-		&fileStateSummary{false, true, true, true, s1})
+		&stateSummary{false, true, true, true, s1})
 
 	// Redo
 	f.Undo(false)
 
 	check(t, "TestFileUndoRedoWithMark after 1 redo", f,
-		&fileStateSummary{false, true, false, true, s1 + s2})
-
+		&stateSummary{false, true, false, true, s1 + s2})
 }
 
 func TestFileLoadNoUndo(t *testing.T) {
@@ -226,8 +171,7 @@ func TestFileLoadNoUndo(t *testing.T) {
 	}
 
 	check(t, "TestFileLoadNoUndo after file load", f,
-		&fileStateSummary{false, false, false, false, s1[0:2] + s2 + s2 + s1[2:]})
-
+		&stateSummary{false, false, false, false, s1[0:2] + s2 + s2 + s1[2:]})
 }
 
 func TestFileLoadUndoHash(t *testing.T) {
@@ -251,7 +195,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 
 	// Having loaded the file and then Clean(),
 	check(t, "TestFileLoadUndoHash after file load", f,
-		&fileStateSummary{false, false, false, false, s2 + s2})
+		&stateSummary{false, false, false, false, s2 + s2})
 
 	// Set an undo point (the initial state)
 	f.Mark(1)
@@ -259,13 +203,13 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// Enabling Undo will cause HasSaveableChanges to be true.
 	// This is strange and I need to rationalize seq.
 	check(t, "TestFileLoadUndoHash after Mark", f,
-		&fileStateSummary{false, false, false, true, s2 + s2})
+		&stateSummary{false, false, false, true, s2 + s2})
 
 	// SaveableAndDirty should return true if the File is plausibly writable
 	// to f.details.Name and has changes that might require writing it out.
 	f.SetName("plan9")
 	check(t, "TestFileLoadUndoHash after SetName", f,
-		&fileStateSummary{false, true, false, true, s2 + s2})
+		&stateSummary{false, true, false, true, s2 + s2})
 
 	if got, want := f.Name(), "plan9"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
@@ -274,23 +218,10 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// Undo renmaing the file.
 	f.Undo(true)
 	check(t, "TestFileLoadUndoHash after Undo", f,
-		&fileStateSummary{false, false, true, false, s2 + s2})
+		&stateSummary{false, false, true, false, s2 + s2})
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
-}
-
-// TODO(rjk): These should enforce observer callback contents in a flexible way.
-type testObserver struct {
-	t *testing.T
-}
-
-func (to *testObserver) Inserted(q0 int, r []rune) {
-	to.t.Logf("Inserted at %d: %q", q0, string(r))
-}
-
-func (to *testObserver) Deleted(q0, q1 int) {
-	to.t.Logf("Deleted range [%d, %d)", q0, q1)
 }
 
 // Multiple interleaved actions do the right thing.
@@ -302,41 +233,41 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	f.Mark(1)
 	f.Clean()
 	check(t, "TestFileInsertDeleteUndo after init", f,
-		&fileStateSummary{false, false, false, false, ""})
+		&stateSummary{false, false, false, false, ""})
 
 	f.Mark(2)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(0, []rune(s2))
 	// After inserting two strings is an Undo point:  byehi 海老麺
 	check(t, "TestFileInsertDeleteUndo after second Mark", f,
-		&fileStateSummary{false, true, false, true, "byehi 海老麺"})
+		&stateSummary{false, true, false, true, "byehi 海老麺"})
 
 	f.Mark(3)
 	f.DeleteAt(0, 1) // yehi 海老
 	f.DeleteAt(1, 3) // yi 海老
 	// After deleting is an Undo point.
 	check(t, "TestFileInsertDeleteUndo after third Mark", f,
-		&fileStateSummary{false, true, false, true, "yi 海老麺"})
+		&stateSummary{false, true, false, true, "yi 海老麺"})
 
 	f.Mark(4)
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
 	check(t, "TestFileInsertDeleteUndo after setup", f,
-		&fileStateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
+		&stateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
 	t.Logf("after setup seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(true)
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&fileStateSummary{false, true, true, true, "yi 海老麺"})
+		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(true) // 2 deletes should get removed because they have the same sequence.
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
-		&fileStateSummary{false, true, true, true, "byehi 海老麺"})
+		&stateSummary{false, true, true, true, "byehi 海老麺"})
 	t.Logf("after 2 Undo seq %d, putseq %d", f.seq, f.putseq)
 
 	f.Undo(false) // 2 deletes should be put back.
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&fileStateSummary{false, true, true, true, "yi 海老麺"})
+		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
 }
 
@@ -348,7 +279,7 @@ func TestFileRedoSeq(t *testing.T) {
 	f.InsertAt(0, []rune(s1))
 
 	check(t, "TestFileRedoSeq after setup", f,
-		&fileStateSummary{false, true, false, true, s1})
+		&stateSummary{false, true, false, true, s1})
 
 	if got, want := f.RedoSeq(), 0; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
@@ -356,7 +287,7 @@ func TestFileRedoSeq(t *testing.T) {
 
 	f.Undo(true)
 	check(t, "TestFileRedoSeq after Undo", f,
-		&fileStateSummary{false, false, true, false, ""})
+		&stateSummary{false, false, true, false, ""})
 
 	if got, want := f.RedoSeq(), 1; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
@@ -454,14 +385,3 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 }
-
-type testText struct {
-	file *ObservableEditableBuffer
-	b    RuneArray
-}
-
-// Inserted is implemented to satisfy the BufferObserver interface
-func (t testText) Inserted(q0 int, r []rune) {}
-
-// Deleted is implemented to satisfy the BufferObserver interface
-func (t testText) Deleted(q0, q1 int) {}
