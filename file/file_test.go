@@ -160,7 +160,6 @@ type stateSummary struct {
 	filecontents         string
 }
 
-
 type checkable interface {
 	// Return the entire backing as a string.
 	readwholefile(*testing.T) string
@@ -184,16 +183,16 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 		t.Fatalf("only one oeb.f or oeb.b should be in use")
 	}
 
-	// Lets the test infrastructure call against files 
+	// Lets the test infrastructure call against files
 	f := checkable(oeb.f)
 	if oeb.b != nil {
 		f = checkable(oeb.b)
 	}
 
 	if f.commitisgermane() {
-	if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
-		t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
-	}
+		if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
+			t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
+		}
 	}
 	if got, want := oeb.HasUndoableChanges(), fss.HasUndoableChanges; got != want {
 		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
