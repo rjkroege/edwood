@@ -96,7 +96,7 @@ func TestFileInsertAt(t *testing.T) {
 		&stateSummary{false, true, false, true, s1 + s2})
 }
 
-func readwholefile(t *testing.T, f *File) string {
+func (f *File) readwholefile(t *testing.T) string {
 	t.Helper()
 	var sb strings.Builder
 
@@ -173,7 +173,7 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 		t.Fatalf("only one oeb.f or oeb.b should be in use")
 	}
 
-// TODO(rjk): need to have some kind of branching.
+	// TODO(rjk): need to have some kind of branching.
 	f := oeb.f
 
 	if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
@@ -188,7 +188,7 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 	if got, want := oeb.SaveableAndDirty(), fss.SaveableAndDirty; got != want {
 		t.Errorf("%s: SaveableAndDirty failed. got %v want %v", testname, got, want)
 	}
-	if got, want := readwholefile(t, f), fss.filecontents; got != want {
+	if got, want := f.readwholefile(t), fss.filecontents; got != want {
 		t.Errorf("%s: File contents not expected. got «%#v» want «%#v»", testname, got, want)
 	}
 }
