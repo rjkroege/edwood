@@ -88,7 +88,6 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 }
 
 // TODO(rjk): These should enforce observer callback contents in a flexible way.
-// TODO(rjk): testText and testObserver
 type testObserver struct {
 	t *testing.T
 }
@@ -100,14 +99,3 @@ func (to *testObserver) Inserted(q0 int, r []rune) {
 func (to *testObserver) Deleted(q0, q1 int) {
 	to.t.Logf("Deleted range [%d, %d)", q0, q1)
 }
-
-type testText struct {
-	file *ObservableEditableBuffer
-	b    RuneArray
-}
-
-// Inserted is implemented to satisfy the BufferObserver interface
-func (t testText) Inserted(q0 int, r []rune) {}
-
-// Deleted is implemented to satisfy the BufferObserver interface
-func (t testText) Deleted(q0, q1 int) {}

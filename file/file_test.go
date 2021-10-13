@@ -11,15 +11,14 @@ import (
 func TestDelObserver(t *testing.T) {
 	f := MakeObservableEditableBuffer("", RuneArray{})
 
-	testData := []*testText{{file: MakeObservableEditableBuffer("World sourdoughs from antiquity", nil)},
-		{file: MakeObservableEditableBuffer("Willowbrook Association Handbook: 2011", nil)},
-		{file: MakeObservableEditableBuffer("Weakest in the Nation", nil)},
+	testData := []*testObserver{
+		{t: t},
+		{t: t},
+		{t: t},
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&testText{
-			file: MakeObservableEditableBuffer("HowToExitVim.txt", nil),
-		})
+		err := f.DelObserver(&testObserver{t})
 		if err == nil {
 			t.Errorf("expected panic when deleting nonexistent observers")
 		}
@@ -39,7 +38,7 @@ func TestDelObserver(t *testing.T) {
 			t.Fatalf("DelObserver resulted in observers of length %v; expected %v", got, want)
 		}
 		f.AllObservers(func(i interface{}) {
-			inText := i.(*testText)
+			inText := i.(*testObserver)
 			if inText == text {
 				t.Fatalf("DelObserver did not delete correctly at index %v", i)
 			}
