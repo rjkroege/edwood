@@ -160,11 +160,22 @@ type stateSummary struct {
 	filecontents         string
 }
 
-/*
+
 type checkable interface {
-	readwholefile(
+	// Return the entire backing as a string.
+	readwholefile(*testing.T) string
+
+	// Return true to enable tests of UncommittedChanges. This concept does not
+	// exist with file.Buffer.
+	commitisgermane() bool
 }
-*/
+
+func (f *File) commitisgermane() bool { return true }
+
+func (b *Buffer) commitisgermane() bool { return false }
+
+// TODO(camsn0w): write this.
+func (b *Buffer) readwholefile(*testing.T) string { return "" }
 
 func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *stateSummary) {
 	t.Helper()
@@ -173,11 +184,16 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 		t.Fatalf("only one oeb.f or oeb.b should be in use")
 	}
 
-	// TODO(rjk): need to have some kind of branching.
-	f := oeb.f
+	// Lets the test infrastructure call against files 
+	f := checkable(oeb.f)
+	if oeb.b != nil {
+		f = checkable(oeb.b)
+	}
 
+	if f.commitisgermane() {
 	if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
 		t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
+	}
 	}
 	if got, want := oeb.HasUndoableChanges(), fss.HasUndoableChanges; got != want {
 		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
