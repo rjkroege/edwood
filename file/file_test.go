@@ -310,6 +310,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 }
 
 // TODO(rjk): These should enforce observer callback contents in a flexible way.
+// TODO(rjk): merge these into testText
 type testObserver struct {
 	t *testing.T
 }

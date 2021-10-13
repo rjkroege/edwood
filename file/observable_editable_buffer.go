@@ -23,7 +23,8 @@ type ObservableEditableBuffer struct {
 	f *File
 
 	// The new wip implementation.During the transitional phase file.Buffer is tested,
-	// only one of these should be true at a time.
+	// only one of f or b should be non-nil. The interim forwarding functions can
+	// branch to implementations based on which is not-nil.
 	b *Buffer
 
 	Elog sam.Elog
