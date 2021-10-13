@@ -95,7 +95,6 @@ func TestFileInsertAt(t *testing.T) {
 		&stateSummary{false, true, false, true, s1 + s2})
 }
 
-
 func TestFileUndoRedo(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
 
@@ -224,7 +223,6 @@ func TestFileLoadUndoHash(t *testing.T) {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
 }
-
 
 // Multiple interleaved actions do the right thing.
 func TestFileInsertDeleteUndo(t *testing.T) {
@@ -387,4 +385,3 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
 }
-
