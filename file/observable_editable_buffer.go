@@ -131,11 +131,9 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 
 // Clean marks the ObservableEditableBuffer as being non-dirty: the
 // backing is the same as File.
-//
-// TODO(rjk): Conceivably SnapshotSeq can be replaced with this function.
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
-	e.SnapshotSeq()
+	e.putseq = e.seq
 }
 
 // Mark is a forwarding function for file.Mark.
@@ -436,9 +434,4 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 // SetEpsilon is a setter for file.epsilon for use in tests.
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
-}
-
-// SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-func (f *ObservableEditableBuffer) SnapshotSeq() {
-	f.putseq = f.seq
 }

@@ -238,7 +238,7 @@ func TestEditCmdWithFile(t *testing.T) {
 			w := makeSkeletonWindowModel(test.dot, test.filename)
 
 			// The filename actually exists so needs to start as if it's saved.
-			w.body.file.SnapshotSeq()
+			w.body.file.Clean()
 
 			editcmd(&w.body, []rune(test.expr))
 
