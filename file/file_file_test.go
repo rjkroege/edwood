@@ -7,7 +7,7 @@ import (
 	"github.com/rjkroege/edwood/sam"
 )
 
-// Tests that File.Undo correctly reports selection values across Undo
+// TestFileHandlesNilEpsilonDelta shows that File.Undo correctly reports selection values across Undo
 // actions and does not fail if the File's delta or epsilon arrays are
 // nil. This test is derived from TestWindowUndoSelection. That test was
 // fragile as it reached into specific details of the file.File
@@ -36,22 +36,10 @@ func TestFileHandlesNilEpsilonDelta(t *testing.T) {
 		{"undo (nil delta)", true, 14, 17, 14, 17, nil, nil},
 		{"redo (nil epsilon)", false, 14, 17, 14, 17, nil, nil},
 	} {
-/*
-		w := &Window{
-			body: Text{
-				q0:   tc.q0,
-				q1:   tc.q1,
-				file: file.MakeObservableEditableBuffer("", []rune("This is an example sentence.\n")),
-			},
-		}
-*/
-
 		oeb := MakeObservableEditableBuffer("", []rune("This is an example sentence.\n"))
 		oeb.f.delta = tc.delta
 		oeb.f.epsilon = tc.epsilon
 		
-//		w.body.file.SetDelta(tc.delta)
-//		w.body.file.SetEpsilon(tc.epsilon)
 		q0, q1 := tc.q0, tc.q1
 		if nq0, nq1, hazselection := oeb.Undo(tc.isundo); hazselection {
 			q0, q1 = nq0, nq1
