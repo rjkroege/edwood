@@ -33,7 +33,7 @@ type ObservableEditableBuffer struct {
 	// when the Elog is applied and should be marked Clean() at that time.
 	EditClean bool
 
-	details   *DiskDetails
+	details *DiskDetails
 
 	// Tracks the editing sequence.
 	seq    int // undo sequencing
