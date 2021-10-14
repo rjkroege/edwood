@@ -607,7 +607,7 @@ func seqof(w *Window, isundo bool) int {
 	return w.body.file.RedoSeq()
 }
 
-// TODO(rjk): Why does this work this way?
+// TODO(rjk): Test the logic of Undo across multiple buffers very carefully.
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	if et == nil || et.w == nil {
 		return

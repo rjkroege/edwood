@@ -286,17 +286,17 @@ func (e *ObservableEditableBuffer) Modded() {
 	e.treatasclean = false
 }
 
-// Name is a getter for file.details.Name.
+// Name is a getter for file.DiskDetails.Name.
 func (e *ObservableEditableBuffer) Name() string {
 	return e.details.Name
 }
 
-// Info is a Getter for e.details.Info
+// Info is a Getter for e.DiskDetails.Info
 func (e *ObservableEditableBuffer) Info() os.FileInfo {
 	return e.details.Info
 }
 
-// UpdateInfo is a forwarding function for file.UpdateInfo
+// UpdateInfo is a forwarding function for DiskDetails.UpdateInfo
 func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) error {
 	return e.details.UpdateInfo(filename, d)
 }
@@ -316,7 +316,8 @@ func (e *ObservableEditableBuffer) Seq() int {
 	return e.seq
 }
 
-// RedoSeq is a getter for file.details.RedoSeq.
+// RedoSeq finds the seq of the last redo record. Forwards its
+// implementation to file.File or file.Buffer.
 func (e *ObservableEditableBuffer) RedoSeq() int {
 	return e.f.RedoSeq()
 }
