@@ -39,7 +39,7 @@ func TestFileHandlesNilEpsilonDelta(t *testing.T) {
 		oeb := MakeObservableEditableBuffer("", []rune("This is an example sentence.\n"))
 		oeb.f.delta = tc.delta
 		oeb.f.epsilon = tc.epsilon
-		
+
 		q0, q1 := tc.q0, tc.q1
 		if nq0, nq1, hazselection := oeb.Undo(tc.isundo); hazselection {
 			q0, q1 = nq0, nq1
