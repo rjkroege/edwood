@@ -426,13 +426,3 @@ func (e *ObservableEditableBuffer) SetSeq(seq int) {
 func (e *ObservableEditableBuffer) SetPutseq(putseq int) {
 	e.putseq = putseq
 }
-
-// SetDelta is a setter for file.delta for use in tests.
-func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
-	e.f.delta = delta
-}
-
-// SetEpsilon is a setter for file.epsilon for use in tests.
-func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
-	e.f.epsilon = epsilon
-}
