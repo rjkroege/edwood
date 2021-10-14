@@ -29,14 +29,11 @@ type ObservableEditableBuffer struct {
 
 	Elog sam.Elog
 
-	// TODO(rjk): This is probably unnecessary after the transition to file.Buffer.
-	// At present, InsertAt and DeleteAt have an implicit Commit operation
-	// associated with them. In an undo.RuneArray context, these two ops
-	// don't have an implicit Commit. We set editclean in the Edit cmd
-	// implementation code to let multiple Inserts be grouped together?
-	// Figure out how this inter-operates with seq.
+	// Used to note that the oeb's contents will be replaced with a new disk backing
+	// when the Elog is applied and should be marked Clean() at that time.
 	EditClean bool
-	details   *DiskDetails
+
+	details *DiskDetails
 
 	// Tracks the editing sequence.
 	seq    int // undo sequencing
@@ -134,11 +131,9 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 
 // Clean marks the ObservableEditableBuffer as being non-dirty: the
 // backing is the same as File.
-//
-// TODO(rjk): Conceivably SnapshotSeq can be replaced with this function.
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
-	e.SnapshotSeq()
+	e.putseq = e.seq
 }
 
 // Mark is a forwarding function for file.Mark.
@@ -207,7 +202,7 @@ func (e *ObservableEditableBuffer) ReadC(q int) rune {
 // as clean and is this File writable to a backing. They are combined in
 // this method.
 func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
-	sad := (e.f.saveableAndDirtyImpl() || e.Dirty()) && !e.IsDirOrScratch()
+	sad := (e.f.HasUncommitedChanges() || e.Dirty()) && !e.IsDirOrScratch()
 	return e.details.Name != "" && sad
 }
 
@@ -291,17 +286,17 @@ func (e *ObservableEditableBuffer) Modded() {
 	e.treatasclean = false
 }
 
-// Name is a getter for file.details.Name.
+// Name is a getter for file.DiskDetails.Name.
 func (e *ObservableEditableBuffer) Name() string {
 	return e.details.Name
 }
 
-// Info is a Getter for e.details.Info
+// Info is a Getter for e.DiskDetails.Info
 func (e *ObservableEditableBuffer) Info() os.FileInfo {
 	return e.details.Info
 }
 
-// UpdateInfo is a forwarding function for file.UpdateInfo
+// UpdateInfo is a forwarding function for DiskDetails.UpdateInfo
 func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) error {
 	return e.details.UpdateInfo(filename, d)
 }
@@ -321,7 +316,8 @@ func (e *ObservableEditableBuffer) Seq() int {
 	return e.seq
 }
 
-// RedoSeq is a getter for file.details.RedoSeq.
+// RedoSeq finds the seq of the last redo record. Forwards its
+// implementation to file.File or file.Buffer.
 func (e *ObservableEditableBuffer) RedoSeq() int {
 	return e.f.RedoSeq()
 }
@@ -439,9 +435,4 @@ func (e *ObservableEditableBuffer) SetDelta(delta []*Undo) {
 // SetEpsilon is a setter for file.epsilon for use in tests.
 func (e *ObservableEditableBuffer) SetEpsilon(epsilon []*Undo) {
 	e.f.epsilon = epsilon
-}
-
-// SnapshotSeq saves the current seq to putseq. Call this on Put actions.
-func (f *ObservableEditableBuffer) SnapshotSeq() {
-	f.putseq = f.seq
 }

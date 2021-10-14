@@ -16,8 +16,6 @@ import (
 // undo/redo back to an initial state. Mark (undo.RuneArray.Commit) notes
 // an undo point.
 //
-// Next, a File might have a backing to a disk file.
-//
 // Lastly the text buffer might be clean/dirty. A clean buffer is possibly
 // the same as its disk backing. A specific point in the undo record is
 // considered clean.
@@ -45,26 +43,10 @@ type File struct {
 	cq0 int
 }
 
-// Remember that the high-level goal is to slowly coerce
-// ObservableEditableBuffer into looking like a scrawny wrapper around
-// the file.Buffer implementation.
-//
-// func (b *Buffer) Clean()
-//func (b *Buffer) Commit()
-//func (b *Buffer) Delete(off, length int64) error
-//func (b *Buffer) Dirty() bool
-//func (b *Buffer) Insert(off int64, data []byte) error
-//func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error)
-//func (b *Buffer) Redo() (off, n int64)
-//func (b *Buffer) Size() int64
-//func (b *Buffer) Undo() (off, n int64)
-//
-// NB: file.Buffer implements caching internally.
-
 // HasUncommitedChanges returns true if there are changes that
 // have been made to the File since the last Commit.
-func (t *File) HasUncommitedChanges() bool {
-	return len(t.cache) != 0
+func (f *File) HasUncommitedChanges() bool {
+	return len(f.cache) > 0
 }
 
 // HasUndoableChanges returns true if there are changes to the File
@@ -112,10 +94,6 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 	// TODO(rjk): This should include cache contents but currently
 	// callers do not require it to.
 	return f.b.Read(off, r)
-}
-
-func (f *File) saveableAndDirtyImpl() bool {
-	return len(f.cache) > 0
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
