@@ -29,13 +29,10 @@ type ObservableEditableBuffer struct {
 
 	Elog sam.Elog
 
-	// TODO(rjk): This is probably unnecessary after the transition to file.Buffer.
-	// At present, InsertAt and DeleteAt have an implicit Commit operation
-	// associated with them. In an undo.RuneArray context, these two ops
-	// don't have an implicit Commit. We set editclean in the Edit cmd
-	// implementation code to let multiple Inserts be grouped together?
-	// Figure out how this inter-operates with seq.
+	// Used to note that the oeb's contents will be replaced with a new disk backing
+	// when the Elog is applied and should be marked Clean() at that time.
 	EditClean bool
+
 	details   *DiskDetails
 
 	// Tracks the editing sequence.
