@@ -18,7 +18,7 @@ func TestDelObserver(t *testing.T) {
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&testObserver{t})
+		err := f.DelObserver(MakeTestObserver(t))
 		if err == nil {
 			t.Errorf("expected panic when deleting nonexistent observers")
 		}
@@ -227,7 +227,8 @@ func TestFileLoadUndoHash(t *testing.T) {
 // Multiple interleaved actions do the right thing.
 func TestFileInsertDeleteUndo(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
-	f.AddObserver(&testObserver{t})
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	// Empty File is an Undo point and considered clean.
 	f.Mark(1)
@@ -241,6 +242,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	// After inserting two strings is an Undo point:  byehi 海老麺
 	check(t, "TestFileInsertDeleteUndo after second Mark", f,
 		&stateSummary{false, true, false, true, "byehi 海老麺"})
+	to.Check(nil)
 
 	f.Mark(3)
 	f.DeleteAt(0, 1) // yehi 海老
@@ -248,6 +250,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	// After deleting is an Undo point.
 	check(t, "TestFileInsertDeleteUndo after third Mark", f,
 		&stateSummary{false, true, false, true, "yi 海老麺"})
+	to.Check(nil)
 
 	f.Mark(4)
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
