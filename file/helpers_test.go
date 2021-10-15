@@ -143,7 +143,7 @@ func (to *testObserver) Check(expected []*observation) {
 	}
 
 	for i, o := range to.tape {
-		if got, want := o, expected[i]; got != want {
+		if got, want := o, expected[i]; *got != *want {
 			to.t.Errorf("observation [%d] got: %v, want %v", i, got, want)
 		}
 	}

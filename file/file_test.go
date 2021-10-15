@@ -242,7 +242,6 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	// After inserting two strings is an Undo point:  byehi 海老麺
 	check(t, "TestFileInsertDeleteUndo after second Mark", f,
 		&stateSummary{false, true, false, true, "byehi 海老麺"})
-	to.Check(nil)
 
 	f.Mark(3)
 	f.DeleteAt(0, 1) // yehi 海老
@@ -250,7 +249,6 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	// After deleting is an Undo point.
 	check(t, "TestFileInsertDeleteUndo after third Mark", f,
 		&stateSummary{false, true, false, true, "yi 海老麺"})
-	to.Check(nil)
 
 	f.Mark(4)
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
@@ -262,6 +260,38 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
+	to.Check([]*observation{
+		{
+			callback: "Inserted",
+			q0: 0,
+			payload: "hi 海老麺",
+		},
+		{
+			callback: "Inserted",
+			q0: 0,
+			payload: "bye",
+		},
+		{
+			callback: "Deleted",
+			q0: 0,
+			q1: 1,
+		},
+		{
+			callback: "Deleted",
+			q0: 1,
+			q1: 3,
+		},
+		{
+			callback: "Inserted",
+			q0: f.Nr()-1,
+			payload: s1,
+		},
+		{
+			callback: "Deleted",
+			q0: 5,
+			q1: 5 + len([]rune(s1)),
+		},
+	})
 
 	f.Undo(true) // 2 deletes should get removed because they have the same sequence.
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
@@ -272,6 +302,28 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
+	to.Check([]*observation{
+		{
+			callback: "Inserted",
+			q0: 1,
+			payload: "eh",
+		},
+		{
+			callback: "Inserted",
+			q0: 0,
+			payload: "b",
+		},
+		{
+			callback: "Deleted",
+			q0: 0,
+			q1: 1,
+		},
+		{
+			callback: "Deleted",
+			q0: 1,
+			q1: 3,
+		},
+	})
 }
 
 func TestFileRedoSeq(t *testing.T) {
