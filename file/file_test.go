@@ -182,6 +182,8 @@ func TestFileLoadUndoHash(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash bad initial name. got %v want %v", got, want)
 	}
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	buffy := bytes.NewBuffer([]byte(s2 + s2))
 
@@ -222,6 +224,12 @@ func TestFileLoadUndoHash(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
+	to.Check([]*observation{		{
+			callback: "Inserted",
+			q0: 0,
+			payload: "byebye",
+		},
+})
 }
 
 // Multiple interleaved actions do the right thing.
@@ -402,6 +410,8 @@ func TestFileUpdateInfoError(t *testing.T) {
 func TestFileNameSettingWithScratch(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
 	// Empty File is an Undo point and considered clean
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
@@ -439,4 +449,5 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.isscratch, false; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
+	to.Check([]*observation{})
 }
