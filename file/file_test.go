@@ -224,12 +224,12 @@ func TestFileLoadUndoHash(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
-	to.Check([]*observation{		{
-			callback: "Inserted",
-			q0: 0,
-			payload: "byebye",
-		},
-})
+	to.Check([]*observation{{
+		callback: "Inserted",
+		q0:       0,
+		payload:  "byebye",
+	},
+	})
 }
 
 // Multiple interleaved actions do the right thing.
@@ -271,33 +271,33 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	to.Check([]*observation{
 		{
 			callback: "Inserted",
-			q0: 0,
-			payload: "hi 海老麺",
+			q0:       0,
+			payload:  "hi 海老麺",
 		},
 		{
 			callback: "Inserted",
-			q0: 0,
-			payload: "bye",
+			q0:       0,
+			payload:  "bye",
 		},
 		{
 			callback: "Deleted",
-			q0: 0,
-			q1: 1,
+			q0:       0,
+			q1:       1,
 		},
 		{
 			callback: "Deleted",
-			q0: 1,
-			q1: 3,
+			q0:       1,
+			q1:       3,
 		},
 		{
 			callback: "Inserted",
-			q0: f.Nr()-1,
-			payload: s1,
+			q0:       f.Nr() - 1,
+			payload:  s1,
 		},
 		{
 			callback: "Deleted",
-			q0: 5,
-			q1: 5 + len([]rune(s1)),
+			q0:       5,
+			q1:       5 + len([]rune(s1)),
 		},
 	})
 
@@ -313,23 +313,23 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	to.Check([]*observation{
 		{
 			callback: "Inserted",
-			q0: 1,
-			payload: "eh",
+			q0:       1,
+			payload:  "eh",
 		},
 		{
 			callback: "Inserted",
-			q0: 0,
-			payload: "b",
+			q0:       0,
+			payload:  "b",
 		},
 		{
 			callback: "Deleted",
-			q0: 0,
-			q1: 1,
+			q0:       0,
+			q1:       1,
 		},
 		{
 			callback: "Deleted",
-			q0: 1,
-			q1: 3,
+			q0:       1,
+			q1:       3,
 		},
 	})
 }

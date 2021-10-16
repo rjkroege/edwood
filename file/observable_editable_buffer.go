@@ -250,7 +250,7 @@ func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
 // SetName sets the name of the backing for this file. Some backings that
 // opt them out of typically being persisted. Resetting a file name to a
 // new value does not have any effect.
-// 
+//
 // TODO(rjk): This implementation is a layering violation for the
 // conversion to file.Buffer.
 func (e *ObservableEditableBuffer) SetName(name string) {
