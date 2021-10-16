@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"
@@ -254,6 +255,9 @@ func TestXfidwriteQWaddr(t *testing.T) {
 }
 
 func TestXfidopen(t *testing.T) {
+	display := edwoodtest.NewDisplay()
+	configureGlobals()
+
 	for _, tc := range []struct {
 		name string
 		q    uint64
@@ -276,7 +280,11 @@ func TestXfidopen(t *testing.T) {
 			if q != Qlog && q != Qeditout {
 				w = NewWindow().initHeadless(nil)
 				w.col = new(Column)
+				w.col.safe = true
 				w.body.fr = &MockFrame{}
+				w.display = display
+				w.tag.display = display
+				w.tag.fr = &MockFrame{}
 			}
 			x := &Xfid{
 				f: &Fid{
@@ -340,7 +348,9 @@ func TestXfidopenQeditout(t *testing.T) {
 }
 
 func TestXfidopenQWeditout(t *testing.T) {
+	configureGlobals()
 	mr := new(mockResponder)
+
 	x := &Xfid{
 		f: &Fid{
 			qid: plan9.Qid{Path: QID(0, QWeditout)},
@@ -350,6 +360,7 @@ func TestXfidopenQWeditout(t *testing.T) {
 	}
 	t.Run("ErrInUse", func(t *testing.T) {
 		x.f.w.editoutlk = nil
+		global.editing = Inserting
 		xfidopen(x)
 		if got, want := mr.err, ErrInUse; got != want {
 			t.Errorf("got error %v; want %v", got, want)
@@ -530,12 +541,17 @@ func TestXfidclose(t *testing.T) {
 
 func TestXfidwriteQWdata(t *testing.T) {
 	configureGlobals()
+	display := edwoodtest.NewDisplay()
 
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
+	w.col.safe = true
+	w.display = display
 	w.body.fr = &MockFrame{}
-	w.body.display = edwoodtest.NewDisplay()
+	w.body.display = display
+	w.tag.fr = &MockFrame{}
+	w.tag.display = display
 
 	for _, tc := range []struct {
 		name    string // test name
@@ -631,6 +647,7 @@ func TestXfidwriteQWtag(t *testing.T) {
 	w.col = new(Column)
 	w.body.file = file.MakeObservableEditableBuffer("", nil)
 	w.tag.file = file.MakeObservableEditableBuffer("", []rune(prevTag))
+	w.tagfilenameend = len(parsetaghelper(prevTag))
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  []byte(extra),
@@ -655,11 +672,16 @@ func TestXfidwriteQWtag(t *testing.T) {
 }
 
 func TestXfidwriteQWwrsel(t *testing.T) {
+	configureGlobals()
+	mockDisplay := edwoodtest.NewDisplay()
+
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
 	w.body.file = file.MakeObservableEditableBuffer("", nil)
 	w.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w.body.fr = &MockFrame{}
+	w.body.display = mockDisplay
+	w.tag.display = mockDisplay
 
 	for _, tc := range []struct {
 		name       string // test name
@@ -723,13 +745,15 @@ func TestXfidwriteQlabel(t *testing.T) {
 }
 
 func TestXfidwriteQcons(t *testing.T) {
+	configureGlobals()
+	mr := new(mockResponder)
+
 	global.row.Init(image.Rectangle{
 		image.Point{0, 0},
 		image.Point{800, 600},
 	}, edwoodtest.NewDisplay())
 
 	data := []byte("cons error: Hello, 世界!\n")
-	mr := new(mockResponder)
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
@@ -754,13 +778,40 @@ func TestXfidwriteQcons(t *testing.T) {
 }
 
 func TestXfidwriteQWerrors(t *testing.T) {
+	// TODO(rjk): This is another of one these places where I should really
+	// be using a quality backing mock.
 	data := []byte("window error: Hello, 世界!\n")
+
+	configureGlobals()
 	mr := new(mockResponder)
+	mockdisplay := edwoodtest.NewDisplay()
+
+	global.row.display = mockdisplay
+
+	col := new(Column)
+	col.display = mockdisplay
+	col.tag.fr = &MockFrame{}
+	global.row.col = append(global.row.col, col)
+	col.tag.display = mockdisplay
+	col.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w := NewWindow().initHeadless(nil)
-	w.col = new(Column)
-	w.tag.file = file.MakeObservableEditableBuffer("", []rune("/home/gopher/edwood/row.go Del Snarf | Look "))
+	w.display = mockdisplay
+	w.col = col
+
+	tagcontents := "/home/gopher/edwood/row.go Del Snarf | Look "
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(tagcontents))
+	w.tagfilenameend = len(parsetaghelper(string(tagcontents)))
+	col.w = append(col.w, w)
+	w.tag.display = mockdisplay
+	w.tag.w = w
+	w.tag.col = col
+	w.tag.row = &global.row
+
 	w.tag.fr = &MockFrame{}
+
 	w.body.fr = &MockFrame{}
+	w.body.display = mockdisplay
+
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
@@ -1004,6 +1055,8 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 		display: d,
 	}
 	w.body.file.AddObserver(&w.body)
+	w.tag.file.AddObserver(w)
+	w.tagfilenameend = len("Send")
 
 	// Put something in the snarf buffer.
 	const snarfbuf = "Hello, 世界\n"
@@ -1065,24 +1118,38 @@ func TestXfidreadEmptyFiles(t *testing.T) {
 }
 
 func TestXfidreadQWbodyQWtag(t *testing.T) {
+	// TODO(rjk): These tests are fragile in how they setup their skeleton.
+	// Use the common skeleton.
+	display := edwoodtest.NewDisplay()
+	configureGlobals()
+	const data = "This is an εxαmplε sentence.\n"
+
 	for _, tc := range []struct {
-		name string
-		q    uint64
+		name  string
+		q     uint64
+		setup string
+		want  string
 	}{
-		{"QWbody", QWbody},
-		{"QWtag", QWtag},
+		{"QWbody", QWbody, data, data},
+		// TODO(rjk): Why doesn't setTag1 run?
+		{"QWtag", QWtag, "εxαmplε", "εxαmplε"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			const data = "This is an εxαmplε sentence.\n"
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
+			w.col.safe = true
+			w.display = display
+			w.body.display = display
 			w.body.fr = &MockFrame{}
+			w.tag.display = display
+			w.tag.fr = &MockFrame{}
 			switch tc.q {
 			case QWbody:
-				w.body.file = file.MakeObservableEditableBuffer("", []rune(data))
+				w.body.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
 			case QWtag:
-				w.tag.file = file.MakeObservableEditableBuffer("", []rune(data))
+				w.tag.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
+				w.tagfilenameend = utf8.RuneCountInString(tc.setup)
 			}
 
 			x := &Xfid{
@@ -1097,11 +1164,11 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 				fs: mr,
 			}
 			xfidread(x)
-			if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+			if got, want := mr.fcall.Count, uint32(len(tc.want)); got != want {
 				t.Errorf("read %v bytes; want %v",
 					got, want)
 			}
-			if got, want := string(mr.fcall.Data), data; got != want {
+			if got, want := string(mr.fcall.Data), tc.want; got != want {
 				t.Errorf("got data %q; want %q", got, want)
 			}
 		})

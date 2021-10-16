@@ -20,12 +20,36 @@ import (
 )
 
 type Exectab struct {
-	name  string
-	fn    func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
-	mark  bool
+	// Name of the command.
+	name string
+
+	// Function run to implement this command.
+	//
+	// * t is the text where the middle click happened. This is frequently
+	// the tag and the command will affect the tag's window's body.
+	//
+	// * seltext comes from global.seltext. This is the last text clicked on
+	// with LMB. Middle clicks don't change unless the middle click has the
+	// side-effect of deleting the text. in which case it becomes nil.
+	//
+	// * argt text contains the argument to a MMB-LMB chord. If not
+	// delivering an argument this way, it will be nil.
+	//
+	// * arg is the string after the command as MMB-dragged over the command
+	// and arg.
+	fn func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
+
+	// Command is undoable (e.g. Cut) and requires establishing an Undo point.
+	mark bool
+
+	// Meaning of both flags is command-specific and is used (mostly) to let a single
+	// function implement two different commands. Note the TODO below
 	flag1 bool
 	flag2 bool
 }
+
+// TODO(rjk): This could be more idiomatic: each command implements an
+// interface. Flags would then be unnecessary.
 
 var exectab = []Exectab{
 	//	{ "Abort",		doabort,	false,	true /*unused*/,		true /*unused*/,		},
@@ -156,6 +180,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	r := make([]rune, q1-q0)
 	t.file.Read(q0, r)
 	e := lookup(string(r))
+
+	// Send commands to external client if the target window's event file is
+	// in use.
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		f = 0
 		if e != nil {
@@ -204,6 +231,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		return
 	}
+
+	// Invoke an internal command if it exists.
 	if e != nil {
 		if (e.mark && global.seltext != nil) && global.seltext.what == Body {
 			global.seq++
@@ -216,6 +245,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if len(words) > 1 {
 			arg = strings.TrimLeft(words[1], " \t\n")
 		}
+
+		// e.fn is the function from the Exectab. flag1 and flag2 are also from the Exectab.
 		e.fn(t, global.seltext, argt, e.flag1, e.flag2, arg)
 		return
 	}
@@ -317,7 +348,6 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if t.w != nil {
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			t.w.Commit(t)
-			t.w.SetTag()
 		}
 	} else {
 		if dosnarf { // Snarf command
@@ -330,7 +360,6 @@ func newcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	c := et.row.Add(nil, -1)
 	if c != nil {
 		w := c.Add(nil, nil, -1)
-		w.SetTag()
 		xfidlog(w, "new")
 	}
 }
@@ -400,7 +429,6 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	if t.w != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		t.w.Commit(t)
-		t.w.SetTag()
 	}
 }
 
@@ -465,7 +493,6 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	if samename {
 		t.file.Clean()
 	}
-	w.SetTag()
 	xfidlog(w, "get")
 }
 
@@ -494,7 +521,6 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 //
 // TODO(flux): Write this in terms of the various cases.
 func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) error {
-	w := oeb.GetCurObserver().(*Text).w
 	d, err := os.Stat(name)
 
 	// Putting to the same file that we already read from.
@@ -502,6 +528,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			oeb.UpdateInfo(name, d)
 		}
+
 		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
@@ -554,10 +581,11 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 			oeb.Clean()
 		}
 	}
-	w.SetTag()
 	return nil
 }
 
+// TODO(rjk): Why doesn't this handle its arguments the same as some of
+// the other commands?
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 	if et == nil || et.w == nil || et.w.body.file.IsDir() {
 		return
@@ -607,7 +635,7 @@ func seqof(w *Window, isundo bool) int {
 	return w.body.file.RedoSeq()
 }
 
-// TODO(rjk): Test the logic of Undo across multiple buffers very carefully.
+// TODO(rjk): Test the logic of Undo across multiple buffers very carefully: #383
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	if et == nil || et.w == nil {
 		return
@@ -905,6 +933,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 	c.iseditcommand = iseditcmd
 	c.text = s
+	env := os.Environ()
 	if newns {
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
@@ -922,11 +951,11 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 		// 	rfork(RFNAMEG|RFENVG|RFFDG|RFNOTEG); TODO(flux): I'm sure these settings are important
 
-		os.Setenv("winid", fmt.Sprintf("%d", winid))
+		env = append(env, fmt.Sprintf("winid=%d", winid))
 
 		if filename != "" {
-			os.Setenv("%", filename)
-			os.Setenv("samfile", filename)
+			env = append(env, fmt.Sprintf("%%=%v", filename))
+			env = append(env, fmt.Sprintf("samfile=%v", filename))
 		}
 		var fs *client.Fsys
 		var err error
@@ -971,7 +1000,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 
 	if argaddr != "" {
-		os.Setenv("acmeaddr", argaddr)
+		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
 	}
 	if global.acmeshell != "" {
 		return Hard()
@@ -1001,6 +1030,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	cmd.Stdin = sin
 	cmd.Stdout = sout
 	cmd.Stderr = serr
+	cmd.Env = env
 	err := cmd.Start()
 	if err != nil {
 		Fail()

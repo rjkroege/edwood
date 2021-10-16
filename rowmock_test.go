@@ -24,7 +24,6 @@ func configureGlobals() {
 
 	// Set up Undo to make sure that we see undoable results.
 	// By default, post-load, file.seq, file.putseq = 0, 0.
-	global.seq = 1
 }
 
 // updateText creates a minimal mock Text object from data embedded inside
@@ -59,7 +58,9 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 			file: file.MakeObservableEditableBuffer("", nil),
 		}, &content.RowTag, display),
 	}
+	global.row.tag.Insert(0, []rune(content.RowTag.Buffer), true)
 
+	// TODO(rjk): Consider calling Column.Init?
 	cols := make([]*Column, 0, len(content.Columns))
 	for _, sercol := range content.Columns {
 		col := &Column{
@@ -71,15 +72,19 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 			fortest: true,
 			w:       make([]*Window, 0),
 		}
+		col.safe = true
 		cols = append(cols, col)
 	}
+
+	// This has to be done first.
+	global.row.col = cols
+	configureGlobals()
 
 	for _, serwin := range content.Windows {
 		w := NewWindow().initHeadless(nil)
 		w.display = display
-		updateText(&w.body, &serwin.Body, display)
-		updateText(&w.tag, &serwin.Tag, display)
-		w.body.file.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
+		w.tag.display = display
+		w.body.display = display
 		w.body.w = w
 		w.body.what = Body
 		w.tag.w = w
@@ -90,10 +95,10 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 		w.col = wincol
 		w.body.col = wincol
 		w.tag.col = wincol
+		updateText(&w.tag, &serwin.Tag, display)
+		updateText(&w.body, &serwin.Body, display)
+		w.SetName(strings.SplitN(serwin.Tag.Buffer, " ", 2)[0])
 	}
-
-	global.row.col = cols
-	configureGlobals()
 }
 
 // InsertString inserts a string at the beginning of a buffer. It doesn't

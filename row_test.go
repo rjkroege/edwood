@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
@@ -176,6 +177,7 @@ func TestRowLoad(t *testing.T) {
 
 // checkDump checks Edwood's current state (got) matches loaded dump file content (want).
 func checkDump(t *testing.T, got, want *dumpfile.Content) {
+	t.Helper()
 	// Ignore some mismatch. Positions may not match exactly.
 	// Window tags may get "Put" added or "Undo" removed, and
 	// because of the change in the tag, selection within the tag may not match.
@@ -188,6 +190,7 @@ func checkDump(t *testing.T, got, want *dumpfile.Content) {
 	}
 	for i, w := range want.Windows {
 		g := got.Windows[i]
+		t.Logf("[%d], %+v", i, g)
 		if math.Abs(g.Position-w.Position) < 10 {
 			g.Position = w.Position
 		}
@@ -195,6 +198,7 @@ func checkDump(t *testing.T, got, want *dumpfile.Content) {
 			put  = " Put "
 			undo = " Undo "
 		)
+
 		if strings.Contains(g.Tag.Buffer, put) && !strings.Contains(w.Tag.Buffer, put) {
 			g.Tag.Buffer = w.Tag.Buffer
 		}
@@ -208,6 +212,16 @@ func checkDump(t *testing.T, got, want *dumpfile.Content) {
 		if w := strings.Fields(g.Tag.Buffer); len(w) > 0 {
 			name = w[0]
 		}
+
+		// setTag1 (executed inside of Load) will (correctly) adjust the text
+		// selection to be within a valid range for the buffer.
+		if nr := utf8.RuneCountInString(g.Tag.Buffer); w.Tag.Q0 > nr {
+			w.Tag.Q0 = nr
+		}
+		if nr := utf8.RuneCountInString(g.Tag.Buffer); w.Tag.Q1 > nr {
+			w.Tag.Q1 = nr
+		}
+
 		if n := len(name); n > 0 && name[n-1] == filepath.Separator { // is directory
 			g.Tag.Q0 = w.Tag.Q0
 			g.Tag.Q1 = w.Tag.Q1
@@ -457,6 +471,7 @@ func replacePathsForTesting(t *testing.T, b []byte, isJSON bool) []byte {
 		escape = func(s string) string { return s }
 	}
 
+	// TODO(rjk): Doesn't fix up the positions if the length of the path has changed.
 	b = bytes.Replace(b, []byte(gd+"/"),
 		[]byte(escape(d+string(filepath.Separator))), -1)
 	b = bytes.Replace(b, []byte(gd),

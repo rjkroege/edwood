@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -356,8 +357,12 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 	dumpid := make(map[*file.ObservableEditableBuffer]int)
 
 	for i, c := range r.col {
+		pos := 100.0 * float64(c.r.Min.X-global.row.r.Min.X) / float64(r.r.Dx())
+		if math.IsNaN(pos) || math.IsInf(pos, 0) {
+			pos = 0.
+		}
 		dump.Columns[i] = dumpfile.Column{
-			Position: 100.0 * float64(c.r.Min.X-global.row.r.Min.X) / float64(r.r.Dx()),
+			Position: pos,
 			Tag: dumpfile.Text{
 				Buffer: c.tag.file.String(),
 				Q0:     c.tag.q0,
@@ -393,6 +398,10 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 			// We always include the font name.
 			fontname := t.font
 
+			pos := 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy())
+			if math.IsNaN(pos) || math.IsInf(pos, 0) {
+				pos = 0.
+			}
 			dump.Windows = append(dump.Windows, &dumpfile.Window{
 				Column: i,
 				Body: dumpfile.Text{
@@ -400,7 +409,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 					Q0:     w.body.q0,
 					Q1:     w.body.q1,
 				},
-				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
+				Position: pos,
 				Font:     fontname,
 			})
 			dw := dump.Windows[len(dump.Windows)-1]
@@ -468,9 +477,17 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	if win.Type != dumpfile.Zerox {
 		w.SetName(subl[0])
 	}
+	if subl[0] == "" {
+		// TODO(rjk): I can remove this and just load the tag from the dumpfile?
+		// An empty unmutated tag will not have its tag setup so force that to
+		// happen.
+		w.ForceSetWindowTag()
+	}
 
-	// TODO(rjk): I feel that the code for managing tags could be extracted and unified.
-	// Maybe later. Window.setTag1 would seem fixable.
+	// TODO(rjk): I feel that the code for managing tags could be extracted
+	// and unified. Maybe later. Window.setTag1 would seem fixable. This code
+	// doesn't really belong here. The planned tagindex scheme would subsume
+	// this logic? We'd build the index from the contents of the buffer?
 	afterbar := strings.SplitN(subl[1], "|", 2)
 	if len(afterbar) != 2 {
 		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
@@ -478,14 +495,23 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	w.ClearTag()
 
 	w.tag.Insert(w.tag.file.Nr(), []rune(afterbar[1]), true)
-	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
+
+	// Handle coordinates outside of the tag text.
+	tnr := w.tag.file.Nr()
+	t0, t1 := win.Tag.Q0, win.Tag.Q1
+	if t0 > tnr {
+		t0 = tnr
+	}
+	if t1 > tnr {
+		t1 = tnr
+	}
+
+	w.tag.Show(t0, t1, true)
 
 	if win.Type == dumpfile.Unsaved {
 		w.body.LoadReader(0, subl[0], strings.NewReader(win.Body.Buffer), true)
 		w.body.file.Modded()
 
-		// This shows an example where an observer would be useful?
-		w.SetTag()
 	} else if win.Type != dumpfile.Zerox && len(subl[0]) > 0 && subl[0][0] != '+' && subl[0][0] != '-' {
 		// Implementation of the Get command: open the file.
 		get(&w.body, nil, nil, false, false, "")

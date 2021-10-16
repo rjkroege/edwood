@@ -101,7 +101,6 @@ func xfidopen(x *Xfid) {
 			if w.nopen[q] == 0 {
 				if !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = false
-					w.SetTag()
 				}
 			}
 			w.nopen[q]++
@@ -219,7 +218,6 @@ func xfidclose(x *Xfid) {
 				}
 				if q == QWevent && !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = true
-					w.SetTag()
 				}
 				if q == QWevent {
 					w.dumpstr = ""
@@ -424,7 +422,6 @@ func xfidwrite(x *Xfid) {
 				}
 				t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			}
-			w.SetTag()
 			if qid == QWwrsel {
 				w.wrselrange.q1 += len(r)
 			}
@@ -519,7 +516,6 @@ func xfidwrite(x *Xfid) {
 			t.Show(q0+len(r), q0+len(r), false)
 		}
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
-		w.SetTag()
 		w.addr.q0 += len(r)
 		w.addr.q1 = w.addr.q0
 		fc.Count = x.fcall.Count
@@ -544,7 +540,6 @@ func xfidctlwrite(x *Xfid, w *Window) {
 	// defer log.Println("done xfidctlwrite")
 	var err error
 	const scrdraw = false
-	settag := false
 
 	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
@@ -582,12 +577,10 @@ forloop:
 			// TODO(rjk): Is this right?
 			t.file.Reset()
 			t.file.Clean()
-			settag = true
 		case "dirty": // mark window 'dirty'
 			t := &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
 			t.file.Modded()
-			settag = true
 		case "show": // show dot
 			t := &w.body
 			t.Show(t.q0, t.q1, true)
@@ -652,7 +645,6 @@ forloop:
 			w.body.q0 = w.addr.q0
 			w.body.q1 = w.addr.q1
 			w.body.SetSelect(w.body.q0, w.body.q1)
-			settag = true
 		case "addr=dot": // set addr
 			w.addr.q0 = w.body.q0
 			w.addr.q1 = w.body.q1
@@ -666,14 +658,12 @@ forloop:
 		case "mark": // mark file
 			global.seq++
 			w.body.file.Mark(global.seq)
-			settag = true
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
 		case "menu": // enable automatic menu
 			w.filemenu = true
 		case "cleartag": // wipe tag right of bar
 			w.ClearTag()
-			settag = true
 		case "font":
 			if len(words) < 2 {
 				err = ErrBadCtl
@@ -703,9 +693,6 @@ forloop:
 	}
 	x.respond(&fc, err)
 
-	if settag && w != nil {
-		w.SetTag()
-	}
 	if scrdraw && w != nil {
 		t := &w.body
 		w.body.ScrDraw(t.fr.GetFrameFillStatus().Nchars)

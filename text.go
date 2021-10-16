@@ -1607,6 +1607,9 @@ func (t *Text) Reset() {
 	t.file.ResetBuffer()
 }
 
+// TODO(rjk): Is this method on the right object. It reaches into Window
+// for nearly every reference to t. Assess how DirName is used and adjust
+// appropriately.
 func (t *Text) dirName(name string) string {
 	if t == nil || t.w == nil || filepath.IsAbs(name) {
 		return name
@@ -1636,4 +1639,10 @@ func (t *Text) AbsDirName(name string) string {
 		return filepath.Join(global.wdir, d)
 	}
 	return filepath.Clean(d)
+}
+
+// DebugString provides a Text representation convenient for logging for
+// debugging.
+func (t *Text) DebugString() string {
+	return fmt.Sprintf("t.what (kind): %s contents: %q", t.what, t.file.String())
 }

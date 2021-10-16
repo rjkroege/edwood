@@ -47,7 +47,7 @@ const (
 	//	Infinity  = 0x7FFFFFFF
 
 	EVENTSIZE = 256
-	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
+	BUFSIZE   = 8*1024 + plan9.IOHDRSZ
 	RBUFSIZE  = BUFSIZE / utf8.UTFMax
 
 	Empty = 0

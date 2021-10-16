@@ -254,7 +254,6 @@ func plumbshow(m *plumb.Message) {
 	r, _, _ = util.Cvttorunes(m.Data, len(m.Data))
 	w.body.Insert(0, r, true)
 	w.body.file.Clean()
-	w.SetTag()
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
 	xfidlog(w, "new")
@@ -316,7 +315,6 @@ func search(ct *Text, r []rune) bool {
 		if runes.Equal(s[bi:limit], r) {
 			if ct.w != nil {
 				ct.Show(q, q+n, true)
-				ct.w.SetTag()
 			} else {
 				ct.q0 = q
 				ct.q1 = q + n
@@ -576,7 +574,6 @@ func openfile(t *Text, e *Expand) *Window {
 		w.SetName(e.name)
 		t.Load(0, e.name, true)
 		t.file.Clean()
-		t.w.SetTag()
 		t.w.tag.SetSelect(t.w.tag.file.Nr(), t.w.tag.file.Nr())
 		if ow != nil {
 			for _, inc := range ow.incl {
@@ -606,7 +603,6 @@ func openfile(t *Text, e *Expand) *Window {
 		r.q1 = t.q1
 	}
 	t.Show(r.q0, r.q1, true)
-	t.w.SetTag()
 	global.seltext = t
 	if e.jump {
 		global.row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(global.tagfont, global.row.display).Height()-4)))
@@ -628,7 +624,8 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 	filenames := strings.Split(s, " ")
 	if len(filenames) == 1 && filenames[0] == "" && et.col != nil {
 		w := et.col.Add(nil, nil, -1)
-		w.SetTag()
+		// Note special case for empty windows.
+		w.ForceSetWindowTag()
 		xfidlog(w, "new")
 		return
 	}
