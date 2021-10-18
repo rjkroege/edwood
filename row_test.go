@@ -457,6 +457,7 @@ func replacePathsForTesting(t *testing.T, b []byte, isJSON bool) []byte {
 		escape = func(s string) string { return s }
 	}
 
+	// TODO(rjk): Doesn't fix up the positions if the length of the path has changed.
 	b = bytes.Replace(b, []byte(gd+"/"),
 		[]byte(escape(d+string(filepath.Separator))), -1)
 	b = bytes.Replace(b, []byte(gd),

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -356,8 +357,12 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 	dumpid := make(map[*file.ObservableEditableBuffer]int)
 
 	for i, c := range r.col {
+		pos := 100.0 * float64(c.r.Min.X-global.row.r.Min.X) / float64(r.r.Dx())
+		if math.IsNaN(pos) || math.IsInf(pos, 0) {
+			pos = 0.
+		}
 		dump.Columns[i] = dumpfile.Column{
-			Position: 100.0 * float64(c.r.Min.X-global.row.r.Min.X) / float64(r.r.Dx()),
+			Position: pos,
 			Tag: dumpfile.Text{
 				Buffer: c.tag.file.String(),
 				Q0:     c.tag.q0,
@@ -393,6 +398,10 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 			// We always include the font name.
 			fontname := t.font
 
+			pos := 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy())
+			if math.IsNaN(pos) || math.IsInf(pos, 0) {
+				pos = 0.
+			}
 			dump.Windows = append(dump.Windows, &dumpfile.Window{
 				Column: i,
 				Body: dumpfile.Text{
@@ -400,7 +409,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 					Q0:     w.body.q0,
 					Q1:     w.body.q1,
 				},
-				Position: 100.0 * float64(w.r.Min.Y-c.r.Min.Y) / float64(c.r.Dy()),
+				Position: pos,
 				Font:     fontname,
 			})
 			dw := dump.Windows[len(dump.Windows)-1]

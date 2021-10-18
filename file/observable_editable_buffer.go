@@ -12,9 +12,10 @@ import (
 	"github.com/rjkroege/edwood/util"
 )
 
-// The ObservableEditableBuffer is used by the main program
-// to add, remove and check on the current observer(s) for a Text.
-// Text in turn, implements BufferObserver for the various required callback functions in BufferObserver.
+// The ObservableEditableBuffer is used by the main program to add,
+// remove and check on the current observer(s) for a Text. Text in turn,
+// implements BufferObserver for the various required callback functions
+// in BufferObserver.
 type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{}
@@ -383,6 +384,8 @@ func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 
 // String is a forwarding function for rune_array.String.
 // Returns the entire buffer as a string.
+// TODO(rjk): Consider making this aware of the cache. (If test results depend
+// on this not
 func (e *ObservableEditableBuffer) String() string {
 	return e.f.b.String()
 }

@@ -13,7 +13,7 @@ import (
 // View-Controller.
 //
 // A File tracks several related concepts. First it is a text buffer with
-// undo/redo back to an initial state. Mark (undo.RuneArray.Commit) notes
+// undo/redo back to an initial state. Mark (file.Buffer.Commit) notes
 // an undo point.
 //
 // Lastly the text buffer might be clean/dirty. A clean buffer is possibly
