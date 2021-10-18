@@ -18,7 +18,7 @@ func TestDelObserver(t *testing.T) {
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
-		err := f.DelObserver(&testObserver{t})
+		err := f.DelObserver(MakeTestObserver(t))
 		if err == nil {
 			t.Errorf("expected panic when deleting nonexistent observers")
 		}
@@ -182,6 +182,8 @@ func TestFileLoadUndoHash(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash bad initial name. got %v want %v", got, want)
 	}
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	buffy := bytes.NewBuffer([]byte(s2 + s2))
 
@@ -222,12 +224,19 @@ func TestFileLoadUndoHash(t *testing.T) {
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
+	to.Check([]*observation{{
+		callback: "Inserted",
+		q0:       0,
+		payload:  "byebye",
+	},
+	})
 }
 
 // Multiple interleaved actions do the right thing.
 func TestFileInsertDeleteUndo(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
-	f.AddObserver(&testObserver{t})
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	// Empty File is an Undo point and considered clean.
 	f.Mark(1)
@@ -259,6 +268,38 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
+	to.Check([]*observation{
+		{
+			callback: "Inserted",
+			q0:       0,
+			payload:  "hi 海老麺",
+		},
+		{
+			callback: "Inserted",
+			q0:       0,
+			payload:  "bye",
+		},
+		{
+			callback: "Deleted",
+			q0:       0,
+			q1:       1,
+		},
+		{
+			callback: "Deleted",
+			q0:       1,
+			q1:       3,
+		},
+		{
+			callback: "Inserted",
+			q0:       f.Nr() - 1,
+			payload:  s1,
+		},
+		{
+			callback: "Deleted",
+			q0:       5,
+			q1:       5 + len([]rune(s1)),
+		},
+	})
 
 	f.Undo(true) // 2 deletes should get removed because they have the same sequence.
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
@@ -269,6 +310,28 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 		&stateSummary{false, true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
+	to.Check([]*observation{
+		{
+			callback: "Inserted",
+			q0:       1,
+			payload:  "eh",
+		},
+		{
+			callback: "Inserted",
+			q0:       0,
+			payload:  "b",
+		},
+		{
+			callback: "Deleted",
+			q0:       0,
+			q1:       1,
+		},
+		{
+			callback: "Deleted",
+			q0:       1,
+			q1:       3,
+		},
+	})
 }
 
 func TestFileRedoSeq(t *testing.T) {
@@ -347,6 +410,8 @@ func TestFileUpdateInfoError(t *testing.T) {
 func TestFileNameSettingWithScratch(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
 	// Empty File is an Undo point and considered clean
+	to := MakeTestObserver(t)
+	f.AddObserver(to)
 
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
@@ -384,4 +449,5 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	if got, want := f.isscratch, false; got != want {
 		t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 	}
+	to.Check([]*observation{})
 }

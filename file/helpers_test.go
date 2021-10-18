@@ -1,6 +1,7 @@
 package file
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -87,15 +88,63 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 	}
 }
 
-// TODO(rjk): These should enforce observer callback contents in a flexible way.
+type observation struct {
+	callback string
+	q0       int
+	q1       int
+	payload  string
+}
+
+func (o *observation) String() string {
+	if o.callback == "Inserted" {
+		return fmt.Sprintf("%s %q at %d", o.callback, o.payload, o.q0)
+	}
+	return fmt.Sprintf("%s [%d, %d)", o.callback, o.q0, o.q1)
+}
+
 type testObserver struct {
-	t *testing.T
+	t    *testing.T
+	tape []*observation
+}
+
+func MakeTestObserver(t *testing.T) *testObserver {
+	return &testObserver{
+		t: t,
+	}
 }
 
 func (to *testObserver) Inserted(q0 int, r []rune) {
-	to.t.Logf("Inserted at %d: %q", q0, string(r))
+	o := &observation{
+		callback: "Inserted",
+		q0:       q0,
+		payload:  string(r),
+	}
+	to.t.Log(o)
+	to.tape = append(to.tape, o)
 }
 
 func (to *testObserver) Deleted(q0, q1 int) {
-	to.t.Logf("Deleted range [%d, %d)", q0, q1)
+	o := &observation{
+		callback: "Deleted",
+		q0:       q0,
+		q1:       q1,
+	}
+	to.t.Log(o)
+	to.tape = append(to.tape, o)
+}
+
+func (to *testObserver) Check(expected []*observation) {
+	to.t.Helper()
+	defer func() { to.tape = nil }()
+
+	if got, want := len(to.tape), len(expected); got != want {
+		to.t.Errorf("testObserver: tape length: got %d, want %d", got, want)
+		return
+	}
+
+	for i, o := range to.tape {
+		if got, want := o, expected[i]; *got != *want {
+			to.t.Errorf("observation [%d] got: %v, want %v", i, got, want)
+		}
+	}
 }
