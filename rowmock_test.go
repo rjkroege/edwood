@@ -24,7 +24,6 @@ func configureGlobals() {
 
 	// Set up Undo to make sure that we see undoable results.
 	// By default, post-load, file.seq, file.putseq = 0, 0.
-	global.seq = 1
 }
 
 // updateText creates a minimal mock Text object from data embedded inside

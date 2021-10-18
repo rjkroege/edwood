@@ -143,6 +143,7 @@ func TestEdit(t *testing.T) {
 const contents = "This is a\nshort text\nto try addressing\n"
 const alt_contents = "A different text\nWith other contents\nSo there!\n"
 
+// Be sure to adjust the global.seq correctly to reflect initial test state.
 func makeSkeletonWindowModel(dot Range, filename string) *Window {
 	MakeWindowScaffold(&dumpfile.Content{
 		Columns: []dumpfile.Column{
@@ -235,8 +236,11 @@ func TestEditCmdWithFile(t *testing.T) {
 			w := makeSkeletonWindowModel(test.dot, test.filename)
 
 			// The filename actually exists so needs to start as if it's saved.
+			global.seq = 1
 			w.body.file.Clean()
 
+			// Bump seq before every undoable mutation.
+			global.seq++
 			editcmd(&w.body, []rune(test.expr))
 
 			n, _ := w.body.ReadB(0, buf[:])
@@ -385,6 +389,8 @@ func TestEditMultipleWindows(t *testing.T) {
 			"hello" + contents,
 			alt_contents,
 		}, []string{"This is a\nshort text\nto try addressing\n"}},
+
+		// TODO(rjk): multiple actions: X, u, e combos
 	}
 
 	buf := make([]rune, 8192)
@@ -394,6 +400,7 @@ func TestEditMultipleWindows(t *testing.T) {
 			t.Logf("[%d] command %q", i, test.expr)
 			warnings = []*Warning{}
 			makeSkeletonWindowModel(test.dot, test.filename)
+			global.seq = 1
 
 			// TODO(rjk): Make this nicer.
 			if test.expr == "1,$p\nu" || test.expr == "1,$p\nu-1\n" {
@@ -407,6 +414,7 @@ func TestEditMultipleWindows(t *testing.T) {
 
 			w := global.row.col[0].w[0]
 			w.Lock('M')
+			global.seq++
 			editcmd(&w.body, []rune(test.expr))
 			w.Unlock()
 
