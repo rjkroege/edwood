@@ -103,8 +103,6 @@ type Buffer struct {
 	head          int       // index for the next action to add
 	currentAction *action   // action for the current change group
 	savedAction   *action
-	mod           bool // true if the file has been changed. [private]
-	treatasclean  bool // Window Clean tests should succeed if set. [private]
 }
 
 type ChangeInfo struct {
@@ -130,7 +128,6 @@ func NewBuffer(content []byte, nr int) *Buffer {
 		t.begin.next = p
 		t.end.prev = p
 	}
-	t.mod = false
 	return t
 }
 
@@ -141,7 +138,6 @@ func NewBufferNoNr(content []byte) *Buffer {
 // InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
 func (b *Buffer) InsertWithNr(off int64, data []byte, nr int) error {
-	b.treatasclean = false
 	if len(data) == 0 {
 		return nil
 	}
@@ -193,7 +189,6 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
 func (b *Buffer) Delete(off, length int64) error {
-	b.treatasclean = false
 	if length <= 0 {
 		return nil
 	}
@@ -411,7 +406,6 @@ func (b *Buffer) Clean() {
 	} else {
 		b.savedAction = nil
 	}
-	b.mod = false
 }
 
 // Dirty reports whether the current state of the buffer is different from the
@@ -573,24 +567,9 @@ func (b *Buffer) HasUndoableChanges() bool {
 func (b *Buffer) HasRedoableChanges() bool {
 	return b.head <= len(b.actions)-1
 }
-func (b *Buffer) Mod() bool {
-	return b.mod
-}
-func (b *Buffer) Modded() {
-	b.mod = true
-	b.treatasclean = false
-}
 
 func (b *Buffer) TreatAsDirty() bool {
-	return !b.treatasclean && b.Dirty()
-}
-
-func (b *Buffer) TreatAsClean() {
-	b.treatasclean = true
-}
-
-func (b *Buffer) MarkUnclean() {
-	b.treatasclean = false
+	return b.Dirty()
 }
 
 func (s *span) Nr() int {
