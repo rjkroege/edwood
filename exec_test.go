@@ -224,5 +224,3 @@ func TestCut(t *testing.T) {
 		t.Errorf("text q0 wrong after cut got %v, want %v", got, want)
 	}
 }
-
-// TODO(rjk): test undo.
