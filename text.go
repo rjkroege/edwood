@@ -1637,3 +1637,9 @@ func (t *Text) AbsDirName(name string) string {
 	}
 	return filepath.Clean(d)
 }
+
+// DebugString provides a Text representation convenient for logging for
+// debugging.
+func (t *Text) DebugString() string {
+	return fmt.Sprintf("t.what (kind): %s contents: %q", t.what, t.file.String())
+}

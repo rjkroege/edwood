@@ -15,9 +15,10 @@ import (
 // TODO(rjk): Document what each of these are.
 type globals struct {
 	globalincref bool
-	seq          int
-	maxtab       uint // size of a tab, in units of the '0' character
-	tabexpand    bool // defines whether to expand tab to spaces
+
+	seq       int  // undo/redo sequence across all file.OEBs
+	maxtab    uint // size of a tab, in units of the '0' character
+	tabexpand bool // defines whether to expand tab to spaces
 
 	tagfont     string
 	mouse       *draw.Mouse

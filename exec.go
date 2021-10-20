@@ -20,12 +20,36 @@ import (
 )
 
 type Exectab struct {
-	name  string
-	fn    func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
-	mark  bool
+	// Name of the command.
+	name string
+
+	// Function run to implement this command.
+	//
+	// * t is the text where the middle click happened. This is frequently
+	// the tag and the command will affect the tag's window's body.
+	//
+	// * seltext comes from global.seltext. This is the last text clicked on
+	// with LMB. Middle clicks don't change unless the middle click has the
+	// side-effect of deleting the text. in which case it becomes nil.
+	//
+	// * argt text contains the argument to a MMB-LMB chord. If not
+	// delivering an argument this way, it will be nil.
+	//
+	// * arg is the string after the command as MMB-dragged over the command
+	// and arg.
+	fn func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
+
+	// Command is undoable (e.g. Cut) and requires establishing an Undo point.
+	mark bool
+
+	// Meaning of both flags is command-specific and is used (mostly) to let a single
+	// function implement two different commands. Note the TODO below
 	flag1 bool
 	flag2 bool
 }
+
+// TODO(rjk): This could be more idiomatic: each command implements an
+// interface. Flags would then be unnecessary.
 
 var exectab = []Exectab{
 	//	{ "Abort",		doabort,	false,	true /*unused*/,		true /*unused*/,		},
@@ -156,6 +180,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	r := make([]rune, q1-q0)
 	t.file.Read(q0, r)
 	e := lookup(string(r))
+
+	// Send commands to external client if the target window's event file is
+	// in use.
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		f = 0
 		if e != nil {
@@ -204,6 +231,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		return
 	}
+
+	// Invoke an internal command if it exists.
 	if e != nil {
 		if (e.mark && global.seltext != nil) && global.seltext.what == Body {
 			global.seq++
@@ -216,6 +245,8 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if len(words) > 1 {
 			arg = strings.TrimLeft(words[1], " \t\n")
 		}
+
+		// e.fn is the function from the Exectab. flag1 and flag2 are also from the Exectab.
 		e.fn(t, global.seltext, argt, e.flag1, e.flag2, arg)
 		return
 	}
