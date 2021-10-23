@@ -210,6 +210,12 @@ func d_cmd(t *Text, cp *Cmd) bool {
 func D1(t *Text) {
 	if t.w.body.file.HasMultipleObservers() || t.w.Clean(false) {
 		t.col.Close(t.w, true)
+
+		// To fix #385, we must decrement the selected target window's
+		// ref count one extra time.
+		if t.w.body.file.HasMultipleObservers() {
+			t.w.ref.Dec()
+		}
 	}
 }
 
@@ -860,12 +866,15 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 	loopstruct.cp = cp
 	loopstruct.XY = XY
 	loopstruct.w = []*Window{}
+	// Construct the list of windows to work on.
 	global.row.AllWindows(func(w *Window) { alllooper(w, &loopstruct) })
 
 	// add a ref to all windows to keep safe windows accessed by X
 	// that would not otherwise have a ref to hold them up during
 	// the shenanigans.  note this with globalincref so that any
 	// newly created windows start with an extra reference.
+	// TODO(rjk): We lock all windows but only mutate some of them?
+	// Improve concurrency opportunities.
 	global.row.AllWindows(func(w *Window) { alllocker(w, true) })
 	global.globalincref = true
 
@@ -875,6 +884,7 @@ func filelooper(t *Text, cp *Cmd, XY bool) {
 		t.w.Unlock()
 	}
 
+	// alllooper generates the list of subject windows above.
 	for i := range loopstruct.w {
 		targ := &loopstruct.w[i].body
 		if targ != nil && targ.w != nil {

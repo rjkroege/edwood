@@ -83,6 +83,7 @@ func (e *ObservableEditableBuffer) DelObserver(observer BufferObserver) error {
 		}
 		return nil
 	}
+	// This never happens right?
 	return fmt.Errorf("can't find editor in File.DelObserver")
 }
 
@@ -92,7 +93,7 @@ func (e *ObservableEditableBuffer) SetCurObserver(observer BufferObserver) {
 }
 
 // GetCurObserver gets the current observer and returns it as a interface type.
-func (e *ObservableEditableBuffer) GetCurObserver() interface{} {
+func (e *ObservableEditableBuffer) GetCurObserver() BufferObserver {
 	return e.currobserver
 }
 

@@ -207,6 +207,8 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	return w
 }
 
+// Close called to remove w from Column c. Set dofree to true to actually
+// delete window w. Otherwise, w will be moved to another Column.
 func (c *Column) Close(w *Window, dofree bool) {
 	var (
 		r            image.Rectangle
@@ -225,12 +227,17 @@ func (c *Column) Close(w *Window, dofree bool) {
 	util.AcmeError("can't find window", nil)
 Found:
 	r = w.r
+	// Crash noted in #385 happens when closing windows with the
+	// Edit command. Col.Close is invoked to remove the windows by ecmd.go/D1.
+	// When we place the Window in the new column, we'll set this. Or we'll
+	// delete the Window in the dofree block.
 	w.tag.col = nil
 	w.body.col = nil
 	w.col = nil
 	didmouse = restoremouse(w)
 	if dofree {
 		w.Delete()
+		// This Close call will decrement the w's reference count.
 		w.Close()
 	}
 	c.w = append(c.w[:i], c.w[i+1:]...)
