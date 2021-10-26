@@ -52,7 +52,6 @@ func main() {
 	// TODO(rjk): Do this here.
 	// global = makeglobals()
 	g := global
-	g.tagfont = *varfontflag
 
 	// TODO(rjk): Push this code into a separate function.
 	var dump *dumpfile.Content
@@ -74,6 +73,7 @@ func main() {
 		}
 	}
 
+	g.tagfont = *varfontflag
 	os.Setenv("font", *varfontflag)
 
 	draw.Main(func(dd *draw.Device) {
