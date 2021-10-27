@@ -315,19 +315,20 @@ func TestPieceNr(t *testing.T) {
 	b.checkContent("TestPieceNr: First insert", t, string(manderianBytes))
 
 	b.Insert(b.Nr(), eng1)
-	b.checkContent("TestPieceNr: Second insert", t, string(eng1)+string(manderianBytes))
+	b.checkContent("TestPieceNr: Second insert", t, string(manderianBytes)+string(eng1))
 
 	b.Insert(0, eng2)
-	buffAfterInserts := string(eng2) + string(eng1) + string(manderianBytes)
-	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
+	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
+	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts+"extra")
 
 	b.Delete(13, 10)
-	buffAfterDelete := buffAfterInserts[:13] + buffAfterInserts[23:]
-	b.checkContent("TestPieceNr: after 1 delete", t, buffAfterDelete)
+	buffAfterDelete := []rune(buffAfterInserts)
+	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
+	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
 	b.Insert(8, eng3)
-	buffAfterDelete = buffAfterDelete[:8] + string(eng3) + buffAfterDelete[8:]
-	b.checkContent("TestPieceNr: after everything", t, buffAfterDelete)
+	buffAfterDelete = append(buffAfterDelete[:8], append([]rune(string(eng3)), buffAfterDelete[8:]...)...)
+	b.checkContent("TestPieceNr: after everything", t, string(buffAfterDelete))
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
