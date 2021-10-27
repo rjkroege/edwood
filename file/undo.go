@@ -86,7 +86,6 @@ import (
 	"errors"
 	"io"
 	"time"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -578,25 +577,4 @@ func (s *span) Nr() int {
 		}
 	}
 	return nr
-}
-
-func (b *Buffer) FindNewNonAscii() (int, int) {
-	for p := b.begin; p != nil; p = p.next {
-		if p.len() > p.nr {
-			return p.FirstNonAscii()
-		}
-	}
-	return -1, 1
-}
-
-func (p *piece) FirstNonAscii() (int, int) {
-	var nonAscii, width int
-	for i := range p.data {
-		if p.data[i] > unicode.MaxASCII {
-			_, width = utf8.DecodeRune(p.data[i:])
-			nonAscii = i
-			return nonAscii, width
-		}
-	}
-	return -1, 1
 }
