@@ -312,11 +312,22 @@ func TestPieceNr(t *testing.T) {
 	eng3 := []byte("In the midst")
 
 	b.Insert(0, manderianBytes)
+	b.checkContent("TestPieceNr: First insert", t, string(manderianBytes))
+
 	b.Insert(b.Nr(), eng1)
+	b.checkContent("TestPieceNr: Second insert", t, string(eng1)+string(manderianBytes))
+
 	b.Insert(0, eng2)
+	buffAfterInserts := string(eng2) + string(eng1) + string(manderianBytes)
+	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
 	b.Delete(13, 10)
+	buffAfterDelete := buffAfterInserts[:13] + buffAfterInserts[23:]
+	b.checkContent("TestPieceNr: after 1 delete", t, buffAfterDelete)
+
 	b.Insert(8, eng3)
+	buffAfterDelete = buffAfterDelete[:8] + string(eng3) + buffAfterDelete[8:]
+	b.checkContent("TestPieceNr: after everything", t, buffAfterDelete)
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
@@ -420,4 +431,8 @@ func (t *Buffer) allContent() string {
 
 func countRunes(b *Buffer) int64 {
 	return int64(utf8.RuneCount(b.Bytes()))
+}
+
+func NewBufferNoNr(content []byte) *Buffer {
+	return NewBuffer(content, utf8.RuneCount(content))
 }
