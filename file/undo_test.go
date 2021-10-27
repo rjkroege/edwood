@@ -319,7 +319,7 @@ func TestPieceNr(t *testing.T) {
 
 	b.Insert(0, eng2)
 	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
-	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts+"extra")
+	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
 	b.Delete(13, 10)
 	buffAfterDelete := []rune(buffAfterInserts)
