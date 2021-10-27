@@ -131,10 +131,6 @@ func NewBuffer(content []byte, nr int) *Buffer {
 	return t
 }
 
-func NewBufferNoNr(content []byte) *Buffer {
-	return NewBuffer(content, utf8.RuneCount(content))
-}
-
 // InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
 func (b *Buffer) InsertWithNr(off int64, data []byte, nr int) error {

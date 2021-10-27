@@ -324,6 +324,7 @@ func TestPieceNr(t *testing.T) {
 	b.Delete(13, 10)
 	buffAfterDelete := []rune(buffAfterInserts)
 	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
+	fmt.Printf("Len of buff before: %v, Length of buff after: %v\n", len([]byte(string(buffAfterDelete))), len(buffAfterInserts)) // Should be a difference of 10
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
 	b.Insert(8, eng3)
