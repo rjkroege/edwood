@@ -84,6 +84,7 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 	"unicode/utf8"
@@ -132,13 +133,16 @@ func NewBuffer(content []byte, nr int) *Buffer {
 
 // InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) InsertWithNr(off int64, data []byte, nr int) error {
+func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
+	off := start.b
+	fmt.Printf("Length is: %v\n inserting at: %v\n", b.Nr(), start.b)
 	if len(data) == 0 {
 		return nil
 	}
 
 	p, offset := b.findPiece(off)
 	if p == nil {
+		fmt.Printf("Failed with: %v", string(data))
 		return ErrWrongOffset
 	} else if p == b.cachedPiece {
 		// just update the last inserted piece
@@ -175,7 +179,7 @@ func (b *Buffer) InsertWithNr(off int64, data []byte, nr int) error {
 	return nil
 }
 
-func (b *Buffer) Insert(off int64, data []byte) error {
+func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
 	return b.InsertWithNr(off, data, utf8.RuneCount(data))
 }
 
@@ -183,7 +187,9 @@ func (b *Buffer) Insert(off int64, data []byte) error {
 // if the portion isn't in the range of the buffer size. If the length exceeds the
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
-func (b *Buffer) Delete(off, length int64) error {
+func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
+	off := startOff.b
+	length := endOff.b - startOff.b
 	if length <= 0 {
 		return nil
 	}
@@ -191,7 +197,7 @@ func (b *Buffer) Delete(off, length int64) error {
 	p, offset := b.findPiece(off)
 	if p == nil {
 		return ErrWrongOffset
-	} else if p == b.cachedPiece && p.delete(offset, length) {
+	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.r-startOff.r)) {
 		// try to update the last inserted piece if the length doesn't exceed
 		return nil
 	}
@@ -526,11 +532,12 @@ func (p *piece) insert(off int, data []byte, nr int) {
 	p.nr += nr
 }
 
-func (p *piece) delete(off int, length int64) bool {
+func (p *piece) delete(off int, length int64, nr int) bool {
 	if int64(off)+length > int64(len(p.data)) {
 		return false
 	}
 	p.data = append(p.data[:off], p.data[off+int(length):]...)
+	p.nr -= nr
 	return true
 }
 
@@ -565,6 +572,30 @@ func (b *Buffer) HasRedoableChanges() bool {
 
 func (b *Buffer) TreatAsDirty() bool {
 	return b.Dirty()
+}
+
+func (b *Buffer) RuneTuple(off int64) OffSetTuple {
+	offTuple := OffSetTuple{
+		b: 0,
+		r: off,
+	}
+	for p := b.begin; p != nil && off > 0; p = p.next {
+		nrAfterPiece := off - int64(p.nr)
+		if nrAfterPiece > 0 {
+			offTuple.b += int64(p.len())
+			off += nrAfterPiece
+		} else if p.len() == p.nr {
+			offTuple.b += int64(p.len())
+		} else {
+			for i := 0; i < p.len() && off > 0; i++ {
+				_, size := utf8.DecodeRune(p.data[i:])
+				offTuple.b += int64(size)
+				off -= 1
+				i += size
+			}
+		}
+	}
+	return offTuple
 }
 
 func (s *span) Nr() int {
