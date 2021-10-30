@@ -1,3 +1,4 @@
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris) && !duitdraw
 // +build darwin dragonfly freebsd linux netbsd openbsd solaris
 // +build !duitdraw
 
