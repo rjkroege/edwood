@@ -1,3 +1,4 @@
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris) && mux9p
 // +build darwin dragonfly freebsd linux netbsd openbsd solaris
 // +build mux9p
 

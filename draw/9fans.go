@@ -1,3 +1,4 @@
+//go:build !duitdraw && !windows
 // +build !duitdraw,!windows
 
 package draw
