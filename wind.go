@@ -60,6 +60,11 @@ type Window struct {
 	editoutlk   chan bool
 }
 
+var (
+	_ file.BufferObserver    = (*Window)(nil) // Enforce at compile time that Window implements BufferObserver
+	_ file.TagStatusObserver = (*Window)(nil) // Enforce at compile time that Window implements BufferObserver
+)
+
 func NewWindow() *Window {
 	return &Window{}
 }
@@ -82,8 +87,12 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
 
+	// Tag setup.
 	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(&w.tag)
+	// w observes tag to update the tag index.
+	// TODO(rjk): Add the tag index facility.
+	f.AddObserver(w)
 	w.tag.file = f
 
 	// Body setup.
@@ -96,6 +105,8 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.body.file = f
 	w.filemenu = true
 	w.autoindent = *globalAutoIndent
+	// w observes body to update the tag in response to actions on the body.
+	f.AddTagStatusObserver(w)
 
 	if clone != nil {
 		w.autoindent = clone.autoindent
@@ -166,6 +177,7 @@ func (w *Window) DrawButton() {
 		b = global.modbutton
 	}
 	var br image.Rectangle
+
 	br.Min = w.tag.scrollr.Min
 	br.Max.X = br.Min.X + b.R().Dx()
 	br.Max.Y = br.Min.Y + b.R().Dy()
@@ -326,8 +338,7 @@ func (w *Window) Lock(owner int) {
 	w.owner = owner
 	f := w.body.file
 	f.AllObservers(func(i interface{}) {
-		t := i.(*Text)
-		if t.w != w {
+		if t, ok := i.(*Text); ok && t.w != w {
 			t.w.lock1(owner)
 		}
 	})
@@ -343,8 +354,7 @@ func (w *Window) unlock1() {
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
 	w.body.file.AllObservers(func(i interface{}) {
-		t := i.(*Text)
-		if t.w != w {
+		if t, ok := i.(*Text); ok && t.w != w {
 			t.w.unlock1()
 		}
 	})
@@ -358,16 +368,11 @@ func (w *Window) MouseBut() {
 	}
 }
 
-//func (w *Window) DirFree() {
-//	// TODO(rjk): This doesn't actually free the memory
-//	w.dirnames = w.dirnames[0:0]
-//	w.widths = w.widths[0:0]
-//}
-
 func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
 		xfidlog(w, "del")
-		//		w.DirFree()
+		w.tag.file.DelObserver(w)
+		w.body.file.DelTagStatusObserver(w)
 		w.tag.Close()
 		w.body.Close()
 		if global.activewin == w {
@@ -459,18 +464,38 @@ func (w *Window) ParseTag() string {
 }
 
 // SetTag updates the tag for this Window and all of its clones.
+// TODO(rjk): No need to invoke this.
 func (w *Window) SetTag() {
-	f := w.body.file
-	f.AllObservers(func(i interface{}) {
-		u := i.(*Text)
-		if u.w.col.safe || u.fr.GetFrameFillStatus().Maxlines > 0 {
-			u.w.setTag1()
-		}
-	})
 }
 
+// ForceSetWindowTag force sets the tag when the tag needs to change
+// without a body modification to trigger the tag update.
+// TODO(rjk): Uses of this method are probably code cleanup opportuniies.
+func (w *Window) ForceSetWindowTag() {
+	if w.col.safe || w.tag.fr.GetFrameFillStatus().Maxlines > 0 {
+		w.setTag1()
+	}
+}
+
+// Use to debug.
+// func (w *Window) setTagDiag(where, when string) {
+// 	log.Println("<<", where, when, w.tag.q0, w.tag.q1, w.tag.DebugString())
+// }
+
 // setTag1 updates the tag contents for a given window w.
+// TODO(rjk): Note the col.safe test... should I do this as part of setTag1()?
 func (w *Window) setTag1() {
+	// w.setTagDiag("setTag1", "before")
+	// defer w.setTagDiag("setTag1","after")
+
+	// TODO(rjk): Figure out if I need this. Presumably this is needed to
+	// make things display correctly when filesystem changes to the tag
+	// happen while the window is collapsed to 0?
+	if !w.col.safe && w.tag.fr.GetFrameFillStatus().Maxlines == 0 {
+		// log.Println("Window.setTag1 early exit")
+		return
+	}
+
 	const (
 		Ldelsnarf = " Del Snarf"
 		Lundo     = " Undo"
@@ -502,6 +527,7 @@ func (w *Window) setTag1() {
 			sb.WriteString(Lput)
 		}
 	}
+	// TODO(rjk): What happens if I make a directory into
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
@@ -696,4 +722,22 @@ func (w *Window) ClampAddr() {
 	if w.addr.q1 > w.body.Nc() {
 		w.addr.q1 = w.body.Nc()
 	}
+}
+
+// TODO(rjk): need to watch the tag for inserts / deletes so that I can
+// update the tag index structure.
+func (w *Window) Inserted(q0 int, r []rune) {
+}
+
+func (w *Window) Deleted(q0, q1 int) {
+}
+
+// Watch for filename undo actions.
+func (w *Window) MemoizedUndone(undo bool) {
+}
+
+// TODO(rjk): This should only get invokved when the tag needs to change
+// do not double-invoke
+func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
+	w.setTag1()
 }

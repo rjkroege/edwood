@@ -198,6 +198,7 @@ func checkDump(t *testing.T, got, want *dumpfile.Content) {
 			put  = " Put "
 			undo = " Undo "
 		)
+
 		if strings.Contains(g.Tag.Buffer, put) && !strings.Contains(w.Tag.Buffer, put) {
 			g.Tag.Buffer = w.Tag.Buffer
 		}

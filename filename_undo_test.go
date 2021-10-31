@@ -16,6 +16,7 @@ func changeFileName(t *testing.T, g *globals, ffn, _ string) {
 	// Mutate
 	fwt := &g.row.col[0].w[0].tag
 
+	// TODO(rjk): WRONG WITH THE UNICODE
 	fwt.q0 = len(ffn)
 	fwt.q1 = len(ffn)
 
@@ -33,6 +34,7 @@ func undoFileNameChange(t *testing.T, g *globals, ffn, _ string) {
 	changeFileName(t, g, ffn, "")
 
 	// TODO(rjk): Move the text position
+	// to the end?
 
 	firstwin := g.row.col[0].w[0]
 	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
@@ -107,7 +109,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: firstfilename + "suffix",
+							Buffer: firstfilename + "suffix" + " Del Snarf Undo Put | Look Edit ",
 							Q0:     len(firstfilename),
 							Q1:     len(firstfilename) + len("suffix"),
 						},
@@ -123,7 +125,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 						Type:   dumpfile.Saved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: secondfilename,
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
 						},
 						Body: dumpfile.Text{},
 					},
@@ -132,10 +134,10 @@ func TestFilenameChangeUndo(t *testing.T) {
 		},
 		{
 			// Verify that we can edit a file name and then undo the change.
-			name:    "undoFileNameChange",
-			fn:      undoFileNameChange,
+			name: "undoFileNameChange",
+			fn:   undoFileNameChange,
+			// Currently failing. Requires some non-trivial coding adjustments.
 			passing: false,
-			// Q1 is not correctly updated.
 			want: &dumpfile.Content{
 				CurrentDir: cwd,
 				VarFont:    defaultVarFont,
@@ -227,7 +229,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: firstfilename + "suffix",
+							Buffer: firstfilename + "suffix" + " Del Snarf Undo Put | Look Edit ",
 							Q0:     len(firstfilename),
 							Q1:     len(firstfilename) + len("suffix"),
 						},

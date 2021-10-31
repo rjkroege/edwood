@@ -477,9 +477,17 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	if win.Type != dumpfile.Zerox {
 		w.SetName(subl[0])
 	}
+	if subl[0] == "" {
+		// TODO(rjk): I can remove this and just load the tag from the dumpfile?
+		// An empty unmutated tag will not have its tag setup so force that to
+		// happen.
+		w.ForceSetWindowTag()
+	}
 
-	// TODO(rjk): I feel that the code for managing tags could be extracted and unified.
-	// Maybe later. Window.setTag1 would seem fixable.
+	// TODO(rjk): I feel that the code for managing tags could be extracted
+	// and unified. Maybe later. Window.setTag1 would seem fixable. This code
+	// doesn't really belong here. The planned tagindex scheme would subsume
+	// this logic? We'd build the index from the contents of the buffer?
 	afterbar := strings.SplitN(subl[1], "|", 2)
 	if len(afterbar) != 2 {
 		return fmt.Errorf("bad window tag in dump file %q", win.Tag)
@@ -487,13 +495,23 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	w.ClearTag()
 
 	w.tag.Insert(w.tag.file.Nr(), []rune(afterbar[1]), true)
-	w.tag.Show(win.Tag.Q0, win.Tag.Q1, true)
+
+	// Handle coordinates outside of the tag text.
+	tnr := w.tag.file.Nr()
+	t0, t1 := win.Tag.Q0, win.Tag.Q1
+	if t0 > tnr {
+		t0 = tnr
+	}
+	if t1 > tnr {
+		t1 = tnr
+	}
+
+	w.tag.Show(t0, t1, true)
 
 	if win.Type == dumpfile.Unsaved {
 		w.body.LoadReader(0, subl[0], strings.NewReader(win.Body.Buffer), true)
 		w.body.file.Modded()
 
-		// This shows an example where an observer would be useful?
 		w.SetTag()
 	} else if win.Type != dumpfile.Zerox && len(subl[0]) > 0 && subl[0][0] != '+' && subl[0][0] != '-' {
 		// Implementation of the Get command: open the file.

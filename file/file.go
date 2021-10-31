@@ -97,7 +97,7 @@ func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
-// keeping them in the cache. Does not map to undo.RuneArray.Commit (that
+// keeping them in the cache. Does not map to file.Buffer.Commit (that
 // method is Mark). Remove this method.
 func (f *File) Commit(seq int) {
 	if !f.HasUncommitedChanges() {
@@ -305,7 +305,11 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			seq = u.seq
 			f.UnsetName(epsilon, seq)
 			newfname := string(u.Buf)
-			f.oeb.Setnameandisscratch(newfname)
+			f.oeb.setnameandisscratch(newfname)
+
+			// New callback scheme
+			f.oeb.observersMemoizedUndone(isundo)
+			// TODO(rjk): Plumb the remaining observer logic for undo/redo actions.
 		}
 		*delta = (*delta)[0 : len(*delta)-1]
 	}

@@ -628,7 +628,8 @@ func newx(et *Text, t *Text, argt *Text, flag1 bool, flag2 bool, arg string) {
 	filenames := strings.Split(s, " ")
 	if len(filenames) == 1 && filenames[0] == "" && et.col != nil {
 		w := et.col.Add(nil, nil, -1)
-		w.SetTag()
+		// Note special case for empty windows.
+		w.ForceSetWindowTag()
 		xfidlog(w, "new")
 		return
 	}

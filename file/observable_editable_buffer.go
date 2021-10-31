@@ -17,8 +17,9 @@ import (
 // implements BufferObserver for the various required callback functions
 // in BufferObserver.
 type ObservableEditableBuffer struct {
-	currobserver BufferObserver
-	observers    map[BufferObserver]struct{}
+	currobserver    BufferObserver
+	observers       map[BufferObserver]struct{}
+	statusobservers map[TagStatusObserver]struct{}
 
 	// The legacy implementation.
 	f *File
@@ -40,15 +41,17 @@ type ObservableEditableBuffer struct {
 	seq    int // undo sequencing
 	putseq int // seq on last put
 
-	// TODO(rjk):
+	// TODO(rjk): Can we get rid of these two booleans?
 	isscratch    bool // Used to track if this File should warn on unsaved deletion.
 	treatasclean bool // Toggle to override the Dirty check on closing a buffer with unsaved changes.
+
+	filtertagobservers bool // If true, TagStatus updates are filtered.
 }
 
 // A ObservableEditableBuffer can have a specific file-backing name that
 // permits it to be persisted to disk but typically would not be. These
 // two constants are suffixes of disk-file names that have this property.
-// TODO(rjk): Consider making this a detail of file.Details.
+// TODO(rjk): Consider making this a detail of file.Details?
 const (
 	slashguide = "/guide"
 	plusErrors = "+Errors"
@@ -105,6 +108,29 @@ func (e *ObservableEditableBuffer) AllObservers(tf func(i interface{})) {
 	}
 }
 
+// AddTagStatusObserver adds obs as a status observer.
+func (e *ObservableEditableBuffer) AddTagStatusObserver(obs TagStatusObserver) {
+	if e.statusobservers == nil {
+		e.statusobservers = make(map[TagStatusObserver]struct{})
+	}
+	e.statusobservers[obs] = struct{}{}
+}
+
+// DelTagStatusObserver removes e as an observer for edits to this File.
+func (e *ObservableEditableBuffer) DelTagStatusObserver(obs TagStatusObserver) {
+	if _, exists := e.statusobservers[obs]; exists {
+		delete(e.statusobservers, obs)
+		return
+	}
+}
+
+// TODO(rjk): Incomplete code for the rest of undo in tags.
+func (e *ObservableEditableBuffer) observersMemoizedUndone(undo bool) {
+	for t := range e.statusobservers {
+		t.MemoizedUndone(undo)
+	}
+}
+
 // GetObserverSize will return the size of the observer map.
 func (e *ObservableEditableBuffer) GetObserverSize() int {
 	return len(e.observers)
@@ -133,9 +159,40 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 
 // Clean marks the ObservableEditableBuffer as being non-dirty: the
 // backing is the same as File.
+// TODO(rjk): Verify that this is invoked on a Put op.
 func (e *ObservableEditableBuffer) Clean() {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	e.treatasclean = false
 	e.putseq = e.seq
+}
+
+// getTagState returns the current tag state. Assumption: this method needs to be cheap to
+// call.
+func (e *ObservableEditableBuffer) getTagStatus() TagStatus {
+	return TagStatus{
+		UndoableChanges:  e.HasUndoableChanges(),
+		RedoableChanges:  e.HasRedoableChanges(),
+		SaveableAndDirty: e.SaveableAndDirty(),
+	}
+}
+
+// notifyTagObservers will invoke the tag state observers (e.g. the
+// Window instances that will want to adjust their tags to reflect
+// alterations to this buffer.) Invoke this function at the end of any
+// entry point that mutates the state of the ObservableEditableBuffer in a
+// way that would mutate the tag contents.
+func (e *ObservableEditableBuffer) notifyTagObservers(before TagStatus) {
+	after := e.getTagStatus()
+	if e.filtertagobservers && before == after {
+		return
+	}
+	e.filtertagobservers = true
+
+	for t := range e.statusobservers {
+		t.UpdateTag(after)
+	}
 }
 
 // Mark is a forwarding function for file.Mark.
@@ -146,9 +203,11 @@ func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.seq = seq
 }
 
-// TODO(rjk): Do we even need this?
 // Reset is a forwarding function for file.Reset.
+// TODO(rjk): Do we even need this?
+// TODO(rjk): I believe that we don't need to invoke tag observers here.
 func (e *ObservableEditableBuffer) Reset() {
+	e.filtertagobservers = false
 	e.f.Reset()
 	e.seq = 0
 }
@@ -222,6 +281,7 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation. I could fix this by using a UTF-8
 // -> []rune reader on top of the os.File instead.
+//
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
 	d, err := ioutil.ReadAll(fd)
 	// TODO(rjk): improve handling of read errors.
@@ -246,7 +306,18 @@ func (e *ObservableEditableBuffer) Dirty() bool {
 // InsertAt is a forwarding function for file.InsertAt.
 // p0 is position in runes.
 func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	e.f.InsertAt(p0, s, e.seq)
+}
+
+// InsertAtNoUndo performs an insertion without creating an Undo record.
+// Use this to insert text while updating the tag contents. The tag's
+// ObservableEditableBuffer doesn't have undo.
+// TODO(rjk): May need the delete version too.
+func (e *ObservableEditableBuffer) InsertAtNoUndo(p0 int, s []rune) {
+	e.f.InsertAt(p0, s, 0)
 }
 
 // SetName sets the name of the backing for this file. Some backings that
@@ -260,14 +331,26 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 		return
 	}
 
+	// SetName always forces an update of the tag let the default tag update
+	// filter skip the name string comparison on the default case of editing
+	// a body.
+	e.filtertagobservers = false
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	if e.seq > 0 {
+		// TODO(rjk): This is the memoize point.
+		// TODO(rjk): Pass in the name?
 		e.f.UnsetName(&e.f.delta, e.seq)
 	}
-	e.Setnameandisscratch(name)
+	e.setnameandisscratch(name)
 }
 
 // Undo is a forwarding function for file.Undo.
 func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	q0, q1, ok, e.seq = e.f.Undo(isundo, e.seq)
 	return q0, q1, ok
 }
@@ -275,6 +358,9 @@ func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
 // DeleteAt is a forwarding function for file.DeleteAt.
 // q0, q1 are in runes.
 func (e *ObservableEditableBuffer) DeleteAt(q0, q1 int) {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	e.f.DeleteAt(q0, q1, e.seq)
 }
 
@@ -287,6 +373,9 @@ func (e *ObservableEditableBuffer) TreatAsClean() {
 // its contents. This is needed to track when Edwood has modified the
 // backing without changing the File (e.g. via the Edit w command.)
 func (e *ObservableEditableBuffer) Modded() {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
 	e.putseq = -1
 	e.treatasclean = false
 }
@@ -357,6 +446,8 @@ func (e *ObservableEditableBuffer) Commit() {
 // InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
 // forwards to InsertAt for file.Buffer.
 func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
 	e.f.InsertAtWithoutCommit(p0, s)
 }
 
@@ -410,12 +501,16 @@ func (e *ObservableEditableBuffer) Nbyte() int {
 	return e.f.b.Nbyte()
 }
 
-// Setnameandisscratch updates the oeb.details.name and isscratch bit
-// at the same time.
-// TODO(rjk): This is a callback from file.go. How to handle file name
-// changes requires attention when forwarding to file.Buffer.
-func (e *ObservableEditableBuffer) Setnameandisscratch(name string) {
+// setnameandisscratch updates the oeb.details.name and isscratch bit at
+// the same time. This is a callback from file.go when an Undo action
+// changes the filename.
+// TODO(rjk): This function needs to be removed and replaced by file.File
+// and file.Buffer calling observersMemoizedUndone.
+func (e *ObservableEditableBuffer) setnameandisscratch(name string) {
 	e.treatasclean = false
+
+	// TODO(rjk): The filename needs to be plumbed into the observer so that
+	// it can mutate the tag.
 	e.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		e.isscratch = true
