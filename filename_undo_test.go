@@ -33,6 +33,7 @@ func undoFileNameChange(t *testing.T, g *globals, ffn, _ string) {
 	changeFileName(t, g, ffn, "")
 
 	// TODO(rjk): Move the text position
+	// to the end?
 
 	firstwin := g.row.col[0].w[0]
 	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
@@ -134,8 +135,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 			// Verify that we can edit a file name and then undo the change.
 			name:    "undoFileNameChange",
 			fn:      undoFileNameChange,
-			passing: false,
-			// Q1 is not correctly updated.
+			passing: true,
 			want: &dumpfile.Content{
 				CurrentDir: cwd,
 				VarFont:    defaultVarFont,

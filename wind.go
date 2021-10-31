@@ -13,6 +13,8 @@ import (
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/runes"
 	"github.com/rjkroege/edwood/util"
+
+	"log"
 )
 
 type Window struct {
@@ -388,9 +390,11 @@ func (w *Window) Delete() {
 func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
+log.Println("Window.Undo before", w.tag.q0, w.tag.q1, w.tag. DebugString())
 	if q0, q1, ok := body.file.Undo(isundo); ok {
 		body.q0, body.q1 = q0, q1
 	}
+log.Println("Window.Undo after", w.tag.q0, w.tag.q1, w.tag. DebugString())
 
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
@@ -471,6 +475,7 @@ func (w *Window) SetTag() {
 
 // setTag1 updates the tag contents for a given window w.
 func (w *Window) setTag1() {
+log.Println("running setTag1", w.tag.q0, w.tag.q1, w.tag.DebugString())
 	const (
 		Ldelsnarf = " Del Snarf"
 		Lundo     = " Undo"
