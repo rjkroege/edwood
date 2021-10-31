@@ -35,6 +35,10 @@ func TestSetTag1(t *testing.T) {
 			file:    file.MakeObservableEditableBuffer("", nil),
 		}
 
+		w.col = &Column{
+			safe: true,
+		}
+
 		w.setTag1()
 		got := w.tag.file.String()
 		want := name + defaultSuffix

@@ -451,3 +451,99 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 	}
 	to.Check([]*observation{})
 }
+
+type observercount struct {
+	memoize   int
+	tagstatus int
+}
+
+func (c *observercount) MemoizedUndone(_ bool) {
+	c.memoize++
+}
+
+func (c *observercount) UpdateTag(_ TagStatus) {
+	c.tagstatus++
+}
+
+func TestTagObserversFireCorrectly(t *testing.T) {
+	counts := &observercount{}
+	oeb := MakeObservableEditableBuffer("", nil)
+
+	oeb.AddTagStatusObserver(counts)
+
+	oeb.InsertAt(0, []rune("hi"))
+	if got, want := *counts, (observercount{0, 1}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.InsertAt(0, []rune("hi"))
+	if got, want := *counts, (observercount{0, 1}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.SetName("buffy")
+	if got, want := *counts, (observercount{0, 2}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.SetName("buffy")
+	if got, want := *counts, (observercount{0, 2}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.SetName("spike")
+	if got, want := *counts, (observercount{0, 3}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Mark(1)
+	if got, want := *counts, (observercount{0, 3}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.InsertAt(0, []rune("hi"))
+	if got, want := *counts, (observercount{0, 4}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Undo(true)
+	if got, want := *counts, (observercount{0, 5}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Undo(false)
+	if got, want := *counts, (observercount{0, 6}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Mark(2)
+	oeb.InsertAtWithoutCommit(0, []rune("hi"))
+	if got, want := *counts, (observercount{0, 6}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Commit()
+	if got, want := *counts, (observercount{0, 6}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.DeleteAt(0, 3)
+	if got, want := *counts, (observercount{0, 6}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.DeleteAt(0, 1)
+	if got, want := *counts, (observercount{0, 6}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Clean()
+	if got, want := *counts, (observercount{0, 7}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	oeb.Clean()
+	if got, want := *counts, (observercount{0, 7}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}

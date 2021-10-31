@@ -254,6 +254,9 @@ func TestXfidwriteQWaddr(t *testing.T) {
 }
 
 func TestXfidopen(t *testing.T) {
+	display := edwoodtest.NewDisplay()
+	configureGlobals()
+
 	for _, tc := range []struct {
 		name string
 		q    uint64
@@ -276,7 +279,11 @@ func TestXfidopen(t *testing.T) {
 			if q != Qlog && q != Qeditout {
 				w = NewWindow().initHeadless(nil)
 				w.col = new(Column)
+				w.col.safe = true
 				w.body.fr = &MockFrame{}
+				w.display = display
+				w.tag.display = display
+				w.tag.fr = &MockFrame{}
 			}
 			x := &Xfid{
 				f: &Fid{
@@ -533,12 +540,17 @@ func TestXfidclose(t *testing.T) {
 
 func TestXfidwriteQWdata(t *testing.T) {
 	configureGlobals()
+	display := edwoodtest.NewDisplay()
 
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
+	w.col.safe = true
+	w.display = display
 	w.body.fr = &MockFrame{}
-	w.body.display = edwoodtest.NewDisplay()
+	w.body.display = display
+	w.tag.fr = &MockFrame{}
+	w.tag.display = display
 
 	for _, tc := range []struct {
 		name    string // test name
@@ -1099,24 +1111,37 @@ func TestXfidreadEmptyFiles(t *testing.T) {
 }
 
 func TestXfidreadQWbodyQWtag(t *testing.T) {
+	// TODO(rjk): These tests are fragile in how they setup their skeleton.
+	// Use the common skeleton.
+	display := edwoodtest.NewDisplay()
+	configureGlobals()
+	const data = "This is an εxαmplε sentence.\n"
+
 	for _, tc := range []struct {
-		name string
-		q    uint64
+		name  string
+		q     uint64
+		setup string
+		want  string
 	}{
-		{"QWbody", QWbody},
-		{"QWtag", QWtag},
+		{"QWbody", QWbody, data, data},
+		// TODO(rjk): Why doesn't setTag1 run?
+		{"QWtag", QWtag, "εxαmplε", "εxαmplε"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			const data = "This is an εxαmplε sentence.\n"
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
+			w.col.safe = true
+			w.display = display
+			w.body.display = display
 			w.body.fr = &MockFrame{}
+			w.tag.display = display
+			w.tag.fr = &MockFrame{}
 			switch tc.q {
 			case QWbody:
-				w.body.file = file.MakeObservableEditableBuffer("", []rune(data))
+				w.body.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
 			case QWtag:
-				w.tag.file = file.MakeObservableEditableBuffer("", []rune(data))
+				w.tag.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
 			}
 
 			x := &Xfid{
@@ -1131,11 +1156,11 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 				fs: mr,
 			}
 			xfidread(x)
-			if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+			if got, want := mr.fcall.Count, uint32(len(tc.want)); got != want {
 				t.Errorf("read %v bytes; want %v",
 					got, want)
 			}
-			if got, want := string(mr.fcall.Data), data; got != want {
+			if got, want := string(mr.fcall.Data), tc.want; got != want {
 				t.Errorf("got data %q; want %q", got, want)
 			}
 		})

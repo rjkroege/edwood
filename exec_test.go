@@ -236,9 +236,12 @@ func testSetupOnly(t *testing.T, g *globals) {
 
 	t.Log("Before seq", global.seq)
 	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
 	t.Log("firstwin.body.file.HasUndoableChanges", g.row.col[0].w[0].body.file.HasUndoableChanges())
 	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+	t.Log("secondwin.tag", secondwin.tag.DebugString())
 	t.Log("secondwin.body.file.HasUndoableChanges", g.row.col[0].w[1].body.file.HasUndoableChanges())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
 
 	// These should both do nothing.
 	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
@@ -246,8 +249,10 @@ func testSetupOnly(t *testing.T, g *globals) {
 
 	t.Log("After seq", global.seq)
 	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
 	t.Log("firstwin.body.file.HasUndoableChanges", g.row.col[0].w[0].body.file.HasUndoableChanges())
 	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+	t.Log("secondwin.tag", secondwin.tag.DebugString())
 	t.Log("secondwin.body.file.HasUndoableChanges", g.row.col[0].w[1].body.file.HasUndoableChanges())
 }
 
@@ -388,7 +393,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Saved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: firstfilename,
+							Buffer: firstfilename + " Del Snarf | Look Edit ",
 						},
 						// Recall that when the contents match the on-disk state,
 						// they are elided.
@@ -398,7 +403,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Saved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: secondfilename,
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
 						},
 						Body: dumpfile.Text{},
 					},
@@ -422,7 +427,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: firstfilename,
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
 						},
 						Body: dumpfile.Text{
 							Buffer: "This is a\nshort TEXT\nto try addressing\n",
@@ -434,7 +439,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: secondfilename,
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
 						},
 						Body: dumpfile.Text{
 							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
@@ -515,10 +520,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							// TODO(rjk): Why does cut+undo remove the tag contents here? Somewhere
-							// the logic for updating the tags is being weird. This could be a bug in
-							// updating tag contents.
-							Buffer: secondfilename,
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
 						},
 						Body: dumpfile.Text{
 							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
@@ -548,7 +550,7 @@ func TestUndoRedo(t *testing.T) {
 						Type:   dumpfile.Unsaved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: firstfilename,
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
 						},
 						Body: dumpfile.Text{
 							Buffer: "Thishort TEXT\nto try addressing\n",
