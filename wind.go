@@ -123,7 +123,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 		clonebuff := []rune(clone.tag.file.String())
 		w.tag.Insert(0, clonebuff, true)
 		w.tag.file.Reset()
-		w.tag.SetSelect(w.tag.file.Nbyte(), w.tag.file.Nbyte())
+		w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
 	}
 	r1 = r
 	r1.Min.Y += w.taglines*fontget(global.tagfont, w.display).Height() + 1
@@ -519,20 +519,20 @@ func (w *Window) setTag1() {
 		sb.WriteString(" ")
 	}
 
-	new := []rune(sb.String())
+	newtag := []rune(sb.String())
 
 	// replace tag if the new one is different
 	resize := false
-	if !runes.Equal(new, []rune(w.tag.file.String())) {
+	if !runes.Equal(newtag, []rune(w.tag.file.String())) {
 		resize = true // Might need to resize the tag
 		// try to preserve user selection
-		newbarIndex := runes.IndexRune(new, '|') // New always has '|'
+		newbarIndex := runes.IndexRune(newtag, '|') // New always has '|'
 		q0 := w.tag.q0
 		q1 := w.tag.q1
 
 		// These alter the Text's selection values.
 		w.tag.Delete(0, w.tag.Nc(), true)
-		w.tag.Insert(0, new, true)
+		w.tag.Insert(0, newtag, true)
 
 		// Rationalize the selection as best as possible
 		w.tag.q0 = util.Min(q0, w.tag.Nc())
