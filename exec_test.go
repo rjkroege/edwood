@@ -49,9 +49,6 @@ func TestRunproc(t *testing.T) {
 		{false, false, false, false, ">ls", "."},
 		{false, false, true, true, "nonexistentcommand", ""},
 
-		// Execute the newns path
-		{false, true, false, false, "ls", "$winid"},
-
 		// Hard: must be executed using a shell
 		{true, false, false, false, "ls '.'", ""},
 		{true, false, false, false, " ls '.' ", ""},
@@ -59,6 +56,9 @@ func TestRunproc(t *testing.T) {
 		{true, false, false, false, "ls '.'", "."},
 		{true, false, false, true, "dat\x08\x08ate", ""},
 		{true, false, false, true, "/non-existent-command", ""},
+
+		// Execute the newns path
+		{true, true, false, false, "ls", ""},
 	}
 	acmeTestingMain()
 
