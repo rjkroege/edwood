@@ -957,8 +957,8 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		env = append(env, fmt.Sprintf("winid=%d", winid))
 
 		if filename != "" {
-			env = append(env, fmt.Sprint("%%=%v", filename))
-			env = append(env, fmt.Sprint("samfile=%v", filename))
+			env = append(env, fmt.Sprintf("%%=%v", filename))
+			env = append(env, fmt.Sprintf("samfile=%v", filename))
 		}
 		var fs *client.Fsys
 		var err error
@@ -1003,7 +1003,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 
 	if argaddr != "" {
-		env = append(env, fmt.Sprint("acmeaddr=%v", argaddr))
+		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
 	}
 	if global.acmeshell != "" {
 		return Hard()
