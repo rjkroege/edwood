@@ -31,30 +31,34 @@ func TestRunproc(t *testing.T) {
 	}
 	tt := []struct {
 		hard      bool
+		newns  bool
 		startfail bool
 		waitfail  bool
 		s, arg    string
 	}{
-		{false, true, true, "", ""},
-		{false, true, true, " ", ""},
-		{false, true, true, "   ", "   "},
-		{false, false, false, "ls", ""},
-		{false, false, false, "ls .", ""},
-		{false, false, false, " ls . ", ""},
-		{false, false, false, "	 ls	 .	 ", ""},
-		{false, false, false, "ls", "."},
-		{false, false, false, "|ls", "."},
-		{false, false, false, "<ls", "."},
-		{false, false, false, ">ls", "."},
-		{false, true, true, "nonexistentcommand", ""},
+		{false, false, true, true, "", ""},
+		{false, false, true, true, " ", ""},
+		{false, false, true, true, "   ", "   "},
+		{false, false, false, false, "ls", ""},
+		{false, false, false, false, "ls .", ""},
+		{false, false, false, false, " ls . ", ""},
+		{false, false, false, false, "	 ls	 .	 ", ""},
+		{false, false, false, false, "ls", "."},
+		{false, false, false, false, "|ls", "."},
+		{false, false, false, false, "<ls", "."},
+		{false, false, false, false, ">ls", "."},
+		{false, false, true, true, "nonexistentcommand", ""},
+
+		// Execute the newns path
+		{false, true, false, false, "echo", "$winid"},
 
 		// Hard: must be executed using a shell
-		{true, false, false, "ls '.'", ""},
-		{true, false, false, " ls '.' ", ""},
-		{true, false, false, "	 ls	 '.'	 ", ""},
-		{true, false, false, "ls '.'", "."},
-		{true, false, true, "dat\x08\x08ate", ""},
-		{true, false, true, "/non-existent-command", ""},
+		{true, false, false, false, "ls '.'", ""},
+		{true, false, false, false, " ls '.' ", ""},
+		{true, false, false, false, "	 ls	 '.'	 ", ""},
+		{true, false, false, false, "ls '.'", "."},
+		{true, false, false, true, "dat\x08\x08ate", ""},
+		{true, false, false, true, "/non-existent-command", ""},
 	}
 	acmeTestingMain()
 
@@ -70,7 +74,7 @@ func TestRunproc(t *testing.T) {
 		cpid := make(chan *os.Process)
 		done := make(chan struct{})
 		go func() {
-			err := runproc(nil, tc.s, "", false, "", tc.arg, &Command{}, cpid, false)
+			err := runproc(nil, tc.s, "", tc.newns, "", tc.arg, &Command{}, cpid, false)
 			if tc.startfail && err == nil {
 				t.Errorf("expected command %q to fail", tc.s)
 			}
