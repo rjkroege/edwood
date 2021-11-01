@@ -50,7 +50,7 @@ func TestRunproc(t *testing.T) {
 		{false, false, true, true, "nonexistentcommand", ""},
 
 		// Execute the newns path
-		{false, true, false, false, "echo", "$winid"},
+		{false, true, false, false, "ls", "$winid"},
 
 		// Hard: must be executed using a shell
 		{true, false, false, false, "ls '.'", ""},
