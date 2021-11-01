@@ -936,6 +936,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 	c.iseditcommand = iseditcmd
 	c.text = s
+	env := os.Environ()
 	if newns {
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
@@ -953,11 +954,11 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 		// 	rfork(RFNAMEG|RFENVG|RFFDG|RFNOTEG); TODO(flux): I'm sure these settings are important
 
-		os.Setenv("winid", fmt.Sprintf("%d", winid))
+		env = append(env, fmt.Sprintf("winid=%d", winid))
 
 		if filename != "" {
-			os.Setenv("%", filename)
-			os.Setenv("samfile", filename)
+			env = append(env, fmt.Sprintf("%%=%v", filename))
+			env = append(env, fmt.Sprintf("samfile=%v", filename))
 		}
 		var fs *client.Fsys
 		var err error
@@ -1002,7 +1003,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 
 	if argaddr != "" {
-		os.Setenv("acmeaddr", argaddr)
+		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
 	}
 	if global.acmeshell != "" {
 		return Hard()
@@ -1032,6 +1033,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	cmd.Stdin = sin
 	cmd.Stdout = sout
 	cmd.Stderr = serr
+	cmd.Env = env
 	err := cmd.Start()
 	if err != nil {
 		Fail()
