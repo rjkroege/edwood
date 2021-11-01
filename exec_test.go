@@ -58,7 +58,7 @@ func TestRunproc(t *testing.T) {
 		{true, false, false, true, "/non-existent-command", ""},
 
 		// Execute the newns path
-		{true, true, false, false, "ls", ""},
+		{true, true, false, false, "ls '.'", ""},
 	}
 	acmeTestingMain()
 
