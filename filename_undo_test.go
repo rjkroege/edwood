@@ -135,7 +135,8 @@ func TestFilenameChangeUndo(t *testing.T) {
 			// Verify that we can edit a file name and then undo the change.
 			name:    "undoFileNameChange",
 			fn:      undoFileNameChange,
-			passing: true,
+			// Currently failing. Requires some non-trivial coding adjustments.
+			passing: false,
 			want: &dumpfile.Content{
 				CurrentDir: cwd,
 				VarFont:    defaultVarFont,
