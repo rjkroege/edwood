@@ -29,7 +29,7 @@ func TestOverall(t *testing.T) {
 	b.Commit()
 	// Also check that multiple change commits don't create empty changes.
 	b.Commit()
-	b.Delete(20, 14)
+	b.deleteCreateOffsetTuple(20, 34)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
 	b.insertString(20, " makes Jack")
@@ -305,29 +305,27 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 
 func TestPieceNr(t *testing.T) {
 	b := NewBufferNoNr(nil)
-
 	manderianBytes := []byte("痛苦本身可能是很多痛苦, 但主要的原因是痛苦, 但我给它时间陷入这种痛苦, 以至于有些巨大的痛苦")
 	eng1 := []byte("Lorem ipsum in Mandarin")
 	eng2 := []byte("This is the")
 	eng3 := []byte("In the midst")
 
-	b.Insert(0, manderianBytes)
+	b.insertCreateOffsetTuple(0, manderianBytes)
 	b.checkContent("TestPieceNr: First insert", t, string(manderianBytes))
 
-	b.Insert(b.Nr(), eng1)
+	b.insertCreateOffsetTuple(b.Nr(), eng1)
 	b.checkContent("TestPieceNr: Second insert", t, string(manderianBytes)+string(eng1))
 
-	b.Insert(0, eng2)
+	b.insertCreateOffsetTuple(0, eng2)
 	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
 	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
-	b.Delete(13, 10)
+	b.deleteCreateOffsetTuple(13, 10)
 	buffAfterDelete := []rune(buffAfterInserts)
 	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
-	fmt.Printf("Len of buff before: %v, Length of buff after: %v\n", len([]byte(string(buffAfterDelete))), len(buffAfterInserts)) // Should be a difference of 10
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
-	b.Insert(8, eng3)
+	b.insertCreateOffsetTuple(8, eng3)
 	buffAfterDelete = append(buffAfterDelete[:8], append([]rune(string(eng3)), buffAfterDelete[8:]...)...)
 	b.checkContent("TestPieceNr: after everything", t, string(buffAfterDelete))
 
@@ -381,7 +379,7 @@ func (t *Buffer) insertString(off int, data string) {
 }
 
 func (t *Buffer) cacheInsertString(off int, data string) {
-	err := t.Insert(int64(off), []byte(data))
+	err := t.insertCreateOffsetTuple(int64(off), []byte(data))
 	if err != nil {
 		panic(err)
 	}
@@ -393,7 +391,7 @@ func (t *Buffer) delete(off, length int) {
 }
 
 func (t *Buffer) cacheDelete(off, length int) {
-	t.Delete(int64(off), int64(length))
+	t.deleteCreateOffsetTuple(int64(off), int64(length))
 }
 
 func (t *Buffer) printPieces() {
@@ -437,4 +435,12 @@ func countRunes(b *Buffer) int64 {
 
 func NewBufferNoNr(content []byte) *Buffer {
 	return NewBuffer(content, utf8.RuneCount(content))
+}
+
+func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
+	return b.Insert(b.RuneTuple(off), content)
+}
+
+func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
+	return b.Delete(b.RuneTuple(off), b.RuneTuple(length))
 }

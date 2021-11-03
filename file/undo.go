@@ -255,7 +255,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		copy(newBuf, start.data[:offset])
 		before.data = newBuf
 		before.prev, before.next = start.prev, after
-		before.nr = utf8.RuneCount(start.data[:offset])
+		before.nr = utf8.RuneCount(newBuf)
 
 		newStart = before
 		if !midwayEnd {
@@ -602,7 +602,7 @@ func (s *span) Nr() int {
 	var nr int
 
 	for p := s.start; p != nil; p = p.next {
-		nr += utf8.RuneCount(p.data)
+		nr += p.nr
 		if p == s.end {
 			break
 		}
