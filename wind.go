@@ -60,7 +60,13 @@ type Window struct {
 	taglines    int
 	tagtop      image.Rectangle
 	editoutlk   chan bool
+
+	alreadyobserving bool
 }
+
+var (
+	_ file.BufferObserver = (*Window)(nil) // Enforce at compile time that Window implements BufferObserver
+)
 
 func NewWindow() *Window {
 	return &Window{}
@@ -84,8 +90,10 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.ctlfid = MaxFid
 	w.utflastqid = -1
 
+	// Tag setup.
 	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(&w.tag)
+	f.AddObserver(w)
 	w.tag.file = f
 
 	// Body setup.
@@ -328,8 +336,7 @@ func (w *Window) Lock(owner int) {
 	w.owner = owner
 	f := w.body.file
 	f.AllObservers(func(i interface{}) {
-		t := i.(*Text)
-		if t.w != w {
+		if t, ok := i.(*Text); ok && t.w != w {
 			t.w.lock1(owner)
 		}
 	})
@@ -345,8 +352,7 @@ func (w *Window) unlock1() {
 // Unlock releases the lock on each clone of w
 func (w *Window) Unlock() {
 	w.body.file.AllObservers(func(i interface{}) {
-		t := i.(*Text)
-		if t.w != w {
+		if t, ok := i.(*Text); ok && t.w != w {
 			t.w.unlock1()
 		}
 	})
@@ -370,6 +376,7 @@ func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
 		xfidlog(w, "del")
 		//		w.DirFree()
+		w.tag.file.DelObserver(w)
 		w.tag.Close()
 		w.body.Close()
 		if global.activewin == w {
@@ -507,6 +514,7 @@ log.Println("running setTag1", w.tag.q0, w.tag.q1, w.tag.DebugString())
 			sb.WriteString(Lput)
 		}
 	}
+	// TODO(rjk): What happens if I make a directory into 
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
@@ -702,3 +710,45 @@ func (w *Window) ClampAddr() {
 		w.addr.q1 = w.body.Nc()
 	}
 }
+
+// ---------------- new stuff related to refactored SetTag ----------
+
+func (w *Window)     Inserted(q0 int, r []rune) {
+    log.Println("Window.Inserted observer", q0, string(r))
+
+    if w.alreadyobserving {
+        return
+    }
+
+    w.alreadyobserving = true
+    defer func() { w.alreadyobserving = false }()
+
+    s := fmt.Sprintf(" -%d-", q0)
+    end := w.tag.file.Nr() -1
+    w.tag.file.InsertAtNoUndo(end, []rune(s))
+
+    // I know it's w.tag.body but we should pass it in?
+    // Why pass something that we don't need?
+
+    // clones? (the body shares the text?)
+    // I have to propagate the changes to the clones "manually"
+    // how do I do this? it's "not nice". Should I clone the OEBs (but they can
+    // have different content) So NO.
+    // all clone texts are available from the observers on the w.body.file. So do it
+    // manually. (But that needs to be an undoable change right?)
+    // This part seems like the most fiddly
+}
+
+func (w *Window)     Deleted(q0, q1 int) {
+    log.Println("Window.Deleted observer", q0, q1)
+}
+
+
+func (w *Window) 	UndoMemoize(undo bool) {
+	log.Println("Window.UndoMemoize observer", undo bool)
+}
+
+func (w *Window) 	UpdateTag(newtagstatus file.TagStatus) {
+	log.Println("Window.UpdateTag observer", newtagstatus)
+}
+

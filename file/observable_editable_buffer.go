@@ -19,6 +19,8 @@ import (
 type ObservableEditableBuffer struct {
 	currobserver BufferObserver
 	observers    map[BufferObserver]struct{}
+	statusobservers    map[TagStatusObserver]struct{}
+
 
 	// The legacy implementation.
 	f *File
@@ -104,6 +106,25 @@ func (e *ObservableEditableBuffer) AllObservers(tf func(i interface{})) {
 		tf(t)
 	}
 }
+
+// AddTagStatusObserver adds obs as a status observer.
+func (e *ObservableEditableBuffer) AddTagStatusObserver(obs TagStatusObserver) {
+	if e.statusobserver == nil {
+		e.statusobserver = make(map[TagStatusObserver]struct{})
+	}
+	// TODO(rjk): Will I need a current TagStatusObserver?
+	e.statusobserver[obs] = struct{}{}
+}
+
+// DelTagStatusObserver removes e as an observer for edits to this File.
+func (e *ObservableEditableBuffer) DelTagStatusObserver(obs TagStatusObserver)  {
+	if _, exists := e.observers[observer]; exists {
+		delete(e.observers, observer)
+	}
+	// TODO(rjk): determine if this is wrong. It certainly would be hiding a bug.
+	panicf("can't find obs in ObservableEditableBuffer.DelTagStatusObserver")
+}
+
 
 // GetObserverSize will return the size of the observer map.
 func (e *ObservableEditableBuffer) GetObserverSize() int {
@@ -248,6 +269,16 @@ func (e *ObservableEditableBuffer) Dirty() bool {
 func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
 	e.f.InsertAt(p0, s, e.seq)
 }
+
+// TODO(rjk): need the delete version too.
+// TODO(rjk): Better naming? Better comments?
+// TODO(rjk): Tests.
+// InsertAtNoUndo
+// p0 is position in runes.
+func (e *ObservableEditableBuffer) InsertAtNoUndo(p0 int, s []rune) {
+	e.f.InsertAt(p0, s, 0)
+}
+
 
 // SetName sets the name of the backing for this file. Some backings that
 // opt them out of typically being persisted. Resetting a file name to a
