@@ -88,6 +88,8 @@ import (
 	"io"
 	"time"
 	"unicode/utf8"
+
+	"log"
 )
 
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
@@ -188,13 +190,16 @@ func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
+log.Println(startOff, endOff)
 	off := startOff.b
 	length := endOff.b - startOff.b
+log.Println(length)
 	if length <= 0 {
 		return nil
 	}
 
 	p, offset := b.findPiece(off)
+log.Printf("Buffer.Delete found piece: %+v, %d\n", p, offset)
 	if p == nil {
 		return ErrWrongOffset
 	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.r-startOff.r)) {
@@ -343,6 +348,7 @@ func (b *Buffer) Undo() (int64, int64) {
 	}
 
 	var off, size int64
+	// nr please.
 	var nR int
 
 	for i := len(a.changes) - 1; i >= 0; i-- {
@@ -352,6 +358,9 @@ func (b *Buffer) Undo() (int64, int64) {
 		size = c.old.len - c.new.len
 		nR -= c.new.Nr() - c.old.Nr()
 	}
+  	  if size < 0 {
+	        size = 0
+	    }	
 	return off, size
 }
 
@@ -395,6 +404,7 @@ func (b *Buffer) shiftAction() *action {
 }
 
 // Commit commits the currently performed changes and creates an undo/redo point.
+// This is not what Commit does.
 func (b *Buffer) Commit() {
 	b.currentAction = nil
 	b.cachedPiece = nil
@@ -533,10 +543,13 @@ func (p *piece) insert(off int, data []byte, nr int) {
 }
 
 func (p *piece) delete(off int, length int64, nr int) bool {
+log.Println("delete", off, length)
 	if int64(off)+length > int64(len(p.data)) {
 		return false
 	}
+log.Printf("delete, before: %q\n", string(p.data))
 	p.data = append(p.data[:off], p.data[off+int(length):]...)
+log.Printf("delete, after: %q\n", string(p.data))
 	p.nr -= nr
 	return true
 }
@@ -574,11 +587,16 @@ func (b *Buffer) TreatAsDirty() bool {
 	return b.Dirty()
 }
 
+// TODO(rjk): give this a better name?
 func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 	offTuple := OffSetTuple{
-		b: 0,
+		b: off,
 		r: off,
 	}
+
+
+	// This code is not currently correct.
+/*
 	for p := b.begin; p != nil && off > 0; p = p.next {
 		nrAfterPiece := off - int64(p.nr)
 		if nrAfterPiece > 0 {
@@ -595,8 +613,11 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 			}
 		}
 	}
+*/
+
 	return offTuple
 }
+
 
 func (s *span) Nr() int {
 	var nr int

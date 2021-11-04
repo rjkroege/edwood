@@ -29,7 +29,8 @@ func TestOverall(t *testing.T) {
 	b.Commit()
 	// Also check that multiple change commits don't create empty changes.
 	b.Commit()
-	b.deleteCreateOffsetTuple(20, 34)
+	// Need to decide if deleteCreateOffsetTuple takes a length 
+	b.deleteCreateOffsetTuple(20, 14)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
 	b.insertString(20, " makes Jack")
@@ -237,12 +238,12 @@ func TestBufferSize(t *testing.T) {
 	b := NewBufferNoNr(nil)
 	tests := []struct {
 		action func()
-		want   int64
+		want   int
 	}{
 		0: {func() {}, 0},
-		1: {func() { b.insertString(0, " Like") }, 5},
-		2: {func() { b.insertString(0, " Colour") }, 12},
-		3: {func() { b.insertString(7, " You") }, 16},
+		1: {func() { b.insertString(0, " Like") }, len(" Like")},
+		2: {func() { b.insertString(0, " Colour") }, len(" Like" + " Colour")},
+		3: {func() { b.insertString(7, " You") }, len(" Like" + " Colour" + " You")},
 		4: {func() { b.delete(5, 1) }, 15},
 		5: {func() { b.insertString(0, "Pink is the") }, 26},
 		6: {func() { b.Undo() }, 15},
@@ -251,8 +252,8 @@ func TestBufferSize(t *testing.T) {
 
 	for i, tt := range tests {
 		tt.action()
-		if got := b.Size(); got != tt.want {
-			t.Fatalf("%d: got %d, want %d", i, got, tt.want)
+		if got := b.Size(); got != int64(tt.want) {
+			t.Fatalf("[%d]: got %d, want %d", i, got, tt.want)
 		}
 	}
 }
@@ -361,12 +362,14 @@ func TestPieceNr(t *testing.T) {
 }
 
 func (b *Buffer) checkPiecesCnt(t *testing.T, expected int) {
+	t.Helper()
 	if b.piecesCnt != expected {
 		t.Errorf("got %d pieces, want %d", b.piecesCnt, expected)
 	}
 }
 
 func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
+	t.Helper()
 	c := b.allContent()
 	if c != expected {
 		t.Errorf("%s: got '%s', want '%s'", name, c, expected)
@@ -378,6 +381,7 @@ func (t *Buffer) insertString(off int, data string) {
 	t.cacheInsertString(off, data)
 }
 
+// TODO(rjk): Pass in the test and make this a test helper. 
 func (t *Buffer) cacheInsertString(off int, data string) {
 	err := t.insertCreateOffsetTuple(int64(off), []byte(data))
 	if err != nil {
@@ -442,5 +446,52 @@ func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
 }
 
 func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
-	return b.Delete(b.RuneTuple(off), b.RuneTuple(length))
+	// Buffer.Delete() operates in offsets so add them in.
+	return b.Delete(b.RuneTuple(off), b.RuneTuple(off + length))
+}
+
+
+func TestRuneTuple(t *testing.T) {
+	tt := []struct{
+		name string
+		buf string
+		nr int
+		roff int
+		bwant int
+	}{
+		{
+			name: "one buf, start",
+			buf: "foo",
+			nr: len("foo"),
+			roff: 0,
+			bwant: 0,
+		},
+		{
+			name: "one buf, middle",
+			buf: "foo",
+			nr: len("foo"),
+			roff: 1,
+			bwant: 1,
+		},
+		{
+			name: "one buf, end",
+			buf: "foo",
+			nr: len("foo"),
+			roff: 2,
+			bwant: 2,
+		},
+	}
+
+	for _, tv := range tt {
+		t.Run(tv.name, func(t *testing.T) {
+		b := NewBuffer([]byte(tv.buf), tv.nr)
+		gt := b.RuneTuple(int64(tv.roff))
+		if got, want := gt.b, tv.bwant; got != int64(want) {
+			t.Errorf("%s got %d != want %d", "byte", got, want)
+		}
+		if got, want := gt.r, tv.roff; got != int64(want) {
+			t.Errorf("%s got %d != want %d", "rune", got, want)
+		}
+	}	)
+	}
 }
