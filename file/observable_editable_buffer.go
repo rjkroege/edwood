@@ -109,22 +109,33 @@ func (e *ObservableEditableBuffer) AllObservers(tf func(i interface{})) {
 
 // AddTagStatusObserver adds obs as a status observer.
 func (e *ObservableEditableBuffer) AddTagStatusObserver(obs TagStatusObserver) {
-	if e.statusobserver == nil {
-		e.statusobserver = make(map[TagStatusObserver]struct{})
+	if e.statusobservers == nil {
+		e.statusobservers = make(map[TagStatusObserver]struct{})
 	}
 	// TODO(rjk): Will I need a current TagStatusObserver?
-	e.statusobserver[obs] = struct{}{}
+	e.statusobservers[obs] = struct{}{}
 }
 
 // DelTagStatusObserver removes e as an observer for edits to this File.
 func (e *ObservableEditableBuffer) DelTagStatusObserver(obs TagStatusObserver)  {
-	if _, exists := e.observers[observer]; exists {
-		delete(e.observers, observer)
+	if _, exists := e.statusobservers[obs]; exists {
+		delete(e.statusobservers, obs)
 	}
 	// TODO(rjk): determine if this is wrong. It certainly would be hiding a bug.
-	panicf("can't find obs in ObservableEditableBuffer.DelTagStatusObserver")
+	panic("can't find obs in ObservableEditableBuffer.DelTagStatusObserver")
 }
 
+func (e *ObservableEditableBuffer) undoMemoize(undo bool) {
+	for t := range e.statusobservers {
+		t.UndoMemoize(undo)
+	}
+}
+
+func (e *ObservableEditableBuffer) updateTag(newtagstatus file.TagStatus) {
+	for t := range e.statusobservers {
+		t.UpdateTag(newtagstatus)
+	}
+}
 
 // GetObserverSize will return the size of the observer map.
 func (e *ObservableEditableBuffer) GetObserverSize() int {
@@ -157,6 +168,12 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 func (e *ObservableEditableBuffer) Clean() {
 	e.treatasclean = false
 	e.putseq = e.seq
+
+	updateTag(TagStatus{
+		UndoableChanges: e.HasUndoableChanges(),
+		RedoableChanges: e.HasRedoableChanges(),
+		SaveableAndDirty: e.SaveableAndDirty(),
+	})
 }
 
 // Mark is a forwarding function for file.Mark.
@@ -165,6 +182,12 @@ func (e *ObservableEditableBuffer) Clean() {
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
+
+	updateTag(
+		UndoableChanges: e.HasUndoableChanges(),
+		RedoableChanges: e.HasRedoableChanges(),
+		SaveableAndDirty: e.SaveableAndDirty(),
+	}
 }
 
 // TODO(rjk): Do we even need this?

@@ -1,7 +1,8 @@
 package file
 
 
-type TagStatus {
+// This is passed by value. I'm assuming that it's small.
+type TagStatus struct {
 	UndoableChanges bool
 	RedoableChanges bool
 	SaveableAndDirty bool
@@ -22,6 +23,7 @@ type TagStatusObserver interface {
 	// Moar.
 	// What are the state changes to accomodate when we actually change the tag.
 	// TODO(rjk): Write some comments here.
+	// Is there a nicer way to do this?
 	UpdateTag(newtagstatus TagStatus)
 	
 }

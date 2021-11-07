@@ -60,12 +60,11 @@ type Window struct {
 	taglines    int
 	tagtop      image.Rectangle
 	editoutlk   chan bool
-
-	alreadyobserving bool
 }
 
 var (
 	_ file.BufferObserver = (*Window)(nil) // Enforce at compile time that Window implements BufferObserver
+	_ file.TagStatusObserver = (*Window)(nil) // Enforce at compile time that Window implements BufferObserver
 )
 
 func NewWindow() *Window {
@@ -93,6 +92,7 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	// Tag setup.
 	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(&w.tag)
+	// w observes tag to update the tag index.
 	f.AddObserver(w)
 	w.tag.file = f
 
@@ -106,6 +106,8 @@ func (w *Window) initHeadless(clone *Window) *Window {
 	w.body.file = f
 	w.filemenu = true
 	w.autoindent = *globalAutoIndent
+	// w observes body to update the tag in response to actions on the body.
+	f.AddTagStatusObserver(w)
 
 	if clone != nil {
 		w.autoindent = clone.autoindent
@@ -377,6 +379,7 @@ func (w *Window) Close() {
 		xfidlog(w, "del")
 		//		w.DirFree()
 		w.tag.file.DelObserver(w)
+		w.body.file.DelTagStatusObserver(w)
 		w.tag.Close()
 		w.body.Close()
 		if global.activewin == w {
@@ -397,11 +400,11 @@ func (w *Window) Delete() {
 func (w *Window) Undo(isundo bool) {
 	w.utflastqid = -1
 	body := &w.body
-log.Println("Window.Undo before", w.tag.q0, w.tag.q1, w.tag. DebugString())
+log.Println("Window.Undo before", w.tag.q0, w.tag.q1, w.tag.DebugString())
 	if q0, q1, ok := body.file.Undo(isundo); ok {
 		body.q0, body.q1 = q0, q1
 	}
-log.Println("Window.Undo after", w.tag.q0, w.tag.q1, w.tag. DebugString())
+log.Println("Window.Undo after", w.tag.q0, w.tag.q1, w.tag.DebugString())
 
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
@@ -715,28 +718,6 @@ func (w *Window) ClampAddr() {
 
 func (w *Window)     Inserted(q0 int, r []rune) {
     log.Println("Window.Inserted observer", q0, string(r))
-
-    if w.alreadyobserving {
-        return
-    }
-
-    w.alreadyobserving = true
-    defer func() { w.alreadyobserving = false }()
-
-    s := fmt.Sprintf(" -%d-", q0)
-    end := w.tag.file.Nr() -1
-    w.tag.file.InsertAtNoUndo(end, []rune(s))
-
-    // I know it's w.tag.body but we should pass it in?
-    // Why pass something that we don't need?
-
-    // clones? (the body shares the text?)
-    // I have to propagate the changes to the clones "manually"
-    // how do I do this? it's "not nice". Should I clone the OEBs (but they can
-    // have different content) So NO.
-    // all clone texts are available from the observers on the w.body.file. So do it
-    // manually. (But that needs to be an undoable change right?)
-    // This part seems like the most fiddly
 }
 
 func (w *Window)     Deleted(q0, q1 int) {
@@ -745,10 +726,10 @@ func (w *Window)     Deleted(q0, q1 int) {
 
 
 func (w *Window) 	UndoMemoize(undo bool) {
-	log.Println("Window.UndoMemoize observer", undo bool)
+	log.Println("Window.UndoMemoize observer", undo )
 }
 
 func (w *Window) 	UpdateTag(newtagstatus file.TagStatus) {
-	log.Println("Window.UpdateTag observer", newtagstatus)
+	log.Printf("Window.UpdateTag observer status %+v", newtagstatus)
 }
 
