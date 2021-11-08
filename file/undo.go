@@ -583,9 +583,10 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 		nrAfterPiece := off - int64(p.nr)
 		if nrAfterPiece > 0 {
 			offTuple.b += int64(p.len())
-			off += nrAfterPiece
+			off = nrAfterPiece
 		} else if p.len() == p.nr {
-			offTuple.b += int64(p.len())
+			offTuple.b = off
+			off = nrAfterPiece
 		} else {
 			for i := 0; i < p.len() && off > 0; i++ {
 				_, size := utf8.DecodeRune(p.data[i:])
