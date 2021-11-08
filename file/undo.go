@@ -153,13 +153,13 @@ func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
 	c := b.newChange(off)
 	var pnew *piece
 	if offset == p.len() {
-		// InsertWithNr between two existing pieces, hence there is nothing to
+		// Insert between two existing pieces, hence there is nothing to
 		// remove, just add a new piece holding the extra text.
 		pnew = b.newPiece(data, p, p.next, nr)
 		c.new = newSpan(pnew, pnew)
 		c.old = newSpan(nil, nil)
 	} else {
-		// InsertWithNr into middle of an existing piece, therefore split the old
+		// Insert into middle of an existing piece, therefore split the old
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
