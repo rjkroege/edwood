@@ -135,7 +135,6 @@ func NewBuffer(content []byte, nr int) *Buffer {
 // given offset is invalid.
 func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
 	off := start.b
-	fmt.Printf("Length is: %v\n inserting at: %v\n", b.Nr(), start.b)
 	if len(data) == 0 {
 		return nil
 	}
@@ -189,7 +188,8 @@ func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	off := startOff.b
-	length := endOff.b - startOff.b
+	length := b.RuneTuple(endOff.r - startOff.r).r
+	fmt.Printf("Length is: %v\n inserting at: %v\n", length, off)
 	if length <= 0 {
 		return nil
 	}
@@ -241,9 +241,9 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		midwayEnd = true
 		end = p
 
-		beg := p.len() + int(length-cur)
-		newBuf := make([]byte, len(p.data[beg:]))
-		copy(newBuf, p.data[beg:])
+		beg := b.RuneTuple(int64(p.len() + int(length-cur))).r
+		newBuf := make([]byte, len(p.data[b.RuneTuple(beg).r:]))
+		copy(newBuf, p.data[b.RuneTuple(beg).b:])
 		nr := utf8.RuneCount(newBuf)
 		after = b.newPiece(newBuf, before, p.next, nr)
 	}
@@ -251,8 +251,8 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	var newStart, newEnd *piece
 	if midwayStart {
 		// we finally know which piece follows our newly allocated before piece
-		newBuf := make([]byte, len(start.data[:offset]))
-		copy(newBuf, start.data[:offset])
+		newBuf := make([]byte, len(start.data[:b.RuneTuple(int64(offset)).r]))
+		copy(newBuf, start.data[:b.RuneTuple(int64(offset)).b])
 		before.data = newBuf
 		before.prev, before.next = start.prev, after
 		before.nr = utf8.RuneCount(newBuf)
@@ -289,6 +289,7 @@ func (b *Buffer) newAction() *action {
 // newChange is associated with the current action or a newly allocated one if
 // none exists.
 func (b *Buffer) newChange(off int64) *change {
+	off = b.RuneTuple(off).b
 	a := b.currentAction
 	if a == nil {
 		a = b.newAction()
@@ -324,7 +325,7 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 	var cur int64
 	for p = b.begin; p.next != nil; p = p.next {
 		if cur <= off && off <= cur+int64(p.len()) {
-			return p, int(off - cur)
+			return p, int(b.RuneTuple(off - cur).b)
 		}
 		cur += int64(p.len())
 	}
@@ -348,7 +349,7 @@ func (b *Buffer) Undo() (int64, int64) {
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
-		off = c.off
+		off = b.RuneTuple(c.off).b
 		size = c.old.len - c.new.len
 		nR -= c.new.Nr() - c.old.Nr()
 	}

@@ -486,7 +486,5 @@ func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
 }
 
 func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
-	start := b.RuneTuple(off)
-	end := b.RuneTuple(start.b + length)
-	return b.Delete(start, end)
+	return b.Delete(b.RuneTuple(off), b.RuneTuple(off+length))
 }
