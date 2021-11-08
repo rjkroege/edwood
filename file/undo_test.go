@@ -322,7 +322,7 @@ func TestPieceNr(t *testing.T) {
 
 	b.deleteCreateOffsetTuple(13, 10)
 	buffAfterDelete := []rune(buffAfterInserts)
-	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
+	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[41:]...)
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
 	b.insertCreateOffsetTuple(8, eng3)
@@ -486,5 +486,7 @@ func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
 }
 
 func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
-	return b.Delete(b.RuneTuple(off), b.RuneTuple(length))
+	start := b.RuneTuple(off)
+	end := b.RuneTuple(start.b + length)
+	return b.Delete(start, end)
 }
