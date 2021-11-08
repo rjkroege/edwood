@@ -1070,7 +1070,7 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 		}
 		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
 	}
-	// InsertWithNr text into the frame.
+	// Insert text into the frame.
 	t.setorigin(fr, q0, true, true)
 }
 
