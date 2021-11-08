@@ -153,7 +153,7 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 func TestFileLoadNoUndo(t *testing.T) {
 	f := MakeObservableEditableBuffer("edwood", nil)
 
-	// InsertWithNr some pre-existing content.
+	// Insert some pre-existing content.
 	f.InsertAt(0, []rune(s1))
 
 	buffy := bytes.NewBuffer([]byte(s2 + s2))
