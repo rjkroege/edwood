@@ -408,6 +408,50 @@ func (t *Buffer) printPieces() {
 	fmt.Println()
 }
 
+func TestRuneTuple(t *testing.T) {
+	tt := []struct {
+		name  string
+		buf   string
+		nr    int
+		roff  int
+		bwant int
+	}{
+		{
+			name:  "one buf, start",
+			buf:   "foo",
+			nr:    len("foo"),
+			roff:  0,
+			bwant: 0,
+		},
+		{
+			name:  "one buf, middle",
+			buf:   "foo",
+			nr:    len("foo"),
+			roff:  1,
+			bwant: 1,
+		},
+		{
+			name:  "one buf, end",
+			buf:   "foo",
+			nr:    len("foo"),
+			roff:  2,
+			bwant: 2,
+		},
+	}
+	for _, tv := range tt {
+		t.Run(tv.name, func(t *testing.T) {
+			b := NewBuffer([]byte(tv.buf), tv.nr)
+			gt := b.RuneTuple(int64(tv.roff))
+			if got, want := gt.b, tv.bwant; got != int64(want) {
+				t.Errorf("%s got %d != want %d", "byte", got, want)
+			}
+			if got, want := gt.r, tv.roff; got != int64(want) {
+				t.Errorf("%s got %d != want %d", "rune", got, want)
+			}
+		})
+	}
+}
+
 func (b *Buffer) checkModified(t *testing.T, id int, expected bool) {
 	if b.Dirty() != expected {
 		if expected {
