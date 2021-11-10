@@ -437,6 +437,13 @@ func TestRuneTuple(t *testing.T) {
 			roff:  2,
 			bwant: 2,
 		},
+		{
+			name:  "one buf, not-ASCII, mid",
+			buf:   "痛苦本身",
+			nr:    utf8.RuneCountInString("痛苦本身"),
+			roff:  2,
+			bwant: len("痛苦"),
+		},
 	}
 	for _, tv := range tt {
 		t.Run(tv.name, func(t *testing.T) {
