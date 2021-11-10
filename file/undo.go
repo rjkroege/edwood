@@ -289,7 +289,6 @@ func (b *Buffer) newAction() *action {
 // newChange is associated with the current action or a newly allocated one if
 // none exists.
 func (b *Buffer) newChange(off int64) *change {
-	off = b.RuneTuple(off).b
 	a := b.currentAction
 	if a == nil {
 		a = b.newAction()
@@ -448,7 +447,7 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 // Delete, Undo and Redo modify the size.
 func (b *Buffer) Size() int64 {
 	var size int64
-	for p := b.begin; p != nil; p = p.next {
+	for p := b.begin; p != b.end; p = p.next {
 		size += int64(p.len())
 	}
 	return size
@@ -457,7 +456,7 @@ func (b *Buffer) Size() int64 {
 // Nr returns the sum of the Nr for each piece in the buffer.
 func (b *Buffer) Nr() int64 {
 	var nr int
-	for p := b.begin; p != nil; p = p.next {
+	for p := b.begin; p != b.end; p = p.next {
 		nr += p.nr
 	}
 	return int64(nr)
@@ -545,7 +544,7 @@ func (p *piece) delete(off int, length int64, nr int) bool {
 // Bytes returns the byte representation of the internal buffer.
 func (b *Buffer) Bytes() []byte {
 	byteBuf := make([]byte, 0, b.Size())
-	for p := b.begin; p != nil; p = p.next {
+	for p := b.begin; p != b.end; p = p.next {
 		byteBuf = append(byteBuf, p.data...)
 	}
 	return byteBuf
@@ -580,23 +579,25 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 		b: 0,
 		r: off,
 	}
-	for p := b.begin; p != nil && off > 0; p = p.next {
+	for p := b.begin; p != b.end && off > 0; p = p.next {
 		nrAfterPiece := off - int64(p.nr)
-		if nrAfterPiece > 0 {
+		if nrAfterPiece >= 0 {
 			offTuple.b += int64(p.len())
 			off = nrAfterPiece
 		} else if p.len() == p.nr {
-			offTuple.b = off
+			offTuple.b += off
 			off = nrAfterPiece
 		} else {
-			for i := 0; i < p.len() && off > 0; i++ {
-				_, size := utf8.DecodeRune(p.data[i:])
+			for i := 0; i < p.len() && off > 0; {
+				r, size := utf8.DecodeRune(p.data[i:])
+				fmt.Printf("Size of: %v is: %v\n", r, size)
 				offTuple.b += int64(size)
 				off -= 1
 				i += size
 			}
 		}
 	}
+	//fmt.Printf("OffsetTuple: %v, off: %v\n", offTuple, off)
 	return offTuple
 }
 
