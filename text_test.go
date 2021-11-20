@@ -336,10 +336,12 @@ func TestTextAbsDirName(t *testing.T) {
 }
 
 func windowWithTag(tag string) *Window {
+	ru := []rune(tag)
 	return &Window{
 		tag: Text{
-			file: file.MakeObservableEditableBuffer("", []rune(tag)),
+			file: file.MakeObservableEditableBuffer("", ru),
 		},
+		tagfilenameend: len(parsetaghelper(tag)),
 	}
 }
 

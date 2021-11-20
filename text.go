@@ -1607,6 +1607,9 @@ func (t *Text) Reset() {
 	t.file.ResetBuffer()
 }
 
+// TODO(rjk): Is this method on the right object. It reaches into Window
+// for nearly every reference to t. Assess how DirName is used and adjust
+// appropriately.
 func (t *Text) dirName(name string) string {
 	if t == nil || t.w == nil || filepath.IsAbs(name) {
 		return name
