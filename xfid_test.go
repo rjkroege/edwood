@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"
@@ -646,6 +647,7 @@ func TestXfidwriteQWtag(t *testing.T) {
 	w.col = new(Column)
 	w.body.file = file.MakeObservableEditableBuffer("", nil)
 	w.tag.file = file.MakeObservableEditableBuffer("", []rune(prevTag))
+	w.tagfilenameend = len(parsetaghelper(prevTag))
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  []byte(extra),
@@ -796,12 +798,15 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	w.display = mockdisplay
 	w.col = col
 
-	w.tag.file = file.MakeObservableEditableBuffer("", []rune("/home/gopher/edwood/row.go Del Snarf | Look "))
+	tagcontents := "/home/gopher/edwood/row.go Del Snarf | Look "
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(tagcontents))
+	w.tagfilenameend = len(parsetaghelper(string(tagcontents)))
 	col.w = append(col.w, w)
 	w.tag.display = mockdisplay
 	w.tag.w = w
 	w.tag.col = col
 	w.tag.row = &global.row
+
 	w.tag.fr = &MockFrame{}
 
 	w.body.fr = &MockFrame{}
@@ -1050,6 +1055,8 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 		display: d,
 	}
 	w.body.file.AddObserver(&w.body)
+	w.tag.file.AddObserver(w)
+	w.tagfilenameend = len("Send")
 
 	// Put something in the snarf buffer.
 	const snarfbuf = "Hello, 世界\n"
@@ -1142,6 +1149,7 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 				w.body.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
 			case QWtag:
 				w.tag.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
+				w.tagfilenameend = utf8.RuneCountInString(tc.setup)
 			}
 
 			x := &Xfid{

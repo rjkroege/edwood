@@ -88,13 +88,11 @@ func TestWindowParseTag(t *testing.T) {
 		{"/foo/bar.txt", "/foo/bar.txt"},
 		{"/foo/bar.txt | Look", "/foo/bar.txt"},
 		{"/foo/bar.txt Del Snarf\t| Look", "/foo/bar.txt"},
+		{"/foo/bar.txt Del Snarf Del Snarf", "/foo/bar.txt"},
+		{"/foo/bar.txt  Del Snarf", "/foo/bar.txt "},
+		{"/foo/b|ar.txt  Del Snarf", "/foo/b|ar.txt "},
 	} {
-		w := &Window{
-			tag: Text{
-				file: file.MakeObservableEditableBuffer("", []rune(tc.tag)),
-			},
-		}
-		if got, want := w.ParseTag(), tc.filename; got != want {
+		if got, want := parsetaghelper(tc.tag), tc.filename; got != want {
 			t.Errorf("tag %q has filename %q; want %q", tc.tag, got, want)
 		}
 	}
