@@ -512,7 +512,6 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 		w.body.LoadReader(0, subl[0], strings.NewReader(win.Body.Buffer), true)
 		w.body.file.Modded()
 
-		w.SetTag()
 	} else if win.Type != dumpfile.Zerox && len(subl[0]) > 0 && subl[0][0] != '+' && subl[0][0] != '-' {
 		// Implementation of the Get command: open the file.
 		get(&w.body, nil, nil, false, false, "")

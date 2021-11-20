@@ -164,7 +164,6 @@ func readfile(c *Column, filename string) {
 	w.SetName(abspath)
 	w.body.Load(0, filename, true)
 	w.body.file.Clean()
-	w.SetTag()
 	w.Resize(w.r, false, true)
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.tag.SetSelect(w.tag.file.Nr(), w.tag.file.Nr())
@@ -351,10 +350,6 @@ func MovedMouse(g *globals, m draw.Mouse) {
 		switch {
 		case m.Buttons&1 != 0:
 			t.Select()
-			if w != nil {
-				// This may replicate work done elsewhere.
-				w.SetTag()
-			}
 			g.argtext = t
 			g.seltext = t
 			if t.col != nil {
@@ -557,7 +552,6 @@ func newwindowthread(g *globals) {
 
 		// TODO(rjk): Should this be in a row lock?
 		w = makenewwindow(nil)
-		w.SetTag()
 		xfidlog(w, "new")
 		g.cnewwindow <- w
 	}

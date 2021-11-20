@@ -167,7 +167,6 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	w.maxlines = w.body.fr.GetFrameFillStatus().Maxlines
 	if clone != nil {
 		w.body.SetSelect(clone.body.q0, clone.body.q1)
-		w.SetTag()
 	}
 }
 
@@ -400,19 +399,16 @@ func (w *Window) Undo(isundo bool) {
 	// TODO(rjk): Is this absolutely essential.
 	body.Show(body.q0, body.q1, true)
 
-	w.SetTag()
 }
 
 func (w *Window) SetName(name string) {
 	t := &w.body
 	t.file.SetName(name)
 
-	w.SetTag()
 }
 
 func (w *Window) Type(t *Text, r rune) {
 	t.Type(r)
-	w.SetTag()
 }
 
 func (w *Window) ClearTag() {
@@ -461,11 +457,6 @@ func (w *Window) ParseTag() string {
 		return tag[:i]
 	}
 	return tag
-}
-
-// SetTag updates the tag for this Window and all of its clones.
-// TODO(rjk): No need to invoke this.
-func (w *Window) SetTag() {
 }
 
 // ForceSetWindowTag force sets the tag when the tag needs to change
@@ -599,7 +590,6 @@ func (w *Window) Commit(t *Text) {
 		global.seq++
 		w.body.file.Mark(global.seq)
 		w.SetName(filename)
-		w.SetTag()
 	}
 }
 

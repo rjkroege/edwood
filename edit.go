@@ -193,7 +193,6 @@ func allupdate(w *Window) {
 		}
 		t.w.owner = owner
 	}
-	w.SetTag()
 }
 
 func editerror(format string, args ...interface{}) {
