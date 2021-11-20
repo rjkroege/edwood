@@ -232,7 +232,6 @@ func flushwarnings() {
 			_, nr = t.BsInsert(t.Nc(), r[:nr], true)
 		}
 		t.Show(q0, t.Nc(), true)
-		t.w.SetTag()
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.owner = owner
 		t.file.TreatAsClean()

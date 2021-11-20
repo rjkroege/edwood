@@ -348,7 +348,6 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if t.w != nil {
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			t.w.Commit(t)
-			t.w.SetTag()
 		}
 	} else {
 		if dosnarf { // Snarf command
@@ -361,7 +360,6 @@ func newcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	c := et.row.Add(nil, -1)
 	if c != nil {
 		w := c.Add(nil, nil, -1)
-		w.SetTag()
 		xfidlog(w, "new")
 	}
 }
@@ -431,7 +429,6 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	if t.w != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		t.w.Commit(t)
-		t.w.SetTag()
 	}
 }
 
@@ -496,7 +493,6 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	if samename {
 		t.file.Clean()
 	}
-	w.SetTag()
 	xfidlog(w, "get")
 }
 
@@ -525,7 +521,6 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 //
 // TODO(flux): Write this in terms of the various cases.
 func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) error {
-	w := oeb.GetCurObserver().(*Text).w
 	d, err := os.Stat(name)
 
 	// Putting to the same file that we already read from.
@@ -585,7 +580,6 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 			oeb.Clean()
 		}
 	}
-	w.SetTag()
 	return nil
 }
 
