@@ -1,4 +1,5 @@
 # Based on https://github.com/mvdan/github-actions-golang
+# Freshen this.
 
 on: [push, pull_request]
 name: edwood
