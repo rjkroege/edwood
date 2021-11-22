@@ -340,7 +340,9 @@ func TestXfidopenQeditout(t *testing.T) {
 }
 
 func TestXfidopenQWeditout(t *testing.T) {
+	configureGlobals()
 	mr := new(mockResponder)
+
 	x := &Xfid{
 		f: &Fid{
 			qid: plan9.Qid{Path: QID(0, QWeditout)},
@@ -350,6 +352,7 @@ func TestXfidopenQWeditout(t *testing.T) {
 	}
 	t.Run("ErrInUse", func(t *testing.T) {
 		x.f.w.editoutlk = nil
+		global.editing = Inserting
 		xfidopen(x)
 		if got, want := mr.err, ErrInUse; got != want {
 			t.Errorf("got error %v; want %v", got, want)
@@ -655,11 +658,16 @@ func TestXfidwriteQWtag(t *testing.T) {
 }
 
 func TestXfidwriteQWwrsel(t *testing.T) {
+	configureGlobals()
+	mockDisplay := edwoodtest.NewDisplay()
+
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
 	w.body.file = file.MakeObservableEditableBuffer("", nil)
 	w.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w.body.fr = &MockFrame{}
+	w.body.display = mockDisplay
+	w.tag.display = mockDisplay
 
 	for _, tc := range []struct {
 		name       string // test name
@@ -723,13 +731,15 @@ func TestXfidwriteQlabel(t *testing.T) {
 }
 
 func TestXfidwriteQcons(t *testing.T) {
+	configureGlobals()
+	mr := new(mockResponder)
+
 	global.row.Init(image.Rectangle{
 		image.Point{0, 0},
 		image.Point{800, 600},
 	}, edwoodtest.NewDisplay())
 
 	data := []byte("cons error: Hello, 世界!\n")
-	mr := new(mockResponder)
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
@@ -754,13 +764,37 @@ func TestXfidwriteQcons(t *testing.T) {
 }
 
 func TestXfidwriteQWerrors(t *testing.T) {
+	// TODO(rjk): This is another of one these places where I should really
+	// be using a quality backing mock.
 	data := []byte("window error: Hello, 世界!\n")
+
+	configureGlobals()
 	mr := new(mockResponder)
+	mockdisplay := edwoodtest.NewDisplay()
+
+	global.row.display = mockdisplay
+
+	col := new(Column)
+	col.display = mockdisplay
+	col.tag.fr = &MockFrame{}
+	global.row.col = append(global.row.col, col)
+	col.tag.display = mockdisplay
+	col.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w := NewWindow().initHeadless(nil)
-	w.col = new(Column)
+	w.display = mockdisplay
+	w.col = col
+
 	w.tag.file = file.MakeObservableEditableBuffer("", []rune("/home/gopher/edwood/row.go Del Snarf | Look "))
+	col.w = append(col.w, w)
+	w.tag.display = mockdisplay
+	w.tag.w = w
+	w.tag.col = col
+	w.tag.row = &global.row
 	w.tag.fr = &MockFrame{}
+
 	w.body.fr = &MockFrame{}
+	w.body.display = mockdisplay
+
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
