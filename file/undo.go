@@ -188,8 +188,8 @@ func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	off := startOff.b
-	length := b.RuneTuple(endOff.r - startOff.r).r
-	fmt.Printf("Length is: %v\n inserting at: %v\n", length, off)
+	length := endOff.b - off //b.RuneTuple(endOff.r - startOff.r).r
+	fmt.Printf("Length is: %v\n deleting at: %v\n", length, off)
 	if length <= 0 {
 		return nil
 	}
@@ -241,9 +241,9 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		midwayEnd = true
 		end = p
 
-		beg := b.RuneTuple(int64(p.len() + int(length-cur))).r
-		newBuf := make([]byte, len(p.data[b.RuneTuple(beg).r:]))
-		copy(newBuf, p.data[b.RuneTuple(beg).b:])
+		beg := b.RuneTuple(int64(p.len() + int(length-cur))).b
+		newBuf := make([]byte, len(p.data[beg:]))
+		copy(newBuf, p.data[beg:])
 		nr := utf8.RuneCount(newBuf)
 		after = b.newPiece(newBuf, before, p.next, nr)
 	}
@@ -251,8 +251,8 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	var newStart, newEnd *piece
 	if midwayStart {
 		// we finally know which piece follows our newly allocated before piece
-		newBuf := make([]byte, len(start.data[:b.RuneTuple(int64(offset)).r]))
-		copy(newBuf, start.data[:b.RuneTuple(int64(offset)).b])
+		newBuf := make([]byte, len(start.data[:offset]))
+		copy(newBuf, start.data[:offset])
 		before.data = newBuf
 		before.prev, before.next = start.prev, after
 		before.nr = utf8.RuneCount(newBuf)
@@ -589,8 +589,7 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 			off = nrAfterPiece
 		} else {
 			for i := 0; i < p.len() && off > 0; {
-				r, size := utf8.DecodeRune(p.data[i:])
-				fmt.Printf("Size of: %v is: %v\n", r, size)
+				_, size := utf8.DecodeRune(p.data[i:])
 				offTuple.b += int64(size)
 				off -= 1
 				i += size
@@ -604,11 +603,8 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 func (s *span) Nr() int {
 	var nr int
 
-	for p := s.start; p != nil; p = p.next {
+	for p := s.start; p != s.end; p = p.next {
 		nr += p.nr
-		if p == s.end {
-			break
-		}
 	}
 	return nr
 }
