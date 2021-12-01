@@ -364,6 +364,50 @@ func mutateBranchedAndRejoined(t *testing.T, g *globals) {
 	undo(&secondwin.tag, nil, nil, false /* this is not undo */, false /* ignored */, "")
 }
 
+func mutatePut(t *testing.T, g *globals) {
+	t.Helper()
+
+	firstwin := g.row.col[0].w[0]
+
+	// Mutate firstwin via cut.
+	firstwin.body.q0 = 3
+	firstwin.body.q1 = 10
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+
+	// Put the instance (This fails the first time because oeb.details.Info
+	// isn't set by the mock.)
+	put(&firstwin.tag, nil, nil, false, true, "")
+	put(&firstwin.tag, nil, nil, false, true, "")
+
+	// Validate that the file has the right contents.
+	fn := firstwin.body.file.Name()
+	contents, err := os.ReadFile(fn)
+	if err != nil {
+		t.Errorf("mutatePut can't read output file %v", err)
+	}
+
+	if got, want := string(contents), "Thishort text\nto try addressing\n"; got != want {
+		t.Errorf("mutatePut, put didn't succeed. got %q, want %q", got, want)
+	}
+}
+
+func mutatePutMutate(t *testing.T, g *globals) {
+	t.Helper()
+
+	mutatePut(t, g)
+
+	firstwin := g.row.col[0].w[0]
+
+	// Mutate firstwin via second cut.
+	firstwin.body.q0 = 0
+	firstwin.body.q1 = 4
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+}
+
 func TestUndoRedo(t *testing.T) {
 	dir := t.TempDir()
 	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
@@ -612,6 +656,85 @@ func TestUndoRedo(t *testing.T) {
 							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
 							Q0:     12,
 							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Mutate, Put
+			name: "mutatePut",
+			fn:   mutatePut,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     3,
+							Q1:     3,
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     0,
+							Q1:     0,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Mutate, Put, Mutate again.
+			// TODO(rjk): Undo sequence on top of this.
+			name: "mutatePutMutate",
+			fn:   mutatePutMutate,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "hort text\nto try addressing\n",
+							Q0:     0,
+							Q1:     0,
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     0,
+							Q1:     0,
 						},
 					},
 				},

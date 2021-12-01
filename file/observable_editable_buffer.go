@@ -162,10 +162,16 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 // TODO(rjk): Verify that this is invoked on a Put op.
 func (e *ObservableEditableBuffer) Clean() {
 	before := e.getTagStatus()
-	defer e.notifyTagObservers(before)
 
 	e.treatasclean = false
+	op := e.putseq
 	e.putseq = e.seq
+
+	e.notifyTagObservers(before)
+
+	if op != e.seq {
+		e.filtertagobservers = false
+	}
 }
 
 // getTagState returns the current tag state. Assumption: this method needs to be cheap to
@@ -334,6 +340,7 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 	// SetName always forces an update of the tag let the default tag update
 	// filter skip the name string comparison on the default case of editing
 	// a body.
+	// TODO(rjk): This reset of filtertagobservers might be unnecessary.
 	e.filtertagobservers = false
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)

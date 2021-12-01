@@ -528,6 +528,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			oeb.UpdateInfo(name, d)
 		}
+
 		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
@@ -583,6 +584,8 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 	return nil
 }
 
+// TODO(rjk): Why doesn't this handle its arguments the same as some of
+// the other commands?
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 	if et == nil || et.w == nil || et.w.body.file.IsDir() {
 		return
