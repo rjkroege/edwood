@@ -559,8 +559,7 @@ func (w *Window) MemoizedUndone(undo bool) {
 	// log.Println("Window.MemoizedUndone")
 }
 
-// TODO(rjk): This should only get invokved when the tag needs to change
-// do not double-invoke
 func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
+	// log.Printf("Window.UpdateTag, status %+v", newtagstatus)
 	w.setTag1()
 }

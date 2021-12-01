@@ -542,8 +542,17 @@ func TestTagObserversFireCorrectly(t *testing.T) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
+	// Previous Clean makes the next observer fire so this one will invoke
+	// but since seq has not changed, it will not cause the last Clean to
+	// invoke the tag observers.
 	oeb.Clean()
-	if got, want := *counts, (observercount{0, 7}); got != want {
+	if got, want := *counts, (observercount{0, 8}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	// Last Clean
+	oeb.Clean()
+	if got, want := *counts, (observercount{0, 8}); got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
