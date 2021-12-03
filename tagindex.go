@@ -7,6 +7,7 @@ import (
 
 	"github.com/rjkroege/edwood/runes"
 	"github.com/rjkroege/edwood/util"
+	//	"log"
 )
 
 // TODO(rjk): This implementation seems non-ideal: why read the whole
@@ -67,7 +68,7 @@ func parsetaghelper(tag string) string {
 }
 
 // NB the sequencing: carefully. actions happen on the body. The result
-// is firing the UpdateTag observer. That method call setTag1. setTag1
+// is firing the UpdateTag observer. That method calls setTag1. setTag1
 // mutates the tag. The edits to the the tag invoke the TagIndex
 // observers and it updates the index. In particular: when UpdateTag
 // runs, it may assume that the tagindex is valid.
@@ -166,6 +167,7 @@ func (w *Window) setTag1() {
 	sb.WriteString(w.body.file.Name())
 	sb.WriteString(Ldelsnarf)
 
+	oldfnend := w.tagfilenameend
 	w.tagfilenameend = utf8.RuneCountInString(w.body.file.Name())
 
 	if w.filemenu {
@@ -179,7 +181,7 @@ func (w *Window) setTag1() {
 			sb.WriteString(Lput)
 		}
 	}
-	// TODO(rjk): What happens if I make a directory into
+	// TODO(rjk): What happens if I make a directory into a file.
 	if w.body.file.IsDir() {
 		sb.WriteString(Lget)
 	}
@@ -212,25 +214,56 @@ func (w *Window) setTag1() {
 		w.tag.Delete(0, w.tag.Nc(), true)
 		w.tag.Insert(0, newtag, true)
 
-		// Rationalize the selection as best as possible
-		w.tag.q0 = util.Min(q0, w.tag.Nc())
-		w.tag.q1 = util.Min(q1, w.tag.Nc())
-		if oldbarIndex != -1 && q0 > oldbarIndex {
+		// log.Println("sorting the selection:", "q0", q0, "q1", q1, "oldfnend", oldfnend, "oldbarIndex", oldbarIndex, "tagfilenameend", w.tagfilenameend, "tag q0", w.tag.q0, "tag q1", w.tag.q1)
+		// TODO(rjk): Consider adjusting this for better unit-testing.
+
+		switch { // q0
+		case q0 <= w.tagfilenameend:
+			// log.Println("q0 < w.tagfilenameend")
+			w.tag.q0 = q0
+		case q0 >= w.tagfilenameend && q0 <= oldfnend:
+			// log.Println("q0 >= w.tagfilenameend && q0 < oldfnend")
+			w.tag.q0 = w.tagfilenameend
+		case oldbarIndex != -1 && q0 > oldbarIndex:
+			// log.Println("oldbarIndex != -1 && q0 > oldbarIndex")
 			bar := newbarIndex - oldbarIndex
 			w.tag.q0 = q0 + bar
+		case q0 > oldfnend && oldbarIndex != -1 && q0 < oldbarIndex:
+			// log.Println("q0 > oldfnend && oldbarIndex != -1 && q0 < oldbarIndex")
+			w.tag.q0 = w.tagfilenameend
+		default:
+			// log.Println("q0 default")
+			w.tag.q0 = util.Min(q0, w.tag.Nc())
+		}
+
+		switch { // q1
+		case q1 <= w.tagfilenameend:
+			// log.Println("q1 < w.tagfilenameend")
+			w.tag.q1 = q1
+		case q1 >= w.tagfilenameend && q1 <= oldfnend:
+			// log.Println("q1 >= w.tagfilenameend && q1 < oldfnend")
+			w.tag.q1 = w.tagfilenameend
+		case oldbarIndex != -1 && q1 > oldbarIndex:
+			// log.Println("oldbarIndex != -1 && q1 > oldbarIndex")
+			bar := newbarIndex - oldbarIndex
 			w.tag.q1 = q1 + bar
+		case q1 > oldfnend && oldbarIndex != -1 && q1 < oldbarIndex:
+			// log.Println("q1 > oldfnend && oldbarIndex != -1 && q1 < oldbarIndex")
+			w.tag.q1 = w.tagfilenameend
+		case q1 >= oldfnend && q1 < oldbarIndex:
+			// If mutating the auto-munged text.
+			w.tag.q1 = w.tag.Nc()
+		default:
+			// log.Println("q1", "default")
+			w.tag.q1 = util.Min(q1, w.tag.Nc())
 		}
 	}
+
 	w.tag.file.Clean()
-	n := w.tag.file.Nr()
-	if w.tag.q0 > n {
-		w.tag.q0 = n
-	}
-	if w.tag.q1 > n {
-		w.tag.q1 = n
-	}
-	// TODO(rjk): This may redraw the selection unnecessarily
-	// if we replaced the tag above.
+	w.tag.q0 = util.Min(w.tag.q0, w.tag.Nc())
+	w.tag.q1 = util.Min(w.tag.q1, w.tag.Nc())
+
+	// TODO(rjk): This can redraw the selection unnecessarily.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)
 	w.DrawButton()
 	if resize {
