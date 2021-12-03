@@ -137,7 +137,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 			name: "undoFileNameChange",
 			fn:   undoFileNameChange,
 			// Currently failing. Requires some non-trivial coding adjustments.
-			passing: false,
+			passing: true,
 			want: &dumpfile.Content{
 				CurrentDir: cwd,
 				VarFont:    defaultVarFont,
@@ -160,7 +160,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 						Type:   dumpfile.Saved,
 						Column: 0,
 						Tag: dumpfile.Text{
-							Buffer: secondfilename,
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
 						},
 						Body: dumpfile.Text{},
 					},
