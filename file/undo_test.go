@@ -371,6 +371,12 @@ func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
 	if c != expected {
 		t.Errorf("%s: got '%s', want '%s'", name, c, expected)
 	}
+
+	actualNr := b.Nr()
+	expectedNr := int64(utf8.RuneCount(b.Bytes()))
+	if actualNr != expectedNr {
+		t.Errorf("%v: got '%v' runes, expected '%v' runes", name, actualNr, expectedNr)
+	}
 }
 
 func (t *Buffer) insertString(off int, data string) {
