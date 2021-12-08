@@ -158,8 +158,8 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 }
 
 // Clean marks the ObservableEditableBuffer as being non-dirty: the
-// backing is the same as File.
-// TODO(rjk): Verify that this is invoked on a Put op.
+// backing is the same as File. In particular, invoked in response to a
+// Put operation.
 func (e *ObservableEditableBuffer) Clean() {
 	before := e.getTagStatus()
 
@@ -207,15 +207,6 @@ func (e *ObservableEditableBuffer) notifyTagObservers(before TagStatus) {
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
-}
-
-// Reset is a forwarding function for file.Reset.
-// TODO(rjk): Do we even need this?
-// TODO(rjk): I believe that we don't need to invoke tag observers here.
-func (e *ObservableEditableBuffer) Reset() {
-	e.filtertagobservers = false
-	e.f.Reset()
-	e.seq = 0
 }
 
 // HasUncommitedChanges is a forwarding function for file.HasUncommitedChanges.
@@ -488,9 +479,13 @@ func (e *ObservableEditableBuffer) String() string {
 	return e.f.b.String()
 }
 
-// ResetBuffer is a forwarding function for rune_array.Reset.
+// ResetBuffer is a forwarding function for rune_array.Reset. Equivalent
+// to re-creating the buffer.
 func (e *ObservableEditableBuffer) ResetBuffer() {
-	e.f.b.Reset()
+	e.filtertagobservers = false
+	e.seq = 0
+	e.f = NewFile()
+	e.f.oeb = e
 }
 
 // Reader is a forwarding function for rune_array.Reader.

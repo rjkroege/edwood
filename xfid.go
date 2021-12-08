@@ -574,8 +574,6 @@ forloop:
 		case "clean": // mark window 'clean', seq=0
 			t := &w.body
 			t.eq0 = ^0
-			// TODO(rjk): Is this right?
-			t.file.Reset()
 			t.file.Clean()
 		case "dirty": // mark window 'dirty'
 			t := &w.body
