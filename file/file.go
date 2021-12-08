@@ -320,21 +320,12 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 	return q0, q1, ok, seq
 }
 
-// Reset removes all Undo records for this File.
-// TODO(rjk): This concept doesn't particularly exist in file.Buffer.
-// Why can't I just create a new File?
-func (f *File) Reset() {
-	f.delta = f.delta[0:0]
-	f.epsilon = f.epsilon[0:0]
-}
-
-// Mark sets an Undo point and
-// and discards Redo records. Call this at the beginning
-// of a set of edits that ought to be undo-able as a unit. This
-// is equivalent to file.Buffer.Commit()
-// NB: current implementation permits calling Mark on an empty
-// file to indicate that one can undo to the file state at the time of
-// calling Mark.
+// Mark sets an Undo point and and discards Redo records. Call this at
+// the beginning of a set of edits that ought to be undo-able as a unit.
+// This is equivalent to file.Buffer.Commit() NB: current implementation
+// permits calling Mark on an empty file to indicate that one can undo to
+// the file state at the time of calling Mark.
+//
 // TODO(rjk): Consider renaming to SetUndoPoint
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]

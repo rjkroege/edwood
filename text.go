@@ -1603,7 +1603,6 @@ func (t *Text) Reset() {
 	t.org = 0
 	t.q0 = 0
 	t.q1 = 0
-	t.file.Reset()
 	t.file.ResetBuffer()
 }
 
