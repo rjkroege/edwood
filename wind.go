@@ -558,11 +558,6 @@ func (w *Window) ClampAddr() {
 	}
 }
 
-// Watch for filename undo actions.
-func (w *Window) MemoizedUndone(undo bool) {
-	// log.Println("Window.MemoizedUndone")
-}
-
 func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
 	// log.Printf("Window.UpdateTag, status %+v", newtagstatus)
 	w.setTag1()

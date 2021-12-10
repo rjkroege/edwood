@@ -300,16 +300,12 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			q1 = u.P0 + u.N
 			ok = true
 		case sam.Filename:
-			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
-			// TODO(rjk): If I have a zerox, how does Undo work?
+			// If I have a zerox, Undo works via Undo calling
+			// TagStatusObserver.UpdateTag on the appropriate observers.
 			seq = u.seq
 			f.UnsetName(epsilon, seq)
 			newfname := string(u.Buf)
-			f.oeb.setnameandisscratch(newfname)
-
-			// New callback scheme
-			f.oeb.observersMemoizedUndone(isundo)
-			// TODO(rjk): Plumb the remaining observer logic for undo/redo actions.
+			f.oeb.setfilename(newfname)
 		}
 		*delta = (*delta)[0 : len(*delta)-1]
 	}
