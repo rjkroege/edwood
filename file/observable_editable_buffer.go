@@ -124,13 +124,6 @@ func (e *ObservableEditableBuffer) DelTagStatusObserver(obs TagStatusObserver) {
 	}
 }
 
-// TODO(rjk): Incomplete code for the rest of undo in tags.
-func (e *ObservableEditableBuffer) observersMemoizedUndone(undo bool) {
-	for t := range e.statusobservers {
-		t.MemoizedUndone(undo)
-	}
-}
-
 // GetObserverSize will return the size of the observer map.
 func (e *ObservableEditableBuffer) GetObserverSize() int {
 	return len(e.observers)
@@ -317,31 +310,26 @@ func (e *ObservableEditableBuffer) InsertAtNoUndo(p0 int, s []rune) {
 	e.f.InsertAt(p0, s, 0)
 }
 
-// SetName sets the name of the backing for this file. Some backings that
-// opt them out of typically being persisted. Resetting a file name to a
-// new value does not have any effect.
-//
-// TODO(rjk): This implementation is a layering violation for the
-// conversion to file.Buffer.
+// SetName sets the name of the backing for this file. Some backing names
+// are "virtual": the name is displayed in the ObservableEditableBuffer's
+// corresponding tag but there is no backing. Setting e's name to its
+// existing value will not invoke the observers.
 func (e *ObservableEditableBuffer) SetName(name string) {
 	if e.Name() == name {
 		return
 	}
 
-	// SetName always forces an update of the tag let the default tag update
-	// filter skip the name string comparison on the default case of editing
-	// a body.
-	// TODO(rjk): This reset of filtertagobservers might be unnecessary.
+	// SetName always forces an update of the tag.
+	// TODO(rjk): This reset of filtertagobservers might now be unnecessary.
 	e.filtertagobservers = false
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)
 
 	if e.seq > 0 {
-		// TODO(rjk): This is the memoize point.
-		// TODO(rjk): Pass in the name?
+		// TODO(rjk): Pass in the name, make the function name better reflect its purpose.
 		e.f.UnsetName(&e.f.delta, e.seq)
 	}
-	e.setnameandisscratch(name)
+	e.setfilename(name)
 }
 
 // Undo is a forwarding function for file.Undo.
@@ -503,16 +491,16 @@ func (e *ObservableEditableBuffer) Nbyte() int {
 	return e.f.b.Nbyte()
 }
 
-// setnameandisscratch updates the oeb.details.name and isscratch bit at
-// the same time. This is a callback from file.go when an Undo action
-// changes the filename.
-// TODO(rjk): This function needs to be removed and replaced by file.File
-// and file.Buffer calling observersMemoizedUndone.
-func (e *ObservableEditableBuffer) setnameandisscratch(name string) {
+// setfilename updates the oeb.details.name and isscratch bit at the same
+// time. The underlying buffer (file.Buffer or file.File) needs to invoke
+// this when Undo-ing a filename change.
+//
+// If we get here via invoking Undo (e.g. oeb.Undo, file.Undo,
+// oeb.setfilename), we will execute the tag update observers if
+// appropriate to update the tag status.
+func (e *ObservableEditableBuffer) setfilename(name string) {
 	e.treatasclean = false
 
-	// TODO(rjk): The filename needs to be plumbed into the observer so that
-	// it can mutate the tag.
 	e.details.Name = name
 	if strings.HasSuffix(name, slashguide) || strings.HasSuffix(name, plusErrors) {
 		e.isscratch = true
