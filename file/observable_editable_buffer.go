@@ -425,7 +425,6 @@ func (e *ObservableEditableBuffer) deleted(q0 int, q1 int) {
 // Commit is a forwarding function for file.Commit.
 // nop with file.Buffer.
 func (e *ObservableEditableBuffer) Commit() {
-	e.treatasclean = false
 	e.f.Commit(e.seq)
 }
 

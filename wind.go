@@ -486,7 +486,7 @@ func (w *Window) Clean(conservative bool) bool {
 		return true
 	}
 	if w.body.file.TreatAsDirty() {
-		if len(w.body.file.Name()) != 0 {
+		if w.body.file.Name() != "" {
 			warning(nil, "%v modified\n", w.body.file.Name())
 		} else {
 			if w.body.Nc() < 100 { // don't whine if it's too small
