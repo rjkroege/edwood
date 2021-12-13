@@ -8,9 +8,55 @@ import (
 	"regexp/syntax"
 )
 
-// FindBackward is similar to FindAllSubmatchIndex but searches
-// backwards in r[start:end], taking care to match ^ and $ correctly.
+// Navigating backwards in file probably means a small window.
+const suffixwindowsize = 500
+
+// newFindBackward is simple O(n) implementation of backwards find.
+func (re *Regexp) newFindBackward(r []rune, start int, end int, n int) [][]int {
+	// log.Println("newFindBackward", "len(r)", len(r), "start", start, "end", end, "n", n)
+
+	ffstart := start
+
+	if n > 0 && (end-start) > n*suffixwindowsize {
+		// Search only through a suffix.
+		ffstart = end - n*suffixwindowsize
+	}
+
+	forwardmatches := re.FindForward(r, ffstart, end, -1)
+	nfw := len(forwardmatches)
+
+	if start != ffstart && (nfw < n || n < 0) {
+		// Maybe the desired number of matches exist in the whole. (Prefix is
+		// insufficient because the regexp might match a substring overlapping
+		// the arbitrarily chosen split point.)
+		forwardmatches = re.FindForward(r, start, end, -1)
+		nfw = len(forwardmatches)
+	}
+
+	if nfw < 1 {
+		return nil
+	}
+
+	if n < 0 || n > nfw {
+		n = nfw
+	}
+
+	matches := make([][]int, 0, n)
+
+	for i := nfw - 1; len(matches) < n; i-- {
+		matches = append(matches, forwardmatches[i])
+	}
+
+	return matches
+}
+
 func (re *Regexp) FindBackward(r []rune, start int, end int, n int) [][]int {
+	return re.newFindBackward(r, start, end, n)
+}
+
+// oldFindBackward is similar to FindAllSubmatchIndex but searches
+// backwards in r[start:end], taking care to match ^ and $ correctly.
+func (re *Regexp) oldFindBackward(r []rune, start int, end int, n int) [][]int {
 	if n < 0 {
 		n = len(r) + 1
 	}
@@ -72,6 +118,8 @@ func (re *Regexp) allMatchesRunesBackward(r []rune, start int, end int, n int, d
 				accept = false
 			}
 		}
+		// By moving back 1 character at a time, the regexp matcher becomes
+		// O(n^2).
 		pos--
 		prevMatchStart = matches[0]
 
