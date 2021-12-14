@@ -460,7 +460,6 @@ func TestRuneTuple(t *testing.T) {
 			roff:  3,
 			bwant: len("痛苦本"),
 		},
-		//Start of my template ones
 		{
 			name:  "three bufs, not-ASCII, start of middle piece",
 			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
