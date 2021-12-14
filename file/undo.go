@@ -575,29 +575,32 @@ func (b *Buffer) TreatAsDirty() bool {
 }
 
 func (b *Buffer) RuneTuple(off int64) OffSetTuple {
-	offTuple := OffSetTuple{
+	offsets := OffSetTuple{
 		b: 0,
 		r: off,
 	}
-	for p := b.begin; p != b.end && off > 0; p = p.next {
-		nrAfterPiece := off - int64(p.nr)
-		if nrAfterPiece >= 0 {
-			offTuple.b += int64(p.len())
-			off = nrAfterPiece
-		} else if p.len() == p.nr {
-			offTuple.b += off
-			off = nrAfterPiece
+	for p := b.begin; p != b.end && off >= 0; p = p.next {
+		isAscii := p.len() == p.nr
+
+		if isAscii {
+			if off-int64(p.nr) >= 0 {
+				off -= int64(p.nr)
+				offsets.b += int64(p.nr)
+			} else {
+				offsets.b += off
+				off -= off
+			}
 		} else {
-			for i := 0; i < p.len() && off > 0; {
-				_, size := utf8.DecodeRune(p.data[i:])
-				offTuple.b += int64(size)
+			i := 0
+			for _, rSize := utf8.DecodeRune(p.data[i:]); i < p.len() && off > 0; i += rSize {
+				offsets.b += int64(rSize)
 				off -= 1
-				i += size
 			}
 		}
 	}
-	//fmt.Printf("OffsetTuple: %v, off: %v\n", offTuple, off)
-	return offTuple
+
+	return offsets
+
 }
 
 func (s *span) Nr() int {
