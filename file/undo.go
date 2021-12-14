@@ -241,7 +241,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		midwayEnd = true
 		end = p
 
-		beg := b.RuneTuple(int64(p.len() + int(length-cur))).b
+		beg := int64(p.len() + int(length-cur))
 		newBuf := make([]byte, len(p.data[beg:]))
 		copy(newBuf, p.data[beg:])
 		nr := utf8.RuneCount(newBuf)
@@ -324,7 +324,7 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 	var cur int64
 	for p = b.begin; p.next != nil; p = p.next {
 		if cur <= off && off <= cur+int64(p.len()) {
-			return p, int(b.RuneTuple(off - cur).b)
+			return p, int(off - cur)
 		}
 		cur += int64(p.len())
 	}
