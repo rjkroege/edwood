@@ -188,7 +188,7 @@ func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	off := startOff.b
-	length := endOff.b - off //b.RuneTuple(endOff.r - startOff.r).r
+	length := endOff.b - startOff.b //b.RuneTuple(endOff.r - startOff.r).r
 	fmt.Printf("Length is: %v\n deleting at: %v\n", length, off)
 	if length <= 0 {
 		return nil
