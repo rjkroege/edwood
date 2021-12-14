@@ -451,16 +451,49 @@ func TestRuneTuple(t *testing.T) {
 			bwant: len("痛苦"),
 		},
 		{
-			name:  "one buf, not-ASCII, mid",
+			name:  "one buf, not-ASCII, end",
 			buf:   "痛苦本身",
 			nr:    utf8.RuneCountInString("痛苦本身"),
-			roff:  2,
-			bwant: len("痛苦"),
+			roff:  3,
+			bwant: len("痛苦本"),
+		},
+		//Start of my template ones
+		{
+			name:  "three bufs, not-ASCII, start of middle piece",
+			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
+			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			roff:  5,
+			bwant: len("痛苦本身痛"),
+		},
+		{
+			name:  "one buf, not-ASCII, end of middle piece",
+			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
+			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			roff:  7,
+			bwant: len("痛苦本身痛苦本"),
+		},
+		{
+			name:  "one buf, not-ASCII, start of end piece",
+			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
+			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			roff:  8,
+			bwant: len("痛苦本身痛苦本痛"),
+		},
+		{
+			name:  "one buf, not-ASCII, end of end piece",
+			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
+			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			roff:  13,
+			bwant: len("痛苦本身痛苦本痛苦痛苦本身"),
 		},
 	}
 	for _, tv := range tt {
 		t.Run(tv.name, func(t *testing.T) {
-			b := NewBuffer([]byte(tv.buf), tv.nr)
+			buf := strings.Split(tv.buf, ",")
+			b := NewBufferNoNr(nil)
+			for _, s := range buf {
+				b.insertString(int(b.Nr()), s)
+			}
 			gt := b.RuneTuple(int64(tv.roff))
 			if got, want := gt.b, tv.bwant; got != int64(want) {
 				t.Errorf("%s got %d != want %d", "byte", got, want)
