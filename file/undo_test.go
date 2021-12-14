@@ -320,7 +320,8 @@ func TestPieceNr(t *testing.T) {
 	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
 	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
-	b.deleteCreateOffsetTuple(13, 10)
+	fmt.Printf("Before delete: %v\n", string(b.Bytes()))
+	b.deleteCreateOffsetTuple(13, 10) // Currently the offset translates to 17 (should be 20). Should be deleting a total of 25 bytes
 	buffAfterDelete := []rune(buffAfterInserts)
 	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[24:]...)
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
@@ -351,12 +352,14 @@ func TestPieceNr(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		tt.op(b)
-		nr := b.Nr()
-		wantNr := countRunes(b)
-		if nr != wantNr {
-			t.Errorf("%d: got n %d, want %d", i, nr, wantNr)
-		}
+		t.Run("TestPieceNr #"+fmt.Sprint(i), func(t *testing.T) {
+			tt.op(b)
+			nr := b.Nr()
+			wantNr := countRunes(b)
+			if nr != wantNr {
+				t.Errorf("%d: got n %d, want %d", i, nr, wantNr)
+			}
+		})
 	}
 }
 
