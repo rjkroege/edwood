@@ -29,7 +29,7 @@ func TestOverall(t *testing.T) {
 	b.Commit()
 	// Also check that multiple change commits don't create empty changes.
 	b.Commit()
-	b.deleteCreateOffsetTuple(20, 34)
+	b.deleteCreateOffsetTuple(20, 14)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
 	b.insertString(20, " makes Jack")
@@ -322,7 +322,7 @@ func TestPieceNr(t *testing.T) {
 
 	b.deleteCreateOffsetTuple(13, 10)
 	buffAfterDelete := []rune(buffAfterInserts)
-	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[41:]...)
+	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[24:]...)
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
 	b.insertCreateOffsetTuple(8, eng3)
