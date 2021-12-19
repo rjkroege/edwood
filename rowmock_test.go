@@ -5,7 +5,10 @@ package main
 
 import (
 	"image"
+	"os"
+	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
@@ -108,4 +111,115 @@ func InsertString(w *Window, s string) {
 	w.body.file.Mark(global.seq)
 	global.seq++
 	w.body.Insert(0, []rune(s), true)
+}
+
+// windowScaffoldOption is a configurable option type.
+type windowScaffoldOption func(*scaffoldBuilder)
+
+// scaffoldBuilder accumulates state set by the options into what's
+// needed to build an array of dumpfile.Window objects.
+type scaffoldBuilder struct {
+	winbyname map[string]*dumpfile.Window
+	windows   []*dumpfile.Window
+	dirs      map[string]string
+	t         testing.TB
+}
+
+func (sb *scaffoldBuilder) dumpfile() *dumpfile.Content {
+	return &dumpfile.Content{
+		Columns: []dumpfile.Column{
+			{},
+		},
+		Windows: sb.windows,
+	}
+}
+
+// FlexiblyMakeWindowScaffold is wrapper around MakeWindowScaffold that
+// provides easily configurable Window scaffold structures.
+func FlexiblyMakeWindowScaffold(t testing.TB, opts ...windowScaffoldOption) {
+	t.Helper()
+
+	sb := &scaffoldBuilder{
+		windows:   make([]*dumpfile.Window, 0),
+		winbyname: make(map[string]*dumpfile.Window),
+		dirs:      make(map[string]string),
+		t:         t,
+	}
+
+	for _, opt := range opts {
+		opt(sb)
+	}
+	MakeWindowScaffold(sb.dumpfile())
+}
+
+// Dir sets the backing directory for window id. Setting a backing
+// directory implies persisting the body to the file formed by Join(path,
+// id).
+func ScDir(path, id string) windowScaffoldOption {
+	return func(f *scaffoldBuilder) {
+		f.t.Helper()
+
+		w, ok := f.winbyname[id]
+		if !ok {
+			f.t.Fatalf("Dir option on non-existent window %s", id)
+		}
+
+		path := filepath.Join(path, id)
+		w.Tag.Buffer = path
+
+		if err := os.WriteFile(path, []byte(w.Body.Buffer), 0644); err != nil {
+			f.t.Fatalf("%s can't write %q: %v", "Dir", path, err)
+		}
+		// Stash the path here so that Dir and Body can be in arbitrary order.
+		f.dirs[id] = path
+	}
+}
+
+// OptBody sets contents and persists it if there's a dir.
+// TODO(rjk): Consider placing in a different package.
+func ScBody(id, contents string) windowScaffoldOption {
+	return func(f *scaffoldBuilder) {
+		f.t.Helper()
+
+		w, ok := f.winbyname[id]
+		if !ok {
+			f.t.Fatalf("Dir option on non-existent window %s", id)
+		}
+
+		w.Body.Buffer = contents
+		// Body can come both after and before Dir.
+		if path, ok := f.dirs[id]; ok {
+			if err := os.WriteFile(path, []byte(w.Body.Buffer), 0644); err != nil {
+				f.t.Fatalf("%s can't write %q: %v", "Dir", path, err)
+			}
+		}
+	}
+}
+
+// Declares a new window with identifier name. Subsequent options use
+// name to specify the window that they effect. name needs to be a valid
+// file name for backed Windows.
+func ScWin(name string) windowScaffoldOption {
+	return func(f *scaffoldBuilder) {
+		f.t.Helper()
+		w := &dumpfile.Window{
+			Tag: dumpfile.Text{
+				Buffer: name,
+			},
+		}
+		f.windows = append(f.windows, w)
+		f.winbyname[name] = w
+	}
+}
+
+// Repeating generates a sequence of identical lines.
+func Repeating(n int, s string) string {
+	var buffy strings.Builder
+
+	for i := 0; i < n; i++ {
+		buffy.WriteString(s)
+		buffy.WriteRune('\n')
+	}
+
+	return buffy.String()
 }

@@ -1,3 +1,18 @@
+// Basics
+Edit X:edwood/\+Errors: 1,$d
+X:edwood/.*\.go: w
+
+go build
+./testedwood.sh  /tmp/xxx.tex
+
+go test --run 'TestLargeEditTargets' -covermode=count -coverprofile=count.out
+go test --run XXX -bench 'BenchmarkLargeEditTargets' -cpuprofile cpu.prof
+go test
+go tool cover -html=count.out
+go test 
+
+// Edit commands for converting C to Go
+
 ",
 { x/->/c/./
 x/TRUE/c/true/

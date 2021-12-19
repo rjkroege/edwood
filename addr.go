@@ -43,7 +43,7 @@ func isregexc(r rune) bool {
 // being careful not to walk past the end of the text,
 // and then nr chars, being careful not to walk past
 // the end of the current line.
-// It returns the final position.
+// It returns the final position in runes.
 func nlcounttopos(t sam.Texter, q0 int, nl int, nr int) int {
 	for nl > 0 && q0 < t.Nc() {
 		if t.ReadC(q0) == '\n' {
