@@ -18,12 +18,11 @@ import (
 
 // configureGlobals setups global variables so that Edwood can operate on
 // a scaffold model.
-func configureGlobals() {
-	// TODO(rjk): Make a proper mock draw.Mouse in edwoodtest.
-	global.mouse = new(draw.Mouse)
-	global.button = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	global.modbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
-	global.colbutton = edwoodtest.NewImage(image.Rect(0, 0, 10, 10))
+func (g *globals) configureGlobals(d draw.Display) {
+	g.mouse = new(draw.Mouse)
+	g.button = edwoodtest.NewImage(d, "button", image.Rect(0, 0, 10, 10))
+	g.modbutton = edwoodtest.NewImage(d, "modbutton", image.Rect(0, 0, 10, 10))
+	g.colbutton = edwoodtest.NewImage(d, "colbutton", image.Rect(0, 0, 10, 10))
 
 	// Set up Undo to make sure that we see undoable results.
 	// By default, post-load, file.seq, file.putseq = 0, 0.
@@ -81,7 +80,7 @@ func MakeWindowScaffold(content *dumpfile.Content) {
 
 	// This has to be done first.
 	global.row.col = cols
-	configureGlobals()
+	global.configureGlobals(display)
 
 	for _, serwin := range content.Windows {
 		w := NewWindow().initHeadless(nil)

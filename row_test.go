@@ -447,13 +447,14 @@ func jsonEscapePath(s string) string {
 
 func setGlobalsForLoadTesting() {
 	global.WinID = 0 // reset
-	global.colbutton = edwoodtest.NewImage(image.Rectangle{})
-	global.button = edwoodtest.NewImage(image.Rectangle{})
-	global.modbutton = edwoodtest.NewImage(image.Rectangle{})
+	display := edwoodtest.NewDisplay()
+
+	global.colbutton = edwoodtest.NewImage(display, "colbutton", image.Rectangle{})
+	global.button = edwoodtest.NewImage(display, "button", image.Rectangle{})
+	global.modbutton = edwoodtest.NewImage(display, "modbutton", image.Rectangle{})
 	global.mouse = &draw.Mouse{}
 	global.maxtab = 4
 
-	display := edwoodtest.NewDisplay()
 	global.row = Row{} // reset
 	global.row.Init(display.ScreenImage().R(), display)
 }
