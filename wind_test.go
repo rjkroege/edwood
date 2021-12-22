@@ -19,9 +19,9 @@ func TestSetTag1(t *testing.T) {
 		"/home/ゴーファー/src/エドウード.txt",
 		"/home/ゴーファー/src/",
 	} {
-		configureGlobals()
-
 		display := edwoodtest.NewDisplay()
+		global.configureGlobals(display)
+
 		w := NewWindow().initHeadless(nil)
 		w.display = display
 		w.body = Text{

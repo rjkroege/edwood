@@ -2,8 +2,8 @@
 Edit X:edwood/\+Errors: 1,$d
 X:edwood/.*\.go: w
 
-go build
-./testedwood.sh  /tmp/xxx.tex
+go build -tags debug
+./testedwood.sh --debug=localhost:8000  
 
 go test --run 'TestLargeEditTargets' -covermode=count -coverprofile=count.out
 go test --run XXX -bench 'BenchmarkLargeEditTargets' -cpuprofile cpu.prof

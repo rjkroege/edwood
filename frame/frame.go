@@ -91,11 +91,11 @@ type Frame interface {
 	// if the frame is to be redrawn with a different font; otherwise the
 	// frame will maintain some data structures associated with the font.
 	//
-	// /To resize a Frame, use Clear and Init and then Insert to recreate the
-	// /display. If a Frame is being moved but not resized, that is, if the
-	// /shape of its containing rectangle is unchanged, it is sufficient to
-	// /use Draw to copy the containing rectangle from the old to the new
-	// /location and then call SetRects to establish the new geometry.
+	// To resize a Frame, use Clear and Init and then Insert to recreate the
+	// display. If a Frame is being moved but not resized, that is, if the
+	// shape of its containing rectangle is unchanged, it is sufficient to
+	// use Draw to copy the containing rectangle from the old to the new
+	// location and then call SetRects to establish the new geometry.
 	Clear(bool)
 
 	// Ptofchar returns the location of the upper left corner of the p'th
