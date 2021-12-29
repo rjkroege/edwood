@@ -323,7 +323,7 @@ func TestPieceNr(t *testing.T) {
 	fmt.Printf("Before delete: %v\n", string(b.Bytes()))
 	b.deleteCreateOffsetTuple(13, 10) // Currently, the offset translates to 17 (should be 20). Should be deleting a total of 25 bytes
 	buffAfterDelete := []rune(buffAfterInserts)
-	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[24:]...)
+	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
 
 	b.insertCreateOffsetTuple(8, eng3)
