@@ -420,80 +420,69 @@ func (t *Buffer) printPieces() {
 func TestRuneTuple(t *testing.T) {
 	tt := []struct {
 		name  string
-		buf   string
-		nr    int
+		buf   []string
 		roff  int
 		bwant int
 	}{
 		{
 			name:  "one buf, start",
-			buf:   "foo",
-			nr:    len("foo"),
+			buf:   []string{"foo"},
 			roff:  0,
 			bwant: 0,
 		},
 		{
 			name:  "one buf, middle",
-			buf:   "foo",
-			nr:    len("foo"),
+			buf:   []string{"foo"},
 			roff:  1,
 			bwant: 1,
 		},
 		{
 			name:  "one buf, end",
-			buf:   "foo",
-			nr:    len("foo"),
+			buf:   []string{"foo"},
 			roff:  2,
 			bwant: 2,
 		},
 		{
 			name:  "one buf, not-ASCII, mid",
-			buf:   "痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身"),
+			buf:   []string{"痛苦本身"},
 			roff:  2,
 			bwant: len("痛苦"),
 		},
 		{
 			name:  "one buf, not-ASCII, end",
-			buf:   "痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身"),
+			buf:   []string{"痛苦本身"},
 			roff:  3,
 			bwant: len("痛苦本"),
 		},
 		{
 			name:  "three bufs, not-ASCII, start of middle piece",
-			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
 			roff:  5,
 			bwant: len("痛苦本身痛"),
 		},
 		{
 			name:  "one buf, not-ASCII, end of middle piece",
-			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
 			roff:  7,
 			bwant: len("痛苦本身痛苦本"),
 		},
 		{
 			name:  "one buf, not-ASCII, start of end piece",
-			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
 			roff:  8,
 			bwant: len("痛苦本身痛苦本痛"),
 		},
 		{
 			name:  "one buf, not-ASCII, end of end piece",
-			buf:   "痛苦本身,痛苦本,痛苦痛苦本身",
-			nr:    utf8.RuneCountInString("痛苦本身痛苦本痛苦痛苦本身"),
+			buf:   []string{"痛苦本身", "痛苦本", "痛苦痛苦本身"},
 			roff:  13,
 			bwant: len("痛苦本身痛苦本痛苦痛苦本身"),
 		},
 	}
 	for _, tv := range tt {
 		t.Run(tv.name, func(t *testing.T) {
-			buf := strings.Split(tv.buf, ",")
 			b := NewBufferNoNr(nil)
-			for _, s := range buf {
+			for _, s := range tv.buf {
 				b.insertString(int(b.Nr()), s)
 			}
 			gt := b.RuneTuple(int64(tv.roff))
