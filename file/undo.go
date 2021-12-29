@@ -579,11 +579,11 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 		b: 0,
 		r: off,
 	}
-	for p := b.begin; p != b.end && off >= 0; p = p.next {
+	for p := b.begin; p != b.end && off > 0; p = p.next {
 		isAscii := p.len() == p.nr
 
 		if isAscii {
-			if off-int64(p.nr) >= 0 {
+			if off-int64(p.nr) > 0 {
 				off -= int64(p.nr)
 				offsets.b += int64(p.nr)
 			} else {
