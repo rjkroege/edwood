@@ -34,7 +34,8 @@ type SelectScrollUpdater interface {
 	DefaultFontHeight() int
 
 	// Delete deletes from the Frame the text between p0 and p1; p1 points at
-	// the first rune beyond the deletion.
+	// the first rune beyond the deletion. Returns the number of whole lines
+	// removed.
 	//
 	// Delete will clear a selection or tick if present but not put it back.
 	Delete(int, int) int
