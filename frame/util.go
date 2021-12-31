@@ -94,6 +94,8 @@ func (f *frameimpl) newwid(pt image.Point, b *frbox) int {
 	return b.Wid
 }
 
+// TODO(rjk): Expand the test cases involving \t characters.
+// TODO(rjk): Wouldn't it be nicer if this was a method on frbox?
 func (f *frameimpl) newwid0(pt image.Point, b *frbox) int {
 	c := f.rect.Max.X
 	x := pt.X
@@ -101,6 +103,7 @@ func (f *frameimpl) newwid0(pt image.Point, b *frbox) int {
 		return b.Wid
 	}
 	if x+int(b.Minwid) > c {
+		// A tab character doesn't fit at the end of the line.
 		pt.X = f.rect.Min.X
 		x = pt.X
 	}

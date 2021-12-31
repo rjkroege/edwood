@@ -7,6 +7,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// TODO(rjk): Test having a height that's not a multiple of the font
+// height. Particularly relevant for supporting lines of differing
+// heights.
+
 // TestInsertAligned is a high-level Insert test that uses a frame where
 // the character edge aligns with the width of the text region.
 func TestInsertAligned(t *testing.T) {
