@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"strings"
 	"sync"
 	"unicode/utf8"
 
@@ -12,6 +13,11 @@ import (
 )
 
 var _ = draw.Display((*mockDisplay)(nil))
+
+const (
+	fwidth  = 13
+	fheight = 10
+)
 
 // GettableDrawOps display implementations can provide a list of the
 // executed draw ops.
@@ -45,11 +51,13 @@ func (d *mockDisplay) Transparent() draw.Image {
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return nil }
 func (d *mockDisplay) InitMouse() *draw.Mousectl       { return nil }
 
-// TODO(rjk): Need to increase fidelity here.
-func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(13, 10), nil }
+// TODO(rjk): Support a richer variety of fonts with better metrics.
+// NB: to make the recorded ops easier to read, I provide them in
+// character multiples based on the fixed font metrics here.
+func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(fwidth, fheight), nil }
 
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
-	name := NiceColourName(val)
+	name := fmt.Sprintf("%s-%v", NiceColourName(val), r)
 	if repl {
 		name += ",tiled"
 	}
@@ -71,7 +79,7 @@ func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
 
 func (d *mockDisplay) Attach(ref int) error { return nil }
 func (d *mockDisplay) Flush() error         { return nil }
-func (d *mockDisplay) ScaleSize(n int) int  { return 0 }
+func (d *mockDisplay) ScaleSize(n int) int  { return 1 }
 
 // ReadSnarf reads the snarf buffer into buf, returning the number of bytes read,
 // the total size of the snarf buffer (useful if buf is too short), and any
@@ -130,6 +138,53 @@ func (i *mockImage) Display() draw.Display { return i.d }
 func (i *mockImage) Pix() draw.Pix         { return 0 }
 func (i *mockImage) R() image.Rectangle    { return i.r }
 
+// rectochars returns positions in character units where that's possible.
+func rectochars(r image.Rectangle) string {
+	var sb strings.Builder
+
+	sb.WriteString(pointochars(r.Min))
+	sb.WriteRune(',')
+
+	sb.WriteRune('[')
+
+	if r.Dx()%fwidth == 0 {
+		fmt.Fprintf(&sb, "%d", r.Dx()/fwidth)
+	} else {
+		sb.WriteRune('-')
+	}
+	sb.WriteRune(',')
+
+	if r.Dy()%fheight == 0 {
+		fmt.Fprintf(&sb, "%d", r.Dy()/fheight)
+	} else {
+		sb.WriteRune('-')
+	}
+	sb.WriteRune(']')
+	return sb.String()
+}
+
+func pointochars(p image.Point) string {
+	var sb strings.Builder
+
+	sb.WriteRune('[')
+
+	if (p.X-20)%fwidth == 0 {
+		fmt.Fprintf(&sb, "%d", (p.X-20)/fwidth)
+	} else {
+		sb.WriteRune('-')
+	}
+	sb.WriteRune(',')
+
+	if (p.Y-10)%fheight == 0 {
+		fmt.Fprintf(&sb, "%d", (p.Y-10)/fheight)
+	} else {
+		sb.WriteRune('-')
+	}
+	sb.WriteRune(']')
+
+	return sb.String()
+}
+
 func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point) {
 	srcname := "nil"
 	if msrc, ok := src.(*mockImage); ok {
@@ -147,6 +202,18 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 		maskname,
 		p1,
 	)
+	switch {
+	case i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && srcname == i.n:
+		sr := r.Sub(r.Min).Add(p1)
+		op = fmt.Sprintf("blit %v %s, to %v %s",
+			sr, rectochars(sr),
+			r, rectochars(r),
+		)
+	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && src.R().Dx() == 0 && src.R().Dy() == 0:
+		op = fmt.Sprintf("fill %v %s",
+			r, rectochars(r),
+		)
+	}
 	i.d.drawops = append(i.d.drawops, op)
 }
 
@@ -172,13 +239,12 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 		srcname = msrc.n
 	}
 
-	op := fmt.Sprintf("%s <- draw-chars %q atpoint: %v font: %s fill: %s sp: %v",
+	op := fmt.Sprintf("%s <- string %q atpoint: %v %s fill: %s",
 		i.n,
 		string(b),
 		pt,
-		f.Name(),
+		pointochars(pt),
 		srcname,
-		sp,
 	)
 	i.d.drawops = append(i.d.drawops, op)
 

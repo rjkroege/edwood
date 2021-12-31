@@ -172,7 +172,11 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	 * (p0); pt1 is terminal point (without line wrap) of insertion.
 	 */
 
-	// Remove the selection or tick.
+	// Remove the selection or tick. This will redraw all selected text characters.
+	// TODO(rjk): Do not remove the selection if it's unnecessary to do so.
+	// Scrolling is the only time that we need to be particularly careful
+	// with this. Small edits won't have a selection? Given however the cost
+	// of selection drawing, we should do the right thing once?
 	f.drawselimpl(f.ptofcharptb(f.sp0, f.rect.Min, 0), f.sp0, f.sp1, false)
 
 	/*
@@ -300,6 +304,7 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 			y = pt.Y
 			cn0 -= b.Nrune
 		} else {
+			// This box (b) is a tab or a newline.
 			rect.Min = pt
 			rect.Max = pt
 			rect.Max.X += b.Wid
