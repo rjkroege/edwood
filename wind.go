@@ -92,6 +92,14 @@ func (w *Window) initHeadless(clone *Window) *Window {
 
 	// Tag setup.
 	f := file.MakeObservableEditableBuffer("", nil)
+
+	if clone != nil {
+		// TODO(rjk): Support something nicer like initializing from a Reader.
+		// (Can refactor ObservableEditableBuffer.Load perhaps.
+		clonebuff := make([]rune, clone.tag.Nc())
+		clone.tag.file.Read(0, clonebuff)
+		f = file.MakeObservableEditableBuffer("", clonebuff)
+	}
 	f.AddObserver(&w.tag)
 	// w observes tag to update the tag index.
 	// TODO(rjk): Add the tag index facility.
@@ -130,13 +138,9 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	w.tag.Init(r1, global.tagfont, global.tagcolors, w.display)
 	w.tag.what = Tag
 
-	// tag is a copy of the contents, not a tracked image
+	// When cloning, we copy the tag so that the tag contents can evolve
+	// independently.
 	if clone != nil {
-		w.tag.Delete(0, w.tag.Nc(), true)
-		// TODO(sn0w): find a nicer way to do this.
-		clonebuff := []rune(clone.tag.file.String())
-		w.tag.Insert(0, clonebuff, true)
-		w.tag.file.Reset()
 		w.tag.SetSelect(w.tag.Nc(), w.tag.Nc())
 	}
 	r1 = r
@@ -482,7 +486,7 @@ func (w *Window) Clean(conservative bool) bool {
 		return true
 	}
 	if w.body.file.TreatAsDirty() {
-		if len(w.body.file.Name()) != 0 {
+		if w.body.file.Name() != "" {
 			warning(nil, "%v modified\n", w.body.file.Name())
 		} else {
 			if w.body.Nc() < 100 { // don't whine if it's too small
@@ -552,11 +556,6 @@ func (w *Window) ClampAddr() {
 	if w.addr.q1 > w.body.Nc() {
 		w.addr.q1 = w.body.Nc()
 	}
-}
-
-// Watch for filename undo actions.
-func (w *Window) MemoizedUndone(undo bool) {
-	// log.Println("Window.MemoizedUndone")
 }
 
 func (w *Window) UpdateTag(newtagstatus file.TagStatus) {

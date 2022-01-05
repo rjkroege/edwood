@@ -47,7 +47,7 @@ func (b *RuneArray) ReadC(q int) rune { return (*b)[q] }
 func (b *RuneArray) String() string { return string(*b) }
 
 func (b *RuneArray) Reset() {
-	*b = (*b)[0:0]
+	*b = make([]rune, 0)
 }
 
 // nc returns the number of characters in the RuneArray.

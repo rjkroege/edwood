@@ -256,7 +256,7 @@ func TestXfidwriteQWaddr(t *testing.T) {
 
 func TestXfidopen(t *testing.T) {
 	display := edwoodtest.NewDisplay()
-	configureGlobals()
+	global.configureGlobals(display)
 
 	for _, tc := range []struct {
 		name string
@@ -348,7 +348,7 @@ func TestXfidopenQeditout(t *testing.T) {
 }
 
 func TestXfidopenQWeditout(t *testing.T) {
-	configureGlobals()
+	global.configureGlobals(edwoodtest.NewDisplay())
 	mr := new(mockResponder)
 
 	x := &Xfid{
@@ -540,8 +540,8 @@ func TestXfidclose(t *testing.T) {
 }
 
 func TestXfidwriteQWdata(t *testing.T) {
-	configureGlobals()
 	display := edwoodtest.NewDisplay()
+	global.configureGlobals(display)
 
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
@@ -672,8 +672,8 @@ func TestXfidwriteQWtag(t *testing.T) {
 }
 
 func TestXfidwriteQWwrsel(t *testing.T) {
-	configureGlobals()
 	mockDisplay := edwoodtest.NewDisplay()
+	global.configureGlobals(mockDisplay)
 
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
@@ -745,7 +745,7 @@ func TestXfidwriteQlabel(t *testing.T) {
 }
 
 func TestXfidwriteQcons(t *testing.T) {
-	configureGlobals()
+	global.configureGlobals(edwoodtest.NewDisplay())
 	mr := new(mockResponder)
 
 	global.row.Init(image.Rectangle{
@@ -782,9 +782,9 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	// be using a quality backing mock.
 	data := []byte("window error: Hello, 世界!\n")
 
-	configureGlobals()
-	mr := new(mockResponder)
 	mockdisplay := edwoodtest.NewDisplay()
+	global.configureGlobals(mockdisplay)
+	mr := new(mockResponder)
 
 	global.row.display = mockdisplay
 
@@ -892,7 +892,7 @@ func TestXfidwriteQWeditout(t *testing.T) {
 }
 
 func TestXfidwriteQWctl(t *testing.T) {
-	configureGlobals()
+	global.configureGlobals(edwoodtest.NewDisplay())
 	warnings = nil
 	global.cwarn = nil
 
@@ -1121,7 +1121,7 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 	// TODO(rjk): These tests are fragile in how they setup their skeleton.
 	// Use the common skeleton.
 	display := edwoodtest.NewDisplay()
-	configureGlobals()
+	global.configureGlobals(display)
 	const data = "This is an εxαmplε sentence.\n"
 
 	for _, tc := range []struct {

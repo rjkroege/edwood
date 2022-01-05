@@ -770,6 +770,7 @@ func TestUndoRedo(t *testing.T) {
 // TODO(rjk): consider how to merge this with makeSkeletonWindowModel
 // Use direct access to the global data to walk the datastructure.
 // TODO(rjk): pass in the global to modify.
+// TODO(rjk): Make this more flexible for building test data. (See FlexiblyMakeWindowScaffold)
 func makeSkeletonWindowModelWithFiles(t *testing.T, firstfilename, secondfilename string) {
 	t.Helper()
 	MakeWindowScaffold(&dumpfile.Content{

@@ -300,16 +300,12 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			q1 = u.P0 + u.N
 			ok = true
 		case sam.Filename:
-			// TODO(rjk): Fix Undo on Filename once the code has matured, removing broken code in the meantime.
-			// TODO(rjk): If I have a zerox, how does Undo work?
+			// If I have a zerox, Undo works via Undo calling
+			// TagStatusObserver.UpdateTag on the appropriate observers.
 			seq = u.seq
 			f.UnsetName(epsilon, seq)
 			newfname := string(u.Buf)
-			f.oeb.setnameandisscratch(newfname)
-
-			// New callback scheme
-			f.oeb.observersMemoizedUndone(isundo)
-			// TODO(rjk): Plumb the remaining observer logic for undo/redo actions.
+			f.oeb.setfilename(newfname)
 		}
 		*delta = (*delta)[0 : len(*delta)-1]
 	}
@@ -320,21 +316,12 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 	return q0, q1, ok, seq
 }
 
-// Reset removes all Undo records for this File.
-// TODO(rjk): This concept doesn't particularly exist in file.Buffer.
-// Why can't I just create a new File?
-func (f *File) Reset() {
-	f.delta = f.delta[0:0]
-	f.epsilon = f.epsilon[0:0]
-}
-
-// Mark sets an Undo point and
-// and discards Redo records. Call this at the beginning
-// of a set of edits that ought to be undo-able as a unit. This
-// is equivalent to file.Buffer.Commit()
-// NB: current implementation permits calling Mark on an empty
-// file to indicate that one can undo to the file state at the time of
-// calling Mark.
+// Mark sets an Undo point and and discards Redo records. Call this at
+// the beginning of a set of edits that ought to be undo-able as a unit.
+// This is equivalent to file.Buffer.Commit() NB: current implementation
+// permits calling Mark on an empty file to indicate that one can undo to
+// the file state at the time of calling Mark.
+//
 // TODO(rjk): Consider renaming to SetUndoPoint
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]

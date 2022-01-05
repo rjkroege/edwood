@@ -422,6 +422,8 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 
 // inserted is a callback invoked by File on Insert* to update each Text
 // that is using a given File.
+// TODO(rjk): Carefully scrub this for opportunities to not do work if the
+// changes are not in the viewport. Also: minimize scrollbar redraws.
 func (t *Text) Inserted(q0 int, r []rune) {
 	if t.eq0 == -1 {
 		t.eq0 = q0
@@ -467,6 +469,8 @@ func (t *Text) logInsert(q0 int, r []rune) {
 			c = 'I'
 		}
 		if n <= EVENTSIZE {
+			// TODO(rjk): Does unnecessary work making a string from r if there's no
+			// event reader.
 			t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
 		} else {
 			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+n)
@@ -1603,7 +1607,6 @@ func (t *Text) Reset() {
 	t.org = 0
 	t.q0 = 0
 	t.q1 = 0
-	t.file.Reset()
 	t.file.ResetBuffer()
 }
 

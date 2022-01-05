@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/dumpfile"
 )
 
@@ -271,6 +272,7 @@ func TestEditCmdWithFile(t *testing.T) {
 	}
 }
 
+// TODO(rjk): There are several almost the same testing harnesses. Merge them.
 func TestEditMultipleWindows(t *testing.T) {
 	fn1, cleaner, err := makeTempFile("file one\n")
 	defer cleaner()
@@ -429,7 +431,6 @@ func TestEditMultipleWindows(t *testing.T) {
 				if string(buf[:n]) != exp {
 					t.Errorf("test %d: Window %d File.b contents expected %#v\nbut got \n%#v\n", i, j, exp, string(buf[:n]))
 				}
-
 			}
 
 			if got, want := len(warnings), len(test.expectedwarns); got != want {
@@ -708,4 +709,148 @@ func mockrun(win *Window, s string, rdir string, newns bool, argaddr string, xar
 
 		global.cedit <- 0
 	}()
+}
+
+func closeWindowWithEdit(t *testing.T, g *globals) {
+	t.Helper()
+
+	firstwin := g.row.col[0].w[0]
+	// Do I need to lock the warning?
+
+	// Lock discipline?
+	// TODO(rjk): figure out how to change this with less global dependency.
+	global.row.lk.Lock()
+	firstwin.Lock('M')
+	global.seq++
+
+	action := "X:" + "firstfile" + ": D"
+	editcmd(&firstwin.body, []rune(action))
+	firstwin.Unlock()
+	global.row.lk.Unlock()
+}
+
+func firstCloseMutatedWindow(t *testing.T, g *globals) {
+	t.Helper()
+
+	// Make one buffer mutated.
+	mutateWithEdit(t, g)
+
+	// One X/blah/ D
+	closeWindowWithEdit(t, g)
+}
+
+func secondCloseMutateWindow(t *testing.T, g *globals) {
+	t.Helper()
+
+	// Make one buffer mutated.
+	mutateWithEdit(t, g)
+
+	// Two X/blah/ D
+	closeWindowWithEdit(t, g)
+	closeWindowWithEdit(t, g)
+}
+
+// Test more complex sequences of Edit ations or Edit mixed with exec.
+func TestComplexEditActions(t *testing.T) {
+	dir := t.TempDir()
+	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		fn   func(t *testing.T, g *globals)
+		want *dumpfile.Content
+	}{
+		{
+			name: "firstCloseMutatedWindow",
+			fn:   firstCloseMutatedWindow,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "This is a\nshort TEXT\nto try addressing\n",
+							Q0:     16,
+							Q1:     20,
+						},
+					},
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "secondCloseMutateWindow",
+			fn:   secondCloseMutateWindow,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			makeSkeletonWindowModelWithFiles(t, firstfilename, secondfilename)
+			// Probably there are other issues here...
+			t.Log("seq", global.seq)
+			t.Log("seq, w0", global.row.col[0].w[0].body.file.Seq())
+			t.Log("seq, w1", global.row.col[0].w[1].body.file.Seq())
+
+			tc.fn(t, global)
+
+			t.Log(*varfontflag, defaultVarFont)
+
+			got, err := global.row.dump()
+			if err != nil {
+				t.Fatalf("dump failed: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("dump mismatch (-want +got):\n%s", diff)
+			}
+
+		})
+	}
 }
