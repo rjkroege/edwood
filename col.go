@@ -4,8 +4,10 @@ import (
 	"image"
 	"sort"
 
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/util"
 )
 
 var (
@@ -47,12 +49,13 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 	c.r = r
 	c.tag.col = c
 	r1 := r
-	r1.Max.Y = r1.Min.Y + fontget(tagfont, c.display).Height()
+	r1.Max.Y = r1.Min.Y + fontget(global.tagfont, c.display).Height()
 
 	// TODO(rjk) better code: making tag should be split out.
-	tagfile := NewFile("")
-	c.tag.file = tagfile.AddText(&c.tag)
-	c.tag.Init(r1, tagfont, tagcolors, c.display)
+	tagfile := file.MakeObservableEditableBuffer("", nil)
+	tagfile.AddObserver(&c.tag)
+	c.tag.file = tagfile
+	c.tag.Init(r1, global.tagfont, global.tagcolors, c.display)
 	c.tag.what = Columntag
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
@@ -60,9 +63,9 @@ func (c *Column) Init(r image.Rectangle, dis draw.Display) *Column {
 		c.display.ScreenImage().Draw(r1, c.display.Black(), nil, image.Point{})
 	}
 	c.tag.Insert(0, Lheader, true)
-	c.tag.SetSelect(c.tag.file.Size(), c.tag.file.Size())
+	c.tag.SetSelect(c.tag.file.Nr(), c.tag.file.Nr())
 	if c.display != nil {
-		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, global.colbutton, nil, global.colbutton.R().Min)
 		// As a general practice, Edwood is very over-eager to Flush. Flushes hurt
 		// perf.
 		c.display.Flush()
@@ -144,10 +147,10 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		}
 
 		// new window must start after v's tag ends
-		y = max(y, v.tagtop.Max.Y+c.display.ScaleSize(Border))
+		y = util.Max(y, v.tagtop.Max.Y+c.display.ScaleSize(Border))
 
 		// new window must start early enough to end before ymax
-		y = min(y, ymax-minht)
+		y = util.Min(y, ymax-minht)
 
 		// if y is too small, too many windows in column
 		if y < v.tagtop.Max.Y+c.display.ScaleSize(Border) {
@@ -158,12 +161,12 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r = v.r
 		r.Max.Y = ymax
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 		}
 		r1 := r
-		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
+		y = util.Min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
 		ffs := v.body.fr.GetFrameFillStatus()
-		r1.Max.Y = min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
+		r1.Max.Y = util.Min(y, v.body.fr.Rect().Min.Y+ffs.Nlines*v.body.fr.DefaultFontHeight())
 		r1.Min.Y = v.Resize(r1, false, false)
 		r1.Max.Y = r1.Min.Y + c.display.ScaleSize(Border)
 		if c.display != nil {
@@ -178,7 +181,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		w = NewWindow()
 		w.col = c
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 		}
 		w.Init(clone, r, c.display)
 	} else {
@@ -200,10 +203,12 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 	if c.display != nil {
 		c.display.MoveTo(w.tag.scrollr.Max.Add(image.Pt(3, 3)))
 	}
-	barttext = &w.body
+	global.barttext = &w.body
 	return w
 }
 
+// Close called to remove w from Column c. Set dofree to true to actually
+// delete window w. Otherwise, w will be moved to another Column.
 func (c *Column) Close(w *Window, dofree bool) {
 	var (
 		r            image.Rectangle
@@ -219,15 +224,20 @@ func (c *Column) Close(w *Window, dofree bool) {
 			goto Found
 		}
 	}
-	acmeerror("can't find window", nil)
+	util.AcmeError("can't find window", nil)
 Found:
 	r = w.r
+	// Crash noted in #385 happens when closing windows with the
+	// Edit command. Col.Close is invoked to remove the windows by ecmd.go/D1.
+	// When we place the Window in the new column, we'll set this. Or we'll
+	// delete the Window in the dofree block.
 	w.tag.col = nil
 	w.body.col = nil
 	w.col = nil
 	didmouse = restoremouse(w)
 	if dofree {
 		w.Delete()
+		// This Close call will decrement the w's reference count.
 		w.Close()
 	}
 	c.w = append(c.w[:i], c.w[i+1:]...)
@@ -248,7 +258,7 @@ Found:
 		r.Max.Y = w.r.Max.Y
 	}
 	if c.display != nil {
-		c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 	}
 	if c.safe && !c.fortest {
 		if !didmouse && up {
@@ -262,8 +272,8 @@ Found:
 }
 
 func (c *Column) CloseAll() {
-	if c == activecol {
-		activecol = nil
+	if c == global.activecol {
+		global.activecol = nil
 	}
 	c.tag.Close()
 	for _, w := range c.w {
@@ -284,7 +294,7 @@ func (c *Column) Resize(r image.Rectangle) {
 	r1.Max.Y = r1.Min.Y + c.tag.fr.DefaultFontHeight()
 	c.tag.Resize(r1, true, false)
 	if c.display != nil {
-		c.display.ScreenImage().Draw(c.tag.scrollr, colbutton, nil, colbutton.R().Min)
+		c.display.ScreenImage().Draw(c.tag.scrollr, global.colbutton, nil, global.colbutton.R().Min)
 	}
 	r1.Min.Y = r1.Max.Y
 	r1.Max.Y += c.display.ScaleSize(Border)
@@ -301,7 +311,7 @@ func (c *Column) Resize(r image.Rectangle) {
 				r1.Max.Y += (w.r.Dy() + c.display.ScaleSize(Border)) * r.Dy() / c.r.Dy()
 			}
 		}
-		r1.Max.Y = max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(tagfont, c.display).Height())
+		r1.Max.Y = util.Max(r1.Max.Y, r1.Min.Y+c.display.ScaleSize(Border)+fontget(global.tagfont, c.display).Height())
 		r2 := r1
 		r2.Max.Y = r2.Min.Y + c.display.ScaleSize(Border)
 		c.display.ScreenImage().Draw(r2, c.display.Black(), nil, image.Point{})
@@ -312,11 +322,11 @@ func (c *Column) Resize(r image.Rectangle) {
 }
 
 func (c *Column) Sort() {
-	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.name < c.w[j].body.file.name })
+	sort.Slice(c.w, func(i, j int) bool { return c.w[i].body.file.Name() < c.w[j].body.file.Name() })
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
-	c.display.ScreenImage().Draw(r, textcolors[frame.ColBack], nil, image.Point{})
+	c.display.ScreenImage().Draw(r, global.textcolors[frame.ColBack], nil, image.Point{})
 	y := r.Min.Y
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
@@ -346,7 +356,7 @@ func (c *Column) Grow(w *Window, but int) {
 		}
 	}
 	if windex == len(c.w) {
-		acmeerror("can't find window", nil)
+		util.AcmeError("can't find window", nil)
 	}
 
 	cr := c.r
@@ -368,7 +378,7 @@ func (c *Column) Grow(w *Window, but int) {
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		c.display.ScreenImage().Draw(cr, textcolors[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(cr, global.textcolors[frame.ColBack], nil, image.Point{})
 		w.Resize(cr, false, true)
 		for i := 1; i < c.nw(); i++ {
 			ffs := c.w[i].body.fr.GetFrameFillStatus()
@@ -399,7 +409,7 @@ func (c *Column) Grow(w *Window, but int) {
 		goto Pack
 	}
 	{ // Scope for nnl & dln
-		nnl := min(onl+max(min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
+		nnl := util.Min(onl+util.Max(util.Min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
 		if nnl < w.taglines-1+w.maxlines {
 			nnl = (w.taglines - 1 + w.maxlines + nnl) / 2
 		}
@@ -412,7 +422,7 @@ func (c *Column) Grow(w *Window, but int) {
 			// prune from later window
 			j := windex + k
 			if j < c.nw() && nl[j] != 0 {
-				l := min(dnl, max(1, nl[j]/2))
+				l := util.Min(dnl, util.Max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
 				dnl -= l
@@ -420,7 +430,7 @@ func (c *Column) Grow(w *Window, but int) {
 			// prune from earlier window
 			j = windex - k
 			if j >= 0 && nl[j] != 0 {
-				l := min(dnl, max(1, nl[j]/2))
+				l := util.Min(dnl, util.Max(1, nl[j]/2))
 				nl[j] -= l
 				nl[windex] += l
 				dnl -= l
@@ -510,15 +520,15 @@ func (c *Column) DragWin(w *Window, but int) {
 	)
 	clearmouse()
 	c.display.SetCursor(&boxcursor)
-	b = mouse.Buttons
-	op = mouse.Point
-	for mouse.Buttons == b {
-		mousectl.Read()
+	b = global.mouse.Buttons
+	op = global.mouse.Point
+	for global.mouse.Buttons == b {
+		global.mousectl.Read()
 	}
 	c.display.SetCursor(nil)
-	if mouse.Buttons != 0 {
-		for mouse.Buttons != 0 {
-			mousectl.Read()
+	if global.mouse.Buttons != 0 {
+		for global.mouse.Buttons != 0 {
+			global.mousectl.Read()
 		}
 		return
 	}
@@ -529,20 +539,20 @@ func (c *Column) DragWin(w *Window, but int) {
 			goto Found
 		}
 	}
-	acmeerror("can't find window", nil)
+	util.AcmeError("can't find window", nil)
 
 Found:
 	if w.tagexpand { // force recomputation of window tag size
 		w.taglines = 1
 	}
-	p = mouse.Point
-	if abs(p.X-op.X) < 5 && abs(p.Y-op.Y) < 5 {
+	p = global.mouse.Point
+	if util.Abs(p.X-op.X) < 5 && util.Abs(p.Y-op.Y) < 5 {
 		c.Grow(w, but)
 		w.MouseBut()
 		return
 	}
 	// is it a flick to the right? Or a jump to the le-e-e-eft?
-	if abs(p.Y-op.Y) < 10 && p.X > op.X+30 && c.row.WhichCol(p) == c {
+	if util.Abs(p.Y-op.Y) < 10 && p.X > op.X+30 && c.row.WhichCol(p) == c {
 		p.X = op.X + w.r.Dx() // yes: toss to next column
 	}
 	nc = c.row.WhichCol(p)

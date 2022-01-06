@@ -34,8 +34,8 @@
 			"Font": "/lib/font/bit/lucsans/euro.8.font",
 			"Tag": {
 				"Buffer": "glass Del Snarf | Look Edit ",
-				"Q0": 10,
-				"Q1": 15
+				"Q0": 5,
+				"Q1": 5
 			},
 			"Body": {
 				"Buffer": "I can eat glass and it doesn't hurt me.\nJe peux manger du verre, ça ne me fait pas mal.\n私はガラスを食べられます。それは私を傷つけません。\nআমি কাঁচ খেতে পারি, তাতে আমার কোনো ক্ষতি হয় না।\n",

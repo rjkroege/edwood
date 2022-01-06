@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"9fans.net/go/plan9"
-	"github.com/rjkroege/edwood/internal/ninep"
+	"github.com/rjkroege/edwood/ninep"
+	"github.com/rjkroege/edwood/util"
 )
 
 type fileServer struct {
@@ -104,10 +105,10 @@ var mnt Mnt
 func fsysinit() *fileServer {
 	p0, p1, err := newPipe()
 	if err != nil {
-		acmeerror("failed to create pipe", err)
+		util.AcmeError("failed to create pipe", err)
 	}
 	if err := post9pservice(p0, "acme", *mtpt); err != nil {
-		acmeerror("can't post service", err)
+		util.AcmeError("can't post service", err)
 	}
 
 	fs := &fileServer{
@@ -132,14 +133,14 @@ func (fs *fileServer) fsysproc() {
 			if fs.closing {
 				break
 			}
-			acmeerror("fsysproc", err)
+			util.AcmeError("fsysproc", err)
 		}
 		if DEBUG {
 			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
 		}
 		if x == nil {
-			cxfidalloc <- nil
-			x = <-cxfidalloc
+			global.cxfidalloc <- nil
+			x = <-global.cxfidalloc
 		}
 		x.fcall = *fc
 		x.fs = fs
@@ -202,7 +203,7 @@ func (mnt *Mnt) DecRef(idm *MntDir) {
 		return
 	}
 	if _, ok := mnt.md[idm.id]; !ok {
-		cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
+		global.cerr <- fmt.Errorf("Mnt.DecRef: can't find id %d", idm.id)
 		return
 	}
 	delete(mnt.md, idm.id)
@@ -241,7 +242,7 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	t.Fid = x.fcall.Fid
 	t.Tag = x.fcall.Tag
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
-		acmeerror("write error in respond", err)
+		util.AcmeError("write error in respond", err)
 	}
 	if DEBUG {
 		fmt.Fprintf(os.Stderr, "--> %v\n", t)
@@ -427,14 +428,14 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 			id64, _ := strconv.ParseInt(wname, 10, 32)
 			id = int(id64)
 		}
-		row.lk.Lock()
-		f.w = row.LookupWin(id)
+		global.row.lk.Lock()
+		f.w = global.row.LookupWin(id)
 		if f.w == nil {
-			row.lk.Unlock()
+			global.row.lk.Unlock()
 			return false, nil
 		}
 		f.w.ref.Inc() // we'll drop reference at end if there's an error
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 
 		f.dir = dirtabw[0] // '.'
 		f.qid.Type = plan9.QTDIR
@@ -447,10 +448,10 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 	err = nil
 	if wname == "new" {
 		if f.w != nil {
-			acmeerror("w set in walk to new", nil)
+			util.AcmeError("w set in walk to new", nil)
 		}
-		cnewwindow <- nil  // signal newwindowthread
-		f.w = <-cnewwindow // receive new window
+		global.cnewwindow <- nil  // signal newwindowthread
+		f.w = <-global.cnewwindow // receive new window
 		f.w.ref.Inc()
 		f.dir = dirtabw[0]
 		f.qid.Type = plan9.QTDIR
@@ -530,13 +531,13 @@ func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 
 		var ids []int // for window sub-directories
 		if id == 0 {
-			row.lk.Lock()
-			for _, c := range row.col {
+			global.row.lk.Lock()
+			for _, c := range global.row.col {
 				for _, w := range c.w {
 					ids = append(ids, w.id)
 				}
 			}
-			row.lk.Unlock()
+			global.row.lk.Unlock()
 			sort.Ints(ids)
 		}
 

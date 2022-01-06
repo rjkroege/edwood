@@ -15,17 +15,41 @@ import (
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
-	"github.com/rjkroege/edwood/internal/file"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
 )
 
 type Exectab struct {
-	name  string
-	fn    func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
-	mark  bool
+	// Name of the command.
+	name string
+
+	// Function run to implement this command.
+	//
+	// * t is the text where the middle click happened. This is frequently
+	// the tag and the command will affect the tag's window's body.
+	//
+	// * seltext comes from global.seltext. This is the last text clicked on
+	// with LMB. Middle clicks don't change unless the middle click has the
+	// side-effect of deleting the text. in which case it becomes nil.
+	//
+	// * argt text contains the argument to a MMB-LMB chord. If not
+	// delivering an argument this way, it will be nil.
+	//
+	// * arg is the string after the command as MMB-dragged over the command
+	// and arg.
+	fn func(t, seltext, argt *Text, flag1, flag2 bool, arg string)
+
+	// Command is undoable (e.g. Cut) and requires establishing an Undo point.
+	mark bool
+
+	// Meaning of both flags is command-specific and is used (mostly) to let a single
+	// function implement two different commands. Note the TODO below
 	flag1 bool
 	flag2 bool
 }
+
+// TODO(rjk): This could be more idiomatic: each command implements an
+// interface. Flags would then be unnecessary.
 
 var exectab = []Exectab{
 	//	{ "Abort",		doabort,	false,	true /*unused*/,		true /*unused*/,		},
@@ -82,13 +106,13 @@ func isexecc(c rune) bool {
 }
 
 func printarg(argt *Text, q0 int, q1 int) string {
-	if argt.what != Body || argt.file.name == "" {
+	if argt.what != Body || argt.file.Name() == "" {
 		return ""
 	}
 	if q0 == q1 {
-		return fmt.Sprintf("%s:#%d", argt.file.name, q0)
+		return fmt.Sprintf("%s:#%d", argt.file.Name(), q0)
 	}
-	return fmt.Sprintf("%s:#%d,#%d", argt.file.name, q0, q1)
+	return fmt.Sprintf("%s:#%d,#%d", argt.file.Name(), q0, q1)
 }
 
 // TODO(rjk): use a tokenizer on the results of getarg
@@ -113,7 +137,7 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	}
 	n := e.q1 - e.q0
 	r := make([]rune, n)
-	argt.file.b.Read(e.q0, r)
+	argt.file.Read(e.q0, r)
 	if doaddr {
 		a = printarg(argt, e.q0, e.q1)
 	}
@@ -132,7 +156,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			q0 = t.q0
 			q1 = t.q1
 		} else {
-			for q1 < t.file.Size() {
+			for q1 < t.file.Nr() {
 				c := t.file.ReadC(q1)
 				if isexecc(c) && c != ':' {
 					q1++
@@ -154,8 +178,11 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 	}
 	r := make([]rune, q1-q0)
-	t.file.b.Read(q0, r)
+	t.file.Read(q0, r)
 	e := lookup(string(r))
+
+	// Send commands to external client if the target window's event file is
+	// in use.
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
 		f = 0
 		if e != nil {
@@ -163,7 +190,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		if q0 != aq0 || q1 != aq1 {
 			r = make([]rune, aq1-aq0)
-			t.file.b.Read(aq0, r)
+			t.file.Read(aq0, r)
 			f |= 2
 		}
 		aa, a := getarg(argt, true, true)
@@ -187,7 +214,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if q0 != aq0 || q1 != aq1 {
 			n = q1 - q0
 			r := make([]rune, n)
-			t.file.b.Read(q0, r)
+			t.file.Read(q0, r)
 			if n <= EVENTSIZE {
 				t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
 			} else {
@@ -204,10 +231,12 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		}
 		return
 	}
+
+	// Invoke an internal command if it exists.
 	if e != nil {
-		if (e.mark && seltext != nil) && seltext.what == Body {
-			seq++
-			seltext.w.body.file.Mark(seq)
+		if (e.mark && global.seltext != nil) && global.seltext.what == Body {
+			global.seq++
+			global.seltext.w.body.file.Mark(global.seq)
 		}
 
 		s := strings.TrimLeft(string(r), " \t\n")
@@ -216,7 +245,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 		if len(words) > 1 {
 			arg = strings.TrimLeft(words[1], " \t\n")
 		}
-		e.fn(t, seltext, argt, e.flag1, e.flag2, arg)
+
+		// e.fn is the function from the Exectab. flag1 and flag2 are also from the Exectab.
+		e.fn(t, global.seltext, argt, e.flag1, e.flag2, arg)
 		return
 	}
 
@@ -235,7 +266,7 @@ func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	}
 	r, _ := getarg(argt, false, true)
 
-	seq++
+	global.seq++
 	if r != "" {
 		editcmd(et, []rune(r))
 	} else {
@@ -244,8 +275,8 @@ func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 }
 
 func xexit(*Text, *Text, *Text, bool, bool, string) {
-	if row.Clean() {
-		close(cexit)
+	if global.row.Clean() {
+		close(global.cexit)
 		//	threadexits(nil);
 	}
 }
@@ -254,7 +285,7 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 	if et.col == nil || et.w == nil {
 		return
 	}
-	if flag1 || et.w.body.file.HasMultipleTexts() || et.w.Clean(false) {
+	if flag1 || et.w.body.file.HasMultipleObservers() || et.w.Clean(false) {
 		et.col.Close(et.w, true)
 	}
 }
@@ -271,7 +302,7 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if et.w.body.q1 > et.w.body.q0 {
 			t = &et.w.body
 			if docut {
-				t.file.Mark(seq) // seq has been incremented by execute
+				t.file.Mark(global.seq) // seq has been incremented by execute
 			}
 		} else {
 			if et.w.tag.q1 > et.w.tag.q0 {
@@ -298,15 +329,15 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		snarfbuf.Delete(0, snarfbuf.nc())
+		global.snarfbuf.Delete(0, global.snarfbuf.Nc())
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
 			if n > RBUFSIZE {
 				n = RBUFSIZE
 			}
-			t.file.b.Read(q0, r[:n])
-			snarfbuf.Insert(snarfbuf.nc(), r[:n])
+			t.file.Read(q0, r[:n])
+			global.snarfbuf.Insert(global.snarfbuf.Nc(), r[:n])
 			q0 += n
 		}
 		acmeputsnarf()
@@ -317,11 +348,10 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 		if t.w != nil {
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			t.w.Commit(t)
-			t.w.SetTag()
 		}
 	} else {
 		if dosnarf { // Snarf command
-			argtext = t
+			global.argtext = t
 		}
 	}
 }
@@ -330,7 +360,6 @@ func newcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	c := et.row.Add(nil, -1)
 	if c != nil {
 		w := c.Add(nil, nil, -1)
-		w.SetTag()
 		xfidlog(w, "new")
 	}
 }
@@ -343,7 +372,7 @@ func delcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
 		if w.nopen[QWevent]+w.nopen[QWaddr]+w.nopen[QWdata]+w.nopen[QWxdata] > 0 {
-			warning(nil, "can't delete column; %s is running an external command\n", w.body.file.name)
+			warning(nil, "can't delete column; %s is running an external command\n", w.body.file.Name())
 			return
 		}
 	}
@@ -359,14 +388,14 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	// if tobody, use body of executing window  (Paste or Send command)
 	if tobody && et != nil && et.w != nil {
 		t = &et.w.body
-		t.file.Mark(seq) // seq has been incremented by execute
+		t.file.Mark(global.seq) // seq has been incremented by execute
 	}
 	if t == nil {
 		return
 	}
 
 	acmegetsnarf()
-	if t == nil || snarfbuf.nc() == 0 {
+	if t == nil || global.snarfbuf.Nc() == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -380,14 +409,14 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	cut(t, t, nil, false, true, "")
 	q = 0
 	q0 = t.q0
-	q1 = t.q0 + snarfbuf.nc()
+	q1 = t.q0 + global.snarfbuf.Nc()
 	r := make([]rune, RBUFSIZE)
 	for q0 < q1 {
 		n = q1 - q0
 		if n > RBUFSIZE {
 			n = RBUFSIZE
 		}
-		snarfbuf.Read(q, r[:n])
+		global.snarfbuf.Read(q, r[:n])
 		t.Insert(q0, r[:n], true)
 		q += n
 		q0 += n
@@ -400,7 +429,6 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	if t.w != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		t.w.Commit(t)
-		t.w.SetTag()
 	}
 }
 
@@ -422,7 +450,7 @@ func getname(t *Text, argt *Text, arg string, isput bool) string {
 	}
 	if promote {
 		if arg == "" {
-			return t.file.name
+			return t.file.Name()
 		}
 		// prefix with directory name if necessary
 		r = filepath.Join(t.DirName(""), arg)
@@ -438,7 +466,7 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	}
 
 	isclean := et.w.Clean(true)
-	if et.w.body.file.Size() > 0 && !isclean {
+	if et.w.body.file.Nr() > 0 && !isclean {
 		return
 	}
 	w := et.w
@@ -449,13 +477,13 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 		return
 	}
 	newNameIsdir, _ := isDir(name)
-	if t.file.HasMultipleTexts() && newNameIsdir {
+	if t.file.HasMultipleObservers() && newNameIsdir {
 		warning(nil, "%s is a directory; can't read with multiple windows on it\n", name)
 		return
 	}
 
 	t.Delete(0, t.file.Nr(), true)
-	samename := name == t.file.name
+	samename := name == t.file.Name()
 	t.Load(0, name, samename)
 
 	// Text.Delete followed by Text.Load will always mark the File as
@@ -465,7 +493,6 @@ func get(et *Text, _ *Text, argt *Text, flag1 bool, _ bool, arg string) {
 	if samename {
 		t.file.Clean()
 	}
-	w.SetTag()
 	xfidlog(w, "get")
 }
 
@@ -480,7 +507,7 @@ func xkill(_, _ *Text, argt *Text, _, _ bool, args string) {
 		xkill(nil, nil, nil, false, false, r)
 	}
 	for _, cmd := range strings.Fields(args) {
-		ckill <- cmd
+		global.ckill <- cmd
 	}
 }
 
@@ -493,27 +520,27 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 // putfile writes File to disk, if it's safe to do so.
 //
 // TODO(flux): Write this in terms of the various cases.
-func putfile(f *File, q0 int, q1 int, name string) error {
-	w := f.curtext.w
+func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) error {
 	d, err := os.Stat(name)
 
 	// Putting to the same file that we already read from.
-	if err == nil && name == f.name {
-		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
-			f.UpdateInfo(name, d)
+	if err == nil && name == oeb.Name() {
+		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
+			oeb.UpdateInfo(name, d)
 		}
-		if !os.SameFile(f.info, d) || d.ModTime().Sub(f.info.ModTime()) > time.Millisecond {
+
+		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
-			f.info = d
+			oeb.SetInfo(d)
 
-			if f.hash == file.EmptyHash {
+			if oeb.Hash() == file.EmptyHash {
 				// Edwood created the File but a disk file with the same name exists.
 				return warnError(nil, "%s not written; file already exists", name)
 			}
 
 			// Edwood loaded the disk file to File but the disk file has been modified since.
-			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, f.info.ModTime(), d.ModTime())
+			return warnError(nil, "%s modified since last read\n\twas %v; now %v", name, oeb.Info().ModTime(), d.ModTime())
 		}
 	}
 
@@ -526,37 +553,39 @@ func putfile(f *File, q0 int, q1 int, name string) error {
 	h := sha1.New()
 
 	d, err = fd.Stat()
-	isapp := (err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0)
+	isapp := err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0
 	if isapp {
 		return warnError(nil, "%s not written; file is append only", name)
 	}
 
-	_, err = io.Copy(io.MultiWriter(h, fd), f.b.Reader(q0, q1))
+	_, err = io.Copy(io.MultiWriter(h, fd), oeb.Reader(q0, q1))
 	if err != nil {
 		return warnError(nil, "can't write file %s: %v", name, err)
 	}
 
 	// Putting to the same file as the one that we originally read from.
-	if name == f.name {
-		if q0 != 0 || q1 != f.Size() {
+	if name == oeb.Name() {
+		if q0 != 0 || q1 != oeb.Nr() {
 			// The backing disk file contents now differ from File because
-			// we've over-written the disk file with part of File.
-			f.Modded()
+			// we've over-written the disk file with part of File. There is no
+			// possible sequence of undo actions that can make the file not modified.
+			oeb.Modded()
 		} else {
 			// A normal put operation of a file modified in Edwood but not
 			// modified on disk.
 			if d1, err := fd.Stat(); err == nil {
 				d = d1
 			}
-			f.info = d
-			f.hash.Set(h.Sum(nil))
-			f.Clean()
+			oeb.SetInfo(d)
+			oeb.Set(h.Sum(nil))
+			oeb.Clean()
 		}
 	}
-	w.SetTag()
 	return nil
 }
 
+// TODO(rjk): Why doesn't this handle its arguments the same as some of
+// the other commands?
 func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 	if et == nil || et.w == nil || et.w.body.file.IsDir() {
 		return
@@ -568,17 +597,17 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
-	putfile(f, 0, f.Size(), name)
+	putfile(w.body.file, 0, f.Nr(), name)
 	xfidlog(w, "put")
 }
 
 func putall(et, _, _ *Text, _, _ bool, arg string) {
-	for _, col := range row.col {
+	for _, col := range global.row.col {
 		for _, w := range col.w {
 			if w.nopen[QWevent] > 0 {
 				continue
 			}
-			a := w.body.file.name
+			a := w.body.file.Name()
 			if w.body.file.SaveableAndDirty() {
 				if _, err := os.Stat(a); err != nil {
 					warning(nil, "no auto-Put of %s: %v\n", a, err)
@@ -606,7 +635,7 @@ func seqof(w *Window, isundo bool) int {
 	return w.body.file.RedoSeq()
 }
 
-// TODO(rjk): Why does this work this way?
+// TODO(rjk): Test the logic of Undo across multiple buffers very carefully: #383
 func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	if et == nil || et.w == nil {
 		return
@@ -620,7 +649,7 @@ func undo(et *Text, _ *Text, _ *Text, flag1, _ bool, _ string) {
 	// in the same file will not call show() and jump to a different location in the file.
 	// Simultaneous changes to other files will be chaotic, however.
 	et.w.Undo(flag1)
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			if w == et.w {
 				continue
@@ -661,11 +690,11 @@ func sendx(et, _, _ *Text, _, _ bool, _ string) {
 	if t.q0 != t.q1 {
 		cut(t, t, nil, true, false, "")
 	}
-	t.SetSelect(t.file.Size(), t.file.Size())
+	t.SetSelect(t.file.Nr(), t.file.Nr())
 	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.Size()-1) != '\n' {
-		t.Insert(t.file.Size(), []rune("\n"), true)
-		t.SetSelect(t.file.Size(), t.file.Size())
+	if t.ReadC(t.file.Nr()-1) != '\n' {
+		t.Insert(t.file.Nr(), []rune("\n"), true)
+		t.SetSelect(t.file.Nr(), t.file.Nr())
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)
@@ -682,7 +711,7 @@ func look(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		if r == "" {
 			n := t.q1 - t.q0
 			rb := make([]rune, n)
-			t.file.b.Read(t.q0, rb[:n])
+			t.file.Read(t.q0, rb[:n])
 			r = string(rb) // TODO(flux) Too many gross []rune-string conversions in here
 		}
 		search(t, []rune(r))
@@ -719,7 +748,7 @@ func tab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 			w.Resize(w.r, false, true)
 		}
 	} else {
-		warning(nil, "%s: Tab %d\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab %d\n", w.body.file.Name(), w.body.tabstop)
 	}
 }
 
@@ -730,10 +759,10 @@ func expandtab(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	w := et.w
 	if w.body.tabexpand {
 		w.body.tabexpand = false
-		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab: %d, Tabexpand OFF\n", w.body.file.Name(), w.body.tabstop)
 	} else {
 		w.body.tabexpand = true
-		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.name, w.body.tabstop)
+		warning(nil, "%s: Tab: %d, Tabexpand ON\n", w.body.file.Name(), w.body.tabstop)
 	}
 }
 
@@ -766,11 +795,11 @@ func fontx(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		}
 	}
 
-	if newfont := fontget(file, row.display); newfont != nil {
+	if newfont := fontget(file, global.row.display); newfont != nil {
 		// TODO(rjk): maybe Frame should know how to clear itself on init?
-		row.display.ScreenImage().Draw(t.w.r, textcolors[frame.ColBack], nil, image.Point{})
+		global.row.display.ScreenImage().Draw(t.w.r, global.textcolors[frame.ColBack], nil, image.Point{})
 		t.font = file
-		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(row.display.ScreenImage()))
+		t.fr.Init(t.w.r, frame.OptFont(newfont), frame.OptBackground(global.row.display.ScreenImage()))
 
 		if t.w.body.file.IsDir() {
 			t.all.Min.X++ // force recolumnation; disgusting!
@@ -801,7 +830,7 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 	t = &t.w.body
 	if t.w.body.file.IsDir() {
 		// TODO(rjk): Why?
-		warning(nil, "%s is a directory; Zerox illegal\n", t.file.name)
+		warning(nil, "%s is a directory; Zerox illegal\n", t.file.Name())
 	} else {
 		nw := t.w.col.Add(nil, t.w, -1)
 		// ugly: fix locks so w.unlock works
@@ -816,10 +845,10 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 
 	if c.proc != nil { // successful exec
 		c.pid = c.proc.Pid
-		ccommand <- c
+		global.ccommand <- c
 	} else {
 		if c.iseditcommand {
-			cedit <- 0
+			global.cedit <- 0
 		}
 	}
 	cpid = nil
@@ -866,7 +895,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			t = s
 			c.text = s
 		}
-		shell = acmeshell
+		shell = global.acmeshell
 		if shell == "" {
 			shell = "rc"
 		}
@@ -885,7 +914,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		go func() {
 			cmd.Wait()
 			Closeall()
-			cwait <- cmd.ProcessState
+			global.cwait <- cmd.ProcessState
 		}()
 		return nil
 	}
@@ -904,28 +933,29 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 	c.iseditcommand = iseditcmd
 	c.text = s
+	env := os.Environ()
 	if newns {
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
 			win.lk.Lock()
-			filename = win.body.file.name
+			filename = win.body.file.Name()
 			winid = win.id
 			incl = append([]string{}, win.incl...)
 			win.lk.Unlock()
 		} else {
 			filename = ""
 			winid = 0
-			if activewin != nil {
-				winid = activewin.id
+			if global.activewin != nil {
+				winid = global.activewin.id
 			}
 		}
 		// 	rfork(RFNAMEG|RFENVG|RFFDG|RFNOTEG); TODO(flux): I'm sure these settings are important
 
-		os.Setenv("winid", fmt.Sprintf("%d", winid))
+		env = append(env, fmt.Sprintf("winid=%d", winid))
 
 		if filename != "" {
-			os.Setenv("%", filename)
-			os.Setenv("samfile", filename)
+			env = append(env, fmt.Sprintf("%%=%v", filename))
+			env = append(env, fmt.Sprintf("samfile=%v", filename))
 		}
 		var fs *client.Fsys
 		var err error
@@ -970,9 +1000,9 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 
 	if argaddr != "" {
-		os.Setenv("acmeaddr", argaddr)
+		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
 	}
-	if acmeshell != "" {
+	if global.acmeshell != "" {
 		return Hard()
 	}
 	for _, r := range t {
@@ -1000,6 +1030,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	cmd.Stdin = sin
 	cmd.Stdout = sout
 	cmd.Stderr = serr
+	cmd.Env = env
 	err := cmd.Start()
 	if err != nil {
 		Fail()
@@ -1009,7 +1040,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	go func() {
 		cmd.Wait()
 		Closeall()
-		cwait <- cmd.ProcessState
+		global.cwait <- cmd.ProcessState
 	}()
 	return nil
 }
@@ -1056,7 +1087,7 @@ func indent(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 		autoindent = indentval(strings.SplitN(arg, " ", 2)[0])
 	}
 	if autoindent == IGlobal {
-		row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
+		global.row.AllWindows(func(w *Window) { w.autoindent = *globalAutoIndent })
 	} else {
 		if w != nil && autoindent >= 0 {
 			w.autoindent = autoindent == Ion
@@ -1075,8 +1106,8 @@ func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 	}
 
 	if isdump {
-		row.Dump(name)
+		global.row.Dump(name)
 	} else {
-		row.Load(nil, name, false)
+		global.row.Load(nil, name, false)
 	}
 }

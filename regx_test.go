@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/sam"
 )
 
 func TestRegexpForward(t *testing.T) {
@@ -24,7 +26,7 @@ func TestRegexpForward(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to compile regular expression %q", tc.re)
 			}
-			text := &TextBuffer{0, 0, []rune(tc.text)}
+			text := sam.NewTextBuffer(0, 0, []rune(tc.text))
 			rs := re.rxexecute(text, nil, 0, text.Nc(), tc.nmax)
 			if !reflect.DeepEqual(rs, tc.expected) {
 				t.Errorf("regexp %q incorrectly matches %q:\nexpected: %v\ngot: %v",
@@ -53,7 +55,7 @@ func TestRegexpBackward(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to compile regular expression %q", tc.re)
 			}
-			text := &TextBuffer{0, 0, []rune(tc.text)}
+			text := sam.NewTextBuffer(0, 0, []rune(tc.text))
 			rs := re.rxbexecute(text, text.Nc(), tc.nmax)
 			if !reflect.DeepEqual(rs, tc.expected) {
 				t.Errorf("regexp %q incorrectly matches %q:\nexpected: %v\ngot: %v",

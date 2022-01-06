@@ -11,13 +11,15 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/frame"
+	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
 )
 
 func emptyText() *Text {
 	w := &Window{
 		body: Text{
-			file: &File{},
+			file: file.MakeObservableEditableBuffer("", nil),
 		},
 	}
 	t := &w.body
@@ -37,9 +39,9 @@ func TestLoadReader(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadReader failed: %v", err)
 		}
-		out := string(text.file.b)
+		out := text.file.String()
 		if out != tc.out {
-			t.Errorf("loaded text %q; expected %q", out, tc.out)
+			t.Errorf("loaded editor %q; expected %q", out, tc.out)
 		}
 	}
 }
@@ -67,9 +69,9 @@ func TestLoad(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
-		out := string(text.file.b)
+		out := text.file.String()
 		if out != tc.out {
-			t.Errorf("loaded text %q; expected %q", out, tc.out)
+			t.Errorf("loaded editor %q; expected %q", out, tc.out)
 		}
 	}
 }
@@ -85,7 +87,7 @@ func TestLoadError(t *testing.T) {
 	text = emptyText()
 	text.file.SetDir(true)
 
-	text.file.name = ""
+	text.file.SetName("")
 	wantErr = "empty directory name"
 	_, err = text.Load(0, "/", true)
 	if err == nil || err.Error() != wantErr {
@@ -100,7 +102,7 @@ func TestLoadError(t *testing.T) {
 	defer func() {
 		*mtpt = ""
 	}()
-	text.file.name = *mtpt
+	text.file.SetName(*mtpt)
 	wantErr = "will not open self mount point /mnt/acme"
 	_, err = text.Load(0, *mtpt, true)
 	if err == nil || err.Error() != wantErr {
@@ -133,9 +135,7 @@ func TestClickHTMLMatch(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: &File{
-					b: Buffer(r),
-				},
+				file: file.MakeObservableEditableBuffer("", r),
 			}
 			q0, q1, ok := text.ClickHTMLMatch(tc.inq0)
 			switch {
@@ -207,7 +207,7 @@ func TestGetDirNames(t *testing.T) {
 	}
 	want = append(want, name)
 
-	cwarn = nil
+	global.cwarn = nil
 	warnings = nil
 	defer func() {
 		warnings = nil
@@ -256,7 +256,7 @@ func (fr *textFillMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
 
 func TestTextFill(t *testing.T) {
 	text := &Text{
-		file: &File{},
+		file: file.MakeObservableEditableBuffer("", []rune{}),
 	}
 	err := text.fill(&textFillMockFrame{})
 	wantErr := "fill: negative slice length -100"
@@ -312,8 +312,8 @@ func TestTextAbsDirName(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
-	wdir = "/home/gopher"
-	defer func() { wdir = "" }()
+	global.wdir = "/home/gopher"
+	defer func() { global.wdir = "" }()
 
 	for _, tc := range []struct {
 		name          string
@@ -336,12 +336,12 @@ func TestTextAbsDirName(t *testing.T) {
 }
 
 func windowWithTag(tag string) *Window {
+	ru := []rune(tag)
 	return &Window{
 		tag: Text{
-			file: &File{
-				b: Buffer([]rune(tag)),
-			},
+			file: file.MakeObservableEditableBuffer("", ru),
 		},
+		tagfilenameend: len(parsetaghelper(tag)),
 	}
 }
 
@@ -368,9 +368,7 @@ func TestBackNL(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: &File{
-				b: Buffer(tc.buf),
-			},
+			file: file.MakeObservableEditableBuffer("", []rune(tc.buf)),
 		}
 		q := text.BackNL(tc.p, tc.n)
 		if got, want := q, tc.q; got != want {
@@ -401,9 +399,7 @@ func TestTextBsInsert(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			text := &Text{
 				what: tc.what,
-				file: &File{
-					b: Buffer(tc.buf),
-				},
+				file: file.MakeObservableEditableBuffer("", []rune(tc.buf)),
 			}
 			q, nr := text.BsInsert(tc.q0, []rune(tc.inbuf), true)
 			if nr != tc.nr {
@@ -412,8 +408,8 @@ func TestTextBsInsert(t *testing.T) {
 			if q != tc.q {
 				t.Errorf("q = %v; want %v", q, tc.q)
 			}
-			if got, want := []rune(text.file.b), tc.outbuf; !cmp.Equal(got, want) {
-				t.Errorf("text.file.b = %q; want %q", got, want)
+			if got, want := []rune(text.file.String()), tc.outbuf; !cmp.Equal(got, want) {
+				t.Errorf("editor.file.b = %q; want %q", got, want)
 			}
 		})
 	}
@@ -435,33 +431,58 @@ func checkTabexpand(t *testing.T, getText func(tabexpand bool, tabstop int) *Tex
 		for _, r := range tc.input {
 			text.Type(r)
 		}
-		if got := string(text.file.cache); got != tc.want {
-			t.Errorf("loaded text %q; expected %q", got, tc.want)
+		text.file.Commit()
+
+		gr := make([]rune, text.file.Nr())
+		text.file.Read(0, gr[:text.file.Nr()])
+
+		if got := string(gr); got != tc.want {
+			t.Errorf("loaded editor %q; expected %q", got, tc.want)
 		}
 	}
 }
 
+func makeTestTextTabexpandState() *Window {
+	MakeWindowScaffold(&dumpfile.Content{
+		Columns: []dumpfile.Column{
+			{},
+		},
+		Windows: []*dumpfile.Window{
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: "",
+				},
+				Body: dumpfile.Text{
+					Buffer: "",
+					Q0:     0,
+					Q1:     0,
+				},
+			},
+		},
+	})
+	return global.row.col[0].w[0]
+}
+
 func TestTextTypeTabInBody(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
-		w := &Window{
-			body: Text{
-				file:      &File{},
-				tabexpand: tabexpand,
-				tabstop:   tabstop,
-			},
-		}
+
+		w := makeTestTextTabexpandState()
 		text := &w.body
-		text.w = w
+		text.tabexpand = tabexpand
+		text.tabstop = tabstop
+
 		return text
 	})
 }
 
 func TestTextTypeTabInTag(t *testing.T) {
 	checkTabexpand(t, func(tabexpand bool, tabstop int) *Text {
-		return &Text{
-			file:      &File{},
-			tabexpand: tabexpand,
-			tabstop:   tabstop,
-		}
+		w := makeTestTextTabexpandState()
+		text := &w.tag
+		text.tabexpand = tabexpand
+		text.tabstop = tabstop
+
+		return text
 	})
 }

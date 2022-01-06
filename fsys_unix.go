@@ -1,3 +1,4 @@
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris) && mux9p
 // +build darwin dragonfly freebsd linux netbsd openbsd solaris
 // +build mux9p
 
@@ -11,6 +12,7 @@ import (
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
+	"github.com/rjkroege/edwood/util"
 )
 
 func newPipe() (net.Conn, net.Conn, error) {
@@ -31,7 +33,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		err := mux9p.Listen("unix", addr, conn, nil)
 		if err != nil {
-			acmeerror("9P multiplexer failed", err)
+			util.AcmeError("9P multiplexer failed", err)
 		}
 	}()
 	return nil

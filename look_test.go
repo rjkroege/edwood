@@ -2,19 +2,32 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"9fans.net/go/plumb"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/runes"
 )
 
 func TestExpand(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
+	dp, err := ioutil.TempDir("", "testexpand")
+	if err != nil {
+		t.Fatalf("can't make tempdir: %v", err)
+	}
+	defer os.RemoveAll(dp)
+	modpath := filepath.Join(dp, "9fans.net/go@v0.0.0")
+	if err := os.MkdirAll(modpath, 0777); err != nil {
+		t.Fatalf("can't make modpath %s: %v", modpath, err)
+	}
+
 	tt := []struct {
 		ok   bool
 		sel1 int
@@ -41,16 +54,15 @@ func TestExpand(t *testing.T) {
 		{true, 0, "<stdio.h>", 2, "stdio", "", ""},
 		{true, 0, "/etc/hosts", 2, "/etc/hosts", "/etc/hosts", ""},
 		{true, 0, "/etc/hosts:42", 2, "/etc/hosts:42", "/etc/hosts", "42"},
+		{true, 0, modpath + ":531", 2, modpath + ":531", modpath, "531"},
 	}
 	for i, tc := range tt {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
 			r := []rune(tc.s)
 			text := &Text{
-				file: &File{
-					b: r,
-				},
-				q0: 0,
-				q1: tc.sel1,
+				file: file.MakeObservableEditableBuffer("", r),
+				q0:   0,
+				q1:   tc.sel1,
 			}
 			e, ok := expand(text, tc.inq, tc.inq)
 			if ok != tc.ok {
@@ -86,9 +98,7 @@ func TestExpandJump(t *testing.T) {
 
 	for _, tc := range tt {
 		text := &Text{
-			file: &File{
-				b: []rune("chicken"),
-			},
+			file: file.MakeObservableEditableBuffer("", []rune("chicken")),
 			q0:   0,
 			q1:   5,
 			what: tc.kind,
@@ -101,13 +111,13 @@ func TestExpandJump(t *testing.T) {
 }
 
 func TestLook3Message(t *testing.T) {
-	wdir = "/home/gopher"
+	global.wdir = "/home/gopher"
 	winDir := "/a/b/c"
 	if runtime.GOOS == "windows" {
-		wdir = `C:\User\gopher`
+		global.wdir = `C:\User\gopher`
 		winDir = `C:\a\b\c`
 	}
-	defer func() { wdir = "" }()
+	defer func() { global.wdir = "" }()
 
 	for _, tc := range []struct {
 		name         string
@@ -116,9 +126,9 @@ func TestLook3Message(t *testing.T) {
 		text         string
 		hasClickAttr bool
 	}{
-		{"NilWindow", nil, wdir, " hello.go ", true},
-		{"Error", nil, wdir, "          ", true},
-		{"InSelection", nil, wdir, " «hello.go» ", false},
+		{"NilWindow", nil, global.wdir, " hello.go ", true},
+		{"Error", nil, global.wdir, "          ", true},
+		{"InSelection", nil, global.wdir, " «hello.go» ", false},
 		{
 			"NonNilWindow",
 			windowWithTag(winDir + string(filepath.Separator) + " Del Snarf | Look"),
@@ -173,5 +183,5 @@ func textSetSelection(t *Text, buf string) {
 
 	t.q0 = popRune('«')
 	t.q1 = popRune('»')
-	t.file = &File{b: Buffer(b)}
+	t.file = file.MakeObservableEditableBuffer("", b)
 }

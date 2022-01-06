@@ -3,44 +3,14 @@ package main
 import (
 	"fmt"
 	"image"
-	"log"
 	"path/filepath"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/util"
 )
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func minu(a, b uint) uint {
-	if a < b {
-		return a
-	}
-	return b
-}
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func acmeerror(s string, err error) {
-	log.Panicf("acme: %s: %v\n", s, err)
-}
 
 var (
 	prevmouse image.Point
@@ -52,7 +22,7 @@ func clearmouse() {
 }
 
 func savemouse(w *Window) {
-	prevmouse = mouse.Point
+	prevmouse = global.mouse.Point
 	mousew = w
 }
 
@@ -66,7 +36,7 @@ func restoremouse(w *Window) bool {
 }
 
 func bytetorune(s []byte) []rune {
-	r, _, _ := cvttorunes(s, len(s))
+	r, _, _ := util.Cvttorunes(s, len(s))
 	return r
 }
 
@@ -87,35 +57,6 @@ func isalnum(c rune) bool {
 	return true
 }
 
-// Cvttorunes decodes runes r from p. It's guaranteed that first n
-// bytes of p will be interpreted without worrying about partial runes.
-// This may mean reading up to UTFMax-1 more bytes than n; the caller
-// must ensure p is large enough. Partial runes and invalid encodings
-// are converted to RuneError. Nb (always >= n) is the number of bytes
-// interpreted.
-//
-// If any U+0000 rune is present in r, they are elided and nulls is set
-// to true.
-func cvttorunes(p []byte, n int) (r []rune, nb int, nulls bool) {
-	for nb < n {
-		var w int
-		var ru rune
-		if p[nb] < utf8.RuneSelf {
-			w = 1
-			ru = rune(p[nb])
-		} else {
-			ru, w = utf8.DecodeRune(p[nb:])
-		}
-		if ru != 0 {
-			r = append(r, ru)
-		} else {
-			nulls = true
-		}
-		nb += w
-	}
-	return
-}
-
 func errorwin1Name(dir string) string {
 	return filepath.Join(dir, "+Errors")
 }
@@ -124,12 +65,12 @@ func errorwin1(dir string, incl []string) *Window {
 	r := errorwin1Name(dir)
 	w := lookfile(r)
 	if w == nil {
-		if len(row.col) == 0 {
-			if row.Add(nil, -1) == nil {
-				acmeerror("can't create column to make error window", nil)
+		if len(global.row.col) == 0 {
+			if global.row.Add(nil, -1) == nil {
+				util.AcmeError("can't create column to make error window", nil)
 			}
 		}
-		w = row.col[len(row.col)-1].Add(nil, nil, -1)
+		w = global.row.col[len(global.row.col)-1].Add(nil, nil, -1)
 		w.filemenu = false
 		w.SetName(r)
 		xfidlog(w, "new")
@@ -189,6 +130,9 @@ func errorwinforwin(w *Window) *Window {
 }
 
 // Heuristic city.
+// TODO(rjk): There are multiple places in this file where we access a
+// global row without any locking discipline. I presume that that this
+// can lead to crashes and incorrect behaviour.
 func makenewwindow(t *Text) *Window {
 	var (
 		c               *Column
@@ -197,19 +141,19 @@ func makenewwindow(t *Text) *Window {
 		i, y, el        int
 	)
 	switch {
-	case activecol != nil:
-		c = activecol
-	case seltext != nil && seltext.col != nil:
-		c = seltext.col
+	case global.activecol != nil:
+		c = global.activecol
+	case global.seltext != nil && global.seltext.col != nil:
+		c = global.seltext.col
 	case t != nil && t.col != nil:
 		c = t.col
 	default:
-		if len(row.col) == 0 && row.Add(nil, -1) == nil {
-			acmeerror("can't make column", nil)
+		if len(global.row.col) == 0 && global.row.Add(nil, -1) == nil {
+			util.AcmeError("can't make column", nil)
 		}
-		c = row.col[len(row.col)-1]
+		c = global.row.col[len(global.row.col)-1]
 	}
-	activecol = c
+	global.activecol = c
 	if t == nil || t.w == nil || len(c.w) == 0 {
 		return c.Add(nil, nil, -1)
 	}
@@ -231,7 +175,7 @@ func makenewwindow(t *Text) *Window {
 	el = emptyb.fr.GetFrameFillStatus().Maxlines - emptyb.fr.GetFrameFillStatus().Nlines
 	// if empty space is big, use it
 	if el > 15 || (el > 3 && el > (bigw.body.fr.GetFrameFillStatus().Maxlines-1)/2) {
-		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(tagfont, t.display).Height()
+		y = emptyb.fr.Rect().Min.Y + emptyb.fr.GetFrameFillStatus().Nlines*fontget(global.tagfont, t.display).Height()
 	} else {
 		// if this window is in column and isn't much smaller, split it
 		if t.col == c && t.w.r.Dy() > 2*bigw.r.Dy()/3 {
@@ -248,9 +192,10 @@ func makenewwindow(t *Text) *Window {
 
 type Warning struct {
 	md  *MntDir
-	buf Buffer
+	buf file.RuneArray
 }
 
+// TODO(rjk): Move into the global object.
 var warnings = []*Warning{}
 var warningsMu sync.Mutex
 
@@ -277,9 +222,9 @@ func flushwarnings() {
 		// place), to avoid a big memory footprint.
 		q0 = t.Nc()
 		r := make([]rune, RBUFSIZE)
-		// TODO(rjk): Figure out why Warning doesn't use a File.
-		for n = 0; n < warn.buf.nc(); n += nr {
-			nr = warn.buf.nc() - n
+		// TODO(rjk): Figure out why Warning doesn't use an file.ObservableEditableBuffer.
+		for n = 0; n < warn.buf.Nc(); n += nr {
+			nr = warn.buf.Nc() - n
 			if nr > RBUFSIZE {
 				nr = RBUFSIZE
 			}
@@ -287,7 +232,6 @@ func flushwarnings() {
 			_, nr = t.BsInsert(t.Nc(), r[:nr], true)
 		}
 		t.Show(q0, t.Nc(), true)
-		t.w.SetTag()
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.owner = owner
 		t.file.TreatAsClean()
@@ -317,7 +261,7 @@ func addwarningtext(md *MntDir, r []rune) {
 
 	for _, warn := range warnings {
 		if warn.md == md {
-			warn.buf.Insert(warn.buf.nc(), r)
+			warn.buf.Insert(warn.buf.Nc(), r)
 			return
 		}
 	}
@@ -329,7 +273,7 @@ func addwarningtext(md *MntDir, r []rune) {
 	warn.buf.Insert(0, r)
 	warnings = append(warnings, &warn)
 	select {
-	case cwarn <- 0:
+	case global.cwarn <- 0:
 	default:
 	}
 }

@@ -4,53 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/file"
 )
-
-// TestWindowUndoSelection checks text selection change after undo/redo.
-// It tests that selection doesn't change when undoing/redoing
-// using nil delta/epsilon, which fixes https://github.com/rjkroege/edwood/issues/230.
-func TestWindowUndoSelection(t *testing.T) {
-	var (
-		word = Buffer("hello")
-		p0   = 3
-		undo = &Undo{
-			t:   Insert,
-			buf: word,
-			p0:  p0,
-			n:   word.nc(),
-		}
-	)
-	for _, tc := range []struct {
-		name           string
-		isundo         bool
-		q0, q1         int
-		wantQ0, wantQ1 int
-		delta, epsilon []*Undo
-	}{
-		{"undo", true, 14, 17, p0, p0 + word.nc(), []*Undo{undo}, nil},
-		{"redo", false, 14, 17, p0, p0 + word.nc(), nil, []*Undo{undo}},
-		{"undo (nil delta)", true, 14, 17, 14, 17, nil, nil},
-		{"redo (nil epsilon)", false, 14, 17, 14, 17, nil, nil},
-	} {
-		w := &Window{
-			body: Text{
-				q0: tc.q0,
-				q1: tc.q1,
-				file: &File{
-					b:       Buffer("This is an example sentence.\n"),
-					delta:   tc.delta,
-					epsilon: tc.epsilon,
-				},
-			},
-		}
-		w.Undo(tc.isundo)
-		if w.body.q0 != tc.wantQ0 || w.body.q1 != tc.wantQ1 {
-			t.Errorf("%v changed q0, q1 to %v, %v; want %v, %v",
-				tc.name, w.body.q0, w.body.q1, tc.wantQ0, tc.wantQ1)
-		}
-	}
-}
 
 func TestSetTag1(t *testing.T) {
 	const (
@@ -63,24 +19,28 @@ func TestSetTag1(t *testing.T) {
 		"/home/ゴーファー/src/エドウード.txt",
 		"/home/ゴーファー/src/",
 	} {
-		configureGlobals()
-
 		display := edwoodtest.NewDisplay()
+		global.configureGlobals(display)
+
 		w := NewWindow().initHeadless(nil)
 		w.display = display
 		w.body = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{name: name},
+			file:    file.MakeObservableEditableBuffer(name, nil),
 		}
 		w.tag = Text{
 			display: display,
 			fr:      &MockFrame{},
-			file:    &File{},
+			file:    file.MakeObservableEditableBuffer("", nil),
+		}
+
+		w.col = &Column{
+			safe: true,
 		}
 
 		w.setTag1()
-		got := string(w.tag.file.b)
+		got := w.tag.file.String()
 		want := name + defaultSuffix
 		if got != want {
 			t.Errorf("bad initial tag for file %q:\n got: %q\nwant: %q", name, got, want)
@@ -88,7 +48,7 @@ func TestSetTag1(t *testing.T) {
 
 		w.tag.file.InsertAt(w.tag.file.Nr(), []rune(extraSuffix))
 		w.setTag1()
-		got = string(w.tag.file.b)
+		got = w.tag.file.String()
 		want = name + defaultSuffix + extraSuffix
 		if got != want {
 			t.Errorf("bad replacement tag for file %q:\n got: %q\nwant: %q", name, got, want)
@@ -97,20 +57,18 @@ func TestSetTag1(t *testing.T) {
 }
 
 func TestWindowClampAddr(t *testing.T) {
-	buf := Buffer("Hello, 世界")
+	buf := file.RuneArray("Hello, 世界")
 
 	for _, tc := range []struct {
 		addr, want Range
 	}{
 		{Range{-1, -1}, Range{0, 0}},
-		{Range{100, 100}, Range{buf.nc(), buf.nc()}},
+		{Range{100, 100}, Range{buf.Nc(), buf.Nc()}},
 	} {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: &File{
-					b: buf,
-				},
+				file: file.MakeObservableEditableBuffer("", buf),
 			},
 		}
 		w.ClampAddr()
@@ -130,15 +88,11 @@ func TestWindowParseTag(t *testing.T) {
 		{"/foo/bar.txt", "/foo/bar.txt"},
 		{"/foo/bar.txt | Look", "/foo/bar.txt"},
 		{"/foo/bar.txt Del Snarf\t| Look", "/foo/bar.txt"},
+		{"/foo/bar.txt Del Snarf Del Snarf", "/foo/bar.txt"},
+		{"/foo/bar.txt  Del Snarf", "/foo/bar.txt "},
+		{"/foo/b|ar.txt  Del Snarf", "/foo/b|ar.txt "},
 	} {
-		w := &Window{
-			tag: Text{
-				file: &File{
-					b: Buffer(tc.tag),
-				},
-			},
-		}
-		if got, want := w.ParseTag(), tc.filename; got != want {
+		if got, want := parsetaghelper(tc.tag), tc.filename; got != want {
 			t.Errorf("tag %q has filename %q; want %q", tc.tag, got, want)
 		}
 	}
@@ -149,13 +103,11 @@ func TestWindowClearTag(t *testing.T) {
 	want := "/foo bar/test.txt Del Snarf Undo Put |"
 	w := &Window{
 		tag: Text{
-			file: &File{
-				b: Buffer(tag),
-			},
+			file: file.MakeObservableEditableBuffer("", []rune(tag)),
 		},
 	}
 	w.ClearTag()
-	got := w.tag.file.b.String()
+	got := w.tag.file.String()
 	if got != want {
 		t.Errorf("got %q; want %q", got, want)
 	}

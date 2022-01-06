@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://travis-ci.com/rjkroege/edwood.svg?branch=master)](https://travis-ci.com/rjkroege/edwood)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://github.com/rjkroege/edwood/actions/workflows/edwood.yml/badge.svg?branch=master)](https://github.com/rjkroege/edwood/actions)
 
 # Overview
 Go port of Rob Pike's Acme editor. Derived from
@@ -41,10 +41,22 @@ Example usage:
 	edwood -f /usr/share/fonts/TTF/DejaVuSans.ttf@12pt -F /usr/share/fonts/TTF/DejaVuSansMono.ttf@12pt
 	edwood -f $PLAN9/font/lucsans/euro.8.font -F $PLAN9/font/lucm/unicode.9.font
 
+## Edwood on Plan 9
+
+To build Edwood on Plan 9, use [9fans.net/go PR#28](https://github.com/9fans/go/pull/28):
+
+	hget https://github.com/rjkroege/edwood/archive/master.tar.gz | tar xvz
+	cd edwood-master
+	go mod edit -replace '9fans.net/go=github.com/fhs/9fans-go@plan9-pr'
+	go build
+	./edwood
 
 # Contributions
 Contributions are welcome. Just submit a pull request and we'll review
 the code before merging it in.
+
+# Discussion
+Have thoughts? Questions? Want to talk about Edwood (or Acme and other related Plan9 things)? If so, I've now enabled [Edwood GitHub Discussions](https://github.com/rjkroege/edwood/discussions).
 
 # Project Status
 Edwood has reached the *useful* milestone (v0.1) and should

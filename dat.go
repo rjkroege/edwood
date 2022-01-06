@@ -6,9 +6,10 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
-	"9fans.net/go/plumb"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/frame"
+	//"9fans.net/go/plumb"
+	//	"github.com/rjkroege/edwood/draw"
+	//	"github.com/rjkroege/edwood/file"
+	//	"github.com/rjkroege/edwood/frame"
 )
 
 // These constants are used to identify a file in the file server.
@@ -46,15 +47,10 @@ const (
 	//	Infinity  = 0x7FFFFFFF
 
 	EVENTSIZE = 256
-	BUFSIZE   = MaxBlock + plan9.IOHDRSZ
+	BUFSIZE   = 8*1024 + plan9.IOHDRSZ
 	RBUFSIZE  = BUFSIZE / utf8.UTFMax
 
-	Empty    = 0
-	Null     = '-'
-	Delete   = 'd'
-	Insert   = 'i'
-	Replace  = 'r'
-	Filename = 'f'
+	Empty = 0
 
 	Inactive   = 0
 	Inserting  = 1
@@ -69,60 +65,6 @@ const (
 	KF             = 0xF000 // Start of private unicode space
 	Kscrolloneup   = KF | 0x20
 	Kscrollonedown = KF | 0x21
-)
-
-var (
-	globalincref bool
-	seq          int
-	maxtab       uint // size of a tab, in units of the '0' character
-	tabexpand    bool // defines whether to expand tab to spaces
-
-	tagfont     string
-	mouse       *draw.Mouse
-	mousectl    *draw.Mousectl
-	keyboardctl *draw.Keyboardctl
-
-	modbutton draw.Image
-	colbutton draw.Image
-	button    draw.Image
-	but2col   draw.Image
-	but3col   draw.Image
-
-	//	boxcursor Cursor
-	row Row
-
-	seltext   *Text
-	argtext   *Text
-	mousetext *Text // global because Text.Close needs to clear it
-	typetext  *Text // global because Text.Close needs to clear it
-	barttext  *Text // shared between mousethread and keyboardthread
-
-	activewin  *Window
-	activecol  *Column
-	snarfbuf   Buffer
-	home       string
-	acmeshell  string
-	tagcolors  [frame.NumColours]draw.Image
-	textcolors [frame.NumColours]draw.Image
-	wdir       string
-	editing    = Inactive
-
-	cplumb     chan *plumb.Message
-	cwait      chan ProcessState
-	ccommand   chan *Command
-	ckill      chan string
-	cxfidalloc chan *Xfid
-	cxfidfree  chan *Xfid
-	cnewwindow chan *Window
-	cexit      chan struct{}
-	csignal    chan os.Signal
-	cerr       chan error
-	cedit      chan int
-	cwarn      chan uint
-
-	editoutlk = make(chan bool, 1)
-
-	WinID = 0
 )
 
 type ProcessState interface {

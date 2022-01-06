@@ -13,36 +13,38 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/edwoodtest"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/file"
 )
 
 func TestXfidallocthread(t *testing.T) {
-	cxfidalloc = make(chan *Xfid)
-	cxfidfree = make(chan *Xfid)
+	global.cxfidalloc = make(chan *Xfid)
+	global.cxfidfree = make(chan *Xfid)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	d := (draw.Display)(nil)
 	done := make(chan struct{})
 	go func() {
-		xfidallocthread(ctx, d)
-		close(cxfidalloc)
-		close(cxfidfree)
-		cxfidalloc = nil
-		cxfidfree = nil
+		xfidallocthread(global, ctx, d)
+		close(global.cxfidalloc)
+		close(global.cxfidfree)
+		global.cxfidalloc = nil
+		global.cxfidfree = nil
 		close(done)
 	}()
 
-	cxfidalloc <- (*Xfid)(nil) // Request an xfid
-	x := <-cxfidalloc
+	global.cxfidalloc <- (*Xfid)(nil) // Request an xfid
+	x := <-global.cxfidalloc
 	if x == nil {
 		t.Errorf("Failed to get an Xfid")
 	}
-	cxfidfree <- x
+	global.cxfidfree <- x
 
 	cancel() // Ask xfidallocthread to finish up.
 
@@ -51,10 +53,10 @@ func TestXfidallocthread(t *testing.T) {
 }
 
 func TestXfidctl(t *testing.T) {
-	cxfidfree = make(chan *Xfid)
+	global.cxfidfree = make(chan *Xfid)
 	defer func() {
-		close(cxfidfree)
-		cxfidfree = nil
+		close(global.cxfidfree)
+		global.cxfidfree = nil
 	}()
 
 	x := &Xfid{c: make(chan func(*Xfid))}
@@ -64,7 +66,7 @@ func TestXfidctl(t *testing.T) {
 	called := false
 	x.c <- func(x *Xfid) { called = true }
 
-	if got := <-cxfidfree; got != x {
+	if got := <-global.cxfidfree; got != x {
 		t.Errorf("got freed Xfid %v; want %v", got, x)
 	}
 	if !called {
@@ -126,10 +128,10 @@ func (mr *mockResponder) msize() int { return 8192 }
 func TestXfidflush(t *testing.T) {
 	mr := new(mockResponder)
 	w1 := NewWindow().initHeadless(nil)
-	w1.body.file = NewFile("")
+	w1.body.file = file.MakeObservableEditableBuffer("", nil)
 	w2 := NewWindow().initHeadless(nil)
-	w2.body.file = NewFile("")
-	row.col = []*Column{
+	w2.body.file = file.MakeObservableEditableBuffer("", nil)
+	global.row.col = []*Column{
 		{
 			w: []*Window{w1, w2},
 		},
@@ -156,16 +158,16 @@ func TestXfidreadQWrdsel(t *testing.T) {
 	const wantSel = "εxαmple"
 
 	w := &Window{
-		body: Text{fr: &MockFrame{}},
+		body: Text{fr: &MockFrame{}, file: file.MakeObservableEditableBuffer("", []rune{})},
 		tag: Text{
 			fr:   &MockFrame{},
-			file: &File{},
+			file: file.MakeObservableEditableBuffer("", []rune{}),
 		},
 		col: new(Column),
 	}
 	textSetSelection(&w.body, "This is an «"+wantSel+"» sentence.\n")
-	w.body.file.text = []*Text{&w.body}
-	w.tag.file.text = []*Text{&w.tag}
+	w.body.file.AddObserver(&w.body)
+	w.tag.file.AddObserver(&w.tag)
 	w.body.w = w
 	w.tag.w = w
 	w.ref.Inc()
@@ -219,7 +221,7 @@ func TestXfidwriteQWaddr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
-			w.body.file.b = Buffer([]rune("abcαβξ\n"))
+			w.body.file = file.MakeObservableEditableBuffer("", []rune("abcαβξ\n"))
 			w.col = new(Column)
 			w.limit = Range{0, w.body.file.Nr()}
 			x := &Xfid{
@@ -253,6 +255,9 @@ func TestXfidwriteQWaddr(t *testing.T) {
 }
 
 func TestXfidopen(t *testing.T) {
+	display := edwoodtest.NewDisplay()
+	global.configureGlobals(display)
+
 	for _, tc := range []struct {
 		name string
 		q    uint64
@@ -268,14 +273,18 @@ func TestXfidopen(t *testing.T) {
 		{"Qeditout", Qeditout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			editing = Inserting // for QWeditout
+			global.editing = Inserting // for QWeditout
 			mr := new(mockResponder)
 			var w *Window
 			q := tc.q
 			if q != Qlog && q != Qeditout {
 				w = NewWindow().initHeadless(nil)
 				w.col = new(Column)
+				w.col.safe = true
 				w.body.fr = &MockFrame{}
+				w.display = display
+				w.tag.display = display
+				w.tag.fr = &MockFrame{}
 			}
 			x := &Xfid{
 				f: &Fid{
@@ -331,7 +340,7 @@ func TestXfidopenQeditout(t *testing.T) {
 		},
 		fs: mr,
 	}
-	editoutlk = nil
+	global.editoutlk = nil
 	xfidopen(x)
 	if got, want := mr.err, ErrInUse; got != want {
 		t.Errorf("got error %v; want %v", got, want)
@@ -339,7 +348,9 @@ func TestXfidopenQeditout(t *testing.T) {
 }
 
 func TestXfidopenQWeditout(t *testing.T) {
+	global.configureGlobals(edwoodtest.NewDisplay())
 	mr := new(mockResponder)
+
 	x := &Xfid{
 		f: &Fid{
 			qid: plan9.Qid{Path: QID(0, QWeditout)},
@@ -349,13 +360,14 @@ func TestXfidopenQWeditout(t *testing.T) {
 	}
 	t.Run("ErrInUse", func(t *testing.T) {
 		x.f.w.editoutlk = nil
+		global.editing = Inserting
 		xfidopen(x)
 		if got, want := mr.err, ErrInUse; got != want {
 			t.Errorf("got error %v; want %v", got, want)
 		}
 	})
 	t.Run("ErrPermission", func(t *testing.T) {
-		editing = Inactive
+		global.editing = Inactive
 		xfidopen(x)
 		if got, want := mr.err, ErrPermission; got != want {
 			t.Errorf("got error %v; want %v", got, want)
@@ -475,8 +487,8 @@ func TestXfidclose(t *testing.T) {
 				w.ctrllock.Lock()
 				close(w.editoutlk) // prevent block on send
 			}
-			editoutlk = make(chan bool)
-			close(editoutlk) // prevent block on send
+			global.editoutlk = make(chan bool)
+			close(global.editoutlk) // prevent block on send
 			x := &Xfid{
 				f: &Fid{
 					qid: plan9.Qid{
@@ -528,13 +540,18 @@ func TestXfidclose(t *testing.T) {
 }
 
 func TestXfidwriteQWdata(t *testing.T) {
-	configureGlobals()
+	display := edwoodtest.NewDisplay()
+	global.configureGlobals(display)
 
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
+	w.col.safe = true
+	w.display = display
 	w.body.fr = &MockFrame{}
-	w.body.display = edwoodtest.NewDisplay()
+	w.body.display = display
+	w.tag.fr = &MockFrame{}
+	w.tag.display = display
 
 	for _, tc := range []struct {
 		name    string // test name
@@ -572,7 +589,7 @@ func TestXfidwriteQWdata(t *testing.T) {
 				if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
 					t.Errorf("Fcall.Count is %v; want %v", got, want)
 				}
-				if got, want := string(w.body.file.b), string(tc.body); got != want {
+				if got, want := w.body.file.String(), string(tc.body); got != want {
 					t.Errorf("got body %q; want %q", got, want)
 				}
 				if tc.q0 != w.body.q0 || tc.q1 != w.body.q1 {
@@ -628,9 +645,9 @@ func TestXfidwriteQWtag(t *testing.T) {
 	mr := new(mockResponder)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.body.file = NewFile("")
-	w.tag.file = NewFile("")
-	w.tag.file.b = Buffer(prevTag)
+	w.body.file = file.MakeObservableEditableBuffer("", nil)
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(prevTag))
+	w.tagfilenameend = len(parsetaghelper(prevTag))
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  []byte(extra),
@@ -649,17 +666,22 @@ func TestXfidwriteQWtag(t *testing.T) {
 	if got, want := mr.fcall.Count, uint32(len(extra)); got != want {
 		t.Errorf("fcall.Count is %v; want %v", got, want)
 	}
-	if got, want := string(w.tag.file.b), newTag; got != want {
+	if got, want := w.tag.file.String(), newTag; got != want {
 		t.Errorf("tag is %q; want %q", got, want)
 	}
 }
 
 func TestXfidwriteQWwrsel(t *testing.T) {
+	mockDisplay := edwoodtest.NewDisplay()
+	global.configureGlobals(mockDisplay)
+
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.body.file = NewFile("")
-	w.tag.file = NewFile("")
+	w.body.file = file.MakeObservableEditableBuffer("", nil)
+	w.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w.body.fr = &MockFrame{}
+	w.body.display = mockDisplay
+	w.tag.display = mockDisplay
 
 	for _, tc := range []struct {
 		name       string // test name
@@ -693,7 +715,7 @@ func TestXfidwriteQWwrsel(t *testing.T) {
 			if got, want := mr.fcall.Count, uint32(len(tc.data)); got != want {
 				t.Errorf("fcall.Count is %v; want %v", got, want)
 			}
-			if got, want := string(w.body.file.b), string(tc.want); got != want {
+			if got, want := w.body.file.String(), string(tc.want); got != want {
 				t.Errorf("buffer is %q; want %q", got, want)
 			}
 		})
@@ -723,13 +745,15 @@ func TestXfidwriteQlabel(t *testing.T) {
 }
 
 func TestXfidwriteQcons(t *testing.T) {
-	row.Init(image.Rectangle{
+	global.configureGlobals(edwoodtest.NewDisplay())
+	mr := new(mockResponder)
+
+	global.row.Init(image.Rectangle{
 		image.Point{0, 0},
 		image.Point{800, 600},
 	}, edwoodtest.NewDisplay())
 
 	data := []byte("cons error: Hello, 世界!\n")
-	mr := new(mockResponder)
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
@@ -748,19 +772,46 @@ func TestXfidwriteQcons(t *testing.T) {
 		t.Errorf("fcall.Count is %v; want %v", got, want)
 	}
 	w := errorwin(x.f.mntdir, 'X')
-	if got, want := w.body.file.b.String(), string(data); got != want {
+	if got, want := w.body.file.String(), string(data); got != want {
 		t.Errorf("+Errors window body is %q; want %q", got, want)
 	}
 }
 
 func TestXfidwriteQWerrors(t *testing.T) {
+	// TODO(rjk): This is another of one these places where I should really
+	// be using a quality backing mock.
 	data := []byte("window error: Hello, 世界!\n")
+
+	mockdisplay := edwoodtest.NewDisplay()
+	global.configureGlobals(mockdisplay)
 	mr := new(mockResponder)
+
+	global.row.display = mockdisplay
+
+	col := new(Column)
+	col.display = mockdisplay
+	col.tag.fr = &MockFrame{}
+	global.row.col = append(global.row.col, col)
+	col.tag.display = mockdisplay
+	col.tag.file = file.MakeObservableEditableBuffer("", nil)
 	w := NewWindow().initHeadless(nil)
-	w.col = new(Column)
-	w.tag.file.b = Buffer("/home/gopher/edwood/row.go Del Snarf | Look ")
+	w.display = mockdisplay
+	w.col = col
+
+	tagcontents := "/home/gopher/edwood/row.go Del Snarf | Look "
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(tagcontents))
+	w.tagfilenameend = len(parsetaghelper(string(tagcontents)))
+	col.w = append(col.w, w)
+	w.tag.display = mockdisplay
+	w.tag.w = w
+	w.tag.col = col
+	w.tag.row = &global.row
+
 	w.tag.fr = &MockFrame{}
+
 	w.body.fr = &MockFrame{}
+	w.body.display = mockdisplay
+
 	x := &Xfid{
 		fcall: plan9.Fcall{
 			Data:  data,
@@ -786,7 +837,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	w = errorwinforwin(w)
 	defer w.Unlock()
 
-	if got, want := w.body.file.b.String(), string(data); got != want {
+	if got, want := w.body.file.String(), string(data); got != want {
 		t.Errorf("+Errors window body is %q; want %q", got, want)
 	}
 }
@@ -822,10 +873,10 @@ func TestXfidwriteQWeditout(t *testing.T) {
 		fs: mr,
 	}
 
-	editing = Collecting
+	global.editing = Collecting
 	collection = nil
 	defer func() {
-		editing = Inactive
+		global.editing = Inactive
 		collection = nil
 	}()
 	xfidwrite(x)
@@ -841,9 +892,9 @@ func TestXfidwriteQWeditout(t *testing.T) {
 }
 
 func TestXfidwriteQWctl(t *testing.T) {
-	configureGlobals()
+	global.configureGlobals(edwoodtest.NewDisplay())
 	warnings = nil
-	cwarn = nil
+	global.cwarn = nil
 
 	for _, tc := range []struct {
 		err  error
@@ -886,6 +937,9 @@ func TestXfidwriteQWctl(t *testing.T) {
 		{fmt.Errorf("file dirty"), "del\ndel\nclean"},
 		{nil, "clean\ndel"},
 		{nil, "clean\ndelete"},
+		{ErrBadCtl, "font"},
+		{fmt.Errorf("nulls in font name"), "font /path/with/\x00nulls"},
+		{nil, "font /path/to/font"},
 	} {
 		t.Run(fmt.Sprintf("Data=%q", tc.data), func(t *testing.T) {
 			mr := new(mockResponder)
@@ -900,12 +954,13 @@ func TestXfidwriteQWctl(t *testing.T) {
 			w.body.fr = &MockFrame{}
 			w.tag.display = display
 			w.tag.fr = &MockFrame{}
+			global.row.display = display
 
 			// mark window dirty
 			f := w.body.file
 			f.InsertAt(0, []rune(strings.Repeat("ha", 100)))
-			f.seq = 0
-			f.putseq = 1
+			f.SetSeq(0)
+			f.SetPutseq(1)
 
 			x := &Xfid{
 				fcall: plan9.Fcall{
@@ -979,7 +1034,7 @@ func TestXfidwriteQWevent(t *testing.T) {
 func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	// Setup a new window with "Send" in the tag.
 	d := edwoodtest.NewDisplay()
-	row = Row{
+	global.row = Row{
 		display: d,
 	}
 	w := NewWindow().initHeadless(nil)
@@ -987,23 +1042,21 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	w.nopen[QWevent]++
 	defer func() { w.nopen[QWevent]-- }()
 	w.tag = Text{
-		w: w,
-		file: &File{
-			b:    Buffer("Send"),
-			text: []*Text{&w.tag},
-		},
+		w:       w,
+		file:    file.MakeObservableEditableBuffer("", []rune("Send")),
 		fr:      &MockFrame{},
 		display: d,
 	}
+	w.tag.file.AddObserver(&w.tag)
 	w.body = Text{
-		w: w,
-		file: &File{
-			b:    Buffer(""),
-			text: []*Text{&w.body},
-		},
+		w:       w,
+		file:    file.MakeObservableEditableBuffer("", nil),
 		fr:      &MockFrame{},
 		display: d,
 	}
+	w.body.file.AddObserver(&w.body)
+	w.tag.file.AddObserver(w)
+	w.tagfilenameend = len("Send")
 
 	// Put something in the snarf buffer.
 	const snarfbuf = "Hello, 世界\n"
@@ -1028,7 +1081,7 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	if got := mr.err; got != nil {
 		t.Errorf("event %q: got error %v; want nil", event, got)
 	}
-	if got, want := string(w.body.file.b), snarfbuf; got != want {
+	if got, want := w.body.file.String(), snarfbuf; got != want {
 		t.Errorf("body contains %q; want %q", got, want)
 	}
 }
@@ -1065,24 +1118,38 @@ func TestXfidreadEmptyFiles(t *testing.T) {
 }
 
 func TestXfidreadQWbodyQWtag(t *testing.T) {
+	// TODO(rjk): These tests are fragile in how they setup their skeleton.
+	// Use the common skeleton.
+	display := edwoodtest.NewDisplay()
+	global.configureGlobals(display)
+	const data = "This is an εxαmplε sentence.\n"
+
 	for _, tc := range []struct {
-		name string
-		q    uint64
+		name  string
+		q     uint64
+		setup string
+		want  string
 	}{
-		{"QWbody", QWbody},
-		{"QWtag", QWtag},
+		{"QWbody", QWbody, data, data},
+		// TODO(rjk): Why doesn't setTag1 run?
+		{"QWtag", QWtag, "εxαmplε", "εxαmplε"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			const data = "This is an εxαmplε sentence.\n"
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
+			w.col.safe = true
+			w.display = display
+			w.body.display = display
 			w.body.fr = &MockFrame{}
+			w.tag.display = display
+			w.tag.fr = &MockFrame{}
 			switch tc.q {
 			case QWbody:
-				w.body.file.b = Buffer(data)
+				w.body.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
 			case QWtag:
-				w.tag.file.b = Buffer(data)
+				w.tag.file = file.MakeObservableEditableBuffer("", []rune(tc.setup))
+				w.tagfilenameend = utf8.RuneCountInString(tc.setup)
 			}
 
 			x := &Xfid{
@@ -1097,11 +1164,11 @@ func TestXfidreadQWbodyQWtag(t *testing.T) {
 				fs: mr,
 			}
 			xfidread(x)
-			if got, want := mr.fcall.Count, uint32(len(data)); got != want {
+			if got, want := mr.fcall.Count, uint32(len(tc.want)); got != want {
 				t.Errorf("read %v bytes; want %v",
 					got, want)
 			}
-			if got, want := string(mr.fcall.Data), data; got != want {
+			if got, want := string(mr.fcall.Data), tc.want; got != want {
 				t.Errorf("got data %q; want %q", got, want)
 			}
 		})
@@ -1141,7 +1208,7 @@ func TestXfidruneread(t *testing.T) {
 			fs: mr,
 		}
 		w := NewWindow().initHeadless(nil)
-		w.body.file.b = Buffer(tc.body)
+		w.body.file = file.MakeObservableEditableBuffer("", tc.body)
 		nr := xfidruneread(x, &w.body, tc.q0, tc.q1)
 		if got, want := nr, tc.nr; got != want {
 			t.Errorf("read %v runes from %q (q0=%v, q1=%v); should read %v runes",
@@ -1183,7 +1250,7 @@ func TestXfidreadQWxdataQWdata(t *testing.T) {
 			mr := new(mockResponder)
 			w := NewWindow().initHeadless(nil)
 			w.col = new(Column)
-			w.body.file.b = Buffer(body)
+			w.body.file = file.MakeObservableEditableBuffer("", []rune(body))
 			w.addr = tc.inAddr
 			xfidread(&Xfid{
 				f: &Fid{
@@ -1217,7 +1284,7 @@ func TestXfidreadQWaddr(t *testing.T) {
 	)
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.body.file.b = Buffer(body)
+	w.body.file = file.MakeObservableEditableBuffer("", []rune(body))
 	w.addr.q0 = 5
 	w.addr.q1 = 12
 
@@ -1241,13 +1308,13 @@ func TestXfidreadQWaddr(t *testing.T) {
 func TestXfidreadQWctl(t *testing.T) {
 	const want = "          1          32          14           0           0           0 /lib/font/edwood.font           0 "
 
-	WinID = 0
+	global.WinID = 0
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
 	w.display = edwoodtest.NewDisplay()
 	w.body.fr = &MockFrame{}
-	w.tag.file.b = Buffer("/etc/hosts Del Snarf | Look Get ")
-	w.body.file.b = Buffer("Hello, world!\n")
+	w.tag.file = file.MakeObservableEditableBuffer("", []rune(("/etc/hosts Del Snarf | Look Get ")))
+	w.body.file = file.MakeObservableEditableBuffer("", []rune("Hello, world!\n"))
 
 	mr := new(mockResponder)
 	xfidread(&Xfid{
@@ -1321,7 +1388,7 @@ func TestXfidreadQlog(t *testing.T) {
 	}
 	xfidlogopen(x)
 	go func() {
-		WinID = 0
+		global.WinID = 0
 		w := NewWindow().initHeadless(nil)
 		xfidlog(w, "new")
 	}()
@@ -1421,12 +1488,14 @@ func TestXfidreadQindex(t *testing.T) {
 		"multi-line-tag",
 	} {
 		t.Run(name, func(t *testing.T) {
-			filename := editDumpFileForTesting(t, filepath.Join("testdata", name+".dump"))
+			origfilename := filepath.Join("testdata", name+".dump")
+			t.Logf("original file: %q", origfilename)
+			filename := editDumpFileForTesting(t, origfilename)
 			defer os.Remove(filename)
 
 			setGlobalsForLoadTesting()
 
-			err := row.Load(nil, filename, true)
+			err := global.row.Load(nil, filename, true)
 			if err != nil {
 				t.Fatalf("Row.Load failed: %v", err)
 			}

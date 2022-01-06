@@ -11,9 +11,10 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/ninep"
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/ninep"
+	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/util"
 )
 
 const Ctlsize = 5 * 12
@@ -40,7 +41,7 @@ func xfidctl(x *Xfid, d draw.Display) {
 		if d != nil {
 			d.Flush()
 		} // d here is for testability.
-		cxfidfree <- x
+		global.cxfidfree <- x
 	}
 }
 
@@ -51,9 +52,9 @@ func xfidflush(x *Xfid) {
 	xfidlogflush(x)
 
 	// search windows for matching tag
-	row.lk.Lock()
-	defer row.lk.Unlock()
-	for _, c := range row.col {
+	global.row.lk.Lock()
+	defer global.row.lk.Unlock()
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			w.Lock('E')
 			wx := w.eventx
@@ -100,7 +101,6 @@ func xfidopen(x *Xfid) {
 			if w.nopen[q] == 0 {
 				if !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = false
-					w.SetTag()
 				}
 			}
 			w.nopen[q]++
@@ -127,7 +127,7 @@ func xfidopen(x *Xfid) {
 			os.Remove(tmp.Name()) // tempfile ORCLOSE
 			w.nopen[q]++
 
-			_, err = io.Copy(tmp, t.file.b.Reader(t.q0, t.q1))
+			_, err = io.Copy(tmp, t.file.Reader(t.q0, t.q1))
 			if err != nil || testIOCopyFail {
 				// TODO(fhs): Do we want to send an error response to the client?
 				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
@@ -135,13 +135,13 @@ func xfidopen(x *Xfid) {
 			w.rdselfd = tmp
 		case QWwrsel:
 			w.nopen[q]++
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 			cut(t, t, nil, false, true, "")
 			w.wrselrange = Range{t.q1, t.q1}
 			w.nomark = true
 		case QWeditout:
-			if editing == Inactive {
+			if global.editing == Inactive {
 				w.Unlock()
 				x.respond(&fc, ErrPermission)
 				return
@@ -162,7 +162,7 @@ func xfidopen(x *Xfid) {
 			xfidlogopen(x)
 		case Qeditout:
 			select {
-			case editoutlk <- true:
+			case global.editoutlk <- true:
 			default:
 				x.respond(&fc, ErrInUse)
 				return
@@ -197,7 +197,7 @@ func xfidclose(x *Xfid) {
 		// We need to lock row here before locking window (just like mousethread)
 		// in order to synchronize mousetext with mousethread: mousetext is
 		// set to nil when the associated window is closed.
-		row.lk.Lock()
+		global.row.lk.Lock()
 		w.Lock('E')
 		switch q {
 		case QWctl:
@@ -218,7 +218,6 @@ func xfidclose(x *Xfid) {
 				}
 				if q == QWevent && !w.body.file.IsDir() && w.col != nil {
 					w.filemenu = true
-					w.SetTag()
 				}
 				if q == QWevent {
 					w.dumpstr = ""
@@ -231,18 +230,18 @@ func xfidclose(x *Xfid) {
 		case QWwrsel:
 			w.nomark = false
 			t := &w.body
-			t.Show(min(w.wrselrange.q0, t.Nc()), min(w.wrselrange.q1, t.Nc()), true)
+			t.Show(util.Min(w.wrselrange.q0, t.Nc()), util.Min(w.wrselrange.q1, t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		case QWeditout:
 			<-w.editoutlk
 		}
 		w.Close()
 		w.Unlock()
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 	} else {
 		switch q {
 		case Qeditout:
-			<-editoutlk
+			<-global.editoutlk
 		}
 	}
 	x.respond(&fc, nil)
@@ -357,7 +356,7 @@ func fullrunewrite(x *Xfid) []rune {
 		cnt += x.f.nrpart
 		x.f.nrpart = 0
 	}
-	r, nb, _ := cvttorunes(x.fcall.Data, cnt-utf8.UTFMax)
+	r, nb, _ := util.Cvttorunes(x.fcall.Data, cnt-utf8.UTFMax)
 	for utf8.FullRune(x.fcall.Data[nb:]) {
 		ru, si := utf8.DecodeRune(x.fcall.Data[nb:])
 		if ru != 0 {
@@ -412,8 +411,8 @@ func xfidwrite(x *Xfid) {
 				t.Insert(q0, r, true)
 			} else {
 				if !w.nomark {
-					seq++
-					t.file.Mark(seq)
+					global.seq++
+					t.file.Mark(global.seq)
 				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
@@ -423,7 +422,6 @@ func xfidwrite(x *Xfid) {
 				}
 				t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 			}
-			w.SetTag()
 			if qid == QWwrsel {
 				w.wrselrange.q1 += len(r)
 			}
@@ -494,10 +492,10 @@ func xfidwrite(x *Xfid) {
 			x.respond(&fc, ErrAddrRange)
 			break
 		}
-		r, _, _ := cvttorunes(x.fcall.Data, int(x.fcall.Count))
+		r, _, _ := util.Cvttorunes(x.fcall.Data, int(x.fcall.Count))
 		if !w.nomark {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		q0 := a.q0
 		if a.q1 > q0 {
@@ -518,7 +516,6 @@ func xfidwrite(x *Xfid) {
 			t.Show(q0+len(r), q0+len(r), false)
 		}
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
-		w.SetTag()
 		w.addr.q0 += len(r)
 		w.addr.q1 = w.addr.q0
 		fc.Count = x.fcall.Count
@@ -543,7 +540,6 @@ func xfidctlwrite(x *Xfid, w *Window) {
 	// defer log.Println("done xfidctlwrite")
 	var err error
 	const scrdraw = false
-	settag := false
 
 	w.tag.Commit()
 	lines := strings.Split(string(x.fcall.Data), "\n")
@@ -571,21 +567,18 @@ forloop:
 		case "unlock": // release exclusive use
 			//w.ctlfid = math.MaxUint32
 			//w.ctrllock.Unlock() // This will crash if the lock isn't already locked.
-			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.name)
+			log.Printf("%v ctl message received for window %v (%v)\n", words[0], w.id, w.body.file.Name())
 			err = ErrBadCtl
 			break forloop
 
 		case "clean": // mark window 'clean', seq=0
 			t := &w.body
 			t.eq0 = ^0
-			t.file.Reset()
 			t.file.Clean()
-			settag = true
 		case "dirty": // mark window 'dirty'
 			t := &w.body
 			// doesn't change sequence number, so "Put" won't appear.  it shouldn't.
 			t.file.Modded()
-			settag = true
 		case "show": // show dot
 			t := &w.body
 			t.Show(t.q0, t.q1, true)
@@ -594,7 +587,7 @@ forloop:
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
 			if nulls {
 				err = fmt.Errorf("nulls in file name")
 				break forloop
@@ -605,15 +598,15 @@ forloop:
 					break forloop
 				}
 			}
-			seq++
-			w.body.file.Mark(seq)
+			global.seq++
+			w.body.file.Mark(global.seq)
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
 			if nulls {
 				err = fmt.Errorf("nulls in dump string")
 				break forloop
@@ -624,7 +617,7 @@ forloop:
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
 			if nulls {
 				err = fmt.Errorf("nulls in dump directory string")
 				break forloop
@@ -650,7 +643,6 @@ forloop:
 			w.body.q0 = w.addr.q0
 			w.body.q1 = w.addr.q1
 			w.body.SetSelect(w.body.q0, w.body.q1)
-			settag = true
 		case "addr=dot": // set addr
 			w.addr.q0 = w.body.q0
 			w.addr.q1 = w.body.q1
@@ -662,24 +654,22 @@ forloop:
 		case "nomark": // turn off automatic marking
 			w.nomark = true
 		case "mark": // mark file
-			seq++
-			w.body.file.Mark(seq)
-			settag = true
+			global.seq++
+			w.body.file.Mark(global.seq)
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
 		case "menu": // enable automatic menu
 			w.filemenu = true
 		case "cleartag": // wipe tag right of bar
 			w.ClearTag()
-			settag = true
 		case "font":
 			if len(words) < 2 {
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := cvttorunes([]byte(words[1]), len(words[1]))
+			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
 			if nulls {
-				err = fmt.Errorf("nulls in dump string")
+				err = fmt.Errorf("nulls in font name")
 				break forloop
 			}
 			fontx(&w.body, nil, nil, XXX, XXX, string(r))
@@ -701,9 +691,6 @@ forloop:
 	}
 	x.respond(&fc, err)
 
-	if settag && w != nil {
-		w.SetTag()
-	}
 	if scrdraw && w != nil {
 		t := &w.body
 		w.body.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
@@ -718,12 +705,12 @@ func xfideventwrite(x *Xfid, w *Window) {
 	rowLock := func() {
 		defer w.Lock(w.owner)
 		w.Unlock() // sets w.owner to 0
-		row.lk.Lock()
+		global.row.lk.Lock()
 	}
 	rowUnlock := func() {
 		defer w.Lock(w.owner)
 		w.Unlock() // sets w.owner to 0
-		row.lk.Unlock()
+		global.row.lk.Unlock()
 	}
 
 	// The messages have a fixed format: a character indicating the
@@ -810,8 +797,8 @@ forloop:
 // rune offset) pair of the last read from buffer for a matching qid
 // (QWbody or QWtag). No data past rune offset q1 is sent to client.
 //
-// TODO(fhs): Remove this function and use Buffer.ReadAt once Buffer
-// implements io.ReaderAt interface. Buffer.ReadAt will need to be careful
+// TODO(fhs): Remove this function and use RuneArray.ReadAt once RuneArray
+// implements io.ReaderAt interface. RuneArray.ReadAt will need to be careful
 // to send full runes only, if we want to keep the current behavior.
 func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 	// log.Println("xfidutfread", x)
@@ -845,7 +832,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if nr > BUFSIZE/utf8.UTFMax {
 			nr = BUFSIZE / utf8.UTFMax
 		}
-		t.file.b.Read(q, r[:nr])
+		t.file.Read(q, r[:nr])
 		b := string(r[:nr])
 		nb := len(b)
 		if boff >= off {
@@ -858,7 +845,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		} else {
 			if boff+uint64(nb) > off {
 				if n != 0 {
-					acmeerror("bad count in utfrune", nil)
+					util.AcmeError("bad count in utfrune", nil)
 				}
 				m := nb - int(off-boff)
 				if m > int(x.fcall.Count) {
@@ -888,9 +875,9 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	t.w.Commit(t)
 
 	// Get Count runes, but that might be larger than Count bytes
-	nr := min(q1-q0, int(x.fcall.Count))
+	nr := util.Min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
-	t.file.b.Read(q0, tmp)
+	t.file.Read(q0, tmp)
 	buf := []byte(string(tmp))
 
 	m := len(buf)
@@ -957,9 +944,9 @@ func xfidindexread(x *Xfid) {
 	// read using a very small buffer and we create/delete windows
 	// in-between the requests.
 
-	row.lk.Lock()
+	global.row.lk.Lock()
 	nmax := 0
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			nmax += Ctlsize + w.tag.Nc()*utf8.UTFMax + 1
 		}
@@ -967,16 +954,16 @@ func xfidindexread(x *Xfid) {
 
 	nmax++
 	var sb strings.Builder
-	for _, c := range row.col {
+	for _, c := range global.row.col {
 		for _, w := range c.w {
 			// only show the currently active window of a set
-			if w.body.file.curtext != &w.body {
+			if w.body.file.GetCurObserver().(*Text) != &w.body {
 				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
-			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
+			m := util.Min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
-			w.tag.file.b.Read(0, tag)
+			w.tag.file.Read(0, tag)
 
 			// We only include first line of a multi-line tag
 			if i := runes.IndexRune(tag, '\n'); i >= 0 {
@@ -986,7 +973,7 @@ func xfidindexread(x *Xfid) {
 			sb.WriteString("\n")
 		}
 	}
-	row.lk.Unlock()
+	global.row.lk.Unlock()
 
 	var fc plan9.Fcall
 	ninep.ReadString(&fc, &x.fcall, sb.String())

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/sam"
 )
 
 func TestAddr(t *testing.T) {
@@ -49,7 +52,7 @@ func TestAddr(t *testing.T) {
 		{Range{0, 0}, "#X", Range{0, 0}, true, 1},
 	}
 
-	text := &TextBuffer{0, 0, []rune("This is a\nshort text\nto try addressing\n")}
+	text := sam.NewTextBuffer(0, 0, []rune("This is a\nshort text\nto try addressing\n"))
 
 	for i, test := range testtab {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
@@ -92,9 +95,7 @@ func TestAcmeregexp(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warnings = nil
 			text := &Text{
-				file: &File{
-					b: Buffer([]rune("abcd αβξδ\n")),
-				},
+				file: file.MakeObservableEditableBuffer("", []rune("abcd αβξδ\n")),
 			}
 			lim := Range{
 				0,

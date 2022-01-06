@@ -7,6 +7,7 @@ import (
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
+	"github.com/rjkroege/edwood/util"
 )
 
 var (
@@ -27,7 +28,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		defer l.Close()
 		if err := mux9p.Do(l, conn, nil); err != nil {
-			acmeerror("9P multiplexer failed", err)
+			util.AcmeError("9P multiplexer failed", err)
 		}
 	}()
 	fsysAddr = l.Addr()

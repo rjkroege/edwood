@@ -12,11 +12,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/internal/complete"
-	"github.com/rjkroege/edwood/internal/draw"
-	"github.com/rjkroege/edwood/internal/draw/drawutil"
-	"github.com/rjkroege/edwood/internal/frame"
-	"github.com/rjkroege/edwood/internal/runes"
+	"github.com/rjkroege/edwood/complete"
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/draw/drawutil"
+	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/util"
 )
 
 const (
@@ -41,6 +43,8 @@ var (
 		left2,
 		left3,
 	}
+
+	_ file.BufferObserver = (*Text)(nil) // Enforce at compile time that Text implements BufferObserver
 )
 
 type TextKind byte
@@ -56,7 +60,7 @@ const (
 // Files have possible multiple texts corresponding to clones.
 type Text struct {
 	display draw.Display
-	file    *File
+	file    *file.ObservableEditableBuffer
 	fr      frame.Frame
 	font    string
 
@@ -74,7 +78,7 @@ type Text struct {
 	col       *Column
 
 	iq1 int
-	eq0 int
+	eq0 int // When 0, typing has started
 
 	nofill   bool // When true, updates to the Text shouldn't update the frame.
 	needundo bool
@@ -102,15 +106,15 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 	r.Min.X += t.display.ScaleSize(Scrollwid) + t.display.ScaleSize(Scrollgap)
 	t.eq0 = ^0
 	t.font = rf
-	t.tabstop = int(maxtab)
-	t.tabexpand = tabexpand
+	t.tabstop = int(global.maxtab)
+	t.tabexpand = global.tabexpand
 	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage(), cols)
 	t.Redraw(r, -1, false /* noredraw */)
 	return t
 }
 
 func (t *Text) Nc() int {
-	return t.file.Size()
+	return t.file.Nr()
 }
 
 // String returns a string representation of the TextKind.
@@ -132,10 +136,10 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	// log.Println("--- Text Redraw start", r, odx, "tag type:" ,  t.what)
 	// defer log.Println("--- Text Redraw end")
 	// use no wider than 3-space tabs in a directory
-	maxt := int(maxtab)
+	maxt := int(global.maxtab)
 	if t.what == Body {
 		if t.file.IsDir() {
-			maxt = min(TABDIR, int(maxtab))
+			maxt = util.Min(TABDIR, int(global.maxtab))
 		} else {
 			maxt = t.tabstop
 		}
@@ -187,40 +191,40 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 
 func (t *Text) Close() {
 	t.fr.Clear(true)
-	if err := t.file.DelText(t); err != nil {
-		acmeerror(err.Error(), nil)
+	if err := t.file.DelObserver(t); err != nil {
+		util.AcmeError(err.Error(), nil)
 	}
 	t.file = nil
-	if argtext == t {
-		argtext = nil
+	if global.argtext == t {
+		global.argtext = nil
 	}
-	if typetext == t {
-		typetext = nil
+	if global.typetext == t {
+		global.typetext = nil
 	}
-	if seltext == t {
-		seltext = nil
+	if global.seltext == t {
+		global.seltext = nil
 	}
-	if mousetext == t {
-		mousetext = nil
+	if global.mousetext == t {
+		global.mousetext = nil
 	}
-	if barttext == t {
-		barttext = nil
+	if global.barttext == t {
+		global.barttext = nil
 	}
 }
 
 func (t *Text) Columnate(names []string, widths []int) {
 	var colw, mint, maxt, ncol, nrow int
-	q1 := (0)
+	q1 := 0
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
-	if t.file.HasMultipleTexts() {
+	if t.file.HasMultipleObservers() {
 		panic("Text.Columnate is only for directories that can't have zerox")
 	}
 
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
-	t.fr.Maxtab(min(int(maxtab), TABDIR) * mint)
+	t.fr.Maxtab(util.Min(int(global.maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
 		if maxt-w%maxt < mint || w%maxt == 0 {
@@ -236,7 +240,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	if colw == 0 {
 		ncol = 1
 	} else {
-		ncol = max(1, t.fr.Rect().Dx()/colw)
+		ncol = util.Max(1, t.fr.Rect().Dx()/colw)
 	}
 	nrow = (len(names) + ncol - 1) / ncol
 
@@ -270,11 +274,11 @@ func (t *Text) Columnate(names []string, widths []int) {
 }
 
 func (t *Text) checkSafeToLoad(filename string) error {
-	if t.file.HasUncommitedChanges() || t.file.Size() > 0 || t.w == nil || t != &t.w.body {
+	if t.file.HasUncommitedChanges() || t.file.Nr() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 
-	if t.file.IsDir() && t.file.name == "" {
+	if t.file.IsDir() && t.file.Name() == "" {
 		return warnError(nil, "empty directory name")
 	}
 	if ismtpt(filename) {
@@ -320,19 +324,19 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		return 0, warnError(nil, "can't fstat %s: %v", filename, err)
 	}
 	if setqid {
-		t.file.info = d
+		t.file.SetInfo(d)
 	}
 
 	if d.IsDir() {
 		// this is checked in get() but it's possible the file changed underfoot
-		if t.file.HasMultipleTexts() {
+		if t.file.HasMultipleObservers() {
 			return 0, warnError(nil, "%s is a directory; can't read with multiple windows on it", filename)
 		}
 		t.file.SetDir(true)
 		t.w.filemenu = false
-		if len(t.file.name) > 0 && !strings.HasSuffix(t.file.name, string(filepath.Separator)) {
-			t.file.name = t.file.name + string(filepath.Separator)
-			t.w.SetName(t.file.name)
+		if len(t.file.Name()) > 0 && !strings.HasSuffix(t.file.Name(), string(filepath.Separator)) {
+			t.file.SetName(t.file.Name() + string(filepath.Separator))
+			t.w.SetName(t.file.Name())
 		}
 		dirNames, err := getDirNames(fd)
 		if err != nil {
@@ -346,7 +350,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
-		q1 := t.file.Size()
+		q1 := t.file.Nr()
 		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
@@ -418,7 +422,12 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 
 // inserted is a callback invoked by File on Insert* to update each Text
 // that is using a given File.
-func (t *Text) inserted(q0 int, r []rune) {
+// TODO(rjk): Carefully scrub this for opportunities to not do work if the
+// changes are not in the viewport. Also: minimize scrollbar redraws.
+func (t *Text) Inserted(q0 int, r []rune) {
+	if t.eq0 == -1 {
+		t.eq0 = q0
+	}
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
@@ -445,7 +454,6 @@ func (t *Text) inserted(q0 int, r []rune) {
 	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 	}
-
 }
 
 // writeEventLog emits an event log for an insertion.
@@ -461,6 +469,8 @@ func (t *Text) logInsert(q0 int, r []rune) {
 			c = 'I'
 		}
 		if n <= EVENTSIZE {
+			// TODO(rjk): Does unnecessary work making a string from r if there's no
+			// event reader.
 			t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
 		} else {
 			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+n)
@@ -510,10 +520,10 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 		t.TypeCommit()
 	}
 	for {
-		n := t.file.Size() - (t.org + fr.GetFrameFillStatus().Nchars)
+		n := t.file.Nr() - (t.org + fr.GetFrameFillStatus().Nchars)
 		if n < 0 {
 			log.Printf("Text.fill: negative slice length %v (file size %v, t.org %v, frame nchars %v)\n",
-				n, t.file.Size(), t.org, fr.GetFrameFillStatus().Nchars)
+				n, t.file.Nr(), t.org, fr.GetFrameFillStatus().Nchars)
 			return fmt.Errorf("fill: negative slice length %v", n)
 		}
 		if n == 0 {
@@ -523,7 +533,7 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 			n = 2000
 		}
 		rp := make([]rune, n)
-		t.file.b.Read(t.org+fr.GetFrameFillStatus().Nchars, rp)
+		t.file.Read(t.org+fr.GetFrameFillStatus().Nchars, rp)
 		//
 		// it's expensive to frinsert more than we need, so
 		// count newlines.
@@ -565,26 +575,26 @@ func (t *Text) Delete(q0, q1 int, _ bool) {
 // deleted implements the single-text deletion observer for this Text's
 // backing File. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
-func (t *Text) deleted(q0, q1 int) {
+func (t *Text) Deleted(q0, q1 int) {
 	n := q1 - q0
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
 	if q0 < t.iq1 {
-		t.iq1 -= min(n, t.iq1-q0)
+		t.iq1 -= util.Min(n, t.iq1-q0)
 	}
 	if q0 < t.q0 {
-		t.q0 -= min(n, t.q0-q0)
+		t.q0 -= util.Min(n, t.q0-q0)
 	}
 	if q0 < t.q1 {
-		t.q1 -= min(n, t.q1-q0)
+		t.q1 -= util.Min(n, t.q1-q0)
 	}
 	if q1 <= t.org {
 		t.org -= n
 	} else if t.fr != nil && q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {
 		p1 := q1 - t.org
 		if p1 > (t.fr.GetFrameFillStatus().Nchars) {
-			p1 = (t.fr.GetFrameFillStatus().Nchars)
+			p1 = t.fr.GetFrameFillStatus().Nchars
 		}
 		p0 := 0
 		if q0 < t.org {
@@ -593,7 +603,7 @@ func (t *Text) deleted(q0, q1 int) {
 		} else {
 			p0 = q0 - t.org
 		}
-		t.fr.Delete((p0), (p1))
+		t.fr.Delete(p0, p1)
 		t.fill(t.fr)
 	}
 
@@ -616,16 +626,15 @@ func (t *Text) logInsertDelete(q0, q1 int) {
 	}
 }
 
-func (t *Text) View(q0, q1 int) []rune                   { return t.file.b.View(q0, q1) }
-func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.b.Read(q, r); return }
-func (t *Text) nc() int                                  { return t.file.Size() }
+func (t *Text) ReadB(q int, r []rune) (n int, err error) { n, err = t.file.Read(q, r); return }
+func (t *Text) nc() int                                  { return t.file.Nr() }
 func (t *Text) Q0() int                                  { return t.q0 }
 func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = min(q0, t.file.Size())
-	p1 = min(q1, t.file.Size())
+	p0 = util.Min(q0, t.file.Nr())
+	p1 = util.Min(q1, t.file.Nr())
 	return p0, p1
 }
 
@@ -780,7 +789,7 @@ func (t *Text) Type(r rune) {
 		return
 	case draw.KeyRight:
 		t.TypeCommit()
-		if t.q1 < t.file.Size() {
+		if t.q1 < t.file.Nr() {
 			// This is a departure from the plan9/plan9port acme
 			// Instead of always going right one char from q1, it
 			// collapses multi-character selections first, behaving
@@ -847,14 +856,14 @@ func (t *Text) Type(r rune) {
 	case draw.KeyEnd:
 		t.TypeCommit()
 		if t.iq1 > t.org+t.fr.GetFrameFillStatus().Nchars {
-			if t.iq1 > t.file.Size() {
+			if t.iq1 > t.file.Nr() {
 				// should not happen, but does. and it will crash textbacknl.
-				t.iq1 = t.file.Size()
+				t.iq1 = t.file.Nr()
 			}
 			q0 = t.BackNL(t.iq1, 1)
 			t.SetOrigin(q0, true)
 		} else {
-			t.Show(t.file.Size(), t.file.Size(), false)
+			t.Show(t.file.Nr(), t.file.Nr(), false)
 		}
 		return
 	case '\t': // ^I (TAB)
@@ -876,7 +885,7 @@ func (t *Text) Type(r rune) {
 	case 0x05: // ^E: end of line
 		t.TypeCommit()
 		q0 = t.q0
-		for q0 < t.file.Size() && t.file.ReadC(q0) != '\n' {
+		for q0 < t.file.Nr() && t.file.ReadC(q0) != '\n' {
 			q0++
 		}
 		t.Show(q0, q0, true)
@@ -896,16 +905,16 @@ func (t *Text) Type(r rune) {
 
 	}
 	if t.what == Body {
-		seq++
-		t.file.Mark(seq)
+		global.seq++
+		t.file.Mark(global.seq)
 	}
 	// cut/paste must be done after the seq++/filemark
 	switch r {
 	case draw.KeyCmd + 'x': // %X: cut
 		t.TypeCommit()
 		if t.what == Body {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		cut(t, t, nil, true, true, "")
 		t.Show(t.q0, t.q0, true)
@@ -914,8 +923,8 @@ func (t *Text) Type(r rune) {
 	case draw.KeyCmd + 'v': // %V: paste
 		t.TypeCommit()
 		if t.what == Body {
-			seq++
-			t.file.Mark(seq)
+			global.seq++
+			t.file.Mark(global.seq)
 		}
 		paste(t, t, nil, true, false, "")
 		t.Show(t.q0, t.q1, true)
@@ -925,7 +934,7 @@ func (t *Text) Type(r rune) {
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		if t.file.HasUncommitedChanges() {
-			acmeerror("text.type", nil)
+			util.AcmeError("text.type", nil)
 		}
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
@@ -991,7 +1000,7 @@ func (t *Text) Type(r rune) {
 		t.file.Commit()
 		t.Delete(q0, q0+nnb, true)
 
-		// Run through the code that will update the t.w.body.file.name.
+		// Run through the code that will update the t.w.body.file.details.Name.
 		t.TypeCommit()
 
 		t.iq1 = t.q0
@@ -1019,9 +1028,15 @@ func (t *Text) Type(r rune) {
 	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
 
-	// TODO(rjk): Do we always want to commit if editing a
-	// a tag?
-	if r == '\n' && t.w != nil {
+	// Always commit if the typing is into a tag. The reason to do this is to
+	// be sure to invoke the special logic in Window.Commit() that creates an
+	// undo point for a file name change and updates the file details.
+	//
+	// This doesn't seem ideal. We have subtle logic that spans layers. Can
+	// we clean this up in some fashion so that it's easier to have Text
+	// instances that are editable but have partial auto-generated semantics
+	// (e.g. directories, tags)
+	if t.w != nil && (r == '\n' && t.what == Body || t.what != Body) {
 		t.w.Commit(t)
 	}
 	t.iq1 = t.q0
@@ -1052,9 +1067,9 @@ func (t *Text) FrameScroll(fr frame.SelectScrollUpdater, dl int) {
 	}
 	var q0 int
 	if dl < 0 {
-		q0 = t.BackNL(t.org, (-dl))
+		q0 = t.BackNL(t.org, -dl)
 	} else {
-		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Size() {
+		if t.org+(fr.GetFrameFillStatus().Nchars) == t.file.Nr() {
 			return
 		}
 		q0 = t.org + fr.Charofpt(image.Pt(fr.Rect().Min.X, fr.Rect().Min.Y+dl*fr.DefaultFontHeight()))
@@ -1085,37 +1100,37 @@ func (t *Text) Select() {
 
 	// To have double-clicking and chording, we double-click
 	// immediately if it might make sense.
-	b := mouse.Buttons
+	b := global.mouse.Buttons
 	q0 := t.q0
 	q1 := t.q1
-	selectq = t.org + t.fr.Charofpt(mouse.Point)
+	selectq = t.org + t.fr.Charofpt(global.mouse.Point)
 	//	fmt.Printf("Text.Select: mouse.Msec %v, clickmsec %v\n", mouse.Msec, clickmsec)
 	//	fmt.Printf("clicktext==t %v, (q0==q1 && selectq==q0): %v", clicktext == t, q0 == q1 && selectq == q0)
-	if (clicktext == t && mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
+	if (clicktext == t && global.mouse.Msec-clickmsec < 500) && (q0 == q1 && selectq == q0) {
 		q0, q1 = t.DoubleClick(q0, q1)
 		t.SetSelect(q0, q1)
 		t.display.Flush()
-		x := mouse.Point.X
-		y := mouse.Point.Y
+		x := global.mouse.Point.X
+		y := global.mouse.Point.Y
 		// stay here until something interesting happens
 		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
-			mousectl.Read()
-			if !(mouse.Buttons == b && abs(mouse.Point.X-x) < 3 && abs(mouse.Point.Y-y) < 3) {
+			global.mousectl.Read()
+			if !(global.mouse.Buttons == b && util.Abs(global.mouse.Point.X-x) < 3 && util.Abs(global.mouse.Point.Y-y) < 3) {
 				break
 			}
 		}
-		mouse.Point.X = x // in case we're calling frselect
-		mouse.Point.Y = y
+		global.mouse.Point.X = x // in case we're calling frselect
+		global.mouse.Point.Y = y
 		q0 = t.q0 // may have changed
 		q1 = t.q1
 		selectq = q0
 	}
-	if mouse.Buttons == b {
-		sP0, sP1 := t.fr.Select(mousectl, mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
+	if global.mouse.Buttons == b {
+		sP0, sP1 := t.fr.Select(global.mousectl, global.mouse, func(fr frame.SelectScrollUpdater, dl int) { t.FrameScroll(fr, dl) })
 
 		// horrible botch: while asleep, may have lost selection altogether
-		if selectq > t.file.Size() {
+		if selectq > t.file.Nr() {
 			selectq = t.org + sP0
 		}
 		if selectq < t.org {
@@ -1130,12 +1145,12 @@ func (t *Text) Select() {
 		}
 	}
 	if q0 == q1 {
-		if q0 == t.q0 && clicktext == t && mouse.Msec-clickmsec < 500 {
+		if q0 == t.q0 && clicktext == t && global.mouse.Msec-clickmsec < 500 {
 			q0, q1 = t.DoubleClick(q0, q1)
 			clicktext = nil
 		} else {
 			clicktext = t
-			clickmsec = mouse.Msec
+			clickmsec = global.mouse.Msec
 		}
 	} else {
 		clicktext = nil
@@ -1143,13 +1158,13 @@ func (t *Text) Select() {
 	t.SetSelect(q0, q1)
 	t.display.Flush()
 	state := None // what we've done; undo when possible
-	for mouse.Buttons != 0 {
-		mouse.Msec = 0
-		b := mouse.Buttons
+	for global.mouse.Buttons != 0 {
+		global.mouse.Msec = 0
+		b := global.mouse.Buttons
 		if (b&1) != 0 && (b&6) != 0 {
 			if state == None && t.what == Body {
-				seq++
-				t.w.body.file.Mark(seq)
+				global.seq++
+				t.w.body.file.Mark(global.seq)
 			}
 			if b&2 != 0 {
 				if state == Paste && t.what == Body {
@@ -1178,8 +1193,8 @@ func (t *Text) Select() {
 			clearmouse()
 		}
 		t.display.Flush()
-		for mouse.Buttons == b {
-			mousectl.Read()
+		for global.mouse.Buttons == b {
+			global.mousectl.Read()
 		}
 		clicktext = nil
 	}
@@ -1209,7 +1224,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
 	tsd = false // do we call textscrdraw?
-	nc = t.file.Size()
+	nc = t.file.Nr()
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {
 			tsd = true
@@ -1271,10 +1286,10 @@ func (t *Text) SetSelect(q0, q1 int) {
 	}
 	if p0 > (t.fr.GetFrameFillStatus().Nchars) {
 		ticked = false
-		p0 = (t.fr.GetFrameFillStatus().Nchars)
+		p0 = t.fr.GetFrameFillStatus().Nchars
 	}
 	if p1 > (t.fr.GetFrameFillStatus().Nchars) {
-		p1 = (t.fr.GetFrameFillStatus().Nchars)
+		p1 = t.fr.GetFrameFillStatus().Nchars
 	}
 	if p0 > p1 {
 		panic(fmt.Sprintf("acme: textsetselect p0=%d p1=%d q0=%v q1=%v t.org=%d nchars=%d", p0, p1, q0, q1, t.org, t.fr.GetFrameFillStatus().Nchars))
@@ -1286,32 +1301,32 @@ func (t *Text) SetSelect(q0, q1 int) {
 // TODO(rjk): The implicit initialization of q0, q1 doesn't seem like very nice
 // style? Maybe it is idiomatic?
 func (t *Text) Select23(high draw.Image, mask uint) (q0, q1 int, buts uint) {
-	p0, p1 := t.fr.SelectOpt(mousectl, mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White(), high)
+	p0, p1 := t.fr.SelectOpt(global.mousectl, global.mouse, func(frame.SelectScrollUpdater, int) {}, t.display.White(), high)
 
-	buts = uint(mousectl.Mouse.Buttons)
+	buts = uint(global.mousectl.Mouse.Buttons)
 	if (buts & mask) == 0 {
 		q0 = p0 + t.org
 		q1 = p1 + t.org
 	}
-	for mousectl.Mouse.Buttons != 0 {
-		mousectl.Read()
+	for global.mousectl.Mouse.Buttons != 0 {
+		global.mousectl.Read()
 	}
 	return q0, q1, buts
 }
 
 func (t *Text) Select2() (q0, q1 int, tp *Text, ret bool) {
-	q0, q1, buts := t.Select23(but2col, 4)
+	q0, q1, buts := t.Select23(global.but2col, 4)
 	if (buts & 4) != 0 {
 		return q0, q1, nil, false
 	}
 	if (buts & 1) != 0 { // pick up argument
-		return q0, q1, argtext, true
+		return q0, q1, global.argtext, true
 	}
 	return q0, q1, nil, true
 }
 
 func (t *Text) Select3() (q0, q1 int, r bool) {
-	q0, q1, buts := t.Select23(but3col, 1|2)
+	q0, q1, buts := t.Select23(global.but3col, 1|2)
 	return q0, q1, buts == 0
 }
 
@@ -1342,7 +1357,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 			return
 		}
 		// try matching character to right, looking left
-		if q == t.file.Size() {
+		if q == t.file.Nr() {
 			c = '\n'
 		} else {
 			c = t.file.ReadC(q)
@@ -1351,7 +1366,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 		if p != -1 {
 			if q, ok := t.ClickMatch(c, l[p], -1, q); ok {
 				q1 = inq0
-				if q0 < t.file.Size() && c == '\n' {
+				if q0 < t.file.Nr() && c == '\n' {
 					q1++
 				}
 				q0 = q
@@ -1364,7 +1379,7 @@ func (t *Text) DoubleClick(inq0, inq1 int) (q0, q1 int) {
 	}
 	// try filling out word to right
 	q1 = inq0
-	for q1 < t.file.Size() && isalnum(t.file.ReadC(q1)) {
+	for q1 < t.file.Nr() && isalnum(t.file.ReadC(q1)) {
 		q1++
 	}
 	// try filling out word to left
@@ -1380,16 +1395,16 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 	var c rune
 	for {
 		if dir > 0 {
-			if inq == t.file.Size() {
+			if inq == t.file.Nr() {
 				break
 			}
 			c = t.file.ReadC(inq)
-			(inq)++
+			inq++
 		} else {
 			if inq == 0 {
 				break
 			}
-			(inq)--
+			inq--
 			c = t.file.ReadC(inq)
 		}
 		if c == cr {
@@ -1410,7 +1425,7 @@ func (t *Text) ClickMatch(cl, cr rune, dir int, inq int) (q int, r bool) {
 // Returned stat is 1 for <a>, -1 for </a>, 0 for no tag or <a />.
 // Returned q1 is the location after the tag.
 func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
-	if q+2 > t.file.Size() {
+	if q+2 > t.file.Nr() {
 		return 0, 0
 	}
 	if t.file.ReadC(q) != '<' {
@@ -1422,7 +1437,7 @@ func (t *Text) ishtmlstart(q int) (q1 int, stat int) {
 	c1 := c
 	c2 := c
 	for c != '>' {
-		if q >= t.file.Size() {
+		if q >= t.file.Nr() {
 			return 0, 0
 		}
 		c2 = c
@@ -1478,7 +1493,7 @@ func (t *Text) ClickHTMLMatch(inq0 int) (q0, q1 int, r bool) {
 	if _, stat := t.ishtmlend(q0); stat == 1 {
 		depth := 1
 		q := q1
-		for q < t.file.Size() {
+		for q < t.file.Nr() {
 			nq, n := t.ishtmlstart(q)
 			if n != 0 {
 				depth += n
@@ -1556,7 +1571,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 	if org > 0 && !exact && t.file.ReadC(org-1) != '\n' {
 		// org is an estimate of the char posn; find a newline
 		// don't try harder than 256 chars
-		for i = 0; i < 256 && org < t.file.Size(); i++ {
+		for i = 0; i < 256 && org < t.file.Nr(); i++ {
 			if t.file.ReadC(org) == '\n' {
 				org++
 				break
@@ -1571,7 +1586,7 @@ func (t *Text) setorigin(fr frame.SelectScrollUpdater, org int, exact bool, call
 		if a < 0 && -a < fr.GetFrameFillStatus().Nchars {
 			n = t.org - org
 			r = make([]rune, n)
-			t.file.b.Read(org, r)
+			t.file.Read(org, r)
 			fr.Insert(r, 0)
 		} else {
 			fr.Delete(0, fr.GetFrameFillStatus().Nchars)
@@ -1592,15 +1607,17 @@ func (t *Text) Reset() {
 	t.org = 0
 	t.q0 = 0
 	t.q1 = 0
-	t.file.Reset()
-	t.file.b.Reset()
+	t.file.ResetBuffer()
 }
 
+// TODO(rjk): Is this method on the right object. It reaches into Window
+// for nearly every reference to t. Assess how DirName is used and adjust
+// appropriately.
 func (t *Text) dirName(name string) string {
 	if t == nil || t.w == nil || filepath.IsAbs(name) {
 		return name
 	}
-	nt := t.w.tag.file.Size()
+	nt := t.w.tag.file.Nr()
 	if nt == 0 {
 		return name
 	}
@@ -1622,7 +1639,13 @@ func (t *Text) DirName(name string) string {
 func (t *Text) AbsDirName(name string) string {
 	d := t.dirName(name)
 	if !filepath.IsAbs(d) {
-		return filepath.Join(wdir, d)
+		return filepath.Join(global.wdir, d)
 	}
 	return filepath.Clean(d)
+}
+
+// DebugString provides a Text representation convenient for logging for
+// debugging.
+func (t *Text) DebugString() string {
+	return fmt.Sprintf("t.what (kind): %s contents: %q", t.what, t.file.String())
 }

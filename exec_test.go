@@ -8,14 +8,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/file"
 )
 
 func acmeTestingMain() {
-	acmeshell = os.Getenv("acmeshell")
-	cwait = make(chan ProcessState)
-	cerr = make(chan error)
+	global.acmeshell = os.Getenv("acmeshell")
+	global.cwait = make(chan ProcessState)
+	global.cerr = make(chan error)
 	go func() {
-		for range cerr {
+		for range global.cerr {
 			// Do nothing with command output.
 		}
 	}()
@@ -58,9 +62,9 @@ func TestRunproc(t *testing.T) {
 		// runproc goes into Hard path if acmeshell is non-empty.
 		// Unset acmeshell for non-hard cases.
 		if tc.hard {
-			acmeshell = os.Getenv("acmeshell")
+			global.acmeshell = os.Getenv("acmeshell")
 		} else {
-			acmeshell = ""
+			global.acmeshell = ""
 		}
 
 		cpid := make(chan *os.Process)
@@ -80,7 +84,7 @@ func TestRunproc(t *testing.T) {
 			t.Errorf("nil proc for command %v", tc.s)
 		}
 		if proc != nil {
-			status := <-cwait
+			status := <-global.cwait
 			if tc.waitfail && status.Success() {
 				t.Errorf("command %q exited with status %v", tc.s, status)
 			}
@@ -118,27 +122,26 @@ func TestPutfile(t *testing.T) {
 	want := "Hello, 世界\n"
 	w := &Window{
 		body: Text{
-			file: &File{
-				b:    Buffer(want),
-				name: filename,
-			},
+			file: file.MakeObservableEditableBuffer(filename, []rune(want)),
 		},
 	}
 	f := w.body.file
-	f.curtext = &w.body
-	f.curtext.w = w
+	file := w.body.file
+	cur := &w.body
+	cur.w = w
+	file.SetCurObserver(cur)
 	increaseMtime := func(t *testing.T, duration time.Duration) {
-		tm := f.info.ModTime().Add(duration)
+		tm := file.Info().ModTime().Add(duration)
 		if err := os.Chtimes(filename, tm, tm); err != nil {
 			t.Fatalf("Chtimes failed: %v", err)
 		}
 	}
 
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(file, 0, f.Nr(), filename)
 	if err == nil || !strings.Contains(err.Error(), "file already exists") {
 		t.Fatalf("putfile returned error %v; expected 'file already exists'", err)
 	}
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(file, 0, f.Nr(), filename)
 	if err != nil {
 		t.Fatalf("putfile failed: %v", err)
 	}
@@ -146,7 +149,7 @@ func TestPutfile(t *testing.T) {
 
 	// mtime increased but hash is the same
 	increaseMtime(t, time.Second)
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(file, 0, f.Nr(), filename)
 	if err != nil {
 		t.Fatalf("putfile failed: %v", err)
 	}
@@ -159,17 +162,19 @@ func TestPutfile(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	increaseMtime(t, time.Second)
-	err = putfile(f, 0, f.Size(), filename)
+	err = putfile(file, 0, f.Nr(), filename)
 	if err == nil || !strings.Contains(err.Error(), "modified since last read") {
 		t.Fatalf("putfile returned error %v; expected 'modified since last read'", err)
 	}
 }
 
+// TODO(rjk): Add A case here for partial writes.
+
 func TestExpandtabToggle(t *testing.T) {
 	want := true
 	w := &Window{
 		body: Text{
-			file:      &File{},
+			file:      file.MakeObservableEditableBuffer("", nil),
 			tabexpand: false,
 			tabstop:   4,
 		},
@@ -183,4 +188,632 @@ func TestExpandtabToggle(t *testing.T) {
 	if te != want {
 		t.Errorf("tabexpand is set to %v; expected %v", te, want)
 	}
+}
+
+// Observation: making this particular test useful requires multiple
+// refactorings to fully exercise all code paths through cut.
+// I expect that this observation applies to almost all of the functions
+// noted in exectab.
+func TestCut(t *testing.T) {
+	prefix := "Hello "
+	suffix := "世界\n"
+	w := &Window{
+		body: Text{
+			file: file.MakeObservableEditableBuffer("cuttest", []rune(prefix+suffix)),
+		},
+	}
+
+	bodytext := &w.body
+
+	// TODO(rjk): Setting this will cause the test to crash because it
+	// requires bodytext to have a valid frame. But without setting this,
+	// it's impossible to get good test coverage.
+	// bodytext.w = w
+
+	w.body.q0 = 0
+	w.body.q1 = len(prefix)
+
+	cut(bodytext, bodytext, nil, false, true, "")
+
+	if got, want := w.body.file.String(), suffix; got != want {
+		t.Errorf("text not cut got %q, want %q", got, want)
+	}
+
+	if got, want := w.body.q0, 0; got != want {
+		t.Errorf("text q0 wrong after cut got %v, want %v", got, want)
+	}
+	if got, want := w.body.q1, 0; got != want {
+		t.Errorf("text q0 wrong after cut got %v, want %v", got, want)
+	}
+}
+
+func testSetupOnly(t *testing.T, g *globals) {
+	t.Helper()
+
+	// Mutate with Edit
+	firstwin := g.row.col[0].w[0]
+	secondwin := g.row.col[0].w[1]
+
+	t.Log("Before seq", global.seq)
+	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
+	t.Log("firstwin.body.file.HasUndoableChanges", g.row.col[0].w[0].body.file.HasUndoableChanges())
+	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+	t.Log("secondwin.tag", secondwin.tag.DebugString())
+	t.Log("secondwin.body.file.HasUndoableChanges", g.row.col[0].w[1].body.file.HasUndoableChanges())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
+
+	// These should both do nothing.
+	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+	undo(&secondwin.tag, nil, nil, false /* this is a redo */, false /* ignored */, "")
+
+	t.Log("After seq", global.seq)
+	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("firstwin.tag", firstwin.tag.DebugString())
+	t.Log("firstwin.body.file.HasUndoableChanges", g.row.col[0].w[0].body.file.HasUndoableChanges())
+	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+	t.Log("secondwin.tag", secondwin.tag.DebugString())
+	t.Log("secondwin.body.file.HasUndoableChanges", g.row.col[0].w[1].body.file.HasUndoableChanges())
+}
+
+func mutateWithEdit(t *testing.T, g *globals) {
+	t.Helper()
+
+	// Mutate with Edit
+	firstwin := g.row.col[0].w[0]
+	// secondwin := g.row.col[0].w[1]
+
+	t.Log("Before seq", global.seq)
+	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+
+	// Do I need to lock the warning?
+
+	// Lock discipline?
+	// TODO(rjk): figure out how to change this with less global dependency.
+	global.row.lk.Lock()
+	firstwin.Lock('M')
+	global.seq++
+
+	editcmd(&firstwin.body, []rune("X/.*file/ ,x/text/ c/TEXT/"))
+	firstwin.Unlock()
+	global.row.lk.Unlock()
+
+	t.Log("After seq", global.seq)
+	t.Log("firstwin.body.file.Seq", g.row.col[0].w[0].body.file.Seq())
+	t.Log("secondwin.body.file.Seq", g.row.col[0].w[1].body.file.Seq())
+}
+
+func undoRedoBothMutations(t *testing.T, g *globals) {
+	t.Helper()
+	mutateWithEdit(t, g)
+
+	firstwin := g.row.col[0].w[0]
+	secondwin := g.row.col[0].w[1]
+
+	// Run undo from one of the windows. (i.e. equivalent to clicking on the Undo action.)
+	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+
+	undo(&secondwin.tag, nil, nil, false /* this is a redo */, false /* ignored */, "")
+}
+
+func mutateBothOneUndo(t *testing.T, g *globals) {
+	t.Helper()
+	mutateWithEdit(t, g) // Changes both.
+
+	firstwin := g.row.col[0].w[0]
+
+	// Modify the firstwin.
+	firstwin.body.q0 = 3
+	firstwin.body.q1 = 10
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+
+	// Run undo from first window. (i.e. equivalent to clicking on the Undo action.)
+	// Should undo only the cut.
+	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+}
+
+func mutateBothOtherUndo(t *testing.T, g *globals) {
+	t.Helper()
+	mutateWithEdit(t, g)
+
+	// Mutate with Edit
+	firstwin := g.row.col[0].w[0]
+	secondwin := g.row.col[0].w[1]
+
+	// Modify the firstwin.
+	firstwin.body.q0 = 3
+	firstwin.body.q1 = 10
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+
+	// Run undo from one of the windows. (i.e. same as clicking on the Undo action.)
+	// Cut should remain, original global edit should get Undone only in secondwin.
+	undo(&secondwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+}
+
+func mutateBranchedAndRejoined(t *testing.T, g *globals) {
+	t.Helper()
+
+	// Mutate firstwin, secondwin simultaneously.
+	mutateWithEdit(t, g)
+
+	firstwin := g.row.col[0].w[0]
+	secondwin := g.row.col[0].w[1]
+
+	// Mutate firstwin via cut.
+	firstwin.body.q0 = 3
+	firstwin.body.q1 = 10
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+
+	undo(&secondwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+
+	// Should do nothing.
+	undo(&secondwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+
+	// Undoes the mutateWithEdit on firstwin
+	undo(&firstwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+
+	// Redo on secondwin puts back the change on both firstwin and secondwind.
+	undo(&secondwin.tag, nil, nil, false /* this is not undo */, false /* ignored */, "")
+}
+
+func mutatePut(t *testing.T, g *globals) {
+	t.Helper()
+
+	firstwin := g.row.col[0].w[0]
+
+	// Mutate firstwin via cut.
+	firstwin.body.q0 = 3
+	firstwin.body.q1 = 10
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+
+	// Put the instance (This fails the first time because oeb.details.Info
+	// isn't set by the mock.)
+	put(&firstwin.tag, nil, nil, false, true, "")
+	put(&firstwin.tag, nil, nil, false, true, "")
+
+	// Validate that the file has the right contents.
+	fn := firstwin.body.file.Name()
+	contents, err := os.ReadFile(fn)
+	if err != nil {
+		t.Errorf("mutatePut can't read output file %v", err)
+	}
+
+	if got, want := string(contents), "Thishort text\nto try addressing\n"; got != want {
+		t.Errorf("mutatePut, put didn't succeed. got %q, want %q", got, want)
+	}
+}
+
+func mutatePutMutate(t *testing.T, g *globals) {
+	t.Helper()
+
+	mutatePut(t, g)
+
+	firstwin := g.row.col[0].w[0]
+
+	// Mutate firstwin via second cut.
+	firstwin.body.q0 = 0
+	firstwin.body.q1 = 4
+	global.seq++
+	firstwin.body.file.Mark(global.seq)
+	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
+}
+
+func TestUndoRedo(t *testing.T) {
+	dir := t.TempDir()
+	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		fn   func(t *testing.T, g *globals)
+		want *dumpfile.Content
+	}{
+		{
+			// Verify that test harness creates valid initial state.
+			name: "testSetupOnly",
+			fn:   testSetupOnly,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf | Look Edit ",
+						},
+						// Recall that when the contents match the on-disk state,
+						// they are elided.
+						Body: dumpfile.Text{},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{},
+					},
+				},
+			},
+		},
+		{
+			// Verify that the mutateWithEdit helper successfully applies a mutation
+			// to two buffers via an Edit X command.
+			name: "mutateWithEdit",
+			fn:   mutateWithEdit,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "This is a\nshort TEXT\nto try addressing\n",
+							Q0:     16,
+							Q1:     20,
+						},
+					},
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Having mutated both buffers, Undo one and Redo the other to get back
+			// to the initial mutated state.
+			name: "undoRedoBothMutations",
+			fn:   undoRedoBothMutations,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "This is a\nshort TEXT\nto try addressing\n",
+							Q0:     16,
+							Q1:     20,
+						},
+					},
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Having mutated both buffers, further modify the first buffer via Cut
+			// and then undo only the Cut action on the first buffer.
+			name: "mutateBothOneUndo",
+			fn:   mutateBothOneUndo,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Redo Put | Look Edit ",
+						},
+
+						Body: dumpfile.Text{
+							Buffer: "This is a\nshort TEXT\nto try addressing\n",
+							Q0:     3,
+							Q1:     10,
+						},
+					},
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Edit X mutate both buffers, further mutate the first via Cut. Undo on
+			// second buffer. Show that the second buffer returns to the original
+			// contents but that the first buffer's now divergent history is not
+			// affected.
+			name: "mutateBothOtherUndo",
+			fn:   mutateBothOtherUndo,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "Thishort TEXT\nto try addressing\n",
+							Q0:     3,
+							Q1:     3,
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Redo | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							// Original content is elided.
+							Buffer: "",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Edit X mutate both buffers and further mutate the first via Cut. Undo
+			// the Edit X on the second buffer and hence diverge the undo history.
+			// Undo Cut and Edit X on the first buffer to return to the same point in
+			// the global undo history in first and second. Redo Edit X on the second
+			// buffer also updates the first window.
+			name: "mutateBranchedAndRejoined",
+			fn:   mutateBranchedAndRejoined,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Redo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "This is a\nshort TEXT\nto try addressing\n",
+							Q0:     16,
+							Q1:     20,
+						},
+					},
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "A different TEXT\nWith other contents\nSo there!\n",
+							Q0:     12,
+							Q1:     16,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Mutate, Put
+			name: "mutatePut",
+			fn:   mutatePut,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     3,
+							Q1:     3,
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     0,
+							Q1:     0,
+						},
+					},
+				},
+			},
+		},
+		{
+			// Mutate, Put, Mutate again.
+			// TODO(rjk): Undo sequence on top of this.
+			name: "mutatePutMutate",
+			fn:   mutatePutMutate,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Unsaved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf Undo Put | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "hort text\nto try addressing\n",
+							Q0:     0,
+							Q1:     0,
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Buffer: "",
+							Q0:     0,
+							Q1:     0,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			makeSkeletonWindowModelWithFiles(t, firstfilename, secondfilename)
+			// Probably there are other issues here...
+			t.Log("seq", global.seq)
+			t.Log("seq, w0", global.row.col[0].w[0].body.file.Seq())
+			t.Log("seq, w1", global.row.col[0].w[1].body.file.Seq())
+
+			tc.fn(t, global)
+
+			t.Log(*varfontflag, defaultVarFont)
+
+			got, err := global.row.dump()
+			if err != nil {
+				t.Fatalf("dump failed: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("dump mismatch (-want +got):\n%s", diff)
+			}
+
+		})
+	}
+}
+
+// TODO(rjk): consider how to merge this with makeSkeletonWindowModel
+// Use direct access to the global data to walk the datastructure.
+// TODO(rjk): pass in the global to modify.
+// TODO(rjk): Make this more flexible for building test data. (See FlexiblyMakeWindowScaffold)
+func makeSkeletonWindowModelWithFiles(t *testing.T, firstfilename, secondfilename string) {
+	t.Helper()
+	MakeWindowScaffold(&dumpfile.Content{
+		Columns: []dumpfile.Column{
+			{},
+		},
+		Windows: []*dumpfile.Window{
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: firstfilename,
+				},
+				Body: dumpfile.Text{
+					Buffer: contents,
+				},
+			},
+			{
+				Column: 0,
+				Tag: dumpfile.Text{
+					Buffer: secondfilename,
+				},
+				Body: dumpfile.Text{
+					Buffer: alt_contents,
+				},
+			},
+		},
+	})
+}
+
+func makeTempBackingFiles(t *testing.T, dir string) (string, string) {
+	t.Helper()
+
+	firstfilename := filepath.Join(dir, "firstfile")
+	secondfilename := filepath.Join(dir, "secondfile")
+
+	// Write contents to the files. Use the contents from
+	// makeSkeletonWindowModel to later simplify the task of merging these
+	// together.
+	if err := os.WriteFile(firstfilename, []byte(contents), 0644); err != nil {
+		t.Fatalf("%s can't make %q: %v", "makeTempBackingFiles", firstfilename, err)
+	}
+	if err := os.WriteFile(secondfilename, []byte(alt_contents), 0644); err != nil {
+		t.Fatalf("%s can't make %q: %v", "makeTempBackingFiles", secondfilename, err)
+	}
+	return firstfilename, secondfilename
 }

@@ -7,8 +7,8 @@ import (
 	"path"
 	"syscall"
 
-	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
+	"github.com/rjkroege/edwood/util"
 )
 
 // These constants are from /sys/include/libc.h
@@ -48,17 +48,17 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		// We need to do this within a new goroutine because the file server
 		// hasn't been started yet.
-		err := syscall.Mount(cfd, -1, mtpt, plan9.MREPL, "")
+		err := syscall.Mount(cfd, -1, mtpt, MREPL, "")
 		if err != nil {
-			acmeerror("mount failed", err)
+			util.AcmeError("mount failed", err)
 		}
 		err = syscall.Bind(mtpt, "/mnt/wsys", MREPL)
 		if err != nil {
-			acmeerror("bind /mnt/wsys filed", err)
+			util.AcmeError("bind /mnt/wsys filed", err)
 		}
 		err = syscall.Bind(mtpt, "/dev", MBEFORE)
 		if err != nil {
-			acmeerror("bind /dev filed", err)
+			util.AcmeError("bind /dev filed", err)
 		}
 	}()
 	return nil

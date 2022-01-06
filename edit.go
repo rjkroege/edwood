@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	"github.com/rjkroege/edwood/file"
 )
 
 var (
@@ -38,8 +40,8 @@ type Addr struct {
 }
 
 type Address struct {
-	r Range
-	f *File
+	r    Range
+	file *file.ObservableEditableBuffer
 }
 
 type Cmd struct {
@@ -165,38 +167,37 @@ func editthread(cp *cmdParser) {
 }
 
 func allelogterm(w *Window) {
-	w.body.file.elog.Term()
+	w.body.file.Elog.Term()
 }
 
 func alleditinit(w *Window) {
 	w.tag.Commit()
 	w.body.Commit()
-	w.body.file.editclean = false
+	w.body.file.EditClean = false
 }
 
 func allupdate(w *Window) {
 	t := &w.body
 	f := t.file
 
-	if !f.elog.Empty() {
+	if !f.Elog.Empty() {
 		owner := t.w.owner
 		if owner == 0 {
 			t.w.owner = 'E'
 		}
 		// Set an undo point before applying accumulated Edit actions.
-		f.Mark(seq)
-		f.elog.Apply(t)
-		if f.editclean {
+		f.Mark(global.seq)
+		f.Elog.Apply(t)
+		if f.EditClean {
 			f.Clean()
 		}
 		t.w.owner = owner
 	}
-	w.SetTag()
 }
 
 func editerror(format string, args ...interface{}) {
 	s := fmt.Errorf(format, args...)
-	row.AllWindows(allelogterm) // truncate the edit logs
+	global.row.AllWindows(allelogterm) // truncate the edit logs
 	editerrc <- s
 	runtime.Goexit()
 }
@@ -211,7 +212,7 @@ func editcmd(ct *Text, r []rune) {
 		return
 	}
 
-	row.AllWindows(alleditinit)
+	global.row.AllWindows(alleditinit)
 	cp := newCmdParser(r)
 	if ct.w == nil {
 		curtext = nil
@@ -227,12 +228,12 @@ func editcmd(ct *Text, r []rune) {
 	// but block here.
 	go editthread(cp)
 	err := <-editerrc
-	editing = Inactive
+	global.editing = Inactive
 	if err != nil {
 		warning(nil, "Edit: %s\n", err)
 	}
 	// update everyone whose edit log has data
-	row.AllWindows(allupdate)
+	global.row.AllWindows(allupdate)
 }
 
 func newCmdParser(r []rune) *cmdParser {
