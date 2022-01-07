@@ -49,7 +49,12 @@ type displayImpl struct {
 
 var _ = Display((*displayImpl)(nil))
 
-func (d *displayImpl) ScreenImage() Image { return &imageImpl{d.drawDisplay.ScreenImage} }
+func (d *displayImpl) ScreenImage() Image {
+	if d.drawDisplay == nil {
+		return nil
+	}
+	return &imageImpl{d.drawDisplay.ScreenImage}
+}
 func (d *displayImpl) White() Image       { return &imageImpl{d.drawDisplay.White} }
 func (d *displayImpl) Black() Image       { return &imageImpl{d.drawDisplay.Black} }
 func (d *displayImpl) Opaque() Image      { return &imageImpl{d.drawDisplay.Opaque} }

@@ -23,6 +23,9 @@ func (f *frameimpl) InitTick() {
 
 	height := ft.Height()
 
+	if f.display == nil {
+		return
+	}
 	var err error
 	f.tickimage, err = f.display.AllocImage(image.Rect(0, 0, f.tickscale*frtickw, height), b.Pix(), false, draw.Transparent)
 	if err != nil {
