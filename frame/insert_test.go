@@ -355,6 +355,32 @@ func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	gdo(t, fr).Clear()
+	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n"), 0)
+
+	s := fr.Insert([]rune("\n"), len("0ab\n1cd\n2ef\n"))
+
+	if got, want := s, true; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	gdo(t, fr).Clear()
+	fr.Insert([]rune("0ab1cd2ef3gh4ij5"), 0)
+
+	s := fr.Insert([]rune("ABC"), 0)
+
+	if got, want := s, false; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
 	t.Helper()
 	frimpl := fr.(*frameimpl)
@@ -382,8 +408,7 @@ func TestInsert(t *testing.T) {
 		textarea    image.Rectangle
 		knowntofail bool
 	}{
-		// TODO(rjk): Test cases
-		// 3. add a newline after one already there.
+		// TODO(rjk): Test wrapping of lines contaning tabs.
 		{
 			name: "setupFrame",
 			fn:   nop,
@@ -396,7 +421,7 @@ func TestInsert(t *testing.T) {
 			textarea: image.Rect(20, 10, 400, 500),
 		},
 		{
-			// A short string that fits on one line without breaking.
+			// Inserts ab at the start of the line with no wrapping or ripple.
 			name: "simpleInsertShortString",
 			fn:   simpleInsertShortString,
 			want: []string{
@@ -406,7 +431,7 @@ func TestInsert(t *testing.T) {
 			textarea: image.Rect(20, 10, 400, 500),
 		},
 		{
-			// A multi-line string
+			// A short but newline containing string that fits inserted at the start.
 			name: "multiInsertShortString",
 			fn:   multiInsertShortString,
 			want: []string{"fill (20,10)-(400,20) [0,0],[-,1]",
@@ -417,7 +442,8 @@ func TestInsert(t *testing.T) {
 			textarea: image.Rect(20, 10, 400, 500),
 		},
 		{
-			// A long line inserted
+			// A long line inserted. Requires wrapping the inserted line and rippling
+			// the remaining text.
 			name: "insertLongLine",
 			fn:   insertLongLine,
 			want: []string{
@@ -594,6 +620,51 @@ func TestInsert(t *testing.T) {
 				"fill (33,10)-(46,20) [1,0],[1,1]",
 				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
 			},
+		},
+		{
+			// Insert a new line that pushes another newline down.
+			name:     "insertsRippledNewLine",
+			fn:       insertsRippledNewLine,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(60,50) [0,1],[-,3]",
+				"fill (20,50)-(20,60) [0,4],[0,1]",
+				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
+				"blit (20,40)-(60,50) [0,3],[-,1], to (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,40)-(60,50) [0,3],[-,1]",
+				"fill (20,50)-(20,60) [0,4],[0,1]",
+			},
+		},
+		{
+			// Rippled down off edge of frame of wrapped text.
+			name:     "insertForcesRippleOfWrapped",
+			fn:       insertForcesRippleOfWrapped,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(60,60) [0,1],[-,4]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
+				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
+				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
+				"blit (20,20)-(60,50) [0,1],[-,3], to (20,30)-(60,60) [0,2],[-,3]",
+				"blit (59,10)-(60,20) [3,0],[-,1], to (59,20)-(60,30) [3,1],[-,1]",
+				"blit (20,10)-(59,20) [0,0],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(20,30) [0,1],[0,1]",
+				`screen-800x600 <- string "ABC" atpoint: (20,10) [0,0] fill: black`,
+			},
+
+			// TODO(rjk): Wrapping with tabs
 		},
 	}
 
