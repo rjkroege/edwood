@@ -1065,7 +1065,7 @@ type ToOEB struct {
 	r   string
 }
 
-func alltofile(w *Window, tp *ToOEB) {
+func alltofile(w *Window, tp *ToOEB, filenameregex *AcmeRegexp) {
 	if tp.oeb != nil {
 		return
 	}
@@ -1078,8 +1078,9 @@ func alltofile(w *Window, tp *ToOEB) {
 		return
 	}
 	//	if w.nopen[QWevent] > 0   {
-	//		return;
-	if tp.r == t.file.Name() {
+	//		return
+
+	if filenameregex.FindString(t.file.Name()) != "" {
 		tp.oeb = t.file
 	}
 }
@@ -1089,9 +1090,15 @@ func toOEB(r string) *file.ObservableEditableBuffer {
 
 	t.r = strings.TrimLeft(r, " \t\n")
 	t.oeb = nil
-	global.row.AllWindows(func(w *Window) { alltofile(w, &t) })
+
+	filenameregex, err := rxcompile(t.r)
+	if err != nil {
+		editerror("match not found for\"%v\"", t.r)
+	}
+
+	global.row.AllWindows(func(w *Window) { alltofile(w, &t, filenameregex) })
 	if t.oeb == nil {
-		editerror("no such file\"%v\"", t.r)
+		editerror("match not found for\"%v\"", t.r)
 	}
 	return t.oeb
 }
