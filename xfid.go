@@ -433,7 +433,9 @@ func xfidwrite(x *Xfid) {
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
 	switch qid {
 	case Qcons:
+		global.row.lk.Lock()
 		w = errorwin(x.f.mntdir, 'X')
+		global.row.lk.Unlock()
 		updateText(&w.body)
 
 	case Qlabel:
