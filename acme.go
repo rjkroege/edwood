@@ -129,7 +129,6 @@ func main() {
 			}
 			rightmostcol := g.row.col[len(g.row.col)-1]
 			if len(files) == 0 {
-				fmt.Printf("FILES IS ZERO##################### OPENING g.wdir: %s\n", g.wdir)
 				readfile(g.row.col[len(g.row.col)-1], g.wdir)
 			} else {
 				for i, filename := range files {
