@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/rjkroege/edwood/server"
 )
 
 // readtrim returns a string read from the file or an error.
@@ -117,7 +118,7 @@ func loadhelper(rd *bufio.Reader, subl []string, fontname string, numcol, ndumpe
 func LoadLegacy(file, home string) (*Content, error) {
 	// log.Println("LoadLegacy start", file)
 
-	f, err := os.Open(file)
+	f, err := server.EdSrv.Open(file)
 	if err != nil {
 		return nil, fmt.Errorf("loading old dumpfile file %s failed: %v", file, err)
 	}

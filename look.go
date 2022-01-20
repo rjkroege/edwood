@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"image"
-	"os"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -466,7 +466,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 }
 
 func access(name string) bool {
-	_, err := os.Stat(name)
+	_, err := server.EdSrv.Stat(name)
 	return err == nil
 }
 

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/rjkroege/edwood/server"
 )
 
 const version = 1
@@ -81,7 +83,7 @@ type versionedContent struct {
 
 // Load parses the dump file and returns its content.
 func Load(file string) (*Content, error) {
-	f, err := os.Open(file)
+	f, err := server.EdSrv.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +107,7 @@ func decode(r io.Reader) (*Content, error) {
 
 // Save encodes the dump file content and writes it to file.
 func (c *Content) Save(file string) error {
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := server.EdSrv.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}

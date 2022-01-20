@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"io"
-	"os"
+
+	"github.com/rjkroege/edwood/server"
 )
 
 type Hash [sha1.Size]byte
@@ -27,7 +28,7 @@ func CalcHash(b []byte) Hash {
 }
 
 func HashFor(filename string) (h Hash, err error) {
-	fd, err := os.Open(filename)
+	fd, err := server.EdSrv.Open(filename)
 	if err != nil {
 		return h, err
 	}

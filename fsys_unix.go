@@ -7,11 +7,11 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -26,7 +26,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 		return fmt.Errorf("nothing to do")
 	}
 	ns := client.Namespace()
-	if err := os.MkdirAll(ns, 0700); err != nil {
+	if err := server.EdSrv.MkdirAll(ns, 0700); err != nil {
 		return err
 	}
 	addr := filepath.Join(ns, name)
@@ -45,7 +45,7 @@ func fsysmount(dir string, incl []string) (*MntDir, *client.Fsys, error) {
 	if md == nil {
 		return nil, nil, fmt.Errorf("child: can't allocate mntdir")
 	}
-	conn, err := client.DialService("acme")
+	conn, err := client.DialService("acme2")
 	if err != nil {
 		mnt.DecRef(md)
 		return nil, nil, fmt.Errorf("child: can't connect to acme: %v", err)

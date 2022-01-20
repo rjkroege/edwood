@@ -2,12 +2,12 @@ package file
 
 import (
 	"fmt"
-	"os"
+	"io/fs"
 )
 
 type DiskDetails struct {
 	Name  string
-	Info  os.FileInfo
+	Info  fs.FileInfo
 	Hash  Hash // Used to check if the file has changed on disk since loaded.
 	isdir bool // Used to track if this File is populated from a directory list. [private]
 }
@@ -29,7 +29,7 @@ func (f *DiskDetails) SetDir(isdir bool) {
 }
 
 // UpdateInfo updates File's info to d if file hash hasn't changed.
-func (f *DiskDetails) UpdateInfo(filename string, d os.FileInfo) error {
+func (f *DiskDetails) UpdateInfo(filename string, d fs.FileInfo) error {
 	h, err := HashFor(filename)
 	if err != nil {
 		return fmt.Errorf("failed to compute hash for %v: %v", filename, err)

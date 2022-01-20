@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/rjkroege/edwood/sam"
@@ -62,7 +62,7 @@ func (e *ObservableEditableBuffer) Set(hash []byte) {
 	e.details.Hash.Set(hash)
 }
 
-func (e *ObservableEditableBuffer) SetInfo(info os.FileInfo) {
+func (e *ObservableEditableBuffer) SetInfo(info fs.FileInfo) {
 	e.details.Info = info
 }
 
@@ -372,12 +372,12 @@ func (e *ObservableEditableBuffer) Name() string {
 }
 
 // Info is a Getter for e.DiskDetails.Info
-func (e *ObservableEditableBuffer) Info() os.FileInfo {
+func (e *ObservableEditableBuffer) Info() fs.FileInfo {
 	return e.details.Info
 }
 
 // UpdateInfo is a forwarding function for DiskDetails.UpdateInfo
-func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) error {
+func (e *ObservableEditableBuffer) UpdateInfo(filename string, d fs.FileInfo) error {
 	return e.details.UpdateInfo(filename, d)
 }
 

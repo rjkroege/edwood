@@ -6,7 +6,6 @@ import (
 	"image"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -314,7 +314,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	if err := t.checkSafeToLoad(filename); err != nil {
 		return 0, err
 	}
-	fd, err := os.Open(filename)
+	fd, err := server.EdSrv.Open(filename)
 	if err != nil {
 		return 0, warnError(nil, "can't open %s: %v", filename, err)
 	}
@@ -356,8 +356,8 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }
 
-func getDirNames(f *os.File) ([]string, error) {
-	entries, err := f.Readdir(0)
+func getDirNames(f server.File) ([]string, error) {
+	entries, err := f.ReadDir(0)
 	if err != nil {
 		return nil, err
 	}

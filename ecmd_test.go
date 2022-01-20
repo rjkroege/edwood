@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/server"
 )
 
 // Test for https://github.com/rjkroege/edwood/issues/291
@@ -110,7 +110,7 @@ func BenchmarkLargeEditTargets10000(t *testing.B) { benchmarkLargeEditTargetsImp
 func benchmarkLargeEditTargetsImpl(t *testing.B, nl int) {
 	dir := t.TempDir()
 	firstfilename := filepath.Join(dir, "bigfile")
-	cwd, err := os.Getwd()
+	cwd, err := server.EdSrv.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get current working directory: %v", err)
 	}

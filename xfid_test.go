@@ -1526,7 +1526,7 @@ func readIndexFile(t *testing.T, filename string) []byte {
 		t.Fatalf("failed to get current working directory: %v", err)
 	}
 
-	f, err := os.Open(filename)
+	f, err := edSrv.Open(filename)
 	if err != nil {
 		t.Fatalf("open failed: %v", err)
 	}

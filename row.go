@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -567,7 +567,7 @@ func (row *Row) loadimpl(dump *dumpfile.Content, initing bool) error {
 	// defer log.Println("Load ended")
 
 	// Current directory.
-	if err := os.Chdir(dump.CurrentDir); err != nil {
+	if err := server.EdSrv.Chdir(dump.CurrentDir); err != nil {
 		return err
 	}
 	global.wdir = dump.CurrentDir

@@ -17,6 +17,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -30,9 +31,11 @@ var (
 	mtpt              = flag.String("m", defaultMtpt, "Mountpoint for 9P file server")
 	swapScrollButtons = flag.Bool("r", false, "Swap scroll buttons")
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
+	remote            = flag.String("R", "", "an ssh address in the form user@host:port, when specified causes acme to connect to edit files over an ssh connection")
 )
 
 func main() {
+
 	// rfork(RFENVG|RFNAMEG); TODO(flux): I'm sure these are vitally(?) important.
 
 	// TODO(rjk): Unlimited concurrency please.
@@ -48,9 +51,16 @@ func main() {
 
 	startProfiler()
 
+	if *remote != "" {
+		err := server.StartRemoteSrv(*remote)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// Implicit to preserve existing semantics.
 	// TODO(rjk): Do this here.
-	// global = makeglobals()
+	global = makeglobals()
 	g := global
 
 	// TODO(rjk): Push this code into a separate function.
@@ -119,6 +129,7 @@ func main() {
 			}
 			rightmostcol := g.row.col[len(g.row.col)-1]
 			if len(files) == 0 {
+				fmt.Printf("FILES IS ZERO##################### OPENING g.wdir: %s\n", g.wdir)
 				readfile(g.row.col[len(g.row.col)-1], g.wdir)
 			} else {
 				for i, filename := range files {
@@ -426,7 +437,7 @@ func keyboardthread(g *globals, display draw.Display) {
 func waitthread(g *globals, ctx context.Context) {
 	// There is a race between process exiting and our finding out it was ever created.
 	// This structure keeps a list of processes that have exited we haven't heard of.
-	exited := make(map[int]ProcessState)
+	exited := make(map[server.Execution]ProcessState)
 
 	Freecmd := func(c *Command) {
 		if c != nil {
@@ -451,7 +462,7 @@ func waitthread(g *globals, ctx context.Context) {
 			found := false
 			for _, c := range command {
 				if c.name == cmd+" " {
-					if err := c.proc.Kill(); err != nil {
+					if err := c.e.Kill(); err != nil {
 						warning(nil, "kill %v: %v\n", cmd, err)
 					}
 					found = true
@@ -466,9 +477,9 @@ func waitthread(g *globals, ctx context.Context) {
 				i int
 				c *Command
 			)
-			pid := w.Pid()
+			e := w.Execution()
 			for i, c = range command {
-				if c.pid == pid {
+				if c.e == e {
 					command = append(command[:i], command[i+1:]...)
 					break
 				}
@@ -478,7 +489,7 @@ func waitthread(g *globals, ctx context.Context) {
 			t.Commit()
 			if c == nil {
 				// command exited before we had a chance to add it to command list
-				exited[pid] = w
+				exited[e] = w
 			} else {
 				if search(t, []rune(c.name)) {
 					t.Delete(t.q0, t.q1, true)
@@ -494,11 +505,11 @@ func waitthread(g *globals, ctx context.Context) {
 
 		case c := <-g.ccommand:
 			// has this command already exited?
-			if p, ok := exited[c.pid]; ok {
+			if p, ok := exited[c.e]; ok {
 				if msg := p.String(); msg != "" {
 					warning(c.md, "%s\n", msg)
 				}
-				delete(exited, c.pid)
+				delete(exited, c.e)
 				Freecmd(c)
 				break
 			}
@@ -561,7 +572,7 @@ func newwindowthread(g *globals) {
 func killprocs(fs *fileServer) {
 	fs.close()
 	for _, c := range command {
-		c.proc.Kill()
+		c.e.Kill()
 	}
 }
 
