@@ -203,7 +203,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	}
 	b.cachedPiece = nil
 
-	var cur int64 // how much has already been deleted
+	var cur int // how much has already been deleted
 	midwayStart, midwayEnd := false, false
 
 	var before, after *piece // unmodified pieces before/after deletion point
@@ -216,7 +216,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	} else {
 		// deletion starts midway through a piece
 		midwayStart = true
-		cur = int64(p.len() - offset)
+		cur = p.len() - offset
 		start = p
 		before = b.newEmptyPiece()
 	}
@@ -229,7 +229,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 			break
 		}
 		p = p.next
-		cur += int64(p.len())
+		cur += p.len()
 	}
 
 	if cur == length {
@@ -288,7 +288,7 @@ func (b *Buffer) newAction() *action {
 
 // newChange is associated with the current action or a newly allocated one if
 // none exists.
-func (b *Buffer) newChange(off int64) *change {
+func (b *Buffer) newChange(off int) *change {
 	a := b.currentAction
 	if a == nil {
 		a = b.newAction()
@@ -320,13 +320,14 @@ func (b *Buffer) newEmptyPiece() *piece {
 // to the left is returned with an offset of the piece's length.
 //
 // If off is zero, the beginning sentinel piece is returned.
-func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
-	var cur int64
+// Should this return an offset tuple?
+func (b *Buffer) findPiece(off int) (p *piece, offset int) {
+	var cur int
 	for p = b.begin; p.next != nil; p = p.next {
-		if cur <= off && off <= cur+int64(p.len()) {
+		if cur <= off && off <= cur+p.len() {
 			return p, int(off - cur)
 		}
-		cur += int64(p.len())
+		cur += p.len()
 	}
 	return nil, 0
 }
@@ -335,14 +336,14 @@ func (b *Buffer) findPiece(off int64) (p *piece, offset int) {
 // at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
-func (b *Buffer) Undo() (int64, int64) {
+func (b *Buffer) Undo() (int, int) {
 	b.Commit()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0
 	}
 
-	var off, size int64
+	var off, size int
 	var nR int
 
 	for i := len(a.changes) - 1; i >= 0; i-- {
@@ -367,7 +368,7 @@ func (b *Buffer) unshiftAction() *action {
 // at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
-func (b *Buffer) Redo() (int64, int64) {
+func (b *Buffer) Redo() (int, int) {
 	b.Commit()
 	a := b.shiftAction()
 	if a == nil {
@@ -375,7 +376,7 @@ func (b *Buffer) Redo() (int64, int64) {
 	}
 
 	var nR int
-	var off, size int64
+	var off, size int
 
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
@@ -445,21 +446,21 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 // Size returns the size of the buffer in the current state. Size is the
 // number of bytes available for reading via ReadAt. Operations like Insert,
 // Delete, Undo and Redo modify the size.
-func (b *Buffer) Size() int64 {
-	var size int64
+func (b *Buffer) Size() int {
+	var size int
 	for p := b.begin; p != b.end; p = p.next {
-		size += int64(p.len())
+		size += int(p.len())
 	}
 	return size
 }
 
 // Nr returns the sum of the Nr for each piece in the buffer.
-func (b *Buffer) Nr() int64 {
+func (b *Buffer) Nr() int {
 	var nr int
 	for p := b.begin; p != b.end; p = p.next {
 		nr += p.nr
 	}
-	return int64(nr)
+	return nr
 }
 
 // action is a list of changes which are used to undo/redo all modifications.
@@ -470,22 +471,22 @@ type action struct {
 
 // change keeps all needed information to redo/undo an insertion/deletion.
 type change struct {
-	old span  // all pieces which are being modified/swapped out by the change
-	new span  // all pieces which are introduced/swapped int by the change
-	off int64 // absolute offset at which the change occurred
+	old span // all pieces which are being modified/swapped out by the change
+	new span // all pieces which are introduced/swapped int by the change
+	off int  // absolute offset at which the change occurred
 }
 
 // span holds a certain range of pieces. Changes to the document are always
 // performed by swapping out an existing span with a new one.
 type span struct {
 	start, end *piece // start/end of the span
-	len        int64  // the sum of the lengths of the pieces which form this span
+	len        int    // the sum of the lengths of the pieces which form this span
 }
 
 func newSpan(start, end *piece) span {
 	s := span{start: start, end: end}
 	for p := start; p != nil; p = p.next {
-		s.len += int64(p.len())
+		s.len += (p.len())
 		if p == end {
 			break
 		}
@@ -532,8 +533,8 @@ func (p *piece) insert(off int, data []byte, nr int) {
 	p.nr += nr
 }
 
-func (p *piece) delete(off int, length int64, nr int) bool {
-	if int64(off)+length > int64(len(p.data)) {
+func (p *piece) delete(off int, length int, nr int) bool {
+	if off+length > len(p.data) {
 		return false
 	}
 	p.data = append(p.data[:off], p.data[off+int(length):]...)
@@ -574,18 +575,21 @@ func (b *Buffer) TreatAsDirty() bool {
 	return b.Dirty()
 }
 
-func (b *Buffer) RuneTuple(off int64) OffSetTuple {
+// RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
+// given offset in runes.
+func (b *Buffer) RuneTuple(off int) OffSetTuple {
 	offsets := OffSetTuple{
 		b: 0,
 		r: off,
 	}
 	for p := b.begin; p != b.end && off > 0; p = p.next {
+		// TODO(rjk): I think this does extra work.
 		isAscii := p.len() == p.nr
 
 		if isAscii {
-			if off-int64(p.nr) > 0 {
-				off -= int64(p.nr)
-				offsets.b += int64(p.nr)
+			if off-(p.nr) > 0 {
+				off -= (p.nr)
+				offsets.b += (p.nr)
 			} else {
 				offsets.b += off
 				off -= off
@@ -593,7 +597,7 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 		} else {
 			i := 0
 			for _, rSize := utf8.DecodeRune(p.data[i:]); i < p.len() && off > 0; i += rSize {
-				offsets.b += int64(rSize)
+				offsets.b += (rSize)
 				off -= 1
 			}
 		}
@@ -604,8 +608,7 @@ func (b *Buffer) RuneTuple(off int64) OffSetTuple {
 }
 
 func (s *span) Nr() int {
-	var nr int
-
+	nr := 0
 	for p := s.start; p != s.end; p = p.next {
 		nr += p.nr
 	}

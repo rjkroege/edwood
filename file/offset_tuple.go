@@ -3,12 +3,12 @@ package file
 import "fmt"
 
 type OffSetTuple struct {
-	b int64
-	r int64
+	b int
+	r int
 }
 
 // can work this api to be a little better...
-func (o OffSetTuple) add(b, r int64) OffSetTuple {
+func (o OffSetTuple) add(b, r int) OffSetTuple {
 	return OffSetTuple{
 		b: o.b + b,
 		r: o.r + r,

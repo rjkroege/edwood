@@ -237,7 +237,7 @@ func TestBufferSize(t *testing.T) {
 	b := NewBufferNoNr(nil)
 	tests := []struct {
 		action func()
-		want   int64
+		want   int
 	}{
 		0: {func() {}, 0},
 		1: {func() { b.insertString(0, " Like") }, 5},
@@ -271,9 +271,9 @@ func TestUndoRedoReturnedOffsets(t *testing.T) {
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
-		op      func(*Buffer) (int64, int64)
-		wantOff int64
-		wantN   int64
+		op      func(*Buffer) (int, int)
+		wantOff int
+		wantN   int
 	}{
 		0:  {redo, -1, 0},
 		1:  {undo, 0, 20},
@@ -332,7 +332,7 @@ func TestPieceNr(t *testing.T) {
 
 	undo, redo := (*Buffer).Undo, (*Buffer).Redo
 	tests := []struct {
-		op func(*Buffer) (int64, int64)
+		op func(*Buffer) (int, int)
 	}{
 		0:  {redo},
 		1:  {undo},
@@ -355,7 +355,7 @@ func TestPieceNr(t *testing.T) {
 		t.Run("TestPieceNr #"+fmt.Sprint(i), func(t *testing.T) {
 			tt.op(b)
 			nr := b.Nr()
-			wantNr := countRunes(b)
+			wantNr := countRunes(t, b)
 			if nr != wantNr {
 				t.Errorf("%d: got n %d, want %d", i, nr, wantNr)
 			}
@@ -376,7 +376,7 @@ func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
 	}
 
 	actualNr := b.Nr()
-	expectedNr := int64(utf8.RuneCountInString(expected))
+	expectedNr := (utf8.RuneCountInString(expected))
 	if actualNr != expectedNr {
 		t.Errorf("%v: got '%v' runes, expected '%v' runes", name, actualNr, expectedNr)
 	}
@@ -388,7 +388,7 @@ func (t *Buffer) insertString(off int, data string) {
 }
 
 func (t *Buffer) cacheInsertString(off int, data string) {
-	err := t.insertCreateOffsetTuple(int64(off), []byte(data))
+	err := t.insertCreateOffsetTuple((off), []byte(data))
 	if err != nil {
 		panic(err)
 	}
@@ -400,7 +400,7 @@ func (t *Buffer) delete(off, length int) {
 }
 
 func (t *Buffer) cacheDelete(off, length int) {
-	t.deleteCreateOffsetTuple(int64(off), int64(length))
+	t.deleteCreateOffsetTuple((off), (length))
 }
 
 func (t *Buffer) printPieces() {
@@ -485,11 +485,11 @@ func TestRuneTuple(t *testing.T) {
 			for _, s := range tv.buf {
 				b.insertString(int(b.Nr()), s)
 			}
-			gt := b.RuneTuple(int64(tv.roff))
-			if got, want := gt.b, tv.bwant; got != int64(want) {
+			gt := b.RuneTuple((tv.roff))
+			if got, want := gt.b, tv.bwant; got != (want) {
 				t.Errorf("%s got %d != want %d", "byte", got, want)
 			}
-			if got, want := gt.r, tv.roff; got != int64(want) {
+			if got, want := gt.r, tv.roff; got != (want) {
 				t.Errorf("%s got %d != want %d", "rune", got, want)
 			}
 		})
@@ -517,18 +517,19 @@ func (t *Buffer) allContent() string {
 	return string(data)
 }
 
-func countRunes(b *Buffer) int64 {
-	return int64(utf8.RuneCount(b.Bytes()))
+func countRunes(t *testing.T, b *Buffer) int {
+	t.Helper()
+	return (utf8.RuneCount(b.Bytes()))
 }
 
 func NewBufferNoNr(content []byte) *Buffer {
 	return NewBuffer(content, utf8.RuneCount(content))
 }
 
-func (b *Buffer) insertCreateOffsetTuple(off int64, content []byte) error {
-	return b.Insert(b.RuneTuple(off), content)
+func (b *Buffer) insertCreateOffsetTuple(off int, content []byte) error {
+	return b.InsertWithNr(b.RuneTuple(off), content, utf8.RuneCount(content))
 }
 
-func (b *Buffer) deleteCreateOffsetTuple(off, length int64) error {
+func (b *Buffer) deleteCreateOffsetTuple(off, length int) error {
 	return b.Delete(b.RuneTuple(off), b.RuneTuple(off+length))
 }
