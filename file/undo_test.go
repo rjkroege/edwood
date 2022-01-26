@@ -321,7 +321,9 @@ func TestPieceNr(t *testing.T) {
 	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
 	fmt.Printf("Before delete: %v\n", string(b.Bytes()))
+
 	b.deleteCreateOffsetTuple(13, 10) // Currently, the offset translates to 17 (should be 20). Should be deleting a total of 25 bytes
+
 	buffAfterDelete := []rune(buffAfterInserts)
 	buffAfterDelete = append(buffAfterDelete[:13], buffAfterDelete[23:]...)
 	b.checkContent("TestPieceNr: after 1 delete", t, string(buffAfterDelete))
@@ -364,13 +366,15 @@ func TestPieceNr(t *testing.T) {
 }
 
 func (b *Buffer) checkPiecesCnt(t *testing.T, expected int) {
+	t.Helper()
 	if b.piecesCnt != expected {
 		t.Errorf("got %d pieces, want %d", b.piecesCnt, expected)
 	}
 }
 
 func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
-	c := b.allContent()
+	t.Helper()
+	c := string(b.Bytes())
 	if c != expected {
 		t.Errorf("%s: got '%s', want '%s'", name, c, expected)
 	}
@@ -444,15 +448,27 @@ func TestRuneTuple(t *testing.T) {
 		},
 		{
 			name:  "one buf, not-ASCII, mid",
-			buf:   []string{"痛苦本身"},
+			buf:   []string{"a痛苦本身"},
 			roff:  2,
-			bwant: len("痛苦"),
+			bwant: len("a痛"),
 		},
 		{
 			name:  "one buf, not-ASCII, end",
 			buf:   []string{"痛苦本身"},
 			roff:  3,
 			bwant: len("痛苦本"),
+		},
+		{
+			name:  "one buf, not-ASCII, past-end",
+			buf:   []string{"痛苦本身"},
+			roff:  4,
+			bwant: len("痛苦本身"),
+		},
+		{
+			name:  "one buf, not-ASCII, far past-end",
+			buf:   []string{"痛苦本身"},
+			roff:  1000,
+			bwant: len("痛苦本身"),
 		},
 		{
 			name:  "three bufs, not-ASCII, start of middle piece",
@@ -478,13 +494,22 @@ func TestRuneTuple(t *testing.T) {
 			roff:  13,
 			bwant: len("痛苦本身痛苦本痛苦痛苦本身"),
 		},
+		{
+			// Count runes in xyz: echo -n xyz| u wc -m
+			name:  "failing case in TestPieceNr",
+			buf:   []string{"This is the", "痛苦本身可能是很多痛苦, 但主要的原因是痛苦, 但我给它时间陷入这种痛苦, 以至于有些巨大的痛苦Lorem ipsum in Mandarin"},
+			roff:  23,
+			bwant: len("This is the痛苦本身可能是很多痛苦,"),
+		},
 	}
 	for _, tv := range tt {
 		t.Run(tv.name, func(t *testing.T) {
 			b := NewBufferNoNr(nil)
 			for _, s := range tv.buf {
-				b.insertString(int(b.Nr()), s)
+				b.insertString(b.Nr(), s)
 			}
+			b.checkPiecesCnt(t, 2+len(tv.buf))
+
 			gt := b.RuneTuple((tv.roff))
 			if got, want := gt.b, tv.bwant; got != (want) {
 				t.Errorf("%s got %d != want %d", "byte", got, want)
@@ -497,6 +522,7 @@ func TestRuneTuple(t *testing.T) {
 }
 
 func (b *Buffer) checkModified(t *testing.T, id int, expected bool) {
+	t.Helper()
 	if b.Dirty() != expected {
 		if expected {
 			t.Errorf("#%d should be modified", id)
@@ -504,17 +530,6 @@ func (b *Buffer) checkModified(t *testing.T, id int, expected bool) {
 			t.Errorf("#%d should not be modified", id)
 		}
 	}
-}
-
-func (t *Buffer) allContent() string {
-	var data []byte
-	p := t.begin.next
-	for p != t.end {
-		data = append(data, p.data...)
-		p = p.next
-
-	}
-	return string(data)
 }
 
 func countRunes(t *testing.T, b *Buffer) int {
@@ -527,7 +542,7 @@ func NewBufferNoNr(content []byte) *Buffer {
 }
 
 func (b *Buffer) insertCreateOffsetTuple(off int, content []byte) error {
-	return b.InsertWithNr(b.RuneTuple(off), content, utf8.RuneCount(content))
+	return b.Insert(b.RuneTuple(off), content, utf8.RuneCount(content))
 }
 
 func (b *Buffer) deleteCreateOffsetTuple(off, length int) error {

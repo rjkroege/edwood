@@ -86,9 +86,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"time"
 	"unicode/utf8"
 )
+
+// expensiveCheckedExecution turns on a number of expensive validations
+// of the internal consistency of the file.Buffer implementation. This is
+// true for now while development of file.Buffer continues.
+const expensiveCheckedExecution = true
 
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
 
@@ -115,6 +121,7 @@ type ChangeInfo struct {
 
 // NewBuffer initializes a new buffer with the given content as a starting point.
 // To start with an empty buffer pass nil as a content.
+// TODO(rjk): Should we chunk very large content arrays?
 func NewBuffer(content []byte, nr int) *Buffer {
 	// give the actions stack some default capacity
 	t := &Buffer{actions: make([]*action, 0, 100)}
@@ -131,21 +138,29 @@ func NewBuffer(content []byte, nr int) *Buffer {
 	return t
 }
 
-// InsertWithNr inserts the data at the given offset in the buffer. An error is return when the
+// Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
+func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 	off := start.b
 	if len(data) == 0 {
 		return nil
 	}
 
+	if expensiveCheckedExecution {
+		if c := utf8.RuneCount(data); c != nr {
+			log.Fatalf("newPiece runecount mismatch counted %d, provided %d", c, nr)
+		}
+	}
+	b.validateInvariant()
+
 	p, offset := b.findPiece(off)
 	if p == nil {
-		fmt.Printf("Failed with: %v", string(data))
+		b.validateInvariant()
 		return ErrWrongOffset
 	} else if p == b.cachedPiece {
 		// just update the last inserted piece
 		p.insert(offset, data, nr)
+		b.validateInvariant()
 		return nil
 	}
 
@@ -162,9 +177,11 @@ func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
+		// TODO(rjk): Compute the number of runes in findPiece.
 		beforeNr := utf8.RuneCount(p.data[:offset])
 		before := b.newPiece(p.data[:offset], p.prev, nil, beforeNr)
 		pnew = b.newPiece(data, before, nil, nr)
+		// TODO(rjk): Compute this by subtraction?
 		afterNr := utf8.RuneCount(p.data[offset:])
 		after := b.newPiece(p.data[offset:], pnew, p.next, afterNr)
 		before.next = pnew
@@ -175,11 +192,8 @@ func (b *Buffer) InsertWithNr(start OffSetTuple, data []byte, nr int) error {
 
 	b.cachedPiece = pnew
 	swapSpans(c.old, c.new)
+	b.validateInvariant()
 	return nil
-}
-
-func (b *Buffer) Insert(off OffSetTuple, data []byte) error {
-	return b.InsertWithNr(off, data, utf8.RuneCount(data))
 }
 
 // Delete deletes the portion of the length at the given offset. An error is returned
@@ -244,6 +258,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		beg := int64(p.len() + int(length-cur))
 		newBuf := make([]byte, len(p.data[beg:]))
 		copy(newBuf, p.data[beg:])
+		// TODO(rjk): Should be able to do this via subtraction.
 		nr := utf8.RuneCount(newBuf)
 		after = b.newPiece(newBuf, before, p.next, nr)
 	}
@@ -300,7 +315,15 @@ func (b *Buffer) newChange(off int) *change {
 	return c
 }
 
+// newPiece creates a new piece structure. nr is the number of runes in
+// data.
 func (b *Buffer) newPiece(data []byte, prev, next *piece, nr int) *piece {
+	if expensiveCheckedExecution {
+		if c := utf8.RuneCount(data); c != nr {
+			log.Fatalf("newPiece runecount mismatch counted %d, provided %d", c, nr)
+		}
+	}
+
 	b.piecesCnt++
 	return &piece{
 		id:   b.piecesCnt,
@@ -463,6 +486,18 @@ func (b *Buffer) Nr() int {
 	return nr
 }
 
+// Debugging. Enforce
+func (b *Buffer) validateInvariant() {
+	if expensiveCheckedExecution {
+		for p := b.begin; p != b.end; p = p.next {
+			if p.nr != utf8.RuneCount(p.data) {
+				log.Printf("invariant violated in piece %#v", *p)
+				panic("invariant violated")
+			}
+		}
+	}
+}
+
 // action is a list of changes which are used to undo/redo all modifications.
 type action struct {
 	changes []*change
@@ -559,6 +594,7 @@ func (b *Buffer) GetCache() []byte {
 	return b.cachedPiece.data
 }
 
+// TODO(rjk): Probably not required.
 func (b *Buffer) HasUncommitedChanges() bool {
 	return b.cachedPiece != nil || b.currentAction != nil
 }
@@ -603,8 +639,15 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		}
 	}
 
-	return offsets
+	if expensiveCheckedExecution {
+		tb := b.Bytes()
+		if got, want := offsets.r, utf8.RuneCount(tb[0:offsets.b]); got != want {
+			log.Printf("RuneTuple is generating the wrong result: got %d want %d", got, want)
+			panic("giving up!")
+		}
+	}
 
+	return offsets
 }
 
 func (s *span) Nr() int {
