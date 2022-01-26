@@ -18,18 +18,18 @@ func TestOverall(t *testing.T) {
 	b.checkPiecesCnt(t, 2)
 	b.checkContent("#1", t, "")
 
-	b.insertString(0, "All work makes John a dull boy")
+	b.insertString(0, "All work ウクラ makes John a dull boy")
 	b.checkPiecesCnt(t, 3)
-	b.checkContent("#2", t, "All work makes John a dull boy")
+	b.checkContent("#2", t, "All work ウクラ makes John a dull boy")
 
 	b.insertString(9, "and no playing ")
 	b.checkPiecesCnt(t, 6)
-	b.checkContent("#3", t, "All work and no playing makes John a dull boy")
+	b.checkContent("#3", t, "All work and no playing ウクラ makes John a dull boy")
 
 	b.Commit()
 	// Also check that multiple change commits don't create empty changes.
 	b.Commit()
-	b.deleteCreateOffsetTuple(20, 14)
+	b.deleteCreateOffsetTuple(20, 18)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
 	b.insertString(20, " makes Jack")
@@ -38,12 +38,12 @@ func TestOverall(t *testing.T) {
 	b.Undo()
 	b.checkContent("#6", t, "All work and no play a dull boy")
 	b.Undo()
-	b.checkContent("#7", t, "All work and no playing makes John a dull boy")
+	b.checkContent("#7", t, "All work and no playing ウクラ makes John a dull boy")
 	b.Undo()
-	b.checkContent("#8", t, "All work makes John a dull boy")
+	b.checkContent("#8", t, "All work ウクラ makes John a dull boy")
 
 	b.Redo()
-	b.checkContent("#9", t, "All work and no playing makes John a dull boy")
+	b.checkContent("#9", t, "All work and no playing ウクラ makes John a dull boy")
 	b.Redo()
 	b.checkContent("#10", t, "All work and no play a dull boy")
 	b.Redo()

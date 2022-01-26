@@ -614,40 +614,45 @@ func (b *Buffer) TreatAsDirty() bool {
 // RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
 // given offset in runes.
 func (b *Buffer) RuneTuple(off int) OffSetTuple {
-	offsets := OffSetTuple{
-		b: 0,
-		r: off,
-	}
-	for p := b.begin; p != b.end && off > 0; p = p.next {
-		// TODO(rjk): I think this does extra work.
-		isAscii := p.len() == p.nr
+	b.validateInvariant()
 
-		if isAscii {
-			if off-(p.nr) > 0 {
-				off -= (p.nr)
-				offsets.b += (p.nr)
-			} else {
-				offsets.b += off
-				off -= off
-			}
-		} else {
-			i := 0
-			for _, rSize := utf8.DecodeRune(p.data[i:]); i < p.len() && off > 0; i += rSize {
-				offsets.b += (rSize)
-				off -= 1
-			}
-		}
+	tr, tb := 0, 0
+	p := b.begin
+
+	// Find piece
+	for ; p != b.end && tr+p.nr < off; p = p.next {
+		tr += p.nr
+		tb += len(p.data)
+	}
+
+	log.Printf("tr %d tb %d", tr, tb)
+
+	// Find the byte offset in piece p
+	for i := 0; tr < off; tr++ {
+		_, sz := utf8.DecodeRune(p.data[i:])
+		tb += sz
+		i += sz
 	}
 
 	if expensiveCheckedExecution {
-		tb := b.Bytes()
-		if got, want := offsets.r, utf8.RuneCount(tb[0:offsets.b]); got != want {
+		bs := b.Bytes()
+		if off > len(bs) {
+			return OffSetTuple{
+				b: tb,
+				r: tr,
+			}
+		}
+		if got, want := utf8.RuneCount(bs[0:tb]), off; got != want {
 			log.Printf("RuneTuple is generating the wrong result: got %d want %d", got, want)
+			log.Printf("subrange %q", string(bs[0:tb]))
 			panic("giving up!")
 		}
 	}
 
-	return offsets
+	return OffSetTuple{
+		b: tb,
+		r: tr,
+	}
 }
 
 func (s *span) Nr() int {
