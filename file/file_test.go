@@ -26,7 +26,7 @@ func TestDelObserver(t *testing.T) {
 	for _, text := range testData {
 		f.AddObserver(text)
 	}
-	println("Size is now: ", f.GetObserverSize())
+	t.Log("Size is now: ", f.GetObserverSize())
 	for i, text := range testData {
 		err := f.DelObserver(text)
 		if err != nil {
