@@ -84,7 +84,6 @@ package file
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"time"
@@ -153,7 +152,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 	}
 	b.validateInvariant()
 
-	p, offset := b.findPiece(off)
+	p, offset, roffset := b.findPiece(start)
 	if p == nil {
 		b.validateInvariant()
 		return ErrWrongOffset
@@ -177,13 +176,9 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 		// piece. That is we have 3 new pieces one containing the content
 		// before the insertion point then one holding the newly inserted
 		// text and one holding the content after the insertion point.
-		// TODO(rjk): Compute the number of runes in findPiece.
-		beforeNr := utf8.RuneCount(p.data[:offset])
-		before := b.newPiece(p.data[:offset], p.prev, nil, beforeNr)
+		before := b.newPiece(p.data[:offset], p.prev, nil, roffset)
 		pnew = b.newPiece(data, before, nil, nr)
-		// TODO(rjk): Compute this by subtraction?
-		afterNr := utf8.RuneCount(p.data[offset:])
-		after := b.newPiece(p.data[offset:], pnew, p.next, afterNr)
+		after := b.newPiece(p.data[offset:], pnew, p.next, p.nr-roffset)
 		before.next = pnew
 		pnew.next = after
 		c.new = newSpan(before, after)
@@ -201,23 +196,27 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
+	b.validateInvariant()
 	off := startOff.b
-	length := endOff.b - startOff.b //b.RuneTuple(endOff.r - startOff.r).r
-	fmt.Printf("Length is: %v\n deleting at: %v\n", length, off)
+	length := endOff.b - startOff.b
+	rlength := endOff.r - startOff.r
 	if length <= 0 {
+		b.validateInvariant()
 		return nil
 	}
 
-	p, offset := b.findPiece(off)
+	p, offset, roffset := b.findPiece(startOff)
 	if p == nil {
+		b.validateInvariant()
 		return ErrWrongOffset
 	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.r-startOff.r)) {
 		// try to update the last inserted piece if the length doesn't exceed
+		b.validateInvariant()
 		return nil
 	}
 	b.cachedPiece = nil
 
-	var cur int // how much has already been deleted
+	var cur, rcur int // how much has already been deleted
 	midwayStart, midwayEnd := false, false
 
 	var before, after *piece // unmodified pieces before/after deletion point
@@ -231,6 +230,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		// deletion starts midway through a piece
 		midwayStart = true
 		cur = p.len() - offset
+		rcur = p.nr - roffset
 		start = p
 		before = b.newEmptyPiece()
 	}
@@ -244,6 +244,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		}
 		p = p.next
 		cur += p.len()
+		rcur += p.nr
 	}
 
 	if cur == length {
@@ -255,12 +256,10 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 		midwayEnd = true
 		end = p
 
-		beg := int64(p.len() + int(length-cur))
+		beg := p.len() + length - cur
 		newBuf := make([]byte, len(p.data[beg:]))
 		copy(newBuf, p.data[beg:])
-		// TODO(rjk): Should be able to do this via subtraction.
-		nr := utf8.RuneCount(newBuf)
-		after = b.newPiece(newBuf, before, p.next, nr)
+		after = b.newPiece(newBuf, before, p.next, rcur-rlength)
 	}
 
 	var newStart, newEnd *piece
@@ -290,6 +289,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	c.old = newSpan(start, end)
 	swapSpans(c.old, c.new)
 
+	b.validateInvariant()
 	return nil
 }
 
@@ -338,21 +338,23 @@ func (b *Buffer) newEmptyPiece() *piece {
 	return b.newPiece(nil, nil, nil, 0)
 }
 
-// findPiece returns the piece holding the text at the byte offset. If off happens
-// to be at a piece boundary (i.e. the first byte of a piece) then the previous piece
-// to the left is returned with an offset of the piece's length.
+// findPiece returns the piece holding the text at the byte offset, the
+// byte offset into piece and similarly for the rune offset. If off
+// happens to be at a piece boundary (i.e. the first byte of a piece)
+// then the previous piece to the left is returned with an offset of the
+// piece's length.
 //
 // If off is zero, the beginning sentinel piece is returned.
-// Should this return an offset tuple?
-func (b *Buffer) findPiece(off int) (p *piece, offset int) {
-	var cur int
-	for p = b.begin; p.next != nil; p = p.next {
-		if cur <= off && off <= cur+p.len() {
-			return p, int(off - cur)
+func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
+	tr, tb := 0, 0
+	for p := b.begin; p.next != nil; p = p.next {
+		if tb <= off.b && off.b <= tb+p.len() {
+			return p, off.b - tb, off.r - tr
 		}
-		cur += p.len()
+		tb += p.len()
+		tr += p.nr
 	}
-	return nil, 0
+	return nil, 0, 0
 }
 
 // Undo reverts the last performed action. It returns the offset in bytes
@@ -372,6 +374,7 @@ func (b *Buffer) Undo() (int, int) {
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
+		// TODO(rjk): Is this necessary?
 		off = b.RuneTuple(c.off).b
 		size = c.old.len - c.new.len
 		nR -= c.new.Nr() - c.old.Nr()
@@ -486,13 +489,14 @@ func (b *Buffer) Nr() int {
 	return nr
 }
 
-// Debugging. Enforce
+// validateInvariant tests that every piece has a correct rune count
+// given its byte length.
 func (b *Buffer) validateInvariant() {
 	if expensiveCheckedExecution {
 		for p := b.begin; p != b.end; p = p.next {
 			if p.nr != utf8.RuneCount(p.data) {
 				log.Printf("invariant violated in piece %#v", *p)
-				panic("invariant violated")
+				panic("file.Buffer piece invariant violated")
 			}
 		}
 	}
@@ -594,7 +598,7 @@ func (b *Buffer) GetCache() []byte {
 	return b.cachedPiece.data
 }
 
-// TODO(rjk): Probably not required.
+// TODO(rjk): Might not be required.
 func (b *Buffer) HasUncommitedChanges() bool {
 	return b.cachedPiece != nil || b.currentAction != nil
 }
@@ -625,8 +629,6 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		tb += len(p.data)
 	}
 
-	log.Printf("tr %d tb %d", tr, tb)
-
 	// Find the byte offset in piece p
 	for i := 0; tr < off; tr++ {
 		_, sz := utf8.DecodeRune(p.data[i:])
@@ -645,7 +647,7 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		if got, want := utf8.RuneCount(bs[0:tb]), off; got != want {
 			log.Printf("RuneTuple is generating the wrong result: got %d want %d", got, want)
 			log.Printf("subrange %q", string(bs[0:tb]))
-			panic("giving up!")
+			panic("file bug in RuneTuple")
 		}
 	}
 

@@ -320,7 +320,7 @@ func TestPieceNr(t *testing.T) {
 	buffAfterInserts := string(eng2) + string(manderianBytes) + string(eng1)
 	b.checkContent("TestPieceNr: third insert", t, buffAfterInserts)
 
-	fmt.Printf("Before delete: %v\n", string(b.Bytes()))
+	t.Logf("Before delete: %v\n", string(b.Bytes()))
 
 	b.deleteCreateOffsetTuple(13, 10) // Currently, the offset translates to 17 (should be 20). Should be deleting a total of 25 bytes
 
@@ -405,20 +405,6 @@ func (t *Buffer) delete(off, length int) {
 
 func (t *Buffer) cacheDelete(off, length int) {
 	t.deleteCreateOffsetTuple((off), (length))
-}
-
-func (t *Buffer) printPieces() {
-	for p := t.begin; p != nil; p = p.next {
-		prev, next := 0, 0
-		if p.prev != nil {
-			prev = p.prev.id
-		}
-		if p.next != nil {
-			next = p.next.id
-		}
-		fmt.Printf("%d, p:%d, n:%d = %s\n", p.id, prev, next, string(p.data))
-	}
-	fmt.Println()
 }
 
 func TestRuneTuple(t *testing.T) {
