@@ -40,8 +40,9 @@ func (f *File) readwholefile(t *testing.T) string {
 
 func (b *Buffer) commitisgermane() bool { return false }
 
-// TODO(camsn0w): write this.
-func (b *Buffer) readwholefile(*testing.T) string { return "" }
+func (b *Buffer) readwholefile(*testing.T) string {
+	return b.String()
+}
 
 func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *stateSummary) {
 	t.Helper()
@@ -94,6 +95,7 @@ func MakeTestObserver(t *testing.T) *testObserver {
 }
 
 func (to *testObserver) Inserted(q0 int, r []rune) {
+	to.t.Helper()
 	o := &observation{
 		callback: "Inserted",
 		q0:       q0,
@@ -104,6 +106,7 @@ func (to *testObserver) Inserted(q0 int, r []rune) {
 }
 
 func (to *testObserver) Deleted(q0, q1 int) {
+	to.t.Helper()
 	o := &observation{
 		callback: "Deleted",
 		q0:       q0,
@@ -127,4 +130,18 @@ func (to *testObserver) Check(expected []*observation) {
 			to.t.Errorf("observation [%d] got: %v, want %v", i, got, want)
 		}
 	}
+}
+
+// String is a convenience function to dump span contents. Helpful for
+// debugging logs.
+func (s *span) String() string {
+	buffy := new(strings.Builder)
+
+	for p := s.start; p != s.end; p = p.next {
+		buffy.Write(p.data)
+		buffy.WriteString(" -> ")
+	}
+
+	return buffy.String()
+
 }

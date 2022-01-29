@@ -53,7 +53,8 @@ func (f *File) HasUncommitedChanges() bool {
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
 func (f *File) HasUndoableChanges() bool {
-	return len(f.delta) > 0 || len(f.cache) != 0
+	// TODO(rjk): This is wrong. The Commit would change this to false.
+	return len(f.delta) > 0
 }
 
 // HasRedoableChanges returns true if there are entries in the Redo
@@ -120,11 +121,10 @@ func (f *File) InsertAt(p0 int, s []rune, seq int) {
 		f.Uninsert(&f.delta, p0, len(s), seq)
 	}
 	f.b.Insert(p0, s)
-	f.oeb.inserted(p0, s)
 }
 
 // InsertAtWithoutCommit inserts s at p0 by only writing to the cache.
-func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
+func (f *File) InsertAtWithoutCommit(p0 int, s []rune, _ int) {
 	if p0 > f.b.Nc()+len(f.cache) {
 		panic("File.InsertAtWithoutCommit insertion off the end")
 	}
@@ -138,7 +138,6 @@ func (f *File) InsertAtWithoutCommit(p0 int, s []rune) {
 		}
 	}
 	f.cache = append(f.cache, s...)
-	f.oeb.inserted(p0, s)
 }
 
 // Uninsert generates an action record that deletes runes from the File
@@ -169,7 +168,6 @@ func (f *File) DeleteAt(p0, p1, seq int) {
 		f.Undelete(&f.delta, p0, p1, seq)
 	}
 	f.b.Delete(p0, p1)
-	f.oeb.deleted(p0, p1)
 }
 
 // Undelete generates an action record that inserts runes into the File
@@ -186,18 +184,18 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1, seq int) {
 	*delta = append(*delta, &u)
 }
 
-func (f *File) UnsetName(seq int) {
-	f._unsetName(&f.delta, seq)
+func (f *File) UnsetName(fname string, seq int) {
+	f._unsetName(&f.delta, fname, seq)
 }
 
-func (f *File) _unsetName(delta *[]*Undo, seq int) {
+func (f *File) _unsetName(delta *[]*Undo, fname string, seq int) {
 	var u Undo
 	// undo a file name change by restoring old name
 	u.T = sam.Filename
 	u.seq = seq
 	u.P0 = 0 // unused
-	u.N = len(f.oeb.Name())
-	u.Buf = []rune(f.oeb.Name())
+	u.N = len(fname)
+	u.Buf = []rune(fname)
 	*delta = append(*delta, &u)
 }
 
@@ -225,6 +223,14 @@ func (f *File) RedoSeq() int {
 	return u.seq
 }
 
+func (f *File) Undo(seq int) (int, int, bool, int) {
+	return f._undo(true, seq)
+}
+
+func (f *File) Redo(seq int) (int, int, bool, int) {
+	return f._undo(false, seq)
+}
+
 // Undo undoes edits if isundo is true or redoes edits if isundo is false.
 // It returns the new selection q0, q1 and a bool indicating if the
 // returned selection is meaningful.
@@ -234,7 +240,7 @@ func (f *File) RedoSeq() int {
 // This does not align with the semantics of file.Buffer.
 // Each "Mark" needs to have a seq value provided.
 // Returns new q0, q1, ok, new seq
-func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
+func (f *File) _undo(isundo bool, seq int) (int, int, bool, int) {
 	var (
 		stop           int
 		delta, epsilon *[]*Undo
@@ -292,7 +298,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			// If I have a zerox, Undo works via Undo calling
 			// TagStatusObserver.UpdateTag on the appropriate observers.
 			seq = u.seq
-			f._unsetName(epsilon, seq)
+			f._unsetName(epsilon, f.oeb.Name(), seq)
 			newfname := string(u.Buf)
 			f.oeb.setfilename(newfname)
 		}
@@ -307,11 +313,12 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 
 // Mark sets an Undo point and and discards Redo records. Call this at
 // the beginning of a set of edits that ought to be undo-able as a unit.
-// This is equivalent to file.Buffer.Commit() NB: current implementation
+// This is equivalent to file.Buffer.SetUndoPoint() NB: current implementation
 // permits calling Mark on an empty file to indicate that one can undo to
 // the file state at the time of calling Mark.
 //
 // TODO(rjk): Consider renaming to SetUndoPoint
+// Might want the seq here?
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
 }
