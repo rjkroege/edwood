@@ -450,6 +450,7 @@ func (t *Text) Inserted(q0 int, r []rune) {
 	}
 
 	t.logInsert(q0, r)
+	// TODO(rjk): I do too much work here.
 	t.SetSelect(t.q0, t.q1)
 	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)

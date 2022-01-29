@@ -82,13 +82,22 @@
 // particular action.
 package file
 
+// TODO(rjk): Considerations of the efficiency of file.Buffer must make
+// an assumption about the relative sizes of the various pieces.
+// Pathological piece size distributions exist. I should validate that
+// the code can merge/split pieces over time to keep the piece sizes
+// roughly equal.
+
 import (
 	"errors"
 	"io"
 	"log"
-	"time"
 	"unicode/utf8"
+
+	"github.com/rjkroege/edwood/sam"
 )
+
+var _ io.ReaderAt = (*Buffer)(nil)
 
 // expensiveCheckedExecution turns on a number of expensive validations
 // of the internal consistency of the file.Buffer implementation. This is
@@ -108,14 +117,8 @@ type Buffer struct {
 	head          int       // index for the next action to add
 	currentAction *action   // action for the current change group
 	savedAction   *action
-}
 
-type ChangeInfo struct {
-	Off      int64 // Location of the change, in bytes (always positive)
-	Size     int   // Size of change in bytes (can be negative)
-	Nr       int   // Number of runes in change (can be negative)
-	NonAscii int   // Byte index of of the first non-ascii character
-	Width    int   // Width in bytes of the first non-ascii character
+	oeb *ObservableEditableBuffer
 }
 
 // NewBuffer initializes a new buffer with the given content as a starting point.
@@ -137,9 +140,16 @@ func NewBuffer(content []byte, nr int) *Buffer {
 	return t
 }
 
+func (b *Buffer) FlattenHistory() {
+	b.actions = make([]*action, 0, 100)
+	b.head = 0
+	b.currentAction = nil
+	b.savedAction = nil
+}
+
 // Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
+func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 	off := start.b
 	if len(data) == 0 {
 		return nil
@@ -163,7 +173,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 		return nil
 	}
 
-	c := b.newChange(off)
+	c := b.newChange(off, start.r, len(data), nr, seq)
 	var pnew *piece
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
@@ -195,7 +205,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr int) error {
 // if the portion isn't in the range of the buffer size. If the length exceeds the
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
-func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
+func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
 	b.validateInvariant()
 	off := startOff.b
 	length := endOff.b - startOff.b
@@ -284,7 +294,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 	}
 
 	b.cachedPiece = newStart
-	c := b.newChange(off)
+	c := b.newChange(off, startOff.r, startOff.b-endOff.b, startOff.r-endOff.r, seq)
 	c.new = newSpan(newStart, newEnd)
 	c.old = newSpan(start, end)
 	swapSpans(c.old, c.new)
@@ -294,8 +304,8 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple) error {
 }
 
 // newAction creates a new action and throws away all undone actions.
-func (b *Buffer) newAction() *action {
-	a := &action{time: time.Now()}
+func (b *Buffer) newAction(seq int) *action {
+	a := &action{seq: seq}
 	b.actions = append(b.actions[:b.head], a)
 	b.head++
 	return a
@@ -303,14 +313,19 @@ func (b *Buffer) newAction() *action {
 
 // newChange is associated with the current action or a newly allocated one if
 // none exists.
-func (b *Buffer) newChange(off int) *change {
+func (b *Buffer) newChange(off, roff, nb, nr, seq int) *change {
 	a := b.currentAction
 	if a == nil {
-		a = b.newAction()
+		a = b.newAction(seq)
 		b.cachedPiece = nil
 		b.currentAction = a
 	}
-	c := &change{off: off}
+	c := &change{
+		off:  off,
+		roff: roff,
+		nb:   nb,
+		nr:   nr,
+	}
 	a.changes = append(a.changes, c)
 	return c
 }
@@ -361,25 +376,72 @@ func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
 // at which the first change of the action occurred and the number of bytes
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
-func (b *Buffer) Undo() (int, int) {
+// TODO(rjk): Rationalize the returned values. I'm not sure that they're
+// useful for correct.
+func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 	b.SetUndoPoint()
 	a := b.unshiftAction()
 	if a == nil {
-		return -1, 0
+		return -1, 0, false, 0
+	}
+
+	if a.kind == sam.Filename {
+		return b.filenameChangeAction(a)
 	}
 
 	var off, size int
-	var nR int
 
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
-		// TODO(rjk): Is this necessary?
-		off = b.RuneTuple(c.off).b
+		// TODO(rjk): c.off is in runes? I think it's in bytes. So this is non-sensical?
+		// off = b.RuneTuple(c.off).b
+		off = c.off
 		size = c.old.len - c.new.len
-		nR -= c.new.Nr() - c.old.Nr()
+
+		// Must happen after the swapSpans.
+		b.undone(c, true)
 	}
-	return off, size
+
+	if b.head == 0 {
+		return off, size, false, 0
+	}
+	return off, size, false, b.actions[b.head-1].seq
+}
+
+// undone is an Undo helper to implement Edwood specific semantics.
+// TODO(rjk): I want a zero-copy API all the way into frame.
+func (b *Buffer) undone(c *change, undo bool) {
+	if b.oeb == nil {
+		return
+	}
+
+	var size, rsize int
+	if undo {
+		size = c.nb
+		rsize = c.nr
+	} else {
+		// Redo case.
+		size = -c.nb
+		rsize = -c.nr
+	}
+
+	off := c.off // in bytes. The original location where a change started.
+	if size > 0 {
+		// TODO(rjk): API should be in terms of OffsetTuple and eventually bytes.
+		b.oeb.deleted(c.roff, c.roff+rsize)
+	} else {
+		// size is smaller. So we're undoing a deletion
+		buffy := make([]byte, -size)
+
+		if _, err := b.ReadAt(buffy, int64(off)); err != nil {
+			log.Fatalf("fatal error in Buffer.undone reading inserted contents: %v", err)
+		}
+
+		// TODO(rjk): ick. Pass byte buffers around. Or references. Or something.
+		rb := []rune(string(buffy))
+		b.oeb.inserted(c.roff, rb)
+	}
 }
 
 func (b *Buffer) unshiftAction() *action {
@@ -390,27 +452,52 @@ func (b *Buffer) unshiftAction() *action {
 	return b.actions[b.head]
 }
 
+func (b *Buffer) filenameChangeAction(a *action) (int, int, bool, int) {
+	b.oeb.setfilename(a.fname)
+	if b.head > 0 {
+		return -1, 0, false, b.actions[b.head-1].seq
+	}
+	return -1, 0, false, 0
+}
+
 // Redo repeats the last undone action. It returns the offset in bytes
 // at which the last change of the action occurred and the number of bytes
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
-func (b *Buffer) Redo() (int, int) {
+func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	b.SetUndoPoint()
 	a := b.shiftAction()
 	if a == nil {
-		return -1, 0
+		return -1, 0, false, 0
 	}
 
-	var nR int
+	if a.kind == sam.Filename {
+		return b.filenameChangeAction(a)
+	}
+
 	var off, size int
 
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
 		off = c.off
-		nR -= c.new.Nr() - c.old.Nr()
 		size = c.new.len - c.old.len
+
+		// Must happen after swapSpans
+		b.undone(c, false)
 	}
-	return off, size
+
+	return off, size, false, a.seq
+}
+
+// RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
+// analog in file.Buffer. The value of seq is used to track intra and
+// inter File edit actions so that cross-File changes via Edit X can be
+// undone with a single action.
+func (b *Buffer) RedoSeq() int {
+	if len(b.actions) > 0 && b.head < len(b.actions) {
+		return b.actions[b.head].seq
+	}
+	return 0
 }
 
 func (b *Buffer) shiftAction() *action {
@@ -489,6 +576,20 @@ func (b *Buffer) Nr() int {
 	return nr
 }
 
+// UnsetName records a filename change at seq to fname.
+func (b *Buffer) UnsetName(fname string, seq int) {
+	a := &action{
+		seq:   seq,
+		kind:  sam.Filename,
+		fname: fname,
+	}
+	b.actions = append(b.actions[:b.head], a)
+	b.head++
+
+	b.cachedPiece = nil
+	b.currentAction = nil
+}
+
 // validateInvariant tests that every piece has a correct rune count
 // given its byte length.
 func (b *Buffer) validateInvariant() {
@@ -505,21 +606,28 @@ func (b *Buffer) validateInvariant() {
 // action is a list of changes which are used to undo/redo all modifications.
 type action struct {
 	changes []*change
-	time    time.Time // when the first change of this action was performed
+	seq     int
+
+	kind  int
+	fname string
 }
 
 // change keeps all needed information to redo/undo an insertion/deletion.
 type change struct {
-	old span // all pieces which are being modified/swapped out by the change
-	new span // all pieces which are introduced/swapped int by the change
-	off int  // absolute offset at which the change occurred
+	old  span // all pieces which are being modified/swapped out by the change
+	new  span // all pieces which are introduced/swapped in by the change
+	off  int  // absolute offset at which the change occurred
+	roff int  // absolute offset in runes at which the change occurred.
+	nb   int  // number of bytes in this change, negative on deletion.
+	nr   int  // number of runes in this change, negative on deletion.
 }
 
-// span holds a certain range of pieces. Changes to the document are always
-// performed by swapping out an existing span with a new one.
+// span holds a certain range of pieces. Changes to the document are
+// always performed by swapping out an existing span with a new one. len
+// is required to control swapSpans operation.
 type span struct {
 	start, end *piece // start/end of the span
-	len        int    // the sum of the lengths of the pieces which form this span
+	len        int    // the sum of the lengths of the pieces which form this span.
 }
 
 func newSpan(start, end *piece) span {
@@ -590,15 +698,7 @@ func (b *Buffer) Bytes() []byte {
 	return byteBuf
 }
 
-// GetCache returns the data of the cached piece or nil if it does not exist.
-func (b *Buffer) GetCache() []byte {
-	if b.cachedPiece == nil {
-		return nil
-	}
-	return b.cachedPiece.data
-}
-
-// TODO(rjk): Might not be required.
+// TODO(rjk): This concept is not needed. Handle that later.
 func (b *Buffer) HasUncommitedChanges() bool {
 	return b.cachedPiece != nil || b.currentAction != nil
 }
@@ -609,10 +709,6 @@ func (b *Buffer) HasUndoableChanges() bool {
 
 func (b *Buffer) HasRedoableChanges() bool {
 	return b.head <= len(b.actions)-1
-}
-
-func (b *Buffer) TreatAsDirty() bool {
-	return b.Dirty()
 }
 
 // RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
@@ -655,12 +751,4 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		b: tb,
 		r: tr,
 	}
-}
-
-func (s *span) Nr() int {
-	nr := 0
-	for p := s.start; p != s.end; p = p.next {
-		nr += p.nr
-	}
-	return nr
 }

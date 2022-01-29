@@ -131,6 +131,10 @@ func (e *ObservableEditableBuffer) HasMultipleObservers() bool {
 
 // MakeObservableEditableBuffer is a constructor wrapper for NewFile() to abstract File from the main program.
 func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditableBuffer {
+	return _makeObservableEditableBuffer(filename, b, newTypeBuffer)
+}
+
+func _makeObservableEditableBuffer(filename string, b []rune, newtype bool) *ObservableEditableBuffer {
 	oeb := &ObservableEditableBuffer{
 		currobserver: nil,
 		observers:    nil,
@@ -138,7 +142,9 @@ func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditable
 		Elog:         sam.MakeElog(),
 		EditClean:    true,
 	}
-	if newTypeBuffer {
+	// TODO(rjk): Eventually, we can fold out all of the multiple buffer
+	// support stuff.
+	if newtype {
 		oeb.f = NewTypeBuffer(b, oeb)
 	} else {
 		oeb.f = NewLegacyFile(b, oeb)
@@ -211,7 +217,10 @@ func (e *ObservableEditableBuffer) HasRedoableChanges() bool {
 
 // HasUndoableChanges is a forwarding function for file.HasUndoableChanges
 func (e ObservableEditableBuffer) HasUndoableChanges() bool {
-	return e.f.HasUndoableChanges()
+	if e.seq > 0 {
+		return e.f.HasUndoableChanges() || e.f.HasUncommitedChanges()
+	}
+	return false
 }
 
 // IsDir is a forwarding function for DiskDetails.IsDir.
@@ -280,6 +289,7 @@ func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int
 
 	runes, _, hasNulls := util.Cvttorunes(d, len(d))
 	e.f.InsertAt(q0, runes, e.seq)
+	e.inserted(q0, runes)
 	return len(runes), hasNulls, err
 }
 
@@ -296,14 +306,7 @@ func (e *ObservableEditableBuffer) InsertAt(p0 int, s []rune) {
 	defer e.notifyTagObservers(before)
 
 	e.f.InsertAt(p0, s, e.seq)
-}
-
-// InsertAtNoUndo performs an insertion without creating an Undo record.
-// Use this to insert text while updating the tag contents. The tag's
-// ObservableEditableBuffer doesn't have undo.
-// TODO(rjk): May need the delete version too.
-func (e *ObservableEditableBuffer) InsertAtNoUndo(p0 int, s []rune) {
-	e.f.InsertAt(p0, s, 0)
+	e.inserted(p0, s)
 }
 
 // SetName sets the name of the backing for this file. Some backing names
@@ -323,7 +326,7 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 
 	if e.seq > 0 {
 		// TODO(rjk): Pass in the name, make the function name better reflect its purpose.
-		e.f.UnsetName(e.seq)
+		e.f.UnsetName(e.Name(), e.seq)
 	}
 	e.setfilename(name)
 }
@@ -333,7 +336,11 @@ func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)
 
-	q0, q1, ok, e.seq = e.f.Undo(isundo, e.seq)
+	if isundo {
+		q0, q1, ok, e.seq = e.f.Undo(e.seq)
+	} else {
+		q0, q1, ok, e.seq = e.f.Redo(e.seq)
+	}
 	return q0, q1, ok
 }
 
@@ -344,6 +351,7 @@ func (e *ObservableEditableBuffer) DeleteAt(q0, q1 int) {
 	defer e.notifyTagObservers(before)
 
 	e.f.DeleteAt(q0, q1, e.seq)
+	e.deleted(q0, q1)
 }
 
 // TreatAsClean is a forwarding function for file.TreatAsClean.
@@ -429,7 +437,8 @@ func (e *ObservableEditableBuffer) Commit() {
 func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)
-	e.f.InsertAtWithoutCommit(p0, s)
+	e.f.InsertAtWithoutCommit(p0, s, e.seq)
+	e.inserted(p0, s)
 }
 
 // IsDirOrScratch returns true if the File has a synthetic backing of
@@ -467,7 +476,8 @@ func (e *ObservableEditableBuffer) String() string {
 func (e *ObservableEditableBuffer) ResetBuffer() {
 	e.filtertagobservers = false
 	e.seq = 0
-	if newTypeBuffer {
+	// TODO(rjk): Presumably this is ok?
+	if _, ok := e.f.(*Buffer); ok {
 		e.f = NewTypeBuffer([]rune{}, e)
 	} else {
 		e.f = NewLegacyFile([]rune{}, e)
