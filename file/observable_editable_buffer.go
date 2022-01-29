@@ -21,13 +21,8 @@ type ObservableEditableBuffer struct {
 	observers       map[BufferObserver]struct{}
 	statusobservers map[TagStatusObserver]struct{}
 
-	// The legacy implementation.
-	f *File
-
-	// The new wip implementation.During the transitional phase file.Buffer is tested,
-	// only one of f or b should be non-nil. The interim forwarding functions can
-	// branch to implementations based on which is not-nil.
-	b *Buffer
+	// The switchable implementation.
+	f BufferAdapter
 
 	Elog sam.Elog
 
@@ -136,17 +131,18 @@ func (e *ObservableEditableBuffer) HasMultipleObservers() bool {
 
 // MakeObservableEditableBuffer is a constructor wrapper for NewFile() to abstract File from the main program.
 func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditableBuffer {
-	f := NewFile()
-	f.b = b
 	oeb := &ObservableEditableBuffer{
 		currobserver: nil,
 		observers:    nil,
-		f:            f,
 		details:      &DiskDetails{Name: filename, Hash: Hash{}},
 		Elog:         sam.MakeElog(),
 		EditClean:    true,
 	}
-	oeb.f.oeb = oeb
+	if newTypeBuffer {
+		oeb.f = NewTypeBuffer(b, oeb)
+	} else {
+		oeb.f = NewLegacyFile(b, oeb)
+	}
 	return oeb
 }
 
@@ -327,7 +323,7 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 
 	if e.seq > 0 {
 		// TODO(rjk): Pass in the name, make the function name better reflect its purpose.
-		e.f.UnsetName(&e.f.delta, e.seq)
+		e.f.UnsetName(e.seq)
 	}
 	e.setfilename(name)
 }
@@ -455,7 +451,7 @@ func (e *ObservableEditableBuffer) TreatAsDirty() bool {
 // ReadC can be implemented in terms of Read when using file.Buffer
 // because the "cache" concept is not germane.
 func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
-	return e.f.b.Read(q0, r)
+	return e.f.Read(q0, r)
 }
 
 // String is a forwarding function for rune_array.String.
@@ -463,7 +459,7 @@ func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 // TODO(rjk): Consider making this aware of the cache. (If test results depend
 // on this not
 func (e *ObservableEditableBuffer) String() string {
-	return e.f.b.String()
+	return e.f.String()
 }
 
 // ResetBuffer is a forwarding function for rune_array.Reset. Equivalent
@@ -471,23 +467,21 @@ func (e *ObservableEditableBuffer) String() string {
 func (e *ObservableEditableBuffer) ResetBuffer() {
 	e.filtertagobservers = false
 	e.seq = 0
-	e.f = NewFile()
-	e.f.oeb = e
+	if newTypeBuffer {
+		e.f = NewTypeBuffer([]rune{}, e)
+	} else {
+		e.f = NewLegacyFile([]rune{}, e)
+	}
 }
 
 // Reader is a forwarding function for rune_array.Reader.
 func (e *ObservableEditableBuffer) Reader(q0 int, q1 int) io.Reader {
-	return e.f.b.Reader(q0, q1)
+	return e.f.Reader(q0, q1)
 }
 
 // IndexRune is a forwarding function for rune_array.IndexRune.
 func (e *ObservableEditableBuffer) IndexRune(r rune) int {
-	return e.f.b.IndexRune(r)
-}
-
-// Nbyte is a forwarding function for rune_array.Nbyte.
-func (e *ObservableEditableBuffer) Nbyte() int {
-	return e.f.b.Nbyte()
+	return e.f.IndexRune(r)
 }
 
 // setfilename updates the oeb.details.name and isscratch bit at the same

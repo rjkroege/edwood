@@ -376,31 +376,31 @@ func TestFileUpdateInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat failed: %v", err)
 	}
-	f := MakeObservableEditableBuffer(filename, nil).f
-	f.oeb.SetHash(EmptyHash)
-	f.oeb.SetInfo(nil)
+	oeb := MakeObservableEditableBuffer(filename, nil)
+	oeb.SetHash(EmptyHash)
+	oeb.SetInfo(nil)
 
-	f.oeb.UpdateInfo(filename, d)
-	if f.oeb.Info() != nil {
-		t.Errorf("File info is %v; want nil", f.oeb.Info())
+	oeb.UpdateInfo(filename, d)
+	if oeb.Info() != nil {
+		t.Errorf("File info is %v; want nil", oeb.Info())
 	}
 
 	h, err := HashFor(filename)
 	if err != nil {
 		t.Fatalf("HashFor(%v) failed: %v", filename, err)
 	}
-	f.oeb.SetHash(h)
-	f.oeb.SetInfo(nil)
-	f.oeb.UpdateInfo(filename, d)
-	if f.oeb.Info() != d {
-		t.Errorf("File info is %v; want %v", f.oeb.Info(), d)
+	oeb.SetHash(h)
+	oeb.SetInfo(nil)
+	oeb.UpdateInfo(filename, d)
+	if oeb.Info() != d {
+		t.Errorf("File info is %v; want %v", oeb.Info(), d)
 	}
 }
 
 func TestFileUpdateInfoError(t *testing.T) {
 	filename := "/non-existent-file"
-	f := MakeObservableEditableBuffer(filename, nil).f
-	err := f.oeb.UpdateInfo(filename, nil)
+	oeb := MakeObservableEditableBuffer(filename, nil)
+	err := oeb.UpdateInfo(filename, nil)
 	want := "failed to compute hash for"
 	if err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("File.UpdateInfo returned error %q; want prefix %q", err, want)
