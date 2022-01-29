@@ -2,6 +2,7 @@ package file
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/rjkroege/edwood/sam"
 	"github.com/rjkroege/edwood/util"
@@ -51,28 +52,19 @@ func (f *File) HasUncommitedChanges() bool {
 
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
-// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasUndoableChanges() bool {
 	return len(f.delta) > 0 || len(f.cache) != 0
 }
 
 // HasRedoableChanges returns true if there are entries in the Redo
 // log that can be redone.
-// Has no analog in buffer.Undo. It will require modification.
 func (f *File) HasRedoableChanges() bool {
 	return len(f.epsilon) > 0
 }
 
-// Size returns the complete size of the buffer including both committed
-// and uncommitted runes.
-// This is currently in runes. Note that undo.Buffer.Size() is in bytes.
-func (f *File) Size() int {
-	return int(f.b.Nc()) + len(f.cache)
-}
-
 // Nr returns the number of valid runes in the File.
 func (f *File) Nr() int {
-	return f.Size()
+	return int(f.b.Nc()) + len(f.cache)
 }
 
 // ReadC reads a single rune from the File.
@@ -86,14 +78,6 @@ func (f *File) ReadC(q int) rune {
 		return f.cache[q-f.cq0]
 	}
 	return f.b.ReadC(q)
-}
-
-// ReadAtRune reads at most len(r) runes from File at rune off.
-// It returns the number of  runes read and an error if something goes wrong.
-func (f *File) ReadAtRune(r []rune, off int) (n int, err error) {
-	// TODO(rjk): This should include cache contents but currently
-	// callers do not require it to.
-	return f.b.Read(off, r)
 }
 
 // Commit writes the in-progress edits to the real buffer instead of
@@ -202,7 +186,11 @@ func (f *File) Undelete(delta *[]*Undo, p0, p1, seq int) {
 	*delta = append(*delta, &u)
 }
 
-func (f *File) UnsetName(delta *[]*Undo, seq int) {
+func (f *File) UnsetName(seq int) {
+	f._unsetName(&f.delta, seq)
+}
+
+func (f *File) _unsetName(delta *[]*Undo, seq int) {
 	var u Undo
 	// undo a file name change by restoring old name
 	u.T = sam.Filename
@@ -213,11 +201,12 @@ func (f *File) UnsetName(delta *[]*Undo, seq int) {
 	*delta = append(*delta, &u)
 }
 
-func NewFile() *File {
+func NewLegacyFile(b []rune, oeb *ObservableEditableBuffer) *File {
 	return &File{
-		b:       NewRuneArray(),
+		b:       b,
 		delta:   []*Undo{},
 		epsilon: []*Undo{},
+		oeb:     oeb,
 	}
 }
 
@@ -303,7 +292,7 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 			// If I have a zerox, Undo works via Undo calling
 			// TagStatusObserver.UpdateTag on the appropriate observers.
 			seq = u.seq
-			f.UnsetName(epsilon, seq)
+			f._unsetName(epsilon, seq)
 			newfname := string(u.Buf)
 			f.oeb.setfilename(newfname)
 		}
@@ -325,4 +314,22 @@ func (f *File) Undo(isundo bool, seq int) (int, int, bool, int) {
 // TODO(rjk): Consider renaming to SetUndoPoint
 func (f *File) Mark() {
 	f.epsilon = f.epsilon[0:0]
+}
+
+// Finish implementing  BufferAdapter
+
+func (f *File) IndexRune(r rune) int {
+	return f.b.IndexRune(r)
+}
+
+func (f *File) Read(q0 int, r []rune) (int, error) {
+	return f.b.Read(q0, r)
+}
+
+func (f *File) Reader(q0 int, q1 int) io.Reader {
+	return f.b.Reader(q0, q1)
+}
+
+func (f *File) String() string {
+	return f.b.String()
 }

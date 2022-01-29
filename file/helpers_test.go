@@ -7,6 +7,8 @@ import (
 )
 
 type checkable interface {
+	BufferAdapter
+
 	// Return the entire backing as a string.
 	readwholefile(*testing.T) string
 
@@ -30,24 +32,9 @@ func (f *File) readwholefile(t *testing.T) string {
 	var sb strings.Builder
 
 	// Currently ReadAtRune does not return runes in the cache.
-	if f.HasUncommitedChanges() {
-		for i := 0; i < f.Nr(); i++ {
-			sb.WriteRune(f.ReadC(i))
-		}
-		return sb.String()
+	for i := 0; i < f.Nr(); i++ {
+		sb.WriteRune(f.ReadC(i))
 	}
-
-	targetbuffer := make([]rune, f.Nr())
-	if _, err := f.ReadAtRune(targetbuffer, 0); err != nil {
-		t.Fatalf("readwhole could not read File %v", f)
-	}
-
-	for _, r := range targetbuffer {
-		if _, err := sb.WriteRune(r); err != nil {
-			t.Fatalf("readwhole could not write rune %v to strings.Builder %s", r, sb.String())
-		}
-	}
-
 	return sb.String()
 }
 
@@ -59,15 +46,8 @@ func (b *Buffer) readwholefile(*testing.T) string { return "" }
 func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *stateSummary) {
 	t.Helper()
 
-	if oeb.f != nil && oeb.b != nil {
-		t.Fatalf("only one oeb.f or oeb.b should be in use")
-	}
-
 	// Lets the test infrastructure call against file.Buffer or file.File.
-	f := checkable(oeb.f)
-	if oeb.b != nil {
-		f = checkable(oeb.b)
-	}
+	f := oeb.f.(checkable)
 
 	if f.commitisgermane() {
 		if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
