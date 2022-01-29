@@ -26,9 +26,9 @@ func TestOverall(t *testing.T) {
 	b.checkPiecesCnt(t, 6)
 	b.checkContent("#3", t, "All work and no playing ウクラ makes John a dull boy")
 
-	b.Commit()
+	b.SetUndoPoint()
 	// Also check that multiple change commits don't create empty changes.
-	b.Commit()
+	b.SetUndoPoint()
 	b.deleteCreateOffsetTuple(20, 18)
 	b.checkContent("#4", t, "All work and no play a dull boy")
 
@@ -387,7 +387,7 @@ func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
 }
 
 func (t *Buffer) insertString(off int, data string) {
-	t.Commit()
+	t.SetUndoPoint()
 	t.cacheInsertString(off, data)
 }
 
@@ -399,7 +399,7 @@ func (t *Buffer) cacheInsertString(off int, data string) {
 }
 
 func (t *Buffer) delete(off, length int) {
-	t.Commit()
+	t.SetUndoPoint()
 	t.cacheDelete(off, length)
 }
 

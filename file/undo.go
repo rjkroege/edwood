@@ -362,7 +362,7 @@ func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
 // the change added at off. If there is no action to undo, Undo returns -1
 // as the offset.
 func (b *Buffer) Undo() (int, int) {
-	b.Commit()
+	b.SetUndoPoint()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0
@@ -395,7 +395,7 @@ func (b *Buffer) unshiftAction() *action {
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
 func (b *Buffer) Redo() (int, int) {
-	b.Commit()
+	b.SetUndoPoint()
 	a := b.shiftAction()
 	if a == nil {
 		return -1, 0
@@ -421,8 +421,8 @@ func (b *Buffer) shiftAction() *action {
 	return b.actions[b.head-1]
 }
 
-// Commit commits the currently performed changes and creates an undo/redo point.
-func (b *Buffer) Commit() {
+// SetUndoPoint commits the currently performed changes and creates an undo/redo point.
+func (b *Buffer) SetUndoPoint() {
 	b.currentAction = nil
 	b.cachedPiece = nil
 }
