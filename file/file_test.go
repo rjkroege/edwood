@@ -65,7 +65,7 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 	}
 
 	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
-		&stateSummary{true, true, false, true, s1})
+		&stateSummary{true, true, false, false, s1})
 }
 
 const s1 = "hi 海老麺"
