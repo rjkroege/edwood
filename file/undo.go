@@ -698,9 +698,10 @@ func (b *Buffer) Bytes() []byte {
 	return byteBuf
 }
 
-// TODO(rjk): This concept is not needed. Handle that later.
+// TODO(rjk): This concept is not needed in a file.Buffer world. Improve
+// this.
 func (b *Buffer) HasUncommitedChanges() bool {
-	return b.cachedPiece != nil || b.currentAction != nil
+	return false
 }
 
 func (b *Buffer) HasUndoableChanges() bool {
@@ -713,6 +714,7 @@ func (b *Buffer) HasRedoableChanges() bool {
 
 // RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
 // given offset in runes.
+// TODO(rjk): Consider using the cached piece to speed this up.
 func (b *Buffer) RuneTuple(off int) OffSetTuple {
 	b.validateInvariant()
 
