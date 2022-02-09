@@ -257,7 +257,7 @@ func TestBufferSize(t *testing.T) {
 	}
 }
 
-func disabled_TestUndoRedoReturnedOffsets(t *testing.T) {
+func TestUndoRedoReturnedOffsets(t *testing.T) {
 	b := NewBufferNoNr(nil)
 	insert := func(off, len int) {
 		b.insertString(off, strings.Repeat(".", len))

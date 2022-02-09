@@ -171,7 +171,7 @@ func (b *Buffer) Mark() {
 }
 
 func (b *Buffer) Read(rq0 int, r []rune) (int, error) {
-	p0 := b.RuneTuple(0)
+	p0 := b.RuneTuple(rq0)
 
 	sr := io.NewSectionReader(b, int64(p0.b), int64(b.Size()-p0.b))
 	bsr := bufio.NewReader(sr)
