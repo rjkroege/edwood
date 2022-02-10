@@ -213,7 +213,7 @@ func TestGetDirNames(t *testing.T) {
 		warnings = nil
 	}()
 
-	f, err := os.Open(dir)
+	f, err := server.EdSrv.Open(dir)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}

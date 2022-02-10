@@ -6,7 +6,6 @@ import (
 	"image"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/server"
 )
 
 type Exectab struct {
@@ -521,7 +521,7 @@ func local(et, _, argt *Text, _, _ bool, arg string) {
 //
 // TODO(flux): Write this in terms of the various cases.
 func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) error {
-	d, err := os.Stat(name)
+	d, err := server.EdSrv.Stat(name)
 
 	// Putting to the same file that we already read from.
 	if err == nil && name == oeb.Name() {
@@ -529,7 +529,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 			oeb.UpdateInfo(name, d)
 		}
 
-		if !os.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
+		if !server.EdSrv.SameFile(oeb.Info(), d) || d.ModTime().Sub(oeb.Info().ModTime()) > time.Millisecond {
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
 			oeb.SetInfo(d)
@@ -544,7 +544,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 		}
 	}
 
-	fd, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	fd, err := server.EdSrv.OpenFile(name, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		return warnError(nil, "can't create file %s: %v", name, err)
 	}
@@ -667,7 +667,7 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 	}
 
 	c := &Command{}
-	cpid := make(chan *os.Process)
+	cpid := make(chan server.Execution)
 	go func() {
 		err := runproc(win, s, rdir, newns, argaddr, xarg, c, cpid, iseditcmd)
 		if err != nil && err != errEmptyCmd {
@@ -840,11 +840,11 @@ func zeroxx(et *Text, t *Text, _ *Text, _, _ bool, _4 string) {
 	}
 }
 
-func runwaittask(c *Command, cpid chan *os.Process) {
-	c.proc = <-cpid
+func runwaittask(c *Command, cpid chan server.Execution) {
+	c.e = <-cpid
 
-	if c.proc != nil { // successful exec
-		c.pid = c.proc.Pid
+	if c.e != nil { // successful exec
+		//c.pid = c.proc.Pid
 		global.ccommand <- c
 	} else {
 		if c.iseditcommand {
@@ -859,7 +859,7 @@ var errEmptyCmd = fmt.Errorf("empty command")
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
-func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg string, c *Command, cpid chan *os.Process, iseditcmd bool) error {
+func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg string, c *Command, cpid chan server.Execution, iseditcmd bool) error {
 	var (
 		t, name, filename string
 		incl              []string
@@ -900,21 +900,21 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			shell = "rc"
 		}
 		rcarg = []string{shell, "-c", t}
-		cmd := exec.Command(rcarg[0], rcarg[1:]...)
-		cmd.Dir = dir
-		cmd.Stdin = sin
-		cmd.Stdout = sout
-		cmd.Stderr = serr
-		err := cmd.Start()
+		exe, err := server.EdSrv.Run(rcarg[0], rcarg[1:], dir, nil, sin, sout, serr)
 		if err != nil {
 			Fail()
 			return fmt.Errorf("exec %s: %v", shell, err)
 		}
-		cpid <- cmd.Process
+		err = exe.Start()
+		if err != nil {
+			Fail()
+			return fmt.Errorf("exec %s: %v", shell, err)
+		}
+		cpid <- exe
 		go func() {
-			cmd.Wait()
+			exe.Wait()
 			Closeall()
-			global.cwait <- cmd.ProcessState
+			global.cwait <- exe.State()
 		}()
 		return nil
 	}
@@ -1025,22 +1025,21 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		Fail()
 		return errEmptyCmd
 	}
-	cmd := exec.Command(c.av[0], c.av[1:]...)
-	cmd.Dir = dir
-	cmd.Stdin = sin
-	cmd.Stdout = sout
-	cmd.Stderr = serr
-	cmd.Env = env
-	err := cmd.Start()
+	exe, err := server.EdSrv.Run(c.av[0], c.av[1:], dir, env, sin, sout, serr)
 	if err != nil {
 		Fail()
 		return err
 	}
-	cpid <- cmd.Process
+	err = exe.Start()
+	if err != nil {
+		Fail()
+		return err
+	}
+	cpid <- exe
 	go func() {
-		cmd.Wait()
+		exe.Wait()
 		Closeall()
-		global.cwait <- cmd.ProcessState
+		global.cwait <- exe.State()
 	}()
 	return nil
 }

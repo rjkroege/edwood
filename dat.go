@@ -2,10 +2,10 @@ package main
 
 import (
 	"math"
-	"os"
 	"unicode/utf8"
 
 	"9fans.net/go/plan9"
+	"github.com/rjkroege/edwood/server"
 	//"9fans.net/go/plumb"
 	//	"github.com/rjkroege/edwood/draw"
 	//	"github.com/rjkroege/edwood/file"
@@ -67,8 +67,9 @@ const (
 	Kscrollonedown = KF | 0x21
 )
 
+// TODO(knusbaum) duplicates server.ProcessState
 type ProcessState interface {
-	Pid() int
+	Execution() server.Execution
 	String() string
 	Success() bool
 }
@@ -78,8 +79,9 @@ type Range struct {
 }
 
 type Command struct {
-	pid           int
-	proc          *os.Process
+	//pid           int
+	//proc          *os.Process
+	e             server.Execution
 	name          string
 	text          string
 	av            []string

@@ -10,6 +10,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -437,7 +438,7 @@ func (w *Window) Commit(t *Text) {
 }
 
 func isDir(r string) (bool, error) {
-	f, err := os.Open(r)
+	f, err := server.EdSrv.Open(r)
 	if err != nil {
 		return false, err
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/server"
 )
 
 // TODO(rjk): Document what each of these are.
@@ -73,9 +75,9 @@ var global *globals
 
 // Preserve existing global semantics.
 // TODO(rjk): Remove this *eventually*.
-func init() {
-	global = makeglobals()
-}
+//func init() {
+//	global = makeglobals()
+//}
 
 func makeglobals() *globals {
 	g := &globals{
@@ -95,13 +97,14 @@ func makeglobals() *globals {
 		cwarn:      make(chan uint),
 	}
 
-	if home, err := os.UserHomeDir(); err == nil {
+	if home, err := server.EdSrv.UserHomeDir(); err == nil {
 		g.home = home
 	} else {
 		log.Fatalf("could not get user home directory: %v", err)
 	}
 
-	if pwd, err := os.Getwd(); err == nil {
+	if pwd, err := server.EdSrv.Getwd(); err == nil {
+		fmt.Printf("GOT WORKING DIRECTORY: %s\n", pwd)
 		g.wdir = pwd
 	} else {
 		log.Fatalf("could not get working directory: %v", err)

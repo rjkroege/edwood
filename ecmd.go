@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/server"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -258,7 +258,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror(Enoname)
 	}
 	samename := name == file.Name()
-	fd, err := os.Open(name)
+	fd, err := server.EdSrv.Open(name)
 	if err != nil {
 		editerror("can't open %v: %v", name, err)
 	}
