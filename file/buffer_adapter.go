@@ -3,7 +3,6 @@ package file
 import (
 	"bufio"
 	"bytes"
-	"flag"
 	"io"
 	"strings"
 )
@@ -73,16 +72,8 @@ type BufferAdapter interface {
 // Enforce that *file.File implements BufferAdapter.
 var (
 	_ BufferAdapter = (*File)(nil)
-
-	// TODO(rjk): Make this compile. :-)
 	_ BufferAdapter = (*Buffer)(nil)
-
-	newTypeBuffer bool
 )
-
-func init() {
-	flag.BoolVar(&newTypeBuffer, "newtypebuffer", false, "turn on the file.Buffer new Buffer implementation")
-}
 
 func NewTypeBuffer(inputrunes []rune, oeb *ObservableEditableBuffer) BufferAdapter {
 	// TODO(rjk): Figure out how to plumb in the oeb object to setup Undo

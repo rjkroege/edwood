@@ -36,7 +36,7 @@ func TestFileHandlesNilEpsilonDelta(t *testing.T) {
 		{"undo (nil delta)", true, 14, 17, 14, 17, nil, nil},
 		{"redo (nil epsilon)", false, 14, 17, 14, 17, nil, nil},
 	} {
-		oeb := MakeObservableEditableBuffer("", []rune("This is an example sentence.\n"))
+		oeb := _makeObservableEditableBuffer("", []rune("This is an example sentence.\n"), false)
 
 		fimpl := oeb.f.(*File)
 		fimpl.delta = tc.delta

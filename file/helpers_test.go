@@ -145,3 +145,31 @@ func (s *span) String() string {
 	return buffy.String()
 
 }
+
+type undoexpectation struct {
+	q0 int
+	q1 int
+	ok bool
+}
+
+func (e *ObservableEditableBuffer) checkedUndo(isundo bool, t *testing.T, u undoexpectation) {
+	t.Helper()
+
+	q0, q1, ok := e.Undo(isundo)
+
+	if got, want := ok, u.ok; got != want {
+		t.Errorf("Undo wrong ok: got %v, want %v", got, want)
+	}
+
+	if !ok {
+		// Values of q0, q1 don't matter if ok is false
+		return
+	}
+
+	if got, want := q0, u.q0; got != want {
+		t.Errorf("Undo wrong q0: got %d, want %d", got, want)
+	}
+	if got, want := q1, u.q1; got != want {
+		t.Errorf("Undo wrong q1: got %d, want %d", got, want)
+	}
+}
