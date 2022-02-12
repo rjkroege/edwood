@@ -323,6 +323,9 @@ func mutateBothOtherUndo(t *testing.T, g *globals) {
 	firstwin := g.row.col[0].w[0]
 	secondwin := g.row.col[0].w[1]
 
+	t.Logf("firstwin, %q", firstwin.body.file.String())
+	t.Logf("secondwin, %q", secondwin.body.file.String())
+
 	// Modify the firstwin.
 	firstwin.body.q0 = 3
 	firstwin.body.q1 = 10
@@ -330,9 +333,14 @@ func mutateBothOtherUndo(t *testing.T, g *globals) {
 	firstwin.body.file.Mark(global.seq)
 	cut(&firstwin.tag, &firstwin.body, nil, false, true, "")
 
+	t.Logf("after cut firstwin, %q", firstwin.body.file.String())
+
 	// Run undo from one of the windows. (i.e. same as clicking on the Undo action.)
 	// Cut should remain, original global edit should get Undone only in secondwin.
 	undo(&secondwin.tag, nil, nil, true /* this is an undo */, false /* ignored */, "")
+
+	t.Logf("after undo firstwin, %q", firstwin.body.file.String())
+	t.Logf("after undo secondwin, %q", secondwin.body.file.String())
 }
 
 func mutateBranchedAndRejoined(t *testing.T, g *globals) {

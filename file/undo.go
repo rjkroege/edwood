@@ -150,6 +150,8 @@ func (b *Buffer) FlattenHistory() {
 // Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
 func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
+	//	log.Println("Insert start")
+	//	defer log.Println("Insert end")
 	off := start.b
 	if len(data) == 0 {
 		return nil
@@ -173,7 +175,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 		return nil
 	}
 
-	c := b.newChange(off, start.r, len(data), nr, seq)
+	c := b.newChange(off, start.r, seq)
 	var pnew *piece
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
@@ -294,7 +296,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
 	}
 
 	b.cachedPiece = newStart
-	c := b.newChange(off, startOff.r, startOff.b-endOff.b, startOff.r-endOff.r, seq)
+	c := b.newChange(off, startOff.r, seq)
 	c.new = newSpan(newStart, newEnd)
 	c.old = newSpan(start, end)
 	swapSpans(c.old, c.new)
@@ -313,7 +315,7 @@ func (b *Buffer) newAction(seq int) *action {
 
 // newChange is associated with the current action or a newly allocated one if
 // none exists.
-func (b *Buffer) newChange(off, roff, nb, nr, seq int) *change {
+func (b *Buffer) newChange(off, roff, seq int) *change {
 	a := b.currentAction
 	if a == nil {
 		a = b.newAction(seq)
@@ -323,8 +325,6 @@ func (b *Buffer) newChange(off, roff, nb, nr, seq int) *change {
 	c := &change{
 		off:  off,
 		roff: roff,
-		nb:   nb,
-		nr:   nr,
 	}
 	a.changes = append(a.changes, c)
 	return c
@@ -379,57 +379,75 @@ func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
 // TODO(rjk): Rationalize the returned values. I'm not sure that they're
 // useful for correct.
 func (b *Buffer) Undo(_ int) (int, int, bool, int) {
+	// log.Println("Undo start")
+	// defer log.Println("Undo end")
+	b.validateInvariant()
 	b.SetUndoPoint()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0, false, 0
 	}
 
+	// TODO(rjk): This is wrong if a filename change and edits are part of
+	// the same action?
 	if a.kind == sam.Filename {
 		return b.filenameChangeAction(a)
 	}
 
-	var off, size int
+	var roff, nr int
 
 	for i := len(a.changes) - 1; i >= 0; i-- {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
-		// TODO(rjk): c.off is in runes? I think it's in bytes. So this is non-sensical?
-		// off = b.RuneTuple(c.off).b
-		off = c.off
-		size = c.old.len - c.new.len
+		roff = c.roff
 
 		// Must happen after the swapSpans.
-		b.undone(c, true)
+		nr = b.undone(c, true)
 	}
 
 	if b.head == 0 {
-		return off, size, false, 0
+		return roff, roff - nr, true, 0
 	}
-	return off, size, false, b.actions[b.head-1].seq
+	b.validateInvariant()
+	// TODO(rjk): Conceivably, I need better tests for the return values.
+	return roff, roff - nr, true, b.actions[b.head-1].seq
 }
 
-// undone is an Undo helper to implement Edwood specific semantics.
+// undone is an Undo helper to implement Edwood specific callback
+// semantics. It returns the number of affected runes. There are 4 cases:
+// undo insertion, undo deletion, redo insertion, redo deletion:
+//
+// 	- undo-insertion: dispatch a deletion operation, return 0
+//	- undo-deletion: dispatch an insert, return size of inserted text
+// 	- redo-insertion: dispatch an insert, return size of inserted
+// 	- redo-deletion: dispatch a deletion, return 0
+//
 // TODO(rjk): I want a zero-copy API all the way into frame.
-func (b *Buffer) undone(c *change, undo bool) {
-	if b.oeb == nil {
-		return
-	}
-
+func (b *Buffer) undone(c *change, undo bool) int {
 	var size, rsize int
+	newnb, newnr := c.new.nbr()
+	oldnb, oldnr := c.old.nbr()
+
 	if undo {
-		size = c.nb
-		rsize = c.nr
+		size = newnb - oldnb
+		rsize = newnr - oldnr
 	} else {
 		// Redo case.
-		size = -c.nb
-		rsize = -c.nr
+		size = oldnb - newnb
+		rsize = oldnr - newnr
+	}
+
+	//	log.Println("undone", undo, size, rsize)
+	if b.oeb == nil {
+		// TODO(rjk): Exiting here provides visibility into the computed size.
+		return rsize
 	}
 
 	off := c.off // in bytes. The original location where a change started.
 	if size > 0 {
 		// TODO(rjk): API should be in terms of OffsetTuple and eventually bytes.
 		b.oeb.deleted(c.roff, c.roff+rsize)
+		rsize = 0
 	} else {
 		// size is smaller. So we're undoing a deletion
 		buffy := make([]byte, -size)
@@ -440,8 +458,10 @@ func (b *Buffer) undone(c *change, undo bool) {
 
 		// TODO(rjk): ick. Pass byte buffers around. Or references. Or something.
 		rb := []rune(string(buffy))
+		//		log.Println("undone", undo, c.roff, len(rb), string(buffy))
 		b.oeb.inserted(c.roff, rb)
 	}
+	return rsize
 }
 
 func (b *Buffer) unshiftAction() *action {
@@ -465,6 +485,9 @@ func (b *Buffer) filenameChangeAction(a *action) (int, int, bool, int) {
 // the change added at off. If there is no action to redo, Redo returns -1
 // as the offset.
 func (b *Buffer) Redo(_ int) (int, int, bool, int) {
+	//	log.Println("Redo start")
+	//	defer log.Println("Redo end")
+	b.validateInvariant()
 	b.SetUndoPoint()
 	a := b.shiftAction()
 	if a == nil {
@@ -475,18 +498,18 @@ func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 		return b.filenameChangeAction(a)
 	}
 
-	var off, size int
-
+	var roff, nr int
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
-		off = c.off
-		size = c.new.len - c.old.len
+		roff = c.roff
 
 		// Must happen after swapSpans
-		b.undone(c, false)
+		nr = b.undone(c, false)
 	}
 
-	return off, size, false, a.seq
+	//	log.Println("redo", roff, roff+nr, true, len(a.changes))
+	b.validateInvariant()
+	return roff, roff - nr, true, b.actions[b.head-1].seq
 }
 
 // RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
@@ -618,13 +641,17 @@ type change struct {
 	new  span // all pieces which are introduced/swapped in by the change
 	off  int  // absolute offset at which the change occurred
 	roff int  // absolute offset in runes at which the change occurred.
-	nb   int  // number of bytes in this change, negative on deletion.
-	nr   int  // number of runes in this change, negative on deletion.
+
+	// TODO(rjk): These don't get updated.
+	// It's length of new - length of old?
+	//	nb   int  // number of bytes in this change, negative on deletion.
+	//	nr   int  // number of runes in this change, negative on deletion.
 }
 
 // span holds a certain range of pieces. Changes to the document are
 // always performed by swapping out an existing span with a new one. len
-// is required to control swapSpans operation.
+// is required to control swapSpans operation. len might not be updated
+// when a cached piece is modified.
 type span struct {
 	start, end *piece // start/end of the span
 	len        int    // the sum of the lengths of the pieces which form this span.
@@ -633,12 +660,26 @@ type span struct {
 func newSpan(start, end *piece) span {
 	s := span{start: start, end: end}
 	for p := start; p != nil; p = p.next {
-		s.len += (p.len())
+		s.len += p.len()
 		if p == end {
 			break
 		}
 	}
 	return s
+}
+
+// nbr returns the number of bytes and runes in a span. span.len is not
+// updated for cached piece modification. nbr returns up to date values.
+func (s span) nbr() (int, int) {
+	nr, nb := 0, 0
+	for p := s.start; p != nil; p = p.next {
+		nb += p.len()
+		nr += p.nr
+		if p == s.end {
+			break
+		}
+	}
+	return nb, nr
 }
 
 // swapSpans swaps out an old span and replace it with a new one.

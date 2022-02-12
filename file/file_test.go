@@ -137,7 +137,11 @@ func TestFileUndoRedo(t *testing.T) {
 			// Because of how seq managed the number of Undo actions, this
 			// corresponds to the case of not incrementing seq and undoes every
 			// action in the log.
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 0,
+				q1: 0,
+			})
 
 			t.Log(f.f.String())
 			t.Log(f.seq, f.f.HasUncommitedChanges(), f.Dirty(), f.putseq)
@@ -145,7 +149,21 @@ func TestFileUndoRedo(t *testing.T) {
 				&stateSummary{false, false, true, false, ""})
 
 			// Redo
-			f.Undo(false)
+			// This is actually wrong with legacy file. It will leave a portion of the selection
+			// set.
+			if nt == "newtype" {
+				f.checkedUndo(false, t, undoexpectation{
+					ok: true,
+					q0: 0,
+					q1: 9,
+				})
+			} else {
+				f.checkedUndo(false, t, undoexpectation{
+					ok: true,
+					q0: 6,
+					q1: 9,
+				})
+			}
 
 			t.Log(f.f.String())
 			t.Log(f.seq, f.f.HasUncommitedChanges(), f.Dirty(), f.putseq)
@@ -175,13 +193,21 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 			check(t, "TestFileUndoRedoWithMark after 2 inserts", f,
 				&stateSummary{false, true, false, true, s1 + s2})
 
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 6,
+				q1: 6,
+			})
 
 			check(t, "TestFileUndoRedoWithMark after 1 undo", f,
 				&stateSummary{false, true, true, true, s1})
 
 			// Redo
-			f.Undo(false)
+			f.checkedUndo(false, t, undoexpectation{
+				ok: true,
+				q0: 6,
+				q1: 9,
+			})
 
 			check(t, "TestFileUndoRedoWithMark after 1 redo", f,
 				&stateSummary{false, true, false, true, s1 + s2})
@@ -274,7 +300,9 @@ func TestFileLoadUndoHash(t *testing.T) {
 			}
 
 			// Undo renmaing the file.
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: false,
+			})
 			check(t, "TestFileLoadUndoHash after Undo", f,
 				&stateSummary{false, false, true, false, s2 + s2})
 			if got, want := f.Name(), "edwood"; got != want {
@@ -328,7 +356,11 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 				&stateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
 			t.Logf("after setup seq %d, putseq %d", f.seq, f.putseq)
 
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 5,
+				q1: 5,
+			})
 			check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 				&stateSummary{false, true, true, true, "yi 海老麺"})
 			t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
@@ -365,12 +397,21 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 				},
 			})
 
-			f.Undo(true) // 2 deletes should get removed because they have the same sequence.
+			// 2 deletes should get removed because they have the same sequence.
+			f.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 0,
+				q1: 1,
+			})
 			check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
 				&stateSummary{false, true, true, true, "byehi 海老麺"})
 			t.Logf("after 2 Undo seq %d, putseq %d", f.seq, f.putseq)
 
-			f.Undo(false) // 2 deletes should be put back.
+			f.checkedUndo(false, t, undoexpectation{ // 2 deletes should be put back.
+				ok: true,
+				q0: 1,
+				q1: 1,
+			})
 			check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
 				&stateSummary{false, true, true, true, "yi 海老麺"})
 			t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
@@ -421,7 +462,11 @@ func TestFileRedoSeq(t *testing.T) {
 				t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
 			}
 
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 0,
+				q1: 0,
+			})
 			check(t, "TestFileRedoSeq after Undo", f,
 				&stateSummary{false, false, true, false, ""})
 
@@ -535,7 +580,9 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 				t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 			}
 
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: false,
+			})
 
 			if got, want := f.Name(), "/guide"; got != want {
 				t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
@@ -544,7 +591,9 @@ func TestFileNameSettingWithScratch(t *testing.T) {
 				t.Errorf("TestFileNameSettingWithScratch failed to init isscratch. got %v want %v", got, want)
 			}
 
-			f.Undo(true)
+			f.checkedUndo(true, t, undoexpectation{
+				ok: false,
+			})
 			if got, want := f.Name(), "edwood"; got != want {
 				t.Errorf("TestFileNameSettingWithScratch failed to init name. got %v want %v", got, want)
 			}
@@ -617,12 +666,20 @@ func TestTagObserversFireCorrectly(t *testing.T) {
 				t.Errorf("got %+v, want %+v", got, want)
 			}
 
-			oeb.Undo(true)
+			oeb.checkedUndo(true, t, undoexpectation{
+				ok: true,
+				q0: 0,
+				q1: 0,
+			})
 			if got, want := *counts, (observercount{0, 5}); got != want {
 				t.Errorf("got %+v, want %+v", got, want)
 			}
 
-			oeb.Undo(false)
+			oeb.checkedUndo(false, t, undoexpectation{
+				ok: true,
+				q0: 0,
+				q1: 2,
+			})
 			if got, want := *counts, (observercount{0, 6}); got != want {
 				t.Errorf("got %+v, want %+v", got, want)
 			}

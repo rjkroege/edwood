@@ -131,7 +131,7 @@ func (e *ObservableEditableBuffer) HasMultipleObservers() bool {
 
 // MakeObservableEditableBuffer is a constructor wrapper for NewFile() to abstract File from the main program.
 func MakeObservableEditableBuffer(filename string, b []rune) *ObservableEditableBuffer {
-	return _makeObservableEditableBuffer(filename, b, newTypeBuffer)
+	return _makeObservableEditableBuffer(filename, b, true)
 }
 
 func _makeObservableEditableBuffer(filename string, b []rune, newtype bool) *ObservableEditableBuffer {
