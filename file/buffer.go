@@ -102,7 +102,7 @@ var _ io.ReaderAt = (*Buffer)(nil)
 // expensiveCheckedExecution turns on a number of expensive validations
 // of the internal consistency of the file.Buffer implementation. This is
 // true for now while development of file.Buffer continues.
-const expensiveCheckedExecution = true
+const expensiveCheckedExecution = false
 
 var ErrWrongOffset = errors.New("offset is greater than buffer size")
 

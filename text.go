@@ -1224,7 +1224,7 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		t.SetSelect(q0, q1)
 	}
 	qe = t.org + t.fr.GetFrameFillStatus().Nchars
-	tsd = false // do we call textscrdraw?
+	tsd = false // do we call ScrDraw?
 	nc = t.file.Nr()
 	if t.org <= q0 {
 		if nc == 0 || q0 < qe {

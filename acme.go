@@ -17,7 +17,6 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
-	"github.com/rjkroege/edwood/util"
 )
 
 var (
@@ -583,15 +582,13 @@ func (w errorWriter) Close() error {
 const MAXSNARF = 100 * 1024
 
 func acmeputsnarf() {
-	r := make([]rune, global.snarfbuf.Nc())
-	global.snarfbuf.Read(0, r[:global.snarfbuf.Nc()])
-	global.row.display.WriteSnarf([]byte(string(r)))
+	global.row.display.WriteSnarf(global.snarfbuf)
 }
 
 func acmegetsnarf() {
+	// TODO(rjk): use the non-blocking interface on platforms that have one
+	// for big snarfs
 	b := make([]byte, MAXSNARF)
 	n, _, _ := global.row.display.ReadSnarf(b)
-	r, _, _ := util.Cvttorunes(b, n)
-	global.snarfbuf.Reset()
-	global.snarfbuf.Insert(0, r)
+	global.snarfbuf = b[0:n]
 }

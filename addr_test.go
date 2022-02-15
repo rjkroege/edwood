@@ -117,7 +117,7 @@ func TestAcmeregexp(t *testing.T) {
 				if len(warnings) == 0 {
 					t.Fatalf("no warning generated; want %q", want)
 				}
-				got := string([]rune(warnings[0].buf))
+				got := warnings[0].buf.String()
 				if got != want {
 					t.Errorf("warning is %q; want %q", got, want)
 				}

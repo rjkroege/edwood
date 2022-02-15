@@ -329,7 +329,8 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		global.snarfbuf.Delete(0, global.snarfbuf.Nc())
+		global.snarfbuf = make([]byte, 0)
+		// TODO(rjk): Don't make bytes into runes.
 		r := make([]rune, RBUFSIZE)
 		for q0 < q1 {
 			n = q1 - q0
@@ -337,7 +338,9 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 				n = RBUFSIZE
 			}
 			t.file.Read(q0, r[:n])
-			global.snarfbuf.Insert(global.snarfbuf.Nc(), r[:n])
+			// TODO(rjk): ick. Zero-conversion.
+			sb := []byte(string(r))
+			global.snarfbuf = append(global.snarfbuf, sb...)
 			q0 += n
 		}
 		acmeputsnarf()
@@ -381,8 +384,8 @@ func delcol(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 
 func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	var (
-		c            int
-		q, q0, q1, n int
+		c      int
+		q0, q1 int
 	)
 
 	// if tobody, use body of executing window  (Paste or Send command)
@@ -395,7 +398,7 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 	}
 
 	acmegetsnarf()
-	if t == nil || global.snarfbuf.Nc() == 0 {
+	if t == nil || len(global.snarfbuf) == 0 {
 		return
 	}
 	if t.w != nil && et.w != t.w {
@@ -407,20 +410,11 @@ func paste(et *Text, t *Text, _ *Text, selectall bool, tobody bool, _ string) {
 		defer t.w.Unlock()
 	}
 	cut(t, t, nil, false, true, "")
-	q = 0
 	q0 = t.q0
-	q1 = t.q0 + global.snarfbuf.Nc()
-	r := make([]rune, RBUFSIZE)
-	for q0 < q1 {
-		n = q1 - q0
-		if n > RBUFSIZE {
-			n = RBUFSIZE
-		}
-		global.snarfbuf.Read(q, r[:n])
-		t.Insert(q0, r[:n], true)
-		q += n
-		q0 += n
-	}
+	// TODO(rjk): Ick. Remove undesirable conversions.
+	r := []rune(string(global.snarfbuf))
+	q1 = t.q0 + len(r)
+	t.Insert(q0, r, true)
 	if selectall {
 		t.SetSelect(t.q0, q1)
 	} else {

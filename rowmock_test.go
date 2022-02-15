@@ -151,7 +151,7 @@ func FlexiblyMakeWindowScaffold(t testing.TB, opts ...windowScaffoldOption) {
 	MakeWindowScaffold(sb.dumpfile())
 }
 
-// Dir sets the backing directory for window id. Setting a backing
+// ScDir sets the backing directory for window id. Setting a backing
 // directory implies persisting the body to the file formed by Join(path,
 // id).
 func ScDir(path, id string) windowScaffoldOption {
@@ -174,7 +174,7 @@ func ScDir(path, id string) windowScaffoldOption {
 	}
 }
 
-// OptBody sets contents and persists it if there's a dir.
+// ScBody sets contents and persists it if there's a dir.
 // TODO(rjk): Consider placing in a different package.
 func ScBody(id, contents string) windowScaffoldOption {
 	return func(f *scaffoldBuilder) {
@@ -195,9 +195,9 @@ func ScBody(id, contents string) windowScaffoldOption {
 	}
 }
 
-// Declares a new window with identifier name. Subsequent options use
-// name to specify the window that they effect. name needs to be a valid
-// file name for backed Windows.
+// ScWin declares a new window with identifier name. Subsequent options
+// use name to specify the window that they effect. name needs to be a
+// valid file name for backed Windows.
 func ScWin(name string) windowScaffoldOption {
 	return func(f *scaffoldBuilder) {
 		f.t.Helper()
@@ -208,6 +208,19 @@ func ScWin(name string) windowScaffoldOption {
 		}
 		f.windows = append(f.windows, w)
 		f.winbyname[name] = w
+	}
+}
+
+func ScBodyRange(id string, dot Range) windowScaffoldOption {
+	return func(f *scaffoldBuilder) {
+		f.t.Helper()
+		w, ok := f.winbyname[id]
+		if !ok {
+			f.t.Fatalf("Dir option on non-existent window %s", id)
+		}
+
+		w.Body.Q0 = dot.q0
+		w.Body.Q1 = dot.q1
 	}
 }
 
