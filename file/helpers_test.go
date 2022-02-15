@@ -25,19 +25,6 @@ type stateSummary struct {
 	filecontents         string
 }
 
-func (f *File) commitisgermane() bool { return true }
-
-func (f *File) readwholefile(t *testing.T) string {
-	t.Helper()
-	var sb strings.Builder
-
-	// Currently ReadAtRune does not return runes in the cache.
-	for i := 0; i < f.Nr(); i++ {
-		sb.WriteRune(f.ReadC(i))
-	}
-	return sb.String()
-}
-
 func (b *Buffer) commitisgermane() bool { return false }
 
 func (b *Buffer) readwholefile(*testing.T) string {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -80,7 +81,8 @@ func undoSecondMutateFileNameChange(t *testing.T, g *globals, ffn, _ string) {
 
 func TestFilenameChangeUndo(t *testing.T) {
 	dir := t.TempDir()
-	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
+	firstfilename := filepath.Join(dir, "firstfile")
+	secondfilename := filepath.Join(dir, "secondfile")
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get current working directory: %v", err)
@@ -262,7 +264,15 @@ func TestFilenameChangeUndo(t *testing.T) {
 				return
 			}
 
-			makeSkeletonWindowModelWithFiles(t, firstfilename, secondfilename)
+			FlexiblyMakeWindowScaffold(
+				t,
+				ScWin("firstfile"),
+				ScBody("firstfile", contents),
+				ScDir(dir, "firstfile"),
+				ScWin("secondfile"),
+				ScBody("secondfile", alt_contents),
+				ScDir(dir, "secondfile"),
+			)
 			// Probably there are other issues here...
 			t.Log("seq", global.seq)
 			t.Log("seq, w0", global.row.col[0].w[0].body.file.Seq())

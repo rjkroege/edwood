@@ -111,13 +111,16 @@ func TestExpandJump(t *testing.T) {
 }
 
 func TestLook3Message(t *testing.T) {
-	global.wdir = "/home/gopher"
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	global.wdir = cwd
 	winDir := "/a/b/c"
 	if runtime.GOOS == "windows" {
-		global.wdir = `C:\User\gopher`
 		winDir = `C:\a\b\c`
 	}
-	defer func() { global.wdir = "" }()
 
 	for _, tc := range []struct {
 		name         string

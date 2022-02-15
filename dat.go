@@ -106,6 +106,7 @@ type MntDir struct {
 
 	// Additional search paths for C #include inherited from the window
 	// where the command was run.
+	// TODO(rjk): This feature should be externalized? Why can't plumb do this?
 	incl []string
 }
 

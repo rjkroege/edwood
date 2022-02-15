@@ -3,14 +3,15 @@ Edit X:edwood/\+Errors: 1,$d
 X:edwood/.*\.go: w
 
 go build -tags debug
-./testedwood.sh --newtypebuffer
+./testedwood.sh
 
-go test --run 'TestLargeEditTargets' -covermode=count -coverprofile=count.out
-go test --run XXX -bench 'BenchmarkLargeEditTargets' -cpuprofile cpu.prof
 go test -covermode=count -coverprofile=count.out
 go tool cover -html=count.out
 
+go test --run 'TestFlushWarnings' -covermode=count -coverprofile=count.out
+
 // Edit commands for converting C to Go
+cs 'flushwarnings\('
 
 ",
 { x/->/c/./

@@ -418,7 +418,8 @@ func mutatePutMutate(t *testing.T, g *globals) {
 
 func TestUndoRedo(t *testing.T) {
 	dir := t.TempDir()
-	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
+	firstfilename := filepath.Join(dir, "firstfile")
+	secondfilename := filepath.Join(dir, "secondfile")
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get current working directory: %v", err)
@@ -752,7 +753,15 @@ func TestUndoRedo(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			makeSkeletonWindowModelWithFiles(t, firstfilename, secondfilename)
+			FlexiblyMakeWindowScaffold(
+				t,
+				ScWin("firstfile"),
+				ScBody("firstfile", contents),
+				ScDir(dir, "firstfile"),
+				ScWin("secondfile"),
+				ScBody("secondfile", alt_contents),
+				ScDir(dir, "secondfile"),
+			)
 			// Probably there are other issues here...
 			t.Log("seq", global.seq)
 			t.Log("seq, w0", global.row.col[0].w[0].body.file.Seq())
@@ -773,55 +782,4 @@ func TestUndoRedo(t *testing.T) {
 
 		})
 	}
-}
-
-// TODO(rjk): consider how to merge this with makeSkeletonWindowModel
-// Use direct access to the global data to walk the datastructure.
-// TODO(rjk): pass in the global to modify.
-// TODO(rjk): Make this more flexible for building test data. (See FlexiblyMakeWindowScaffold)
-func makeSkeletonWindowModelWithFiles(t *testing.T, firstfilename, secondfilename string) {
-	t.Helper()
-	MakeWindowScaffold(&dumpfile.Content{
-		Columns: []dumpfile.Column{
-			{},
-		},
-		Windows: []*dumpfile.Window{
-			{
-				Column: 0,
-				Tag: dumpfile.Text{
-					Buffer: firstfilename,
-				},
-				Body: dumpfile.Text{
-					Buffer: contents,
-				},
-			},
-			{
-				Column: 0,
-				Tag: dumpfile.Text{
-					Buffer: secondfilename,
-				},
-				Body: dumpfile.Text{
-					Buffer: alt_contents,
-				},
-			},
-		},
-	})
-}
-
-func makeTempBackingFiles(t *testing.T, dir string) (string, string) {
-	t.Helper()
-
-	firstfilename := filepath.Join(dir, "firstfile")
-	secondfilename := filepath.Join(dir, "secondfile")
-
-	// Write contents to the files. Use the contents from
-	// makeSkeletonWindowModel to later simplify the task of merging these
-	// together.
-	if err := os.WriteFile(firstfilename, []byte(contents), 0644); err != nil {
-		t.Fatalf("%s can't make %q: %v", "makeTempBackingFiles", firstfilename, err)
-	}
-	if err := os.WriteFile(secondfilename, []byte(alt_contents), 0644); err != nil {
-		t.Fatalf("%s can't make %q: %v", "makeTempBackingFiles", secondfilename, err)
-	}
-	return firstfilename, secondfilename
 }

@@ -456,6 +456,7 @@ func isDir(r string) (bool, error) {
 }
 
 // Should include file lookup be built-in? Or provided by a helper?
+// TODO(rjk): This should be provided by an external helper.
 func (w *Window) AddIncl(r string) {
 	// Tries to open absolute paths, and if fails, tries
 	// to use dirname instead.

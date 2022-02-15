@@ -143,7 +143,7 @@ func TestWaitthreadEarlyExit(t *testing.T) {
 	}
 
 	global.row.lk.Lock()
-	got := string(warnings[0].buf)
+	got := warnings[0].buf.String()
 	global.row.lk.Unlock()
 	want := "pid 42, success true\n"
 	if got != want {
@@ -187,7 +187,7 @@ func TestWaitthreadKill(t *testing.T) {
 	waitthreadSync()
 
 	global.row.lk.Lock()
-	got := string(warnings[0].buf)
+	got := warnings[0].buf.String()
 	global.row.lk.Unlock()
 	want := "Kill: no process unknown_cmd\n"
 	if got != want {

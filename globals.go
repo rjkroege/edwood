@@ -8,7 +8,6 @@ import (
 
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
-	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 )
 
@@ -42,7 +41,7 @@ type globals struct {
 
 	activewin  *Window
 	activecol  *Column
-	snarfbuf   file.RuneArray
+	snarfbuf   []byte
 	home       string
 	acmeshell  string
 	tagcolors  [frame.NumColours]draw.Image

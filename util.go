@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/runes"
 	"github.com/rjkroege/edwood/util"
 )
@@ -57,14 +57,17 @@ func isalnum(c rune) bool {
 	return true
 }
 
+// errorwin1Name adds an +Errors suffix to dir.
 func errorwin1Name(dir string) string {
 	return filepath.Join(dir, "+Errors")
 }
 
+// errorwin1 is an internal helper function.
 func errorwin1(dir string, incl []string) *Window {
 	r := errorwin1Name(dir)
 	w := lookfile(r)
 	if w == nil {
+		// TODO(rjk): This should be inside the row lock.
 		if len(global.row.col) == 0 {
 			if global.row.Add(nil, -1) == nil {
 				util.AcmeError("can't create column to make error window", nil)
@@ -92,6 +95,9 @@ func errorwin(md *MntDir, owner int) *Window {
 		} else {
 			w = errorwin1(md.dir, md.incl)
 		}
+
+		// TODO(rjk): This locking behaviour seems suspect?
+		// There is an implicit assumption of a race condition here?
 		w.Lock(owner)
 		if w.col != nil {
 			break
@@ -192,7 +198,7 @@ func makenewwindow(t *Text) *Window {
 
 type Warning struct {
 	md  *MntDir
-	buf file.RuneArray
+	buf bytes.Buffer
 }
 
 // TODO(rjk): Move into the global object.
@@ -200,10 +206,11 @@ var warnings = []*Warning{}
 var warningsMu sync.Mutex
 
 func flushwarnings() {
+	// TODO(rjk): why don't we lock warningsMu?
 	var (
-		w                *Window
-		t                *Text
-		owner, nr, q0, n int
+		w         *Window
+		t         *Text
+		owner, q0 int
 	)
 	for _, warn := range warnings {
 		w = errorwin(warn.md, 'E')
@@ -212,26 +219,15 @@ func flushwarnings() {
 		if owner == 0 {
 			w.owner = 'E'
 		}
-		w.Commit(t) // marks the backing text as dirty
 
-		// Most commands don't generate much output. For instance,
-		// Edit ,>cat goes through /dev/cons and is already in blocks
-		// because of the i/o system, but a few can.  Edit ,p will
-		// put the entire result into a single hunk.  So it's worth doing
-		// this in blocks (and putting the text in a buffer in the first
-		// place), to avoid a big memory footprint.
-		q0 = t.Nc()
-		r := make([]rune, RBUFSIZE)
-		// TODO(rjk): Figure out why Warning doesn't use an file.ObservableEditableBuffer.
-		for n = 0; n < warn.buf.Nc(); n += nr {
-			nr = warn.buf.Nc() - n
-			if nr > RBUFSIZE {
-				nr = RBUFSIZE
-			}
-			warn.buf.Read(n, r[:nr])
-			_, nr = t.BsInsert(t.Nc(), r[:nr], true)
-		}
+		// TODO(rjk): Ick.
+		r := []rune(warn.buf.String())
+		t.BsInsert(t.Nc(), r, true)
+
 		t.Show(q0, t.Nc(), true)
+
+		// TODO(rjk): Code inspection of Show suggests that this might
+		// be redundant.
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		w.owner = owner
 		t.file.TreatAsClean()
@@ -245,32 +241,39 @@ func flushwarnings() {
 }
 
 func warning(md *MntDir, s string, args ...interface{}) {
-	r := []rune(fmt.Sprintf(s, args...))
+	warningsMu.Lock()
+	defer warningsMu.Unlock()
+
+	r := fmt.Sprintf(s, args...)
 	addwarningtext(md, r)
 }
 
 func warnError(md *MntDir, s string, args ...interface{}) error {
-	err := fmt.Errorf(s, args...)
-	addwarningtext(md, []rune(err.Error()+"\n"))
-	return err
-}
-
-func addwarningtext(md *MntDir, r []rune) {
 	warningsMu.Lock()
 	defer warningsMu.Unlock()
 
+	err := fmt.Errorf(s, args...)
+	addwarningtext(md, err.Error()+"\n")
+	return err
+}
+
+// TODO(rjk): Convert to using bytes.
+func addwarningtext(md *MntDir, b string) {
 	for _, warn := range warnings {
 		if warn.md == md {
-			warn.buf.Insert(warn.buf.Nc(), r)
+			warn.buf.WriteString(b)
 			return
 		}
 	}
-	warn := Warning{}
-	warn.md = md
+
+	// No in-progress Warning.
+	warn := Warning{
+		md: md,
+	}
 	if md != nil {
 		mnt.IncRef(md) // DecRef in flushwarnings
 	}
-	warn.buf.Insert(0, r)
+	warn.buf.WriteString(b)
 	warnings = append(warnings, &warn)
 	select {
 	case global.cwarn <- 0:

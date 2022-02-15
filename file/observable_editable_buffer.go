@@ -142,13 +142,7 @@ func _makeObservableEditableBuffer(filename string, b []rune, newtype bool) *Obs
 		Elog:         sam.MakeElog(),
 		EditClean:    true,
 	}
-	// TODO(rjk): Eventually, we can fold out all of the multiple buffer
-	// support stuff.
-	if newtype {
-		oeb.f = NewTypeBuffer(b, oeb)
-	} else {
-		oeb.f = NewLegacyFile(b, oeb)
-	}
+	oeb.f = NewTypeBuffer(b, oeb)
 	return oeb
 }
 
@@ -476,12 +470,7 @@ func (e *ObservableEditableBuffer) String() string {
 func (e *ObservableEditableBuffer) ResetBuffer() {
 	e.filtertagobservers = false
 	e.seq = 0
-	// TODO(rjk): Presumably this is ok?
-	if _, ok := e.f.(*Buffer); ok {
-		e.f = NewTypeBuffer([]rune{}, e)
-	} else {
-		e.f = NewLegacyFile([]rune{}, e)
-	}
+	e.f = NewTypeBuffer([]rune{}, e)
 }
 
 // Reader is a forwarding function for rune_array.Reader.

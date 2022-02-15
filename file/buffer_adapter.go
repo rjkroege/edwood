@@ -71,7 +71,6 @@ type BufferAdapter interface {
 
 // Enforce that *file.File implements BufferAdapter.
 var (
-	_ BufferAdapter = (*File)(nil)
 	_ BufferAdapter = (*Buffer)(nil)
 )
 

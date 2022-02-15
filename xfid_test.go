@@ -421,7 +421,7 @@ func TestXfidopenQWrdsel(t *testing.T) {
 		if len(warnings) == 0 {
 			t.Fatalf("not warning generated")
 		}
-		got := string(warnings[0].buf)
+		got := string(warnings[0].buf.String())
 		want := "can't write temp file for pipe command"
 		if !strings.HasPrefix(got, want) {
 			t.Errorf("got warning %q; want prefix %q", got, want)

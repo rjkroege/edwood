@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -228,7 +229,7 @@ func TestGetDirNames(t *testing.T) {
 	}
 	if len(warnings) > 0 {
 		for _, warn := range warnings {
-			t.Logf("warning: %v\n", string(warn.buf))
+			t.Logf("warning: %v\n", warn.buf.String())
 		}
 		t.Errorf("getDirnames generated %v warning(s)", len(warnings))
 	}
@@ -312,8 +313,10 @@ func TestTextAbsDirName(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
-	global.wdir = "/home/gopher"
-	defer func() { global.wdir = "" }()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
 
 	for _, tc := range []struct {
 		name          string
@@ -321,7 +324,7 @@ func TestTextAbsDirName(t *testing.T) {
 		filename, dir string
 	}{
 		{"AbsDir", windowWithTag("/a/b/c/ Del Snarf | Look "), "d.go", "/a/b/c/d.go"},
-		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", "/home/gopher/a/b/c/d.go"},
+		{"RelativeDir", windowWithTag("a/b/c/ Del Snarf | Look "), "d.go", path.Join(cwd, "/a/b/c/d.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			text := Text{

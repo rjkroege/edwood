@@ -57,18 +57,18 @@ func TestSetTag1(t *testing.T) {
 }
 
 func TestWindowClampAddr(t *testing.T) {
-	buf := file.RuneArray("Hello, 世界")
-
+	const hello_世界 = "Hello, 世界"
+	runic_hello_世界 := []rune(hello_世界)
 	for _, tc := range []struct {
 		addr, want Range
 	}{
 		{Range{-1, -1}, Range{0, 0}},
-		{Range{100, 100}, Range{buf.Nc(), buf.Nc()}},
+		{Range{100, 100}, Range{len(runic_hello_世界), len(runic_hello_世界)}},
 	} {
 		w := &Window{
 			addr: tc.addr,
 			body: Text{
-				file: file.MakeObservableEditableBuffer("", buf),
+				file: file.MakeObservableEditableBuffer("", runic_hello_世界),
 			},
 		}
 		w.ClampAddr()

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -105,7 +106,15 @@ func TestEdit(t *testing.T) {
 		warnings = []*Warning{}
 		warningsMu.Unlock()
 
-		w := makeSkeletonWindowModel(test.dot, test.filename)
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin(test.filename),
+			ScBody(test.filename, contents),
+			ScBodyRange(test.filename, test.dot),
+			ScWin("alt_example_2"),
+			ScBody("alt_example_2", alt_contents),
+		)
+		w := global.row.col[0].w[0]
 
 		// All middle button commands including Edit run inside a lock discipline
 		// set up by MovedMouse. We need to mirror this for external process
@@ -131,9 +140,9 @@ func TestEdit(t *testing.T) {
 		}
 
 		for j, tw := range test.expectedwarns {
-			n, _ := warnings[j].buf.Read(0, buf[:])
-			if string(buf[:n]) != tw {
-				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+			wb := warnings[j].buf.Bytes()
+			if string(wb) != tw {
+				t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(wb))
 			}
 
 		}
@@ -141,45 +150,9 @@ func TestEdit(t *testing.T) {
 	}
 }
 
+// TODO(rjk): Make longer names.
 const contents = "This is a\nshort text\nto try addressing\n"
 const alt_contents = "A different text\nWith other contents\nSo there!\n"
-
-// Be sure to adjust the global.seq correctly to reflect initial test state.
-func makeSkeletonWindowModel(dot Range, filename string) *Window {
-	MakeWindowScaffold(&dumpfile.Content{
-		Columns: []dumpfile.Column{
-			{},
-		},
-		Windows: []*dumpfile.Window{
-			{
-				Column: 0,
-				Tag: dumpfile.Text{
-					Buffer: filename,
-				},
-				Body: dumpfile.Text{
-					Buffer: contents,
-					Q0:     dot.q0,
-					Q1:     dot.q1,
-				},
-			},
-			{
-				Column: 0,
-				Tag: dumpfile.Text{
-					Buffer: "alt_example_2",
-				},
-				Body: dumpfile.Text{
-					Buffer: alt_contents,
-				},
-			},
-		},
-	})
-
-	// All of the body texts build here should nominally be Modded() as they
-	// have no backing file. Increase fidelity of constructed test data.
-	global.row.col[0].w[0].body.file.Modded()
-
-	return global.row.col[0].w[0]
-}
 
 func makeTempFile(contents string) (string, func(), error) {
 	tfd, err := ioutil.TempFile("", "example")
@@ -234,7 +207,16 @@ func TestEditCmdWithFile(t *testing.T) {
 		t.Run(test.expr, func(t *testing.T) {
 			t.Logf("cmd: %q", test.expr)
 			warnings = []*Warning{}
-			w := makeSkeletonWindowModel(test.dot, test.filename)
+
+			FlexiblyMakeWindowScaffold(
+				t,
+				ScWin(test.filename),
+				ScBody(test.filename, contents),
+				ScBodyRange(test.filename, test.dot),
+				ScWin("alt_example_2"),
+				ScBody("alt_example_2", alt_contents),
+			)
+			w := global.row.col[0].w[0]
 
 			// The filename actually exists so needs to start as if it's saved.
 			global.seq = 1
@@ -263,16 +245,15 @@ func TestEditCmdWithFile(t *testing.T) {
 			}
 
 			for j, tw := range test.expectedwarns {
-				n, _ := warnings[j].buf.Read(0, buf[:])
-				if string(buf[:n]) != tw {
-					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+				wb := warnings[j].buf.Bytes()
+				if string(wb) != tw {
+					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(wb))
 				}
 			}
 		})
 	}
 }
 
-// TODO(rjk): There are several almost the same testing harnesses. Merge them.
 func TestEditMultipleWindows(t *testing.T) {
 	fn1, cleaner, err := makeTempFile("file one\n")
 	defer cleaner()
@@ -401,7 +382,14 @@ func TestEditMultipleWindows(t *testing.T) {
 		t.Run(test.expr, func(t *testing.T) {
 			t.Logf("[%d] command %q", i, test.expr)
 			warnings = []*Warning{}
-			makeSkeletonWindowModel(test.dot, test.filename)
+			FlexiblyMakeWindowScaffold(
+				t,
+				ScWin(test.filename),
+				ScBody(test.filename, contents),
+				ScBodyRange(test.filename, test.dot),
+				ScWin("alt_example_2"),
+				ScBody("alt_example_2", alt_contents),
+			)
 			global.seq = 1
 
 			// TODO(rjk): Make this nicer.
@@ -439,9 +427,9 @@ func TestEditMultipleWindows(t *testing.T) {
 			}
 
 			for j, tw := range test.expectedwarns {
-				n, _ := warnings[j].buf.Read(0, buf[:])
-				if string(buf[:n]) != tw {
-					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(buf[:n]))
+				wb := warnings[j].buf.Bytes()
+				if string(wb) != tw {
+					t.Errorf("test %d: Warning %d contents expected \n%#v\nbut got \n%#v\n", i, j, tw, string(wb))
 				}
 			}
 			// TODO(rjk): Create backing disk files and enforce their state.
@@ -753,7 +741,8 @@ func secondCloseMutateWindow(t *testing.T, g *globals) {
 // Test more complex sequences of Edit ations or Edit mixed with exec.
 func TestComplexEditActions(t *testing.T) {
 	dir := t.TempDir()
-	firstfilename, secondfilename := makeTempBackingFiles(t, dir)
+	firstfilename := filepath.Join(dir, "firstfile")
+	secondfilename := filepath.Join(dir, "secondfile")
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get current working directory: %v", err)
@@ -832,7 +821,15 @@ func TestComplexEditActions(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			makeSkeletonWindowModelWithFiles(t, firstfilename, secondfilename)
+			FlexiblyMakeWindowScaffold(
+				t,
+				ScWin("firstfile"),
+				ScBody("firstfile", contents),
+				ScDir(dir, "firstfile"),
+				ScWin("secondfile"),
+				ScBody("secondfile", alt_contents),
+				ScDir(dir, "secondfile"),
+			)
 			// Probably there are other issues here...
 			t.Log("seq", global.seq)
 			t.Log("seq, w0", global.row.col[0].w[0].body.file.Seq())

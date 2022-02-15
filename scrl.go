@@ -63,6 +63,7 @@ func ScrlResize(display draw.Display) {
 	}
 }
 
+// TODO(rjk): Don't pass in nchars. It's always the same.
 func (t *Text) ScrDraw(nchars int) {
 	var (
 		r, r1, r2 image.Rectangle
