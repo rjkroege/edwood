@@ -372,12 +372,9 @@ func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
 	return nil, 0, 0
 }
 
-// Undo reverts the last performed action. It returns the offset in bytes
-// at which the first change of the action occurred and the number of bytes
-// the change added at off. If there is no action to undo, Undo returns -1
-// as the offset.
-// TODO(rjk): Rationalize the returned values. I'm not sure that they're
-// useful for correct.
+// Undo reverts the last performed action. It returns the new selection
+// q0, q1 and a bool indicating if the returned selection is meaningful..
+// If there is no action to undo, Undo returns -1 as the offset.
 func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 	// log.Println("Undo start")
 	// defer log.Println("Undo end")
@@ -480,10 +477,9 @@ func (b *Buffer) filenameChangeAction(a *action) (int, int, bool, int) {
 	return -1, 0, false, 0
 }
 
-// Redo repeats the last undone action. It returns the offset in bytes
-// at which the last change of the action occurred and the number of bytes
-// the change added at off. If there is no action to redo, Redo returns -1
-// as the offset.
+// Redo repeats the last undone action. It returns new selection q0, q1
+// and a bool indicating if the returned selection is meaningful.. If
+// there is no action to redo, Redo returns -1 as the offset.
 func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	//	log.Println("Redo start")
 	//	defer log.Println("Redo end")
@@ -512,10 +508,9 @@ func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	return roff, roff - nr, true, b.actions[b.head-1].seq
 }
 
-// RedoSeq finds the seq of the last redo record. TODO(rjk): This has no
-// analog in file.Buffer. The value of seq is used to track intra and
-// inter File edit actions so that cross-File changes via Edit X can be
-// undone with a single action.
+// RedoSeq finds the seq of the last redo record.The value of seq is used
+// to track intra and inter File edit actions so that cross-File changes
+// via Edit X can be undone with a single action.
 func (b *Buffer) RedoSeq() int {
 	if len(b.actions) > 0 && b.head < len(b.actions) {
 		return b.actions[b.head].seq
@@ -739,16 +734,22 @@ func (b *Buffer) Bytes() []byte {
 	return byteBuf
 }
 
+// HasUncommitedChanges returns true if there are changes that
+// have been made to the File since the last Commit.
 // TODO(rjk): This concept is not needed in a file.Buffer world. Improve
 // this.
 func (b *Buffer) HasUncommitedChanges() bool {
 	return false
 }
 
+// HasUndoableChanges returns true if there are changes to the File
+// that can be undone.
 func (b *Buffer) HasUndoableChanges() bool {
 	return b.head != 0
 }
 
+// HasRedoableChanges returns true if there are entries in the Redo
+// log that can be redone.
 func (b *Buffer) HasRedoableChanges() bool {
 	return b.head <= len(b.actions)-1
 }

@@ -6,17 +6,6 @@ import (
 	"testing"
 )
 
-type checkable interface {
-	BufferAdapter
-
-	// Return the entire backing as a string.
-	readwholefile(*testing.T) string
-
-	// Return true to enable tests of UncommittedChanges. This concept does not
-	// exist with file.Buffer.
-	commitisgermane() bool
-}
-
 type stateSummary struct {
 	HasUncommitedChanges bool
 	HasUndoableChanges   bool
@@ -34,8 +23,7 @@ func (b *Buffer) readwholefile(*testing.T) string {
 func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *stateSummary) {
 	t.Helper()
 
-	// Lets the test infrastructure call against file.Buffer or file.File.
-	f := oeb.f.(checkable)
+	f := oeb.f
 
 	if f.commitisgermane() {
 		if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {

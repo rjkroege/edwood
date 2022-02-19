@@ -21,8 +21,7 @@ type ObservableEditableBuffer struct {
 	observers       map[BufferObserver]struct{}
 	statusobservers map[TagStatusObserver]struct{}
 
-	// The switchable implementation.
-	f BufferAdapter
+	f *Buffer
 
 	Elog sam.Elog
 
