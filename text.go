@@ -424,32 +424,33 @@ func (t *Text) BsInsert(q0 int, r []rune, tofile bool) (q, nr int) {
 // that is using a given File.
 // TODO(rjk): Carefully scrub this for opportunities to not do work if the
 // changes are not in the viewport. Also: minimize scrollbar redraws.
-func (t *Text) Inserted(q0 int, r []rune) {
+func (t *Text) Inserted(oq0 file.OffsetTuple, b []byte, nr int) {
+	q0 := oq0.R
 	if t.eq0 == -1 {
 		t.eq0 = q0
 	}
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
-	n := len(r)
+
 	if q0 < t.iq1 {
-		t.iq1 += n
+		t.iq1 += nr
 	}
 	if q0 < t.q1 {
-		t.q1 += n
+		t.q1 += nr
 	}
 	if q0 < t.q0 {
-		t.q0 += n
+		t.q0 += nr
 	}
 	if q0 < t.org {
-		t.org += n
+		t.org += nr
 	} else {
 		if t.fr != nil && q0 <= t.org+(t.fr.GetFrameFillStatus().Nchars) {
-			t.fr.Insert(r[:n], q0-t.org)
+			t.fr.InsertByte(b, q0-t.org)
 		}
 	}
 
-	t.logInsert(q0, r)
+	t.logInsert(oq0, b, nr)
 	// TODO(rjk): I do too much work here.
 	t.SetSelect(t.q0, t.q1)
 	if t.fr != nil && t.display != nil {
@@ -462,19 +463,19 @@ func (t *Text) Inserted(q0 int, r []rune) {
 // TODO(rjk): can be more stateless.
 // TODO(rjk): Can express this more precisely with an interface
 // that makes its state dependency obvious
-func (t *Text) logInsert(q0 int, r []rune) {
-	n := len(r)
+func (t *Text) logInsert(oq0 file.OffsetTuple, b []byte, nr int) {
+	q0 := oq0.R
 	if t.w != nil {
 		c := 'i'
 		if t.what == Body {
 			c = 'I'
 		}
-		if n <= EVENTSIZE {
+		if nr <= EVENTSIZE {
 			// TODO(rjk): Does unnecessary work making a string from r if there's no
 			// event reader.
-			t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q0+n, n, string(r))
+			t.w.Eventf("%c%d %d 0 %d %s\n", c, q0, q0+nr, nr, b)
 		} else {
-			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+n)
+			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q0+nr)
 		}
 	}
 }
@@ -576,7 +577,10 @@ func (t *Text) Delete(q0, q1 int, _ bool) {
 // deleted implements the single-text deletion observer for this Text's
 // backing File. It updates the Text (i.e. the view) for the removal of
 // runes [q0, q1).
-func (t *Text) Deleted(q0, q1 int) {
+func (t *Text) Deleted(oq0, oq1 file.OffsetTuple) {
+	q0 := oq0.R
+	q1 := oq1.R
+
 	n := q1 - q0
 	if t.what == Body {
 		t.w.utflastqid = -1

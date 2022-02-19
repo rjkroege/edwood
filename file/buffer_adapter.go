@@ -7,18 +7,20 @@ import (
 	"strings"
 )
 
-func NewTypeBuffer(inputrunes []rune, oeb *ObservableEditableBuffer) *Buffer {
-	// TODO(rjk): Figure out how to plumb in the oeb object to setup Undo
-	// observer callbacks.
-
+// RunesToBytes converts and returns the []byte representation and number of runes.
+// TODO(rjk): Replace this with util.Cvttorunes
+func RunesToBytes(inputrunes []rune) ([]byte, int) {
 	// TODO(rjk): We can do better.
 	buffy := new(bytes.Buffer)
 	buffy.Grow(len(inputrunes))
 	for _, r := range inputrunes {
 		buffy.WriteRune(r)
 	}
+	return buffy.Bytes(), len(inputrunes)
+}
 
-	nb := NewBuffer(buffy.Bytes(), len(inputrunes))
+func NewTypeBuffer(inputrunes []rune, oeb *ObservableEditableBuffer) *Buffer {
+	nb := NewBuffer(RunesToBytes(inputrunes))
 	nb.oeb = oeb
 	return nb
 }
@@ -27,36 +29,6 @@ func NewTypeBuffer(inputrunes []rune, oeb *ObservableEditableBuffer) *Buffer {
 // keeping them in the cache.
 func (b *Buffer) Commit(seq int) {
 	// NOP
-}
-
-// DeleteAt removes the rune range [p0,p1) from File.
-func (b *Buffer) DeleteAt(rp0, rp1, seq int) {
-	p0 := b.RuneTuple(rp0)
-	p1 := b.RuneTuple(rp1)
-
-	b.Delete(p0, p1, seq)
-
-	if seq < 1 {
-		b.FlattenHistory()
-	}
-}
-
-// InsertAt inserts s runes at rune address p0.
-func (b *Buffer) InsertAt(rp0 int, rs []rune, seq int) {
-	p0 := b.RuneTuple(rp0)
-
-	buffy := new(bytes.Buffer)
-	for _, r := range rs {
-		// TODO(rjk): Some error handling might be needed here?
-		buffy.WriteRune(r)
-	}
-	s := buffy.Bytes()
-
-	b.Insert(p0, s, len(rs), seq)
-
-	if seq < 1 {
-		b.FlattenHistory()
-	}
 }
 
 // ReadC reads a single rune from the File.
@@ -89,10 +61,6 @@ func (b *Buffer) IndexRune(r rune) int {
 		}
 	}
 	return -1
-}
-
-func (b *Buffer) InsertAtWithoutCommit(p0 int, s []rune, seq int) {
-	b.InsertAt(p0, s, seq)
 }
 
 // Mark sets an Undo point and and discards Redo records. Call this at
