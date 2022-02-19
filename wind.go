@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"os"
@@ -533,7 +534,12 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 	if w.owner == 0 {
 		util.AcmeError("no window owner", nil)
 	}
-	b := []byte(fmt.Sprintf(format, args...))
+	buffy := new(bytes.Buffer)
+	fmt.Fprintf(buffy, format, args...)
+	b := buffy.Bytes()
+
+	// TODO(rjk): events should be a bytes.Buffer?
+
 	w.events = append(w.events, byte(w.owner))
 	w.events = append(w.events, b...)
 	x = w.eventx

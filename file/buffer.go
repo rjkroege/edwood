@@ -149,7 +149,7 @@ func (b *Buffer) FlattenHistory() {
 
 // Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
-func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
+func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 	//	log.Println("Insert start")
 	//	defer log.Println("Insert end")
 	off := start.B
@@ -207,7 +207,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 // if the portion isn't in the range of the buffer size. If the length exceeds the
 // size of the buffer, the portions from off to the end of the buffer will be
 // deleted.
-func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
+func (b *Buffer) Delete(startOff, endOff OffsetTuple, seq int) error {
 	b.validateInvariant()
 	off := startOff.B
 	length := endOff.B - startOff.B
@@ -360,7 +360,7 @@ func (b *Buffer) newEmptyPiece() *piece {
 // piece's length.
 //
 // If off is zero, the beginning sentinel piece is returned.
-func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
+func (b *Buffer) findPiece(off OffsetTuple) (*piece, int, int) {
 	tr, tb := 0, 0
 	for p := b.begin; p.next != nil; p = p.next {
 		if tb <= off.B && off.B <= tb+p.len() {
@@ -442,8 +442,7 @@ func (b *Buffer) undone(c *change, undo bool) int {
 
 	off := c.off // in bytes. The original location where a change started.
 	if size > 0 {
-		// TODO(rjk): API should be in terms of OffsetTuple and eventually bytes.
-		b.oeb.deleted(c.roff, c.roff+rsize)
+		b.oeb.deleted(Ot(c.off, c.roff), Ot(c.off+size, c.roff+rsize))
 		rsize = 0
 	} else {
 		// size is smaller. So we're undoing a deletion
@@ -452,11 +451,7 @@ func (b *Buffer) undone(c *change, undo bool) int {
 		if _, err := b.ReadAt(buffy, int64(off)); err != nil {
 			log.Fatalf("fatal error in Buffer.undone reading inserted contents: %v", err)
 		}
-
-		// TODO(rjk): ick. Pass byte buffers around. Or references. Or something.
-		rb := []rune(string(buffy))
-		//		log.Println("undone", undo, c.roff, len(rb), string(buffy))
-		b.oeb.inserted(c.roff, rb)
+		b.oeb.inserted(Ot(c.off, c.roff), buffy, -rsize)
 	}
 	return rsize
 }
@@ -757,7 +752,7 @@ func (b *Buffer) HasRedoableChanges() bool {
 // RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
 // given offset in runes.
 // TODO(rjk): Consider using the cached piece to speed this up.
-func (b *Buffer) RuneTuple(off int) OffSetTuple {
+func (b *Buffer) RuneTuple(off int) OffsetTuple {
 	b.validateInvariant()
 
 	tr, tb := 0, 0
@@ -779,7 +774,7 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 	if expensiveCheckedExecution {
 		bs := b.Bytes()
 		if off > len(bs) {
-			return OffSetTuple{
+			return OffsetTuple{
 				B: tb,
 				R: tr,
 			}
@@ -791,7 +786,7 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		}
 	}
 
-	return OffSetTuple{
+	return OffsetTuple{
 		B: tb,
 		R: tr,
 	}

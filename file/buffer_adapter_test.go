@@ -14,23 +14,6 @@ func TestNewTypeBufferCreation(t *testing.T) {
 	}
 }
 
-func TestNewDeleteAt(t *testing.T) {
-	b := NewTypeBuffer([]rune("hello"), nil)
-
-	b.DeleteAt(0, 2, 0)
-
-	if got, want := b.String(), "llo"; got != want {
-		t.Errorf("didn't run delete correctly got %q want %q", got, want)
-	}
-	if got, want := b.HasUndoableChanges(), false; got != want {
-		t.Errorf("HasUndoableChanges wrong got %v want %v", got, want)
-	}
-	if got, want := b.HasRedoableChanges(), false; got != want {
-		t.Errorf("HasRedoableChanges wrong got %v want %v", got, want)
-	}
-
-}
-
 func TestNewIndexRune(t *testing.T) {
 	b := NewTypeBuffer([]rune("yi 海老hi 海老麺麺"), nil)
 

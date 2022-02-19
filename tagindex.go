@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/runes"
 	"github.com/rjkroege/edwood/util"
 	//	"log"
@@ -75,30 +76,36 @@ func parsetaghelper(tag string) string {
 //
 // This is problematic because it will be invoked (sometimes) from within setTag
 // and sometimes from elsewhere. So track that.
-func (w *Window) Inserted(q0 int, r []rune) {
+func (w *Window) Inserted(oq0 file.OffsetTuple, b []byte, nr int) {
 	if w.tagsetting {
 		// We have invoked this within setTag1 so do nothing because setTag1 is
 		// responsible for actually updating the tagfilenameend
 		return
 	}
 
+	q0 := oq0.R
+
 	switch {
-	case q0 == 0 && r[0] == '\t',
-		q0 == 0 && r[0] == ' ':
+	case q0 == 0 && b[0] == '\t',
+		q0 == 0 && b[0] == ' ':
 		w.tagfilenameend = 0
 		w.tagfilenamechanged = true
-	case w.tagfilenameend == 0 && q0 == 0 && w.tag.Nc() == len(r):
+	case w.tagfilenameend == 0 && q0 == 0 && w.tag.Nc() == nr:
+		// TODO(rjk): Turn this into byte ops.
 		tagcontents := make([]rune, w.tag.Nc())
 		w.tag.file.Read(0, tagcontents)
 		w.tagfilenameend = len(parsetaghelper(string(tagcontents)))
 		w.tagfilenamechanged = true
 	case q0 <= w.tagfilenameend:
-		w.tagfilenameend += len(r)
+		w.tagfilenameend += nr
 		w.tagfilenamechanged = true
 	}
 }
 
-func (w *Window) Deleted(q0, q1 int) {
+func (w *Window) Deleted(oq0, oq1 file.OffsetTuple) {
+	q0 := oq0.R
+	q1 := oq1.R
+
 	if w.tagsetting {
 		// We have been invoking this within setTag1. So do nothing.
 		return

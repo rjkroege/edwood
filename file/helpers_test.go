@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 type stateSummary struct {
@@ -69,23 +70,28 @@ func MakeTestObserver(t *testing.T) *testObserver {
 	}
 }
 
-func (to *testObserver) Inserted(q0 int, r []rune) {
+func (to *testObserver) Inserted(q0 OffsetTuple, b []byte, nr int) {
 	to.t.Helper()
+
+	if got, want := nr, utf8.RuneCount(b); got != want {
+		to.t.Errorf("testObserver.Inserted bad nr for %q: got %d, want %d", string(b), got, want)
+	}
+
 	o := &observation{
 		callback: "Inserted",
-		q0:       q0,
-		payload:  string(r),
+		q0:       q0.R,
+		payload:  string(b),
 	}
 	to.t.Log(o)
 	to.tape = append(to.tape, o)
 }
 
-func (to *testObserver) Deleted(q0, q1 int) {
+func (to *testObserver) Deleted(q0, q1 OffsetTuple) {
 	to.t.Helper()
 	o := &observation{
 		callback: "Deleted",
-		q0:       q0,
-		q1:       q1,
+		q0:       q0.R,
+		q1:       q1.R,
 	}
 	to.t.Log(o)
 	to.tape = append(to.tape, o)
