@@ -64,7 +64,7 @@ func (b *Buffer) InsertAt(rp0 int, rs []rune, seq int) {
 func (b *Buffer) ReadC(q int) rune {
 	p0 := b.RuneTuple(q)
 
-	sr := io.NewSectionReader(b, int64(p0.b), 8)
+	sr := io.NewSectionReader(b, int64(p0.B), 8)
 	bsr := bufio.NewReaderSize(sr, 8)
 
 	// TODO(rjk): Add some error checking?
@@ -75,7 +75,7 @@ func (b *Buffer) ReadC(q int) rune {
 func (b *Buffer) IndexRune(r rune) int {
 	p0 := b.RuneTuple(0)
 
-	sr := io.NewSectionReader(b, int64(p0.b), int64(b.Size()))
+	sr := io.NewSectionReader(b, int64(p0.B), int64(b.Size()))
 	// TODO(rjk): Tune the default size.
 	bsr := bufio.NewReader(sr)
 
@@ -107,7 +107,7 @@ func (b *Buffer) Mark() {
 func (b *Buffer) Read(rq0 int, r []rune) (int, error) {
 	p0 := b.RuneTuple(rq0)
 
-	sr := io.NewSectionReader(b, int64(p0.b), int64(b.Size()-p0.b))
+	sr := io.NewSectionReader(b, int64(p0.B), int64(b.Size()-p0.B))
 	bsr := bufio.NewReader(sr)
 
 	for i := range r {
@@ -124,7 +124,7 @@ func (b *Buffer) Reader(rq0 int, rq1 int) io.Reader {
 	p0 := b.RuneTuple(rq0)
 	p1 := b.RuneTuple(rq1)
 
-	return io.NewSectionReader(b, int64(p0.b), int64(p1.b-p0.b))
+	return io.NewSectionReader(b, int64(p0.B), int64(p1.B-p0.B))
 }
 
 func (b *Buffer) String() string {

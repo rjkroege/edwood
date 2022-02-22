@@ -497,10 +497,10 @@ func TestRuneTuple(t *testing.T) {
 			b.checkPiecesCnt(t, 2+len(tv.buf))
 
 			gt := b.RuneTuple((tv.roff))
-			if got, want := gt.b, tv.bwant; got != (want) {
+			if got, want := gt.B, tv.bwant; got != (want) {
 				t.Errorf("%s got %d != want %d", "byte", got, want)
 			}
-			if got, want := gt.r, tv.roff; got != (want) {
+			if got, want := gt.R, tv.roff; got != (want) {
 				t.Errorf("%s got %d != want %d", "rune", got, want)
 			}
 		})
