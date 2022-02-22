@@ -7,13 +7,20 @@ import (
 	"unicode/utf8"
 )
 
-var (
-	TMPSIZE = 256
-)
+func (frame *frameimpl) addifnonempty(box *frbox, inby []byte) *frbox {
+	if len(box.Ptr) > 0 {
+		box.Wid = frame.font.BytesWidth(box.Ptr)
+		frame.box = append(frame.box, box)
+		return &frbox{
+			Ptr: inby,
+		}
+	}
+	return box
+}
 
-func (f *frameimpl) bxscan(r []rune, ppt *image.Point) (image.Point, *frameimpl) {
-	var c rune
-
+// bxscan divides inby into single-line, nl and tab boxes. bxscan assumes that
+// it has ownership of inby
+func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameimpl) {
 	frame := &frameimpl{
 		rect:              f.rect,
 		display:           f.display,
@@ -25,68 +32,54 @@ func (f *frameimpl) bxscan(r []rune, ppt *image.Point) (image.Point, *frameimpl)
 		box:               []*frbox{},
 	}
 
+	// TODO(rjk): This is (conceivably) pointless works?
 	copy(frame.cols[:], f.cols[:])
+
 	nl := 0
 
 	// TODO(rjk): There are no boxes allocated?
 	// log.Println("boxes are allocated?", "nalloc", f.nalloc, "box len", len(frame.box))
 
-	offs := 0
-	for nb := 0; offs < len(r) && nl <= f.maxlines; nb++ {
-		switch c = r[offs]; c {
+	wipbox := &frbox{
+		Ptr: inby[0:0],
+	}
+
+	for i := 0; i < len(inby); frame.nchars++ {
+		if nl > f.maxlines {
+			break
+		}
+		switch inby[i] {
 		case '\t':
+			wipbox = frame.addifnonempty(wipbox, inby[i+1:i+1])
+
 			frame.box = append(frame.box, &frbox{
-				Bc:     c,
+				Bc:     '\t',
 				Wid:    10000,
 				Minwid: byte(frame.font.StringWidth(" ")),
 				Nrune:  -1,
 			})
 
-			frame.nchars++
-			offs++
+			i++
 		case '\n':
+			wipbox = frame.addifnonempty(wipbox, inby[i+1:i+1])
+
 			frame.box = append(frame.box, &frbox{
-				Bc:     c,
+				Bc:     '\n',
 				Wid:    10000,
 				Minwid: 0,
 				Nrune:  -1,
 			})
 
-			frame.nchars++
-			offs++
+			i++
 			nl++
 		default:
-			s := 0
-			nr := 0
-			w := 0
-
-			tmp := make([]byte, TMPSIZE+3)
-			for offs < len(r) {
-				c := r[offs]
-				if c == '\t' || c == '\n' {
-					break
-				}
-				rw := utf8.EncodeRune(tmp[s:], c)
-				if s+rw >= TMPSIZE {
-					break
-				}
-				w += frame.font.RunesWidth(r[offs : offs+1])
-
-				offs++
-				s += rw
-				nr++
-			}
-			p := make([]byte, s)
-			copy(p, tmp[:s])
-
-			frame.box = append(frame.box, &frbox{
-				Ptr:   p,
-				Wid:   w,
-				Nrune: nr,
-			})
-			frame.nchars += nr
+			_, n := utf8.DecodeRune(inby[i:])
+			wipbox.Ptr = wipbox.Ptr[:len(wipbox.Ptr)+n]
+			wipbox.Nrune++
+			i += n
 		}
 	}
+	frame.addifnonempty(wipbox, []byte{})
 
 	*ppt = f.cklinewrap0(*ppt, frame.box[0])
 	return frame._draw(*ppt), frame
@@ -120,23 +113,33 @@ type points struct {
 	pt0, pt1 image.Point
 }
 
-var nalloc = 0
-
 func (f *frameimpl) Insert(r []rune, p0 int) bool {
 	f.lk.Lock()
 	defer f.lk.Unlock()
 	return f.insertimpl(r, p0)
 }
 
+func (f *frameimpl) InsertByte(b []byte, p0 int) bool {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+	return f.insertbyteimpl(b, p0)
+}
+
 func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
+	// TODO(rjk): Ick. But we'll get rid of this soon.
+	inby := []byte(string(r))
+	return f.insertbyteimpl(inby, p0)
+}
+
+func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
 	// log.Printf("frame.Insert. Start: %s", string(r))
 	// defer log.Println("frame.Insert end")
 	//	f.Logboxes("at very start of insert")
-	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(r))
-	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(r))
-	f.validateinputs(r, "Frame.Insert Start")
+	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(inby))
+	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(inby))
+	f.validateinputs(inby, "Frame.Insert Start")
 
-	if p0 > f.nchars || len(r) == 0 || f.background == nil {
+	if p0 > f.nchars || len(inby) == 0 || f.background == nil {
 		return f.lastlinefull
 	}
 
@@ -158,7 +161,8 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 	pt0 := f.ptofcharnb(p0, n0)
 	ppt0 := pt0
 	opt0 := pt0
-	pt1, nframe := f.bxscan(r, &ppt0)
+
+	pt1, nframe := f.bxscan(inby, &ppt0)
 	ppt1 := pt1
 
 	if n0 < len(f.box) {
@@ -361,12 +365,12 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 
 // validateinputs ensures that the given rune string is valid for
 // insertion.
-func (f *frameimpl) validateinputs(runes []rune, format string, args ...interface{}) {
+func (f *frameimpl) validateinputs(inby []byte, format string, args ...interface{}) {
 	if !*validate {
 		return
 	}
 
-	for i, r := range runes {
+	for i, r := range inby {
 		if r == 0x00 { // Nulls in input string are forbidden.
 			log.Printf(format, args...)
 			log.Printf("r[%d] null", i)

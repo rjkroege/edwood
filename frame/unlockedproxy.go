@@ -40,6 +40,12 @@ func (up *selectscrollupdaterimpl) Insert(r []rune, p0 int) bool {
 	return f.insertimpl(r, p0)
 }
 
+func (up *selectscrollupdaterimpl) InsertByte(b []byte, p0 int) bool {
+	// log.Println("selectscrollupdaterimpl.InsertByte")
+	f := (*frameimpl)(up)
+	return f.insertbyteimpl(b, p0)
+}
+
 func (up *selectscrollupdaterimpl) IsLastLineFull() bool {
 	// log.Println("selectscrollupdaterimpl.IsLastLineFull")
 	f := (*frameimpl)(up)

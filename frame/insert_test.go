@@ -1,7 +1,6 @@
 package frame
 
 import (
-	"bytes"
 	"image"
 	"strings"
 	"testing"
@@ -47,10 +46,6 @@ func (bx InsertTest) Verify(t *testing.T, prefix string, result interface{}) {
 	testcore(t, prefix, bx.name, r.frame, bx.nbox, bx.afterboxes)
 }
 
-func mkRu(s string) []rune {
-	return bytes.Runes([]byte(s))
-}
-
 func makereplicatedstring(c int) string {
 	var b strings.Builder
 	b.WriteString("a本")
@@ -74,7 +69,7 @@ func TestBxscan(t *testing.T) {
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(10, 15)
-				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				pt2, f := f.bxscan([]byte("本"), &pt1)
 				return pt1, pt2, f
 			},
 			1,
@@ -91,7 +86,7 @@ func TestBxscan(t *testing.T) {
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(56, 15)
-				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				pt2, f := f.bxscan([]byte("本"), &pt1)
 				return pt1, pt2, f
 			},
 			1,
@@ -108,7 +103,7 @@ func TestBxscan(t *testing.T) {
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(58, 15)
-				pt2, f := f.bxscan(mkRu("本"), &pt1)
+				pt2, f := f.bxscan([]byte("本"), &pt1)
 				return pt1, pt2, f
 			},
 			1,
@@ -125,7 +120,7 @@ func TestBxscan(t *testing.T) {
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(56, 15)
-				pt2, f := f.bxscan(mkRu("本a"), &pt1)
+				pt2, f := f.bxscan([]byte("本a"), &pt1)
 				return pt1, pt2, f
 			},
 			2,
@@ -142,7 +137,7 @@ func TestBxscan(t *testing.T) {
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
 				pt1 := image.Pt(10, 15)
-				pt2, f := f.bxscan(mkRu(bigstring), &pt1)
+				pt2, f := f.bxscan([]byte(bigstring), &pt1)
 				return pt1, pt2, f
 			},
 			3,
