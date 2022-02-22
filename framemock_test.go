@@ -22,6 +22,7 @@ func (mf *MockFrame) Charofpt(pt image.Point) int                  { return 0 }
 func (mf *MockFrame) DefaultFontHeight() int                       { return 10 }
 func (mf *MockFrame) Delete(int, int) int                          { return 0 }
 func (mf *MockFrame) Insert([]rune, int) bool                      { return false }
+func (mf *MockFrame) InsertByte([]byte, int) bool                  { return false }
 func (mf *MockFrame) IsLastLineFull() bool                         { return false }
 func (mf *MockFrame) Rect() image.Rectangle                        { return image.Rect(0, 0, 0, 0) }
 func (mf *MockFrame) TextOccupiedHeight(r image.Rectangle) int     { return 0 }

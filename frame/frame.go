@@ -39,7 +39,7 @@ type SelectScrollUpdater interface {
 	// Delete will clear a selection or tick if present but not put it back.
 	Delete(int, int) int
 
-	// Insert inserts r into Frame f starting at index p0.
+	// Insert inserts r into Frame f starting at rune index p0.
 	// If a NUL (0) character is inserted, chaos will ensue. Tabs
 	// and newlines are handled by the library, but all other characters,
 	// including control characters, are just displayed. For example,
@@ -47,6 +47,7 @@ type SelectScrollUpdater interface {
 	//
 	// Insert will remove the selection or tick  if present but update selection offsets.
 	Insert([]rune, int) bool
+	InsertByte([]byte, int) bool
 
 	IsLastLineFull() bool
 	Rect() image.Rectangle
