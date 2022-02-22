@@ -152,7 +152,7 @@ func (b *Buffer) FlattenHistory() {
 func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 	//	log.Println("Insert start")
 	//	defer log.Println("Insert end")
-	off := start.b
+	off := start.B
 	if len(data) == 0 {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 		return nil
 	}
 
-	c := b.newChange(off, start.r, seq)
+	c := b.newChange(off, start.R, seq)
 	var pnew *piece
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
@@ -209,9 +209,9 @@ func (b *Buffer) Insert(start OffSetTuple, data []byte, nr, seq int) error {
 // deleted.
 func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
 	b.validateInvariant()
-	off := startOff.b
-	length := endOff.b - startOff.b
-	rlength := endOff.r - startOff.r
+	off := startOff.B
+	length := endOff.B - startOff.B
+	rlength := endOff.R - startOff.R
 	if length <= 0 {
 		b.validateInvariant()
 		return nil
@@ -221,7 +221,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
 	if p == nil {
 		b.validateInvariant()
 		return ErrWrongOffset
-	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.r-startOff.r)) {
+	} else if p == b.cachedPiece && p.delete(offset, length, int(endOff.R-startOff.R)) {
 		// try to update the last inserted piece if the length doesn't exceed
 		b.validateInvariant()
 		return nil
@@ -296,7 +296,7 @@ func (b *Buffer) Delete(startOff, endOff OffSetTuple, seq int) error {
 	}
 
 	b.cachedPiece = newStart
-	c := b.newChange(off, startOff.r, seq)
+	c := b.newChange(off, startOff.R, seq)
 	c.new = newSpan(newStart, newEnd)
 	c.old = newSpan(start, end)
 	swapSpans(c.old, c.new)
@@ -363,8 +363,8 @@ func (b *Buffer) newEmptyPiece() *piece {
 func (b *Buffer) findPiece(off OffSetTuple) (*piece, int, int) {
 	tr, tb := 0, 0
 	for p := b.begin; p.next != nil; p = p.next {
-		if tb <= off.b && off.b <= tb+p.len() {
-			return p, off.b - tb, off.r - tr
+		if tb <= off.B && off.B <= tb+p.len() {
+			return p, off.B - tb, off.R - tr
 		}
 		tb += p.len()
 		tr += p.nr
@@ -780,8 +780,8 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 		bs := b.Bytes()
 		if off > len(bs) {
 			return OffSetTuple{
-				b: tb,
-				r: tr,
+				B: tb,
+				R: tr,
 			}
 		}
 		if got, want := utf8.RuneCount(bs[0:tb]), off; got != want {
@@ -792,7 +792,7 @@ func (b *Buffer) RuneTuple(off int) OffSetTuple {
 	}
 
 	return OffSetTuple{
-		b: tb,
-		r: tr,
+		B: tb,
+		R: tr,
 	}
 }
