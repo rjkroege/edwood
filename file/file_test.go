@@ -52,10 +52,12 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 
 	f.InsertAtWithoutCommit(0, []rune(s1))
 
+	t.Logf("contents %q, %s", f.f.String(), f.f.viewedState())
+
 	i := 0
 	for _, r := range s1 {
 		if got, want := f.ReadC(i), r; got != want {
-			t.Errorf("ReadC failed. got %v want % v", got, want)
+			t.Errorf("ReadC failed %d. got %v want % v", i, got, want)
 		}
 		i++
 	}

@@ -3,6 +3,7 @@ package file
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -35,12 +36,7 @@ func (b *Buffer) Commit(seq int) {
 // TODO(rjk): Implement RuneReader
 func (b *Buffer) ReadC(q int) rune {
 	p0 := b.RuneTuple(q)
-
-	sr := io.NewSectionReader(b, int64(p0.B), 8)
-	bsr := bufio.NewReaderSize(sr, 8)
-
-	// TODO(rjk): Add some error checking?
-	r, _, _ := bsr.ReadRune()
+	r, _, _ := b.ReadRuneAt(p0)
 	return r
 }
 
@@ -103,4 +99,19 @@ func (b *Buffer) String() string {
 	// TODO(rjk): Add some error checking.
 	io.Copy(buffy, sr)
 	return buffy.String()
+}
+
+// viewedState returns a string representation of a Buffer b good for debugging.
+func (b *Buffer) viewedState() string {
+	sb := new(strings.Builder)
+
+	fmt.Fprintf(sb, "Buffer (vws: %v, vwl: %v) {\n", b.vws, b.vwl)
+	for p := b.begin; p != nil; p = p.next {
+		if p == b.viewed {
+			sb.WriteString("->")
+		}
+		fmt.Fprintf(sb, "	id: %d len: %d nr: %d data: %q\n", p.id, p.len(), p.nr, string(p.data))
+	}
+	sb.WriteString("}")
+	return sb.String()
 }

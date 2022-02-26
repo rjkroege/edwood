@@ -90,3 +90,24 @@ func TestNewRead(t *testing.T) {
 		})
 	}
 }
+
+func TestReadCSplit(t *testing.T) {
+	b := NewBuffer([]byte("hello\n1 2 3 4\nfoo"), len("hello\n1 2 3 4\nfoo"))
+
+	t.Log("before insert", b.viewedState())
+
+	b.Insert(b.RuneTuple(len("hello\n1 2")), []byte("X"), 1, 1)
+
+	t.Log("after insert", b.viewedState())
+
+	s := "hello\n1 2X 3 4\nfoo"
+	if got, want := b.String(), s; got != want {
+		t.Errorf("buffer contents not as expected got %q, want %q", got, want)
+	}
+
+	for i, r := range s {
+		if got, want := b.ReadC(i), r; got != want {
+			t.Errorf("something went wrong? %d got '%c' %d, want '%c'", i, got, got, want)
+		}
+	}
+}

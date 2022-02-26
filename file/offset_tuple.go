@@ -17,3 +17,10 @@ func Ot(b, r int) OffsetTuple {
 		R: r,
 	}
 }
+
+func (o OffsetTuple) decrement(p *piece) OffsetTuple {
+	return Ot(
+		o.B-len(p.data),
+		o.R-p.nr,
+	)
+}
