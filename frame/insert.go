@@ -75,7 +75,7 @@ func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameim
 				}
 			}
 			_, n := utf8.DecodeRune(inby[i:])
-			wipbox.Ptr = wipbox.Ptr[:len(wipbox.Ptr)+n]
+			wipbox.Ptr = append(wipbox.Ptr, inby[i:i+n]...)
 			wipbox.Nrune++
 			i += n
 		}

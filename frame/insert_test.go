@@ -145,6 +145,24 @@ func TestBxscan(t *testing.T) {
 			image.Pt(10, 15),
 			image.Pt(10+2*10, 15+13+13),
 		},
+		InsertTest{
+			"tabs and newlines placed in dedicated boxes",
+			&frameimpl{
+				font:              mockFont(),
+				defaultfontheight: 13,
+				rect:              image.Rect(10, 15, 10+57, 15+57),
+				maxtab:            8,
+			},
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
+				pt1 := image.Pt(10, 15)
+				pt2, f := f.bxscan([]byte("\ta\n"), &pt1)
+				return pt1, pt2, f
+			},
+			3,
+			[]*frbox{makeBox("\t"), makeBox("a"), makeBox("\n")},
+			image.Pt(10, 15),
+			image.Pt(10, 15+13),
+		},
 	})
 }
 

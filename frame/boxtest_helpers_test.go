@@ -19,18 +19,16 @@ func makeBox(s string) *frbox {
 	switch s {
 	case "\t":
 		return &frbox{
-			Wid:    5000,
+			Wid:    10,
 			Nrune:  -1,
-			Ptr:    []byte(s),
 			Bc:     r,
 			Minwid: 10,
 		}
 
 	case "\n":
 		return &frbox{
-			Wid:    5000,
+			Wid:    10000,
 			Nrune:  -1,
-			Ptr:    []byte(s),
 			Bc:     r,
 			Minwid: 0,
 		}
