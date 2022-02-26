@@ -119,6 +119,11 @@ type Buffer struct {
 	savedAction   *action
 
 	oeb *ObservableEditableBuffer
+
+	viewed *piece      // piece most recently accessed by ReadRuneAt
+	vws    OffsetTuple // OffsetTuple for start of viewed
+	vwl    OffsetTuple // Last determined OffsetTuple
+	pnr    int         // Cached nr.
 }
 
 // NewBuffer initializes a new buffer with the given content as a starting point.
@@ -136,6 +141,7 @@ func NewBuffer(content []byte, nr int) *Buffer {
 		p := t.newPiece(content, t.begin, t.end, nr)
 		t.begin.next = p
 		t.end.prev = p
+		t.pnr = nr
 	}
 	return t
 }
@@ -150,7 +156,7 @@ func (b *Buffer) FlattenHistory() {
 // Insert inserts the data at the given offset in the buffer. An error is return when the
 // given offset is invalid.
 func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
-	//	log.Println("Insert start")
+	//	log.Printf("Insert start %v %q %d", start, string(data), nr)
 	//	defer log.Println("Insert end")
 	off := start.B
 	if len(data) == 0 {
@@ -164,6 +170,9 @@ func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 	}
 	b.validateInvariant()
 
+	//log.Println("before", b.viewedState())
+
+	b.pnr += nr
 	p, offset, roffset := b.findPiece(start)
 	if p == nil {
 		b.validateInvariant()
@@ -175,8 +184,13 @@ func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 		return nil
 	}
 
+	//log.Println("not in cached state")
+
 	c := b.newChange(off, start.R, seq)
 	var pnew *piece
+
+	//TODO(rjk): Increase cases where cache is preserved.
+	b.viewed = nil
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
 		// remove, just add a new piece holding the extra text.
@@ -200,6 +214,7 @@ func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 	b.cachedPiece = pnew
 	swapSpans(c.old, c.new)
 	b.validateInvariant()
+	//log.Println("after", b.viewedState())
 	return nil
 }
 
@@ -217,6 +232,7 @@ func (b *Buffer) Delete(startOff, endOff OffsetTuple, seq int) error {
 		return nil
 	}
 
+	b.pnr -= rlength
 	p, offset, roffset := b.findPiece(startOff)
 	if p == nil {
 		b.validateInvariant()
@@ -227,6 +243,7 @@ func (b *Buffer) Delete(startOff, endOff OffsetTuple, seq int) error {
 		return nil
 	}
 	b.cachedPiece = nil
+	b.viewed = nil
 
 	var cur, rcur int // how much has already been deleted
 	midwayStart, midwayEnd := false, false
@@ -361,25 +378,49 @@ func (b *Buffer) newEmptyPiece() *piece {
 //
 // If off is zero, the beginning sentinel piece is returned.
 func (b *Buffer) findPiece(off OffsetTuple) (*piece, int, int) {
-	tr, tb := 0, 0
-	for p := b.begin; p.next != nil; p = p.next {
-		if tb <= off.B && off.B <= tb+p.len() {
-			return p, off.B - tb, off.R - tr
-		}
-		tb += p.len()
-		tr += p.nr
+	p := b.viewed
+	if p == nil || iabs(off.B-b.vwl.B) > off.B {
+		p = b.begin
+		b.vwl = Ot(0, 0)
+		b.vws = Ot(0, 0)
 	}
+
+	if off.B < b.vwl.B { // Go backwards.
+		for ; p != nil; p = p.prev {
+			if b.vws.B < off.B && off.B <= b.vws.B+p.len() {
+				b.vwl = off
+				b.viewed = p
+				return p, off.B - b.vws.B, off.R - b.vws.R
+			}
+
+			b.vws = Ot(b.vws.B-p.prev.len(), b.vws.R-p.prev.nr)
+		}
+	} else { // Go forwards.
+		for ; p.next != nil; p = p.next {
+			if b.vws.B <= off.B && off.B <= b.vws.B+p.len() {
+				b.vwl = off
+				b.viewed = p
+				return p, off.B - b.vws.B, off.R - b.vws.R
+			}
+
+			b.vws = Ot(b.vws.B+p.len(), b.vws.R+p.nr)
+		}
+	}
+	b.vwl = Ot(0, 0)
+	b.vws = Ot(0, 0)
 	return nil, 0, 0
 }
 
 // Undo reverts the last performed action. It returns the new selection
 // q0, q1 and a bool indicating if the returned selection is meaningful..
 // If there is no action to undo, Undo returns -1 as the offset.
+// TODO(rjk): nil the cached piece here and in Redo
 func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 	// log.Println("Undo start")
 	// defer log.Println("Undo end")
 	b.validateInvariant()
 	b.SetUndoPoint()
+	b.InvalidateCachedData()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0, false, 0
@@ -480,6 +521,7 @@ func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	//	defer log.Println("Redo end")
 	b.validateInvariant()
 	b.SetUndoPoint()
+	b.InvalidateCachedData()
 	a := b.shiftAction()
 	if a == nil {
 		return -1, 0, false, 0
@@ -527,6 +569,12 @@ func (b *Buffer) SetUndoPoint() {
 	b.cachedPiece = nil
 }
 
+// InvalidateCachedData clears cached data.
+func (b *Buffer) InvalidateCachedData() {
+	b.viewed = nil
+	b.pnr = -1
+}
+
 // Clean marks the buffer as non-dirty.
 func (b *Buffer) Clean() {
 	if b.head > 0 {
@@ -543,6 +591,7 @@ func (b *Buffer) Dirty() bool {
 		b.head > 0 && b.savedAction != b.actions[b.head-1]
 }
 
+// TODO(rjk): It's possible to speed this up with the cached view.
 func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 	p := b.begin
 	for ; p != nil; p = p.next {
@@ -582,10 +631,15 @@ func (b *Buffer) Size() int {
 
 // Nr returns the sum of the Nr for each piece in the buffer.
 func (b *Buffer) Nr() int {
+	if b.pnr >= 0 {
+		return b.pnr
+	}
+
 	var nr int
 	for p := b.begin; p != b.end; p = p.next {
 		nr += p.nr
 	}
+	b.pnr = nr
 	return nr
 }
 
@@ -749,45 +803,81 @@ func (b *Buffer) HasRedoableChanges() bool {
 	return b.head <= len(b.actions)-1
 }
 
+func iabs(a int) int {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
+// ReadRuneAt returns the rune at off.
+func (b *Buffer) ReadRuneAt(off OffsetTuple) (rune, int, error) {
+	p, tb, _ := b.findPiece(off)
+
+	// Remember that findPiece is finding p that is where next text at off
+	// would be appended so must bump forward.
+	if tb == p.len() {
+		p = p.next
+		tb = 0
+	}
+
+	if p == nil {
+		if off.B == 0 {
+			return 0, 0, io.EOF
+		}
+		return 0, 0, ErrWrongOffset
+	}
+
+	r, sz := utf8.DecodeRune(p.data[tb:])
+	return r, sz, nil
+}
+
 // RuneTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
 // given offset in runes.
-// TODO(rjk): Consider using the cached piece to speed this up.
+//
+// In setting b.viewed, RuneTuple follows the semantic that aligns with
+// findPiece: if off is on a piece boundary, b.viewed will be set to piece
+// before the insertion point.
 func (b *Buffer) RuneTuple(off int) OffsetTuple {
-	b.validateInvariant()
+	p := b.viewed
 
-	tr, tb := 0, 0
-	p := b.begin
-
-	// Find piece
-	for ; p != b.end && tr+p.nr < off; p = p.next {
-		tr += p.nr
-		tb += len(p.data)
+	// Start at the beginning if that's cheaper or fallback to regular
+	// RuneTuple operation.
+	if p == nil || iabs(off-b.vwl.R) > off {
+		p = b.begin
+		b.vwl = Ot(0, 0)
+		b.vws = Ot(0, 0)
 	}
 
-	// Find the byte offset in piece p
-	for i := 0; tr < off; tr++ {
-		_, sz := utf8.DecodeRune(p.data[i:])
-		tb += sz
-		i += sz
-	}
-
-	if expensiveCheckedExecution {
-		bs := b.Bytes()
-		if off > len(bs) {
-			return OffsetTuple{
-				B: tb,
-				R: tr,
-			}
+	if off < b.vwl.R { // Go backwards.
+		for p != b.begin && off <= b.vws.R {
+			p = p.prev
+			b.vwl = Ot(b.vws.B, b.vws.R)
+			b.vws = Ot(b.vws.B-p.len(), b.vws.R-p.nr)
 		}
-		if got, want := utf8.RuneCount(bs[0:tb]), off; got != want {
-			log.Printf("RuneTuple is generating the wrong result: got %d want %d", got, want)
-			log.Printf("subrange %q", string(bs[0:tb]))
-			panic("file bug in RuneTuple")
+
+		// Find the byte offset in piece p
+		for i := b.vwl.B - b.vws.B; i >= 0 && b.vwl.R > off; {
+			_, sz := utf8.DecodeLastRune(p.data[0:i])
+			b.vwl = Ot(b.vwl.B-sz, b.vwl.R-1)
+			i -= sz
+		}
+	} else { // Go forwards.
+		for ; p != b.end && off > b.vws.R+p.nr; p = p.next {
+			b.vws = Ot(b.vws.B+len(p.data), b.vws.R+p.nr)
+			b.vwl = b.vws
+		}
+
+		// Find the byte offset in piece p
+		for i := b.vwl.B - b.vws.B; b.vwl.R < off; {
+			_, sz := utf8.DecodeRune(p.data[i:])
+			b.vwl = Ot(b.vwl.B+sz, b.vwl.R+1)
+			i += sz
 		}
 	}
-
-	return OffsetTuple{
-		B: tb,
-		R: tr,
+	if p == nil {
+		panic("not expected!")
 	}
+	b.viewed = p
+	return b.vwl
 }

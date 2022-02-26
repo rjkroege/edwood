@@ -450,8 +450,6 @@ func (e *ObservableEditableBuffer) Commit() {
 // InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
 // forwards to InsertAt for file.Buffer.
 func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
-	before := e.getTagStatus()
-	defer e.notifyTagObservers(before)
 	e.InsertAt(p0, s)
 }
 

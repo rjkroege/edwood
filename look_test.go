@@ -10,6 +10,7 @@ import (
 
 	"9fans.net/go/plumb"
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/runes"
 )
@@ -187,4 +188,106 @@ func textSetSelection(t *Text, buf string) {
 	t.q0 = popRune('«')
 	t.q1 = popRune('»')
 	t.file = file.MakeObservableEditableBuffer("", b)
+}
+
+func look3linenumber(t testing.TB, g *globals) {
+	t.Helper()
+
+	secondwin := g.row.col[0].w[1]
+
+	// Probably need to lock here.
+	global.row.lk.Lock()
+	secondwin.Lock('M')
+
+	// t.Logf("secondwin %q", secondwin.body.file.String())
+
+	look3(&secondwin.body, 1, 1, false)
+
+	secondwin.Unlock()
+	global.row.lk.Unlock()
+}
+
+func BenchmarkLook3(t *testing.B) {
+	dir := t.TempDir()
+	firstfilename := filepath.Join(dir, "bigfile")
+	secondfilename := filepath.Join(dir, "littlefile")
+	nl := 4000
+	tnl := nl - 1
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		fn   func(t testing.TB, g *globals)
+		want *dumpfile.Content
+	}{
+		{
+			name: "jumpToNumberedLine",
+			fn:   look3linenumber,
+			want: &dumpfile.Content{
+				CurrentDir: cwd,
+				VarFont:    defaultVarFont,
+				FixedFont:  defaultFixedFont,
+				Columns: []dumpfile.Column{
+					{},
+				},
+				Windows: []*dumpfile.Window{
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: firstfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{
+							Q0: (tnl - 1) * (1 + len("the quick brown fox")),
+							Q1: tnl * (1 + len("the quick brown fox")),
+						},
+					},
+					{
+						Type:   dumpfile.Saved,
+						Column: 0,
+						Tag: dumpfile.Text{
+							Buffer: secondfilename + " Del Snarf | Look Edit ",
+						},
+						Body: dumpfile.Text{},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(b *testing.B) {
+			b.StopTimer()
+
+			for i := 0; i < b.N; i++ {
+
+				FlexiblyMakeWindowScaffold(
+					b,
+					ScWin("bigfile"),
+					ScDir(dir, "bigfile"),
+					ScBody("bigfile", Repeating(nl, "the quick brown fox")),
+
+					ScWin("littlefile"),
+					ScDir(dir, "littlefile"),
+					ScBody("littlefile", fmt.Sprintf("%s:%d\n", firstfilename, tnl)),
+				)
+
+				b.StartTimer()
+				tc.fn(b, global)
+				b.StopTimer()
+
+				got, err := global.row.dump()
+				if err != nil {
+					b.Fatalf("dump failed: %v", err)
+				}
+
+				if diff := cmp.Diff(tc.want, got); diff != "" {
+					b.Errorf("dump mismatch (-want +got):\n%s", diff)
+				}
+
+			}
+		})
+	}
 }
