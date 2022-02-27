@@ -850,6 +850,19 @@ func runwaittask(c *Command, cpid chan *os.Process) {
 
 var errEmptyCmd = fmt.Errorf("empty command")
 
+func setupenvvars(filename, argaddr string, winid int) []string {
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("winid=%d", winid))
+	if filename != "" {
+		env = append(env, fmt.Sprintf("%%=%v", filename))
+		env = append(env, fmt.Sprintf("samfile=%v", filename))
+	}
+	if argaddr != "" {
+		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
+	}
+	return env
+}
+
 // runproc. Something with the running of external processes. Executes
 // asynchronously.
 // TODO(rjk): Must lock win on mutation.
@@ -895,15 +908,8 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 		rcarg = []string{shell, "-c", t}
 
-		env := os.Environ()
-		env = append(env, fmt.Sprintf("winid=%d", winid))
-		if filename != "" {
-			env = append(env, fmt.Sprintf("%%=%v", filename))
-			env = append(env, fmt.Sprintf("samfile=%v", filename))
-		}
-
 		cmd := exec.Command(rcarg[0], rcarg[1:]...)
-		cmd.Env = env
+		cmd.Env = setupenvvars(filename, argaddr, winid)
 		cmd.Dir = dir
 		cmd.Stdin = sin
 		cmd.Stdout = sout
@@ -936,7 +942,6 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	}
 	c.iseditcommand = iseditcmd
 	c.text = s
-	env := os.Environ()
 	if newns {
 		if win != nil {
 			// Access possibly mutable Window state inside a lock.
@@ -954,12 +959,6 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		}
 		// 	rfork(RFNAMEG|RFENVG|RFFDG|RFNOTEG); TODO(flux): I'm sure these settings are important
 
-		env = append(env, fmt.Sprintf("winid=%d", winid))
-
-		if filename != "" {
-			env = append(env, fmt.Sprintf("%%=%v", filename))
-			env = append(env, fmt.Sprintf("samfile=%v", filename))
-		}
 		var fs *client.Fsys
 		var err error
 		c.md, fs, err = fsysmount(dir, incl)
@@ -1002,9 +1001,6 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 		win.lk.Unlock()
 	}
 
-	if argaddr != "" {
-		env = append(env, fmt.Sprintf("acmeaddr=%v", argaddr))
-	}
 	if global.acmeshell != "" {
 		return Hard()
 	}
@@ -1033,7 +1029,7 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 	cmd.Stdin = sin
 	cmd.Stdout = sout
 	cmd.Stderr = serr
-	cmd.Env = env
+	cmd.Env = setupenvvars(filename, argaddr, winid)
 	err := cmd.Start()
 	if err != nil {
 		Fail()
