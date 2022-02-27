@@ -894,7 +894,16 @@ func runproc(win *Window, s string, dir string, newns bool, argaddr string, arg 
 			shell = "rc"
 		}
 		rcarg = []string{shell, "-c", t}
+
+		env := os.Environ()
+		env = append(env, fmt.Sprintf("winid=%d", winid))
+		if filename != "" {
+			env = append(env, fmt.Sprintf("%%=%v", filename))
+			env = append(env, fmt.Sprintf("samfile=%v", filename))
+		}
+
 		cmd := exec.Command(rcarg[0], rcarg[1:]...)
+		cmd.Env = env
 		cmd.Dir = dir
 		cmd.Stdin = sin
 		cmd.Stdout = sout
