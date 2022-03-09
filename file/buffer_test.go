@@ -384,6 +384,10 @@ func (b *Buffer) checkContent(name string, t *testing.T, expected string) {
 	if actualNr != expectedNr {
 		t.Errorf("%v: got '%v' runes, expected '%v' runes", name, actualNr, expectedNr)
 	}
+
+	if got, want := b.Size(), len(expected); got != want {
+		t.Errorf("%v: b.Size() got %d, want %d", name, got, want)
+	}
 }
 
 func (b *Buffer) insertString(off int, data string, t *testing.T) {
@@ -887,7 +891,7 @@ func TestFindPiece(t *testing.T) {
 			targetoff := b.RuneTuple(tv.roff)
 
 			// Invalidate the cached data to make sure that everything is consistent.
-			b.InvalidateCachedData()
+			b.invalidateCachedData()
 
 			// New bi-directional findPiece depends on the state of previous findPiece and
 			// RuneTuple invocations to speed up operation. Run additional RuneTuple
@@ -934,4 +938,10 @@ func (b *Buffer) old_findPiece(off OffsetTuple) (*piece, int, int) {
 		tr += p.nr
 	}
 	return nil, 0, 0
+}
+
+// invalidateCachedData clears cached data.
+func (b *Buffer) invalidateCachedData() {
+	b.viewed = nil
+	b.pend = Ot(-1, -1)
 }

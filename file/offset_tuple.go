@@ -32,6 +32,14 @@ func (p0 OffsetTuple) Less(p1 OffsetTuple) bool {
 	return p0.R < p1.R
 }
 
+func (p0 OffsetTuple) Add(b, r int) OffsetTuple {
+	return Ot(p0.B+b, p0.R+r)
+}
+
+func (p0 OffsetTuple) Sub(b, r int) OffsetTuple {
+	return Ot(p0.B-b, p0.R-r)
+}
+
 var (
 	// Force that BufferCursor is an io.RuneReader.
 	_ io.RuneReader = (*BufferCursor)(nil)

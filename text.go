@@ -451,7 +451,8 @@ func (t *Text) Inserted(oq0 file.OffsetTuple, b []byte, nr int) {
 	}
 
 	t.logInsert(oq0, b, nr)
-	// TODO(rjk): I do too much work here.
+	// TODO(rjk): The below should only be invoked once (at the end) of a
+	// sequence of modifications to the file.Buffer, not here per action.
 	t.SetSelect(t.q0, t.q1)
 	if t.fr != nil && t.display != nil {
 		t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)

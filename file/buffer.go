@@ -123,7 +123,7 @@ type Buffer struct {
 	viewed *piece      // piece most recently accessed by ReadRuneAt
 	vws    OffsetTuple // OffsetTuple for start of viewed
 	vwl    OffsetTuple // Last determined OffsetTuple
-	pnr    int         // Cached nr.
+	pend   OffsetTuple // Cached end of the buffer.
 }
 
 // NewBuffer initializes a new buffer with the given content as a starting point.
@@ -141,7 +141,7 @@ func NewBuffer(content []byte, nr int) *Buffer {
 		p := t.newPiece(content, t.begin, t.end, nr)
 		t.begin.next = p
 		t.end.prev = p
-		t.pnr = nr
+		t.pend = Ot(len(content), nr)
 	}
 	return t
 }
@@ -172,7 +172,7 @@ func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 
 	//log.Println("before", b.viewedState())
 
-	b.pnr += nr
+	b.pend = b.pend.Add(len(data), nr)
 	p, offset, roffset := b.findPiece(start)
 	if p == nil {
 		b.validateInvariant()
@@ -189,7 +189,7 @@ func (b *Buffer) Insert(start OffsetTuple, data []byte, nr, seq int) error {
 	c := b.newChange(off, start.R, seq)
 	var pnew *piece
 
-	//TODO(rjk): Increase cases where cache is preserved.
+	//TODO(rjk): Increase cases where b.v
 	b.viewed = nil
 	if offset == p.len() {
 		// Insert between two existing pieces, hence there is nothing to
@@ -232,7 +232,7 @@ func (b *Buffer) Delete(startOff, endOff OffsetTuple, seq int) error {
 		return nil
 	}
 
-	b.pnr -= rlength
+	b.pend = b.pend.Sub(length, rlength)
 	p, offset, roffset := b.findPiece(startOff)
 	if p == nil {
 		b.validateInvariant()
@@ -243,6 +243,7 @@ func (b *Buffer) Delete(startOff, endOff OffsetTuple, seq int) error {
 		return nil
 	}
 	b.cachedPiece = nil
+	// TODO(rjk): Expand caching opportunities.
 	b.viewed = nil
 
 	var cur, rcur int // how much has already been deleted
@@ -420,7 +421,6 @@ func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 	// defer log.Println("Undo end")
 	b.validateInvariant()
 	b.SetUndoPoint()
-	b.InvalidateCachedData()
 	a := b.unshiftAction()
 	if a == nil {
 		return -1, 0, false, 0
@@ -438,6 +438,12 @@ func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 		c := a.changes[i]
 		swapSpans(c.new, c.old)
 		roff = c.roff
+
+		// Every time we call swapSpans, we've altered which pieces comprise the
+		// linked list of pieces. p.viewed may now not be a piece actually in the
+		// current piece list. Do this for each swapSpans because the undone
+		// callback may invoke code that resets the b.viewed piece.
+		b.viewed = nil
 
 		// Must happen after the swapSpans.
 		nr = b.undone(c, true)
@@ -475,9 +481,11 @@ func (b *Buffer) undone(c *change, undo bool) int {
 		rsize = oldnr - newnr
 	}
 
+	// Fix-up the cached end.
+	b.pend = Ot(b.pend.B-size, b.pend.R-rsize)
+
 	//	log.Println("undone", undo, size, rsize)
 	if b.oeb == nil {
-		// TODO(rjk): Exiting here provides visibility into the computed size.
 		return rsize
 	}
 
@@ -489,6 +497,9 @@ func (b *Buffer) undone(c *change, undo bool) int {
 		// size is smaller. So we're undoing a deletion
 		buffy := make([]byte, -size)
 
+		// Regarding my comment about speeding up ReadAt with the cached view,
+		// the b.viewed is nil at this point. But: might be able to speed this up
+		// because I think that the read material is always complete pieces.
 		if _, err := b.ReadAt(buffy, int64(off)); err != nil {
 			log.Fatalf("fatal error in Buffer.undone reading inserted contents: %v", err)
 		}
@@ -521,7 +532,6 @@ func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	//	defer log.Println("Redo end")
 	b.validateInvariant()
 	b.SetUndoPoint()
-	b.InvalidateCachedData()
 	a := b.shiftAction()
 	if a == nil {
 		return -1, 0, false, 0
@@ -535,6 +545,9 @@ func (b *Buffer) Redo(_ int) (int, int, bool, int) {
 	for _, c := range a.changes {
 		swapSpans(c.old, c.new)
 		roff = c.roff
+
+		// Reset the cached piece.
+		b.viewed = nil
 
 		// Must happen after swapSpans
 		nr = b.undone(c, false)
@@ -567,12 +580,6 @@ func (b *Buffer) shiftAction() *action {
 func (b *Buffer) SetUndoPoint() {
 	b.currentAction = nil
 	b.cachedPiece = nil
-}
-
-// InvalidateCachedData clears cached data.
-func (b *Buffer) InvalidateCachedData() {
-	b.viewed = nil
-	b.pnr = -1
 }
 
 // Clean marks the buffer as non-dirty.
@@ -618,29 +625,32 @@ func (b *Buffer) ReadAt(data []byte, off int64) (n int, err error) {
 	return n, nil
 }
 
+// End returns an OffsetTuple for the end of the buffer.
+func (b *Buffer) End() OffsetTuple {
+	if b.pend.B >= 0 && b.pend.R >= 0 {
+		return b.pend
+	}
+
+	tb, tr := 0, 0
+	for p := b.begin; p != b.end; p = p.next {
+		tb += p.len()
+		tr += p.nr
+	}
+
+	b.pend = Ot(tb, tr)
+	return b.pend
+}
+
 // Size returns the size of the buffer in the current state. Size is the
 // number of bytes available for reading via ReadAt. Operations like Insert,
 // Delete, Undo and Redo modify the size.
 func (b *Buffer) Size() int {
-	var size int
-	for p := b.begin; p != b.end; p = p.next {
-		size += int(p.len())
-	}
-	return size
+	return b.End().B
 }
 
 // Nr returns the sum of the Nr for each piece in the buffer.
 func (b *Buffer) Nr() int {
-	if b.pnr >= 0 {
-		return b.pnr
-	}
-
-	var nr int
-	for p := b.begin; p != b.end; p = p.next {
-		nr += p.nr
-	}
-	b.pnr = nr
-	return nr
+	return b.End().R
 }
 
 // UnsetName records a filename change at seq to fname.
@@ -699,6 +709,8 @@ type change struct {
 type span struct {
 	start, end *piece // start/end of the span
 	len        int    // the sum of the lengths of the pieces which form this span.
+	// TODO(rjk): Tracking the number of runes in the span permits preseving
+	// p.viewed across swapSpans operations.
 }
 
 func newSpan(start, end *piece) span {
