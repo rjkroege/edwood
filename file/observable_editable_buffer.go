@@ -528,3 +528,23 @@ func (e *ObservableEditableBuffer) SetSeq(seq int) {
 func (e *ObservableEditableBuffer) SetPutseq(putseq int) {
 	e.putseq = putseq
 }
+
+// RuneTuple is a forwarding function.
+func (e *ObservableEditableBuffer) RuneTuple(q int) OffsetTuple {
+	return e.f.RuneTuple(q)
+}
+
+// ByteTuple is a forwarding function.
+func (e *ObservableEditableBuffer) ByteTuple(q int) OffsetTuple {
+	return e.f.ByteTuple(q)
+}
+
+// End is a forwarding function.
+func (e *ObservableEditableBuffer) End() OffsetTuple {
+	return e.f.End()
+}
+
+// MakeBufferCursor is a forwarding function.
+func (e *ObservableEditableBuffer) MakeBufferCursor(p0, p1 OffsetTuple) *BufferCursor {
+	return MakeBufferCursor(e.f, p0, p1)
+}
