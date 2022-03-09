@@ -6,13 +6,14 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"9fans.net/go/plumb"
-	"github.com/rjkroege/edwood/runes"
+	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -259,77 +260,46 @@ func plumbshow(m *plumb.Message) {
 	xfidlog(w, "new")
 }
 
-// TODO(flux): This just looks for r in ct; a regexp could do it too,
-// using our buffer streaming thing.  Frankly, even scanning the buffer
-// using the streamer would probably be easier to read/more idiomatic.
 func search(ct *Text, r []rune) bool {
-	var (
-		n, maxn int
-	)
-	n = len(r)
-	if n == 0 || n > ct.Nc() {
-		return false
-	}
-	if 2*n > RBUFSIZE {
+	n := len(r)
+	if n > RBUFSIZE {
 		warning(nil, "string too long\n")
 		return false
 	}
-	maxn = util.Max(2*n, RBUFSIZE)
-	s := make([]rune, RBUFSIZE)
-	bi := 0 // b indexes s
-	nb := 0
-	wraparound := false
-	q := ct.q1
-	for {
-		if q >= ct.Nc() {
-			q = 0
-			wraparound = true
-			nb = 0
-			//s[bi+nb] = 0; // null terminate
-		}
-		if nb > 0 {
-			ci := runes.IndexRune(s[bi:bi+nb], r[0])
-			if ci == -1 {
-				q += nb
-				nb = 0
-				//s[bi+nb] = 0
-				if wraparound && q >= ct.q1 {
-					break
-				}
-				continue
-			}
-			q += (bi + ci - bi)
-			nb -= (bi + ci - bi)
-			bi = bi + ci
-		}
-		// reload if buffer covers neither string nor rest of file
-		if nb < n && nb != ct.Nc()-q {
-			nb = ct.Nc() - q
-			if nb >= maxn {
-				nb = maxn - 1
-			}
-			ct.file.Read(q, s[:nb])
-			bi = 0
-		}
-		limit := util.Min(len(s), bi+n)
-		if runes.Equal(s[bi:limit], r) {
-			if ct.w != nil {
-				ct.Show(q, q+n, true)
-			} else {
-				ct.q0 = q
-				ct.q1 = q + n
-			}
-			global.seltext = ct
-			return true
-		}
-		nb--
-		bi++
-		q++
-		if wraparound && q >= ct.q1 {
-			break
-		}
+
+	res := regexp.QuoteMeta(string(r))
+	// Unless QuoteMeta has a bug, this will always work.
+	regexp := regexp.MustCompile(res)
+
+	start := ct.file.RuneTuple(ct.q1)
+	end := ct.file.End()
+	cursor := ct.file.MakeBufferCursor(start, end)
+
+	loc := regexp.FindReaderIndex(cursor)
+	if loc == nil {
+		// Try wrapped around.
+		cursor = ct.file.MakeBufferCursor(file.Ot(0, 0), start)
+		start = file.Ot(0, 0)
+		loc = regexp.FindReaderIndex(cursor)
 	}
-	return false
+
+	if loc == nil {
+		return false
+	}
+
+	// loc is w.r.t. start right?
+	q1 := ct.file.ByteTuple(start.B + loc[1]).R
+	q0 := ct.file.ByteTuple(start.B + loc[0]).R
+
+	if ct.w != nil {
+		ct.Show(q0, q1, true)
+	} else {
+		ct.q0 = q0
+		ct.q1 = q1
+	}
+	global.seltext = ct
+	return true
+
 }
 
 func isfilec(r rune) bool {
