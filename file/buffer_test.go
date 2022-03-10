@@ -598,7 +598,7 @@ func TestRuneTuple(t *testing.T) {
 			roff:    5,
 			bwant:   len("痛苦本身痛"),
 			bviewed: 4,
-			preops:  []int{50},
+			preops:  []int{100},
 		},
 		{
 			name: "three bufs, not-ASCII, preop 3rd piece pastend, back to 7",
@@ -638,6 +638,7 @@ func TestRuneTuple(t *testing.T) {
 	}
 	for _, tv := range tt {
 		t.Run(tv.name, func(t *testing.T) {
+			// Test RuneTuple
 			b := NewBufferNoNr(nil)
 			for _, s := range tv.buf {
 				b.insertString(b.Nr(), s, t)
@@ -651,9 +652,43 @@ func TestRuneTuple(t *testing.T) {
 				b.RuneTuple(d)
 			}
 
-			t.Logf("test RuneTuple %d, %s", tv.roff, b.viewedState())
+			// t.Logf("test RuneTuple %d, %s", tv.roff, b.viewedState())
 			gt := b.RuneTuple(tv.roff)
-			t.Logf("test RuneTuple result %v, %s", gt, b.viewedState())
+			// t.Logf("test RuneTuple result %v, %s", gt, b.viewedState())
+
+			if got, want := gt.B, tv.bwant; got != want {
+				t.Errorf("%s got %d != want %d", "byte", got, want)
+			}
+
+			if got, want := gt.R, tv.roff; got != want {
+				t.Errorf("%s got %d != want %d", "rune", got, want)
+			}
+
+			if got, want := b.viewed.id, tv.bviewed; got != want {
+				t.Errorf("%s got %d != want %d", "piece id", got, want)
+			}
+			// Test ByteTuple
+			b = NewBufferNoNr(nil)
+			for _, s := range tv.buf {
+				b.insertString(b.Nr(), s, t)
+			}
+			b.checkPiecesCnt(t, 2+len(tv.buf))
+
+			// ByteTuple depends on the state of previous
+			// RuneTuple/ByteTuple invocations. Run some for their side-effects.
+			for _, d := range tv.preops {
+				b.RuneTuple(d)
+			}
+
+			// Skip the case where we are past the end.
+			if tv.roff > tv.bwant {
+				// This case is impossible for ByteTuple
+				return
+			}
+
+			t.Logf("test ByteTuple %d, %s", tv.bwant, b.viewedState())
+			gt = b.ByteTuple(tv.bwant)
+			t.Logf("test ByteTuple result %v, %s", gt, b.viewedState())
 
 			if got, want := gt.B, tv.bwant; got != want {
 				t.Errorf("%s got %d != want %d", "byte", got, want)
@@ -692,15 +727,15 @@ func NewBufferNoNr(content []byte) *Buffer {
 
 func (b *Buffer) insertCreateOffsetTuple(off int, content []byte, t *testing.T) error {
 	t.Helper()
-	t.Logf("insertCreateOffsetTuple before RuneTuple %d state %s", off, b.viewedState())
+	// t.Logf("insertCreateOffsetTuple before RuneTuple %d state %s", off, b.viewedState())
 
 	start := b.RuneTuple(off)
 
-	t.Logf("insertCreateOffsetTuple after RuneTuple state %s", b.viewedState())
+	// t.Logf("insertCreateOffsetTuple after RuneTuple state %s", b.viewedState())
 
 	err := b.Insert(start, content, utf8.RuneCount(content), 1)
 
-	t.Logf("insertCreateOffsetTuple after Insert state %s", b.viewedState())
+	// t.Logf("insertCreateOffsetTuple after Insert state %s", b.viewedState())
 
 	return err
 }

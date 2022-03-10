@@ -893,3 +893,55 @@ func (b *Buffer) RuneTuple(off int) OffsetTuple {
 	b.viewed = p
 	return b.vwl
 }
+
+// ByteTuple creates a byte, rune offset pair (i.e. OffsetTuple) for a
+// given offset in bytes.
+//
+// In setting b.viewed, ByteTuple follows the semantic that aligns with
+// findPiece: if off is on a piece boundary, b.viewed will be set to piece
+// before the insertion point.
+//
+// TODO(rjk): This code is very similar to RuneTuple. But different.
+func (b *Buffer) ByteTuple(off int) OffsetTuple {
+	p := b.viewed
+
+	// Start at the beginning if that's cheaper or fallback to regular
+	// RuneTuple operation.
+	if p == nil || iabs(off-b.vwl.B) > off {
+		p = b.begin
+		b.vwl = Ot(0, 0)
+		b.vws = Ot(0, 0)
+	}
+
+	if off < b.vwl.B { // Go backwards.
+		for p != b.begin && off <= b.vws.B {
+			p = p.prev
+			b.vwl = b.vws
+			b.vws = Ot(b.vws.B-p.len(), b.vws.R-p.nr)
+		}
+
+		// Find the byte offset in piece p
+		for i := b.vwl.B - b.vws.B; i >= 0 && b.vwl.B > off; {
+			_, sz := utf8.DecodeLastRune(p.data[0:i])
+			b.vwl = Ot(b.vwl.B-sz, b.vwl.R-1)
+			i -= sz
+		}
+	} else { // Go forwards.
+		for ; p != b.end && off > b.vws.B+p.len(); p = p.next {
+			b.vws = Ot(b.vws.B+p.len(), b.vws.R+p.nr)
+			b.vwl = b.vws
+		}
+
+		// Find the byte offset in piece p
+		for i := b.vwl.B - b.vws.B; b.vwl.B < off; {
+			_, sz := utf8.DecodeRune(p.data[i:])
+			b.vwl = Ot(b.vwl.B+sz, b.vwl.R+1)
+			i += sz
+		}
+	}
+	if p == nil {
+		panic("not expected!")
+	}
+	b.viewed = p
+	return b.vwl
+}
