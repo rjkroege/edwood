@@ -826,18 +826,18 @@ func iabs(a int) int {
 func (b *Buffer) ReadRuneAt(off OffsetTuple) (rune, int, error) {
 	p, tb, _ := b.findPiece(off)
 
-	// Remember that findPiece is finding p that is where next text at off
-	// would be appended so must bump forward.
-	if tb == p.len() {
-		p = p.next
-		tb = 0
-	}
-
 	if p == nil {
 		if off.B == 0 {
 			return 0, 0, io.EOF
 		}
 		return 0, 0, ErrWrongOffset
+	}
+
+	// Remember that findPiece is finding p that is where next text at off
+	// would be appended so must bump forward.
+	if tb == p.len() {
+		p = p.next
+		tb = 0
 	}
 
 	r, sz := utf8.DecodeRune(p.data[tb:])
