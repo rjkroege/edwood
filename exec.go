@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"image"
@@ -292,7 +293,7 @@ func del(et *Text, _0 *Text, _1 *Text, flag1 bool, _2 bool, _3 string) {
 
 func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	var (
-		q0, q1, n, c int
+		q0, q1, c int
 	)
 	// if not executing a mouse chord (et != t) and snarfing (dosnarf)
 	// and executed Cut or Snarf in window tag (et.w != nil),
@@ -329,20 +330,11 @@ func cut(et *Text, t *Text, _ *Text, dosnarf bool, docut bool, _ string) {
 	if dosnarf {
 		q0 = t.q0
 		q1 = t.q1
-		global.snarfbuf = make([]byte, 0)
-		// TODO(rjk): Don't make bytes into runes.
-		r := make([]rune, RBUFSIZE)
-		for q0 < q1 {
-			n = q1 - q0
-			if n > RBUFSIZE {
-				n = RBUFSIZE
-			}
-			t.file.Read(q0, r[:n])
-			// TODO(rjk): ick. Zero-conversion.
-			sb := []byte(string(r))
-			global.snarfbuf = append(global.snarfbuf, sb...)
-			q0 += n
-		}
+
+		reader := t.file.Reader(q0, q1)
+		buffy := new(bytes.Buffer)
+		io.Copy(buffy, reader)
+		global.snarfbuf = buffy.Bytes()
 		acmeputsnarf()
 	}
 	if docut {
