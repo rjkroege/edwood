@@ -8,10 +8,18 @@ import (
 )
 
 func (frame *frameimpl) addifnonempty(box *frbox, inby []byte) *frbox {
-	if box != nil && len(box.Ptr) > 0 {
-		// log.Printf("addifnonempty %q", string(box.Ptr))
+	if box == nil {
+		return &frbox{
+			Ptr: inby,
+		}
+	}
+
+	if len(box.Ptr) > 0 {
 		box.Wid = frame.font.BytesWidth(box.Ptr)
 		frame.box = append(frame.box, box)
+		return &frbox{
+			Ptr: inby,
+		}
 	}
 	return nil
 }
@@ -44,6 +52,7 @@ func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameim
 		if nl > f.maxlines {
 			break
 		}
+
 		switch inby[i] {
 		case '\t':
 			wipbox = frame.addifnonempty(wipbox, inby[i+1:i+1])
@@ -69,13 +78,14 @@ func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameim
 			i++
 			nl++
 		default:
+			_, n := utf8.DecodeRune(inby[i:])
 			if wipbox == nil {
 				wipbox = &frbox{
-					Ptr: inby[i:i],
+					Ptr: inby[i : i+n],
 				}
+			} else {
+				wipbox.Ptr = wipbox.Ptr[:len(wipbox.Ptr)+n]
 			}
-			_, n := utf8.DecodeRune(inby[i:])
-			wipbox.Ptr = append(wipbox.Ptr, inby[i:i+n]...)
 			wipbox.Nrune++
 			i += n
 		}
