@@ -88,27 +88,37 @@ func (f *frameimpl) advance(p image.Point, b *frbox) image.Point {
 
 // newwid returns the width of a given box and mutates the
 // appropriately.
-// TODO(rjk): I'm perturbed. This is horrible.
+// TODO(rjk): This can mutate b. I'd like it to be a method on box to
+// suggest this better.
 func (f *frameimpl) newwid(pt image.Point, b *frbox) int {
 	b.Wid = f.newwid0(pt, b)
 	return b.Wid
 }
 
-// TODO(rjk): Expand the test cases involving \t characters.
-// TODO(rjk): Wouldn't it be nicer if this was a method on frbox?
+// newwid0 returns the (possibly new) size of b. If b is not stretchy,
+// then returns the pre-existing size of b. If b is stretchy (i.e. a
+// tab), returns the computed width: size remaining in tabstop down to
+// the minimum width. If this does not fit on the current line, returns
+// the (soft-wrapped) tabstop width.
 func (f *frameimpl) newwid0(pt image.Point, b *frbox) int {
 	c := f.rect.Max.X
 	x := pt.X
+
+	// Non-stretchy elements have their existing widths.
 	if b.Nrune >= 0 || b.Bc != '\t' {
 		return b.Wid
 	}
+
+	// If the tab's minwidth doesn't fit at the end of the line, it starts as
+	// a full-sized tab on the next (soft) line.
 	if x+int(b.Minwid) > c {
-		// A tab character doesn't fit at the end of the line.
 		pt.X = f.rect.Min.X
 		x = pt.X
 	}
 	x += f.maxtab
 	x -= (x - f.rect.Min.X) % f.maxtab
+
+	// Compute size remaining in tabstop down to the minimum tab width.
 	if x-pt.X < int(b.Minwid) || x > c {
 		x = pt.X + int(b.Minwid)
 	}

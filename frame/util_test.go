@@ -201,5 +201,93 @@ func TestClean(t *testing.T) {
 				},
 		*/
 	})
+}
+
+func TestNewwid0(t *testing.T) {
+	f := &frameimpl{
+		rect:   image.Rect(4, 15, 4+57, 15+61),
+		maxtab: 32,
+	}
+
+	testtab := []struct {
+		name string
+		box  *frbox
+		pt   image.Point
+		want int
+	}{
+		{
+			name: "normal character",
+			box: &frbox{
+				Nrune: 0,
+				Wid:   11,
+			},
+			pt:   image.Pt(10, 15),
+			want: 11,
+		},
+		{
+			name: "newline character",
+			box: &frbox{
+				Nrune: -1,
+				Wid:   1000,
+				Bc:    '\n',
+			},
+			pt:   image.Pt(10, 15),
+			want: 1000,
+		},
+		{
+			name: "tab character, left edge",
+			box: &frbox{
+				Nrune:  -1,
+				Wid:    10000,
+				Bc:     '\t',
+				Minwid: 10,
+			},
+			pt:   image.Pt(4, 15),
+			want: f.maxtab,
+		},
+		{
+			name: "tab character, less than maxtab",
+			box: &frbox{
+				Nrune:  -1,
+				Wid:    10000,
+				Bc:     '\t',
+				Minwid: 10,
+			},
+			pt: image.Pt(10, 15),
+			// In 0th tab cell, 6 pixels over so maxtab - 6 over to next tab stop.
+			want: f.maxtab - 6,
+		},
+		{
+			name: "tab character, start of second tabstop, doesn't fit so trimmed",
+			box: &frbox{
+				Nrune:  -1,
+				Wid:    10000,
+				Bc:     '\t',
+				Minwid: 5,
+			},
+			pt:   image.Pt(4+32, 15),
+			want: 5,
+		},
+		{
+			name: "tab character, minwidth doesn't fit so size as if start of next line",
+			box: &frbox{
+				Nrune:  -1,
+				Wid:    10000,
+				Bc:     '\t',
+				Minwid: 5,
+			},
+			pt:   image.Pt(4+56, 15),
+			want: 32,
+		},
+	}
+
+	for _, test := range testtab {
+		t.Run(test.name, func(t *testing.T) {
+			// write me a test here
+			if got, want := f.newwid0(test.pt, test.box), test.want; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		})
+	}
 
 }
