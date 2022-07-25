@@ -782,6 +782,15 @@ func (t *Text) Type(r rune) {
 		t.SetOrigin(q0, true)
 	}
 
+	setUndoPoint := func() {
+		if t.what == Body {
+			global.seq++
+			t.file.Mark(global.seq)
+		}
+	}
+
+	// This switch block contains all actions that don't mutate the buffer
+	// and hence there is no need to create an Undo record.
 	switch r {
 	case draw.KeyLeft:
 		t.TypeCommit()
@@ -910,13 +919,17 @@ func (t *Text) Type(r rune) {
 		return
 
 	}
-	if t.what == Body {
-		global.seq++
-		t.file.Mark(global.seq)
+
+	// Note the use of eq0 to always force an undo point at the start typing.
+	if t.what == Body && t.eq0 == -1 {
+		setUndoPoint()
 	}
+
+	// These following blocks contain mutating actions.
 	// cut/paste must be done after the seq++/filemark
 	switch r {
 	case draw.KeyCmd + 'x': // %X: cut
+		setUndoPoint()
 		t.TypeCommit()
 		if t.what == Body {
 			global.seq++
@@ -927,6 +940,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q0
 		return
 	case draw.KeyCmd + 'v': // %V: paste
+		setUndoPoint()
 		t.TypeCommit()
 		if t.what == Body {
 			global.seq++
@@ -939,6 +953,7 @@ func (t *Text) Type(r rune) {
 	}
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
+		setUndoPoint()
 		if t.file.HasUncommitedChanges() {
 			util.AcmeError("text.type", nil)
 		}
@@ -955,6 +970,7 @@ func (t *Text) Type(r rune) {
 		if rp == nil {
 			return
 		}
+		setUndoPoint()
 		nr = len(rp) // runestrlen(rp);
 		// break into normal insertion case
 	case 0x1B:
@@ -974,6 +990,7 @@ func (t *Text) Type(r rune) {
 		if t.q1 >= t.Nc()-1 {
 			return // End of file
 		}
+		setUndoPoint()
 		t.TypeCommit() // Avoid messing with the cache?
 		if !wasrange {
 			t.q1++
@@ -1003,6 +1020,7 @@ func (t *Text) Type(r rune) {
 
 		// TODO(rjk): figure out the way of nofill
 		// TODO(rjk): I'd like the Undo op to group typing better.
+		setUndoPoint()
 		t.file.Commit()
 		t.Delete(q0, q0+nnb, true)
 
@@ -1012,6 +1030,7 @@ func (t *Text) Type(r rune) {
 		t.iq1 = t.q0
 		return
 	case '\n':
+		setUndoPoint()
 		if t.w.autoindent {
 			// find beginning of previous line using backspace code
 			nnb = t.BsWidth(0x15)    // ^U case
@@ -1042,6 +1061,8 @@ func (t *Text) Type(r rune) {
 	// we clean this up in some fashion so that it's easier to have Text
 	// instances that are editable but have partial auto-generated semantics
 	// (e.g. directories, tags)
+	//
+	// NB: Window.Commit is about updating the tag logic.
 	if t.w != nil && (r == '\n' && t.what == Body || t.what != Body) {
 		t.w.Commit(t)
 	}
