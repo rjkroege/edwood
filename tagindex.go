@@ -178,7 +178,7 @@ func (w *Window) setTag1() {
 	w.tagfilenameend = utf8.RuneCountInString(w.body.file.Name())
 
 	if w.filemenu {
-		if w.body.needundo || w.body.file.HasUndoableChanges() {
+		if w.body.file.HasUndoableChanges() {
 			sb.WriteString(Lundo)
 		}
 		if w.body.file.HasRedoableChanges() {
