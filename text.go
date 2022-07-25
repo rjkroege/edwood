@@ -80,7 +80,7 @@ type Text struct {
 	iq1 int
 	eq0 int // When 0, typing has started
 
-	nofill bool // When true, updates to the Text shouldn't update the frame.
+	nofill   bool // When true, updates to the Text shouldn't update the frame.
 
 	lk sync.Mutex
 }
