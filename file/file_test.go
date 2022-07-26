@@ -67,7 +67,7 @@ func TestFileInsertAtWithoutCommit(t *testing.T) {
 	}
 
 	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
-		&stateSummary{true, false, false, false, s1})
+		&stateSummary{false, false, false, s1})
 }
 
 const s1 = "hi 海老麺"
@@ -83,18 +83,18 @@ func TestFileInsertAt(t *testing.T) {
 
 	// NB: the read code not include the uncommitted content.
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&stateSummary{true, true, false, true, s1})
+		&stateSummary{true, false, true, s1})
 
 	f.Commit()
 
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
-		&stateSummary{false, true, false, true, s1})
+		&stateSummary{true, false, true, s1})
 
 	f.InsertAt(f.Nr(), []rune(s2))
 	f.Commit()
 
 	check(t, "TestFileUndoRedo after InsertAt", f,
-		&stateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{true, false, true, s1 + s2})
 }
 
 func TestFileUndoRedo(t *testing.T) {
@@ -102,14 +102,14 @@ func TestFileUndoRedo(t *testing.T) {
 
 	// Validate before.
 	check(t, "TestFileUndoRedo on an empty buffer", f,
-		&stateSummary{false, false, false, false, ""})
+		&stateSummary{false, false, false, ""})
 
 	f.Mark(1)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedo after 2 inserts", f,
-		&stateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{true, false, true, s1 + s2})
 
 	t.Log(f.f.String())
 	t.Log(f.seq, f.putseq, f.Dirty())
@@ -124,9 +124,9 @@ func TestFileUndoRedo(t *testing.T) {
 	})
 
 	t.Log(f.f.String())
-	t.Log(f.seq, f.f.HasUncommitedChanges(), f.Dirty(), f.putseq)
+	t.Log(f.seq, f.Dirty(), f.putseq)
 	check(t, "TestFileUndoRedo after 1 undo", f,
-		&stateSummary{false, false, true, false, ""})
+		&stateSummary{false, true, false, ""})
 
 	f.checkedUndo(false, t, undoexpectation{
 		ok: true,
@@ -135,10 +135,10 @@ func TestFileUndoRedo(t *testing.T) {
 	})
 
 	t.Log(f.f.String())
-	t.Log(f.seq, f.f.HasUncommitedChanges(), f.Dirty(), f.putseq)
+	t.Log(f.seq, f.Dirty(), f.putseq)
 	// Validate state: we have s1 + s2 inserted.
 	check(t, "TestFileUndoRedo after 1 Redos", f,
-		&stateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{true, false, true, s1 + s2})
 }
 
 func TestFileUndoRedoWithMark(t *testing.T) {
@@ -152,7 +152,7 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 	f.InsertAt(f.Nr(), []rune(s2))
 
 	check(t, "TestFileUndoRedoWithMark after 2 inserts", f,
-		&stateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{true, false, true, s1 + s2})
 
 	f.checkedUndo(true, t, undoexpectation{
 		ok: true,
@@ -161,7 +161,7 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 	})
 
 	check(t, "TestFileUndoRedoWithMark after 1 undo", f,
-		&stateSummary{false, true, true, true, s1})
+		&stateSummary{true, true, true, s1})
 
 	// Redo
 	f.checkedUndo(false, t, undoexpectation{
@@ -171,7 +171,7 @@ func TestFileUndoRedoWithMark(t *testing.T) {
 	})
 
 	check(t, "TestFileUndoRedoWithMark after 1 redo", f,
-		&stateSummary{false, true, false, true, s1 + s2})
+		&stateSummary{true, false, true, s1 + s2})
 }
 
 func TestFileLoadNoUndo(t *testing.T) {
@@ -185,7 +185,6 @@ func TestFileLoadNoUndo(t *testing.T) {
 
 	n, hasNulls, err := f.Load(2, buffy, false)
 	t.Log("seq", f.seq)
-	t.Log("f.f.HasUncommitedChanges()", f.f.HasUncommitedChanges())
 	t.Log("f.Dirty()", f.Dirty())
 
 	if got, want := n, len(s2)+len(s2); got != want {
@@ -199,7 +198,7 @@ func TestFileLoadNoUndo(t *testing.T) {
 	}
 
 	check(t, "TestFileLoadNoUndo after file load", f,
-		&stateSummary{false, false, false, false, s1[0:2] + s2 + s2 + s1[2:]})
+		&stateSummary{false, false, false, s1[0:2] + s2 + s2 + s1[2:]})
 }
 
 func TestFileLoadUndoHash(t *testing.T) {
@@ -225,7 +224,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 
 	// Having loaded the file and then Clean(),
 	check(t, "TestFileLoadUndoHash after file load", f,
-		&stateSummary{false, false, false, false, s2 + s2})
+		&stateSummary{false, false, false, s2 + s2})
 
 	// Set an undo point (the initial state)
 	f.Mark(1)
@@ -233,13 +232,13 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// Enabling Undo will cause HasSaveableChanges to be true.
 	// This is strange and I need to rationalize seq.
 	check(t, "TestFileLoadUndoHash after Mark", f,
-		&stateSummary{false, false, false, true, s2 + s2})
+		&stateSummary{false, false, true, s2 + s2})
 
 	// SaveableAndDirty should return true if the File is plausibly writable
 	// to f.details.Name and has changes that might require writing it out.
 	f.SetName("plan9")
 	check(t, "TestFileLoadUndoHash after SetName", f,
-		&stateSummary{false, true, false, true, s2 + s2})
+		&stateSummary{true, false, true, s2 + s2})
 
 	if got, want := f.Name(), "plan9"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
@@ -250,7 +249,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 		ok: false,
 	})
 	check(t, "TestFileLoadUndoHash after Undo", f,
-		&stateSummary{false, false, true, false, s2 + s2})
+		&stateSummary{false, true, false, s2 + s2})
 	if got, want := f.Name(), "edwood"; got != want {
 		t.Errorf("TestFileLoadUndoHash failed to set name. got %v want %v", got, want)
 	}
@@ -272,26 +271,26 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 	f.Mark(1)
 	f.Clean()
 	check(t, "TestFileInsertDeleteUndo after init", f,
-		&stateSummary{false, false, false, false, ""})
+		&stateSummary{false, false, false, ""})
 
 	f.Mark(2)
 	f.InsertAt(0, []rune(s1))
 	f.InsertAt(0, []rune(s2))
 	// After inserting two strings is an Undo point:  byehi 海老麺
 	check(t, "TestFileInsertDeleteUndo after second Mark", f,
-		&stateSummary{false, true, false, true, "byehi 海老麺"})
+		&stateSummary{true, false, true, "byehi 海老麺"})
 
 	f.Mark(3)
 	f.DeleteAt(0, 1) // yehi 海老
 	f.DeleteAt(1, 3) // yi 海老
 	// After deleting is an Undo point.
 	check(t, "TestFileInsertDeleteUndo after third Mark", f,
-		&stateSummary{false, true, false, true, "yi 海老麺"})
+		&stateSummary{true, false, true, "yi 海老麺"})
 
 	f.Mark(4)
 	f.InsertAt(f.Nr()-1, []rune(s1)) // yi 海老hi 海老麺
 	check(t, "TestFileInsertDeleteUndo after setup", f,
-		&stateSummary{false, true, false, true, "yi 海老hi 海老麺麺"})
+		&stateSummary{true, false, true, "yi 海老hi 海老麺麺"})
 	t.Logf("after setup seq %d, putseq %d", f.seq, f.putseq)
 
 	f.checkedUndo(true, t, undoexpectation{
@@ -300,7 +299,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 		q1: 5,
 	})
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&stateSummary{false, true, true, true, "yi 海老麺"})
+		&stateSummary{true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Undo seq %d, putseq %d", f.seq, f.putseq)
 	to.Check([]*observation{
 		{
@@ -342,7 +341,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 		q1: 1,
 	})
 	check(t, "TestFileInsertDeleteUndo after 2 Undo", f,
-		&stateSummary{false, true, true, true, "byehi 海老麺"})
+		&stateSummary{true, true, true, "byehi 海老麺"})
 	t.Logf("after 2 Undo seq %d, putseq %d", f.seq, f.putseq)
 
 	f.checkedUndo(false, t, undoexpectation{ // 2 deletes should be put back.
@@ -351,7 +350,7 @@ func TestFileInsertDeleteUndo(t *testing.T) {
 		q1: 1,
 	})
 	check(t, "TestFileInsertDeleteUndo after 1 Undo", f,
-		&stateSummary{false, true, true, true, "yi 海老麺"})
+		&stateSummary{true, true, true, "yi 海老麺"})
 	t.Logf("after 1 Redo seq %d, putseq %d", f.seq, f.putseq)
 	to.Check([]*observation{
 		{
@@ -385,7 +384,7 @@ func TestFileRedoSeq(t *testing.T) {
 	f.InsertAt(0, []rune(s1))
 
 	check(t, "TestFileRedoSeq after setup", f,
-		&stateSummary{false, true, false, true, s1})
+		&stateSummary{true, false, true, s1})
 
 	if got, want := f.RedoSeq(), 0; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
@@ -397,7 +396,7 @@ func TestFileRedoSeq(t *testing.T) {
 		q1: 0,
 	})
 	check(t, "TestFileRedoSeq after Undo", f,
-		&stateSummary{false, false, true, false, ""})
+		&stateSummary{false, true, false, ""})
 
 	if got, want := f.RedoSeq(), 1; got != want {
 		t.Errorf("TestFileRedoSeq no redo. got %#v want %#v", got, want)
