@@ -80,7 +80,7 @@ type Text struct {
 	iq1 int
 	eq0 int // When 0, typing has started
 
-	nofill   bool // When true, updates to the Text shouldn't update the frame.
+	nofill bool // When true, updates to the Text shouldn't update the frame.
 
 	lk sync.Mutex
 }
@@ -273,7 +273,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 }
 
 func (t *Text) checkSafeToLoad(filename string) error {
-	if t.file.HasUncommitedChanges() || t.file.Nr() > 0 || t.w == nil || t != &t.w.body {
+	if t.file.Nr() > 0 || t.w == nil || t != &t.w.body {
 		panic("text.load")
 	}
 
@@ -486,9 +486,6 @@ func (t *Text) Insert(q0 int, r []rune, tofile bool) {
 	if !tofile {
 		panic("text.insert")
 	}
-	if tofile && t.file.HasUncommitedChanges() {
-		panic("text.insert")
-	}
 	if len(r) == 0 {
 		return
 	}
@@ -516,10 +513,6 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 	// characters possible?
 	if fr.IsLastLineFull() || t.nofill {
 		return nil
-	}
-	if t.file.HasUncommitedChanges() {
-		// TODO(rjk): This should probably be t.file.Commit()
-		t.TypeCommit()
 	}
 	for {
 		n := t.file.Nr() - (t.org + fr.GetFrameFillStatus().Nchars)
@@ -564,9 +557,6 @@ func (t *Text) fill(fr frame.SelectScrollUpdater) error {
 // Delete removes runes [q0, q1). The selection values will be
 // updated appropriately.
 func (t *Text) Delete(q0, q1 int, _ bool) {
-	if t.file.HasUncommitedChanges() {
-		panic("text.delete")
-	}
 	n := q1 - q0
 	if n == 0 {
 		return
@@ -953,9 +943,6 @@ func (t *Text) Type(r rune) {
 	wasrange := t.q0 != t.q1
 	if t.q1 > t.q0 {
 		setUndoPoint()
-		if t.file.HasUncommitedChanges() {
-			util.AcmeError("text.type", nil)
-		}
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
 	}
@@ -979,9 +966,6 @@ func (t *Text) Type(r rune) {
 			} else {
 				t.SetSelect(t.q0, t.eq0)
 			}
-		}
-		if t.file.HasUncommitedChanges() {
-			t.TypeCommit()
 		}
 		t.iq1 = t.q0
 		return

@@ -8,14 +8,11 @@ import (
 )
 
 type stateSummary struct {
-	HasUncommitedChanges bool
-	HasUndoableChanges   bool
-	HasRedoableChanges   bool
-	SaveableAndDirty     bool
-	filecontents         string
+	HasUndoableChanges bool
+	HasRedoableChanges bool
+	SaveableAndDirty   bool
+	filecontents       string
 }
-
-func (b *Buffer) commitisgermane() bool { return false }
 
 func (b *Buffer) readwholefile(*testing.T) string {
 	return b.String()
@@ -26,11 +23,6 @@ func check(t *testing.T, testname string, oeb *ObservableEditableBuffer, fss *st
 
 	f := oeb.f
 
-	if f.commitisgermane() {
-		if got, want := oeb.HasUncommitedChanges(), fss.HasUncommitedChanges; got != want {
-			t.Errorf("%s: HasUncommitedChanges failed. got %v want %v", testname, got, want)
-		}
-	}
 	if got, want := oeb.HasUndoableChanges(), fss.HasUndoableChanges; got != want {
 		t.Errorf("%s: HasUndoableChanges failed. got %v want %v", testname, got, want)
 	}
@@ -124,7 +116,6 @@ func (s *span) String() string {
 	}
 
 	return buffy.String()
-
 }
 
 type undoexpectation struct {

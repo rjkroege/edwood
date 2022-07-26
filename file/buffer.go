@@ -795,14 +795,6 @@ func (b *Buffer) Bytes() []byte {
 	return byteBuf
 }
 
-// HasUncommitedChanges returns true if there are changes that
-// have been made to the File since the last Commit.
-// TODO(rjk): This concept is not needed in a file.Buffer world. Improve
-// this.
-func (b *Buffer) HasUncommitedChanges() bool {
-	return false
-}
-
 // HasUndoableChanges returns true if there are changes to the File
 // that can be undone.
 func (b *Buffer) HasUndoableChanges() bool {

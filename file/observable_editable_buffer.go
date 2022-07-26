@@ -197,12 +197,6 @@ func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.seq = seq
 }
 
-// HasUncommitedChanges is a forwarding function for file.HasUncommitedChanges.
-// Should be a nop with file.Buffer
-func (e *ObservableEditableBuffer) HasUncommitedChanges() bool {
-	return e.f.HasUncommitedChanges()
-}
-
 // HasRedoableChanges is a forwarding function for file.HasRedoableChanges.
 func (e *ObservableEditableBuffer) HasRedoableChanges() bool {
 	return e.f.HasRedoableChanges()
@@ -211,7 +205,7 @@ func (e *ObservableEditableBuffer) HasRedoableChanges() bool {
 // HasUndoableChanges is a forwarding function for file.HasUndoableChanges
 func (e ObservableEditableBuffer) HasUndoableChanges() bool {
 	if e.seq > 0 {
-		return e.f.HasUndoableChanges() || e.f.HasUncommitedChanges()
+		return e.f.HasUndoableChanges()
 	}
 	return false
 }
