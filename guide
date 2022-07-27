@@ -2,13 +2,15 @@
 Edit X:edwood/\+Errors: 1,$d
 X:edwood/.*\.go: w
 
-go build -tags debug
+{go build -tags debug}
 ./testedwood.sh
 
-go test -covermode=count -coverprofile=count.out
+{go test -covermode=count -coverprofile=count.out}
 go tool cover -html=count.out
 
-go test --run 'TestFlushWarnings' -covermode=count -coverprofile=count.out
+go vet
+
+go test --run 'TestXfidreadQWctl' -covermode=count -coverprofile=count.out
 
 // Edit commands for converting C to Go
 cs 'flushwarnings\('

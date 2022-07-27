@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -48,8 +50,8 @@ func (d *mockDisplay) Opaque() draw.Image { return newimageimpl(d, "opaque", ima
 func (d *mockDisplay) Transparent() draw.Image {
 	return newimageimpl(d, "transparent", image.Rectangle{})
 }
-func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return nil }
-func (d *mockDisplay) InitMouse() *draw.Mousectl       { return nil }
+func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return &draw.Keyboardctl{} }
+func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{} }
 
 // TODO(rjk): Support a richer variety of fonts with better metrics.
 // NB: to make the recorded ops easier to read, I provide them in
@@ -270,8 +272,23 @@ func NewFont(width, height int) draw.Font {
 	}
 }
 
-func (f *mockFont) Name() string             { return "/lib/font/edwood.font" }
+// const MockFontName = "/lib/font/bit/veryloverylongstringherengstringhere/euro.8.font"
+const MockFontName = "/lib/font/bit/lucsans/euro.8.font"
+
+func (f *mockFont) Name() string             { return Plan9FontPath(MockFontName) }
 func (f *mockFont) Height() int              { return f.height }
 func (f *mockFont) BytesWidth(b []byte) int  { return f.width * utf8.RuneCount(b) }
 func (f *mockFont) RunesWidth(r []rune) int  { return f.width * len(r) }
 func (f *mockFont) StringWidth(s string) int { return f.width * utf8.RuneCountInString(s) }
+
+func Plan9FontPath(name string) string {
+	const prefix = "/lib/font/bit"
+	if strings.HasPrefix(name, prefix) {
+		root := os.Getenv("PLAN9")
+		if root == "" {
+			root = "/usr/local/plan9"
+		}
+		return filepath.Join(root, "/font/", name[len(prefix):])
+	}
+	return name
+}

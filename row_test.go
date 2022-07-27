@@ -123,7 +123,7 @@ func checkDumpFsys(t *testing.T, dump *dumpfile.Content, fsys *client.Fsys) {
 			t.Errorf("tag is %q; expected %q", w.tag, dw.Tag)
 		}
 
-		if p := plan9FontPath(dw.Font); unscaledFontName(w.font) != p {
+		if p := edwoodtest.Plan9FontPath(dw.Font); unscaledFontName(w.font) != p {
 			t.Errorf("font for %q is %q; expected %q", w.name, unscaledFontName(w.font), p)
 		}
 
@@ -294,18 +294,6 @@ func unscaledFontName(fname string) string {
 	return strings.TrimLeftFunc(fname, func(r rune) bool {
 		return (r >= '0' && r <= '9') || r == '*'
 	})
-}
-
-func plan9FontPath(name string) string {
-	const prefix = "/lib/font/bit"
-	if strings.HasPrefix(name, prefix) {
-		root := os.Getenv("PLAN9")
-		if root == "" {
-			root = "/usr/local/plan9"
-		}
-		return filepath.Join(root, "/font/", name[len(prefix):])
-	}
-	return name
 }
 
 type winInfo struct {
