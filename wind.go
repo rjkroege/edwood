@@ -505,7 +505,7 @@ func (w *Window) Clean(conservative bool) bool {
 }
 
 // CtlPrint generates the contents of the fsys's acme/<id>/ctl pseduo-file if fonts is true.
-// Otherwise,it emits a portion of the per-window dump file contents.
+// Otherwise, it emits a portion of the per-window dump file contents.
 func (w *Window) CtlPrint(fonts bool) string {
 	isdir := 0
 	if w.body.file.IsDir() {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,63 +17,22 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/google/go-cmp/cmp"
+	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/ninep"
 )
 
 func TestMain(m *testing.M) {
 	switch os.Getenv("TEST_MAIN") {
 	case "edwood":
-		main()
+		dump := predrawInit()
+		display := edwoodtest.NewDisplay()
+		mainWithDisplay(global, dump, display)
 	default:
-		// TODO: Replace Xvfb with a fake devdraw.
-		var x *exec.Cmd
-		switch runtime.GOOS {
-		case "linux", "freebsd", "openbsd", "netbsd", "dragonfly":
-			if os.Getenv("DISPLAY") == "" {
-				dp := fmt.Sprintf(":%d", xvfbServerNumber())
-				x = exec.Command("Xvfb", dp)
-				if err := x.Start(); err != nil {
-					log.Fatalf("failed to execute Xvfb: %v", err)
-				}
-				// Wait for Xvfb to start up.
-				for i := 0; i < 5*60; i++ {
-					err := exec.Command("xdpyinfo", "-display", dp).Run()
-					if err == nil {
-						break
-					}
-					if _, ok := err.(*exec.ExitError); !ok {
-						log.Fatalf("failed to execute xdpyinfo: %v", err)
-					}
-					log.Printf("%v waiting for Xvfb...\n", i)
-					time.Sleep(time.Second)
-				}
-				os.Setenv("DISPLAY", dp)
-			}
-		}
-
 		// Prevent mounting any acme file server being run by the user running tests.
 		os.Unsetenv("NAMESPACE")
-
 		e := m.Run()
-
-		if x != nil {
-			// Kill Xvfb gracefully, so that it cleans up the /tmp/.X*-lock file.
-			x.Process.Signal(os.Interrupt)
-			x.Wait()
-		}
 		os.Exit(e)
 	}
-}
-
-// XvfbServerNumber finds a free server number for Xfvb.
-// Similar logic is used by /usr/bin/xvfb-run:/^find_free_servernum/
-func xvfbServerNumber() int {
-	for n := 99; n < 1000; n++ {
-		if _, err := os.Stat(fmt.Sprintf("/tmp/.X%d-lock", n)); os.IsNotExist(err) {
-			return n
-		}
-	}
-	panic("no free X server number")
 }
 
 type Acme struct {

@@ -29,20 +29,14 @@ var (
 	mtpt              = flag.String("m", defaultMtpt, "Mountpoint for 9P file server")
 	swapScrollButtons = flag.Bool("r", false, "Swap scroll buttons")
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
+	ncol              = flag.Int("c", 2, "Number of columns at startup")
+	loadfile          = flag.String("l", "", "Load state from file generated with Dump command")
 )
 
-func main() {
-	// rfork(RFENVG|RFNAMEG); TODO(flux): I'm sure these are vitally(?) important.
-
+func predrawInit() *dumpfile.Content {
 	// TODO(rjk): Unlimited concurrency please.
 	runtime.GOMAXPROCS(7)
 
-	var (
-		ncol     int
-		loadfile string
-	)
-	flag.IntVar(&ncol, "c", 2, "Number of columns at startup")
-	flag.StringVar(&loadfile, "l", "", "Load state from file generated with Dump command")
 	flag.Parse()
 
 	startProfiler()
@@ -55,11 +49,11 @@ func main() {
 	// TODO(rjk): Push this code into a separate function.
 	var dump *dumpfile.Content
 
-	if loadfile != "" {
-		d, err := dumpfile.Load(loadfile) // Overrides fonts selected up to here.
+	if *loadfile != "" {
+		d, err := dumpfile.Load(*loadfile) // Overrides fonts selected up to here.
 		if err != nil {
 			// Maybe it's in legacy format. Try that too.
-			d, err = dumpfile.LoadLegacy(loadfile, g.home)
+			d, err = dumpfile.LoadLegacy(*loadfile, g.home)
 		}
 		if err == nil {
 			if d.VarFont != "" {
@@ -72,88 +66,102 @@ func main() {
 		}
 	}
 
-	g.tagfont = *varfontflag
+	global.tagfont = *varfontflag
 	os.Setenv("font", *varfontflag)
 
+	return dump
+}
+
+func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
+	if err := display.Attach(draw.Refnone); err != nil {
+		log.Fatalf("failed to attach to window %v\n", err)
+	}
+	display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+
+	g.mousectl = display.InitMouse()
+	g.mouse = &g.mousectl.Mouse
+	g.keyboardctl = display.InitKeyboard()
+
+	g.iconinit(display)
+
+	startplumbing()
+	fs := fsysinit()
+
+	const WindowsPerCol = 6
+
+	g.row.Init(display.ScreenImage().R(), display)
+
+	// TODO(rjk): Can pull this out into a helper function?
+	if *loadfile == "" || g.row.Load(dump, *loadfile, true) != nil {
+		// Open the files from the command line, up to WindowsPerCol each
+		files := flag.Args()
+		if *ncol < 0 {
+			if len(files) == 0 {
+				*ncol = 2
+			} else {
+				*ncol = (len(files) + (WindowsPerCol - 1)) / WindowsPerCol
+				if *ncol < 2 {
+					*ncol = 2
+				}
+			}
+		}
+		if *ncol == 0 {
+			*ncol = 2
+		}
+		for i := 0; i < *ncol; i++ {
+			g.row.Add(nil, -1)
+		}
+		rightmostcol := g.row.col[len(g.row.col)-1]
+		if len(files) == 0 {
+			readfile(g.row.col[len(g.row.col)-1], g.wdir)
+		} else {
+			for i, filename := range files {
+				// guide  always goes in the rightmost column
+				if filepath.Base(filename) == "guide" || i/WindowsPerCol >= len(g.row.col) {
+					readfile(rightmostcol, filename)
+				} else {
+					readfile(g.row.col[i/WindowsPerCol], filename)
+				}
+			}
+		}
+	}
+	display.Flush()
+
+	// After row is initialized
+	// TODO(rjk): put the globals *in* the ctx?
+	ctx := context.Background()
+	go mousethread(g, display)
+	go keyboardthread(g, display)
+	go waitthread(g, ctx)
+	go newwindowthread(g)
+	go xfidallocthread(g, ctx, display)
+
+	signal.Ignore(ignoreSignals...)
+	signal.Notify(g.csignal, hangupSignals...)
+
+	select {
+	case <-g.cexit:
+		// Do nothing.
+	case <-g.csignal:
+		g.row.lk.Lock()
+		g.row.Dump("")
+		g.row.lk.Unlock()
+	}
+	killprocs(fs)
+	os.Exit(0)
+}
+
+func main() {
+	dump := predrawInit()
+
+	// Make the display here in the wrapper to make it possible to provide a
+	// different display for testing.
 	draw.Main(func(dd *draw.Device) {
 		display, err := dd.NewDisplay(nil, *varfontflag, "edwood", *winsize)
 		if err != nil {
 			log.Fatalf("can't open display: %v\n", err)
 		}
-		if err := display.Attach(draw.Refnone); err != nil {
-			panic("failed to attach to window")
-		}
-		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
-
-		g.mousectl = display.InitMouse()
-		g.mouse = &g.mousectl.Mouse
-		g.keyboardctl = display.InitKeyboard()
-
-		g.iconinit(display)
-
-		startplumbing()
-		fs := fsysinit()
-
-		const WindowsPerCol = 6
-
-		g.row.Init(display.ScreenImage().R(), display)
-		if loadfile == "" || g.row.Load(dump, loadfile, true) != nil {
-			// Open the files from the command line, up to WindowsPerCol each
-			files := flag.Args()
-			if ncol < 0 {
-				if len(files) == 0 {
-					ncol = 2
-				} else {
-					ncol = (len(files) + (WindowsPerCol - 1)) / WindowsPerCol
-					if ncol < 2 {
-						ncol = 2
-					}
-				}
-			}
-			if ncol == 0 {
-				ncol = 2
-			}
-			for i := 0; i < ncol; i++ {
-				g.row.Add(nil, -1)
-			}
-			rightmostcol := g.row.col[len(g.row.col)-1]
-			if len(files) == 0 {
-				readfile(g.row.col[len(g.row.col)-1], g.wdir)
-			} else {
-				for i, filename := range files {
-					// guide  always goes in the rightmost column
-					if filepath.Base(filename) == "guide" || i/WindowsPerCol >= len(g.row.col) {
-						readfile(rightmostcol, filename)
-					} else {
-						readfile(g.row.col[i/WindowsPerCol], filename)
-					}
-				}
-			}
-		}
-		display.Flush()
-
-		// After row is initialized
-		// TODO(rjk): put the globals *in* the ctx?
-		ctx := context.Background()
-		go mousethread(g, display)
-		go keyboardthread(g, display)
-		go waitthread(g, ctx)
-		go newwindowthread(g)
-		go xfidallocthread(g, ctx, display)
-
-		signal.Ignore(ignoreSignals...)
-		signal.Notify(g.csignal, hangupSignals...)
-
-		select {
-		case <-g.cexit:
-			// Do nothing.
-		case <-g.csignal:
-			g.row.lk.Lock()
-			g.row.Dump("")
-			g.row.lk.Unlock()
-		}
-		killprocs(fs)
-		os.Exit(0)
+		mainWithDisplay(global, dump, display)
 	})
 }
 

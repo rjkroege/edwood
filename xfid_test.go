@@ -1306,7 +1306,12 @@ func TestXfidreadQWaddr(t *testing.T) {
 }
 
 func TestXfidreadQWctl(t *testing.T) {
-	const want = "          1          32          14           0           0           0 /lib/font/edwood.font           0 "
+	const prewant = "          1          32          14           0           0           0 "
+	const postwant = "           0 "
+	want := prewant + edwoodtest.Plan9FontPath(edwoodtest.MockFontName) + postwant
+	if len(want) > 128 {
+		want = want[:128]
+	}
 
 	global.WinID = 0
 	w := NewWindow().initHeadless(nil)
