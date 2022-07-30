@@ -1001,10 +1001,7 @@ func (t *Text) Type(r rune) {
 			return
 		}
 
-		// TODO(rjk): figure out the way of nofill
-		// TODO(rjk): I'd like the Undo op to group typing better.
 		setUndoPoint()
-		t.file.Commit()
 		t.Delete(q0, q0+nnb, true)
 
 		// Run through the code that will update the t.w.body.file.details.Name.
@@ -1032,8 +1029,8 @@ func (t *Text) Type(r rune) {
 			rp = rp[:nr]
 		}
 	}
-	// otherwise ordinary character; just insert, typically in caches of all texts
-	t.file.InsertAtWithoutCommit(t.q0, rp[:nr])
+	// Otherwise ordinary character; just insert it.
+	t.file.InsertAt(t.q0, rp[:nr])
 	t.SetSelect(t.q0+nr, t.q0+nr)
 
 	// Always commit if the typing is into a tag. The reason to do this is to
@@ -1053,7 +1050,6 @@ func (t *Text) Type(r rune) {
 }
 
 func (t *Text) Commit() {
-	t.file.Commit()
 	if t.what == Body {
 		t.w.utflastqid = -1
 	}
