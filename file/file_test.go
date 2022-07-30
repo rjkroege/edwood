@@ -47,29 +47,6 @@ func TestDelObserver(t *testing.T) {
 	}
 }
 
-func TestFileInsertAtWithoutCommit(t *testing.T) {
-	f := MakeObservableEditableBuffer("edwood", []rune{})
-
-	f.InsertAtWithoutCommit(0, []rune(s1))
-
-	t.Logf("contents %q, %s", f.f.String(), f.f.viewedState())
-
-	i := 0
-	for _, r := range s1 {
-		if got, want := f.ReadC(i), r; got != want {
-			t.Errorf("ReadC failed %d. got %v want % v", i, got, want)
-		}
-		i++
-	}
-
-	if got, want := f.Nr(), 6; got != want {
-		t.Errorf("Nr failed. got %v want % v", got, want)
-	}
-
-	check(t, "TestFileInsertAt after TestFileInsertAtWithoutCommit", f,
-		&stateSummary{false, false, false, s1})
-}
-
 const s1 = "hi 海老麺"
 const s2 = "bye"
 
@@ -79,19 +56,16 @@ func TestFileInsertAt(t *testing.T) {
 	// Force Undo.
 	f.seq = 1
 
-	f.InsertAtWithoutCommit(0, []rune(s1))
+	f.InsertAt(0, []rune(s1))
 
 	// NB: the read code not include the uncommitted content.
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
 		&stateSummary{true, false, true, s1})
 
-	f.Commit()
-
 	check(t, "TestFileInsertAt after InsertAtWithoutCommits", f,
 		&stateSummary{true, false, true, s1})
 
 	f.InsertAt(f.Nr(), []rune(s2))
-	f.Commit()
 
 	check(t, "TestFileUndoRedo after InsertAt", f,
 		&stateSummary{true, false, true, s1 + s2})
@@ -575,12 +549,11 @@ func TestTagObserversFireCorrectly(t *testing.T) {
 	}
 
 	oeb.Mark(2)
-	oeb.InsertAtWithoutCommit(0, []rune("hi"))
+	oeb.InsertAt(0, []rune("hi"))
 	if got, want := *counts, (observercount{0, 6}); got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
-	oeb.Commit()
 	if got, want := *counts, (observercount{0, 6}); got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}

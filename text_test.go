@@ -434,7 +434,6 @@ func checkTabexpand(t *testing.T, getText func(tabexpand bool, tabstop int) *Tex
 		for _, r := range tc.input {
 			text.Type(r)
 		}
-		text.file.Commit()
 
 		gr := make([]rune, text.file.Nr())
 		text.file.Read(0, gr[:text.file.Nr()])

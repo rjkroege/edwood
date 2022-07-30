@@ -26,12 +26,6 @@ func NewTypeBuffer(inputrunes []rune, oeb *ObservableEditableBuffer) *Buffer {
 	return nb
 }
 
-// Commit writes the in-progress edits to the real buffer instead of
-// keeping them in the cache.
-func (b *Buffer) Commit(seq int) {
-	// NOP
-}
-
 // ReadC reads a single rune from the File.
 // TODO(rjk): Implement RuneReader
 func (b *Buffer) ReadC(q int) rune {

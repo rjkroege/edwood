@@ -435,18 +435,6 @@ func (e *ObservableEditableBuffer) deleted(q0, q1 OffsetTuple) {
 	}
 }
 
-// Commit is a forwarding function for file.Commit.
-// nop with file.Buffer.
-func (e *ObservableEditableBuffer) Commit() {
-	e.f.Commit(e.seq)
-}
-
-// InsertAtWithoutCommit is a forwarding function for file.InsertAtWithoutCommit.
-// forwards to InsertAt for file.Buffer.
-func (e *ObservableEditableBuffer) InsertAtWithoutCommit(p0 int, s []rune) {
-	e.InsertAt(p0, s)
-}
-
 // IsDirOrScratch returns true if the File has a synthetic backing of
 // a directory listing or has a name pattern that excludes it from
 // being saved under typical circumstances.
