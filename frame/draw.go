@@ -237,7 +237,7 @@ func (f *frameimpl) Tick(pt image.Point, ticked bool) {
 }
 
 func (f *frameimpl) _draw(pt image.Point) image.Point {
-	// f.LogBoxes("_draw -- start")
+	// f.Logboxes("_draw -- start")
 	for nb := 0; nb < len(f.box); nb++ {
 		b := f.box[nb]
 		if b == nil {
@@ -246,6 +246,7 @@ func (f *frameimpl) _draw(pt image.Point) image.Point {
 		}
 		pt = f.cklinewrap0(pt, b)
 		if pt.Y == f.rect.Max.Y {
+			f.lastlinefull = true
 			f.nchars -= f.strlen(nb)
 			f.delbox(nb, len(f.box)-1)
 			break
@@ -270,7 +271,7 @@ func (f *frameimpl) _draw(pt image.Point) image.Point {
 			}
 		}
 	}
-	// f.LogBoxes("_draw -- end")
+	// f.Logboxes("_draw -- end")
 	return pt
 }
 

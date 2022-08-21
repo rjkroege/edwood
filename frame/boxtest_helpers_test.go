@@ -69,6 +69,7 @@ func comparecore(t *testing.T, prefix string, testvector []BoxTester) {
 // computed box found in frame. prefix and name describe the test and i is the
 // box index.
 func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *frameimpl, afterboxes []*frbox) {
+	t.Helper()
 	if got, want := frame.box[i], afterboxes[i]; !reflect.DeepEqual(got, want) {
 		switch {
 		case got == nil && want != nil:
@@ -87,13 +88,20 @@ func expectedboxesequal(t *testing.T, prefix, name string, i int, frame *frameim
 	}
 }
 
-// testcore checks if the frame's box model matches the provided afterboxes, nbox, Use this to implement Verify methods.
+// testcore checks if the frame's box model matches the provided
+// afterboxes, nbox, Use this to implement Verify methods.
 func testcore(t *testing.T, prefix, name string, frame *frameimpl, nbox int, afterboxes []*frbox) {
 	if got, want := len(frame.box), nbox; got != want {
 		t.Errorf("%s-%s: len(frame.box) got %d but want %d\n", prefix, name, got, want)
 	}
 	if frame.box == nil {
 		t.Errorf("%s-%s: ran add but did not succeed in creating boxex", prefix, name)
+	}
+
+	if len(afterboxes) > len(frame.box) {
+		frame.TestLogboxes(t, "mismatch of length between expected, desired")
+		t.Errorf("wrong number of afterboxes. Should have %d boxes, got %d", len(afterboxes), len(frame.box))
+		return
 	}
 
 	// First part of box array must match the provided afterboxes slice.
@@ -107,4 +115,18 @@ func testcore(t *testing.T, prefix, name string, frame *frameimpl, nbox int, aft
 			t.Errorf("%s-%s: result box [%d] should be nil", prefix, name, i+len(afterboxes))
 		}
 	}
+}
+
+// Logboxes shows the box model to the log for debugging convenience.
+func (f *frameimpl) TestLogboxes(t *testing.T, message string, args ...interface{}) {
+	t.Helper()
+	t.Logf(message, args...)
+	for i, b := range f.box {
+		if b != nil {
+			t.Logf("	box[%d] -> %v\n", i, b)
+		} else {
+			t.Logf("	box[%d] is WRONGLY nil\n", i)
+		}
+	}
+	t.Logf("end: "+message, args...)
 }

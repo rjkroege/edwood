@@ -40,7 +40,7 @@ func (f *frameimpl) canfit(pt image.Point, b *frbox) (int, bool) {
 	return 0, false
 }
 
-// cklinewrap returns a new for where the given the box b should be
+// cklinewrap returns a new point for where the given the box b should be
 // placed. NB: this code is not going to do the right thing with a newline box.
 func (f *frameimpl) cklinewrap(p image.Point, b *frbox) (ret image.Point) {
 	ret = p
@@ -128,7 +128,7 @@ func (f *frameimpl) newwid0(pt image.Point, b *frbox) int {
 // TODO(rjk): Possibly does not work correctly.
 // clean merges boxes where possible over boxes [n0, n1)
 func (f *frameimpl) clean(pt image.Point, n0, n1 int) {
-	//log.Println("clean", pt, n0, n1, f.Rect.Max.X)
+	// log.Println("clean", pt, n0, n1, f.rect.Max.X)
 	//	f.Logboxes("--- clean: starting ---")
 	c := f.rect.Max.X
 	nb := 0
@@ -149,6 +149,10 @@ func (f *frameimpl) clean(pt image.Point, n0, n1 int) {
 		pt = f.cklinewrap(pt, b)
 		pt = f.advance(pt, b)
 	}
+	// Because we strip the boxes past the end in _draw, this will wrongly
+	// change lastlinefull when we run this at the end of of insert.
+	// Consequently, I modified insert to not clean if there was nothing to
+	// add.
 	f.lastlinefull = false
 	if pt.Y >= f.rect.Max.Y {
 		f.lastlinefull = true
@@ -172,6 +176,7 @@ func Rpt(min, max image.Point) image.Rectangle {
 }
 
 // Logboxes shows the box model to the log for debugging convenience.
+// TODO(rjk): Add the computed position for the boxes too.
 func (f *frameimpl) Logboxes(message string, args ...interface{}) {
 	log.Printf(message, args...)
 	for i, b := range f.box {

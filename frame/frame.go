@@ -253,6 +253,10 @@ type frbox struct {
 // 	m.reallock.Unlock()
 // }
 
+// TODO(rjk): It might make sense to group frameimpl into context (e.g.
+// fonts, etc.) and the actual boxes. At any rate, it's worth thinking
+// carefully about the data structures and how they should really be put
+// together.
 type frameimpl struct {
 	lk sync.Mutex
 	// lk debugginglock
