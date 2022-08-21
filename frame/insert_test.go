@@ -68,9 +68,7 @@ func TestBxscan(t *testing.T) {
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(10, 15)
-				pt2, f := f.bxscan([]byte("本"), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte("本"), 0, 0)
 			},
 			1,
 			[]*frbox{makeBox("本")},
@@ -83,16 +81,15 @@ func TestBxscan(t *testing.T) {
 				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
+				box:               []*frbox{makeBox("abc")},
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(56, 15)
-				pt2, f := f.bxscan([]byte("本"), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte("本"), 4, 1)
 			},
 			1,
 			[]*frbox{makeBox("本")},
-			image.Pt(56, 15),
-			image.Pt(66, 15),
+			image.Pt(10+3*10, 15),
+			image.Pt(10+4*10, 15),
 		},
 		InsertTest{
 			"1 rune insertion wraps at end of line",
@@ -100,16 +97,15 @@ func TestBxscan(t *testing.T) {
 				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
+				box:               []*frbox{makeBox("abcde")},
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(58, 15)
-				pt2, f := f.bxscan([]byte("本"), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte("本"), 5, 1)
 			},
 			1,
 			[]*frbox{makeBox("本")},
-			image.Pt(10, 15+13),
-			image.Pt(20, 15+13),
+			image.Pt(10+5*10, 15),
+			image.Pt(10+1*10, 15+13),
 		},
 		InsertTest{
 			"splittable 2 rune insertion at end of line",
@@ -117,16 +113,18 @@ func TestBxscan(t *testing.T) {
 				font:              mockFont(),
 				defaultfontheight: 13,
 				rect:              image.Rect(10, 15, 10+57, 15+57),
+				box:               []*frbox{makeBox("abcd")},
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(56, 15)
-				pt2, f := f.bxscan([]byte("本a"), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte("本a"), 4, 1)
 			},
 			2,
-			[]*frbox{makeBox("本"), makeBox("a")},
-			image.Pt(56, 15),
-			image.Pt(20, 15+13),
+			[]*frbox{
+				makeBox("本"),
+				makeBox("a"),
+			},
+			image.Pt(10+4*10, 15),
+			image.Pt(10+1*10, 15+13),
 		},
 		InsertTest{
 			"splittable multi-rune rune insertion at start of line",
@@ -136,9 +134,7 @@ func TestBxscan(t *testing.T) {
 				rect:              image.Rect(10, 15, 10+57, 15+57),
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(10, 15)
-				pt2, f := f.bxscan([]byte(bigstring), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte(bigstring), 0, 0)
 			},
 			3,
 			[]*frbox{makeBox("a本ポポポ"), makeBox("ポポhel"), makeBox("lo")},
@@ -154,13 +150,33 @@ func TestBxscan(t *testing.T) {
 				maxtab:            8,
 			},
 			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
-				pt1 := image.Pt(10, 15)
-				pt2, f := f.bxscan([]byte("\ta\n"), &pt1)
-				return pt1, pt2, f
+				return f.bxscan([]byte("\ta\n"), 0, 0)
 			},
 			3,
 			[]*frbox{makeBox("\t"), makeBox("a"), makeBox("\n")},
 			image.Pt(10, 15),
+			image.Pt(10, 15+13),
+		},
+		InsertTest{
+			"a newline is inserted at the point point between boxes",
+			&frameimpl{
+				font:              mockFont(),
+				defaultfontheight: 13,
+				rect:              image.Rect(10, 15, 10+57, 15+57),
+				maxtab:            8,
+				box: []*frbox{
+					makeBox("abcde"),
+					makeBox("123"),
+				},
+			},
+			func(f *frameimpl) (image.Point, image.Point, *frameimpl) {
+				return f.bxscan([]byte("\n"), 5, 1)
+			},
+			1,
+			[]*frbox{
+				makeBox("\n"),
+			},
+			image.Pt(10+5*10, 15),
 			image.Pt(10, 15+13),
 		},
 	})
@@ -293,10 +309,28 @@ func splitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 	gdo(t, fr).Clear()
 	rss := []rune(makereplicatedstring(6))
 
-	t.Logf("%q", string(rss))
-
 	fr.Insert(rss, 0)
 	s := fr.Insert([]rune{'\n'}, 3)
+
+	// I would have expected that this should be true?
+	if got, want := s, false; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// preSplitWrappedLine is a handy test function for generating output.
+func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	gdo(t, fr).Clear()
+	tmparr := []rune(makereplicatedstring(6))
+	rss := make([]rune, 0, len(tmparr)+1)
+
+	rss = append(rss, tmparr[0:3]...)
+	rss = append(rss, '\n')
+	rss = append(rss, tmparr[3:]...)
+
+	s := fr.Insert(rss, 0)
 
 	// I would have expected that this should be true?
 	if got, want := s, false; got != want {
@@ -407,8 +441,8 @@ func nop(t *testing.T, _ Frame, _ *invariants) {
 	t.Log("hi from nop")
 }
 
-// TODO(rjk): Conceivably the bxscan test can go away once I have written this
-// to my satisfaction?
+// TODO(rjk): Conceivably the bxscan test can go away once I have written
+// this to my satisfaction?
 func TestInsert(t *testing.T) {
 	iv := &invariants{
 		topcorner: image.Pt(20, 10),
@@ -520,12 +554,22 @@ func TestInsert(t *testing.T) {
 			name:     "splitWrappedLine",
 			fn:       splitWrappedLine,
 			textarea: image.Rect(20, 10, 60, 60),
-			// This inserts an additional blankline for a newline added to the end of
-			// a full text row that doesn't belong there. The contents of the screen
-			// no longer match what we'd expect based on the box model. e.g.
-			// insertForcesWrap below shows that the newline should add a box without
-			// actually drawing anything. Subsequent edits then induce confusion.
-			knowntofail: true,
+			want: []string{
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(60,50) [0,1],[-,3]",
+				"fill (20,50)-(33,60) [0,4],[1,1]",
+				`screen-800x600 <- string "a本ポ" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "ポポポ" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "ポポh" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "ell" atpoint: (20,40) [0,3] fill: black`,
+				`screen-800x600 <- string "o" atpoint: (20,50) [0,4] fill: black`,
+				// The previously failing insertion starts here. We didn't have to do
+				// anything in this case. But we still fill blank space at the end of the
+				// line over again. This is (hopefully) harmless.
+				// TODO(rjk): Elide the 0-width draws.
+				"fill (59,10)-(60,20) [3,0],[-,1]",
+				"fill (20,20)-(20,30) [0,1],[0,1]",
+			},
 		},
 		{
 			// Insert a single character that forces conversion of non-wrapped to
@@ -567,6 +611,8 @@ func TestInsert(t *testing.T) {
 				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
 				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
 				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
+				"fill (59,50)-(60,60) [3,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
 			},
 		},
 
@@ -680,18 +726,6 @@ func TestInsert(t *testing.T) {
 			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
-			// Split a wrapped line by inserting a newline.
-			name:     "splitWrappedLine",
-			fn:       splitWrappedLine,
-			textarea: image.Rect(20, 10, 60, 60),
-			// This inserts an additional blankline for a newline added to the end of
-			// a full text row that doesn't belong there. The contents of the screen
-			// no longer match what we'd expect based on the box model. e.g.
-			// insertForcesWrap below shows that the newline should add a box without
-			// actually drawing anything. Subsequent edits then induce confusion.
-			knowntofail: true,
-		},
-		{
 			// Insert a single character that forces conversion of non-wrapped to
 			// wrapped with wripple to end.
 			name:     "insertForcesWrap",
@@ -716,24 +750,6 @@ func TestInsert(t *testing.T) {
 				`screen-800x600 <- string "X" atpoint: (46,10) [2,0] fill: black`,
 			},
 		},
-		{
-			// Append a pair of characters at the end of the otherwise full text
-			// area.
-			name:     "appendAtEnd",
-			fn:       appendAtEnd,
-			textarea: image.Rect(20, 10, 60, 60),
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-			},
-		},
-
 		{
 			// Append a multibox string that hangs off the end. TODO(rjk): Draws a
 			// zero-width fill off the end of text area. This is conceivably wrong.

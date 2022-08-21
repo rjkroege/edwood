@@ -45,12 +45,23 @@ func TestInsertAligned(t *testing.T) {
 			name:     "splitWrappedLine",
 			fn:       splitWrappedLine,
 			textarea: image.Rect(20, 10, 59, 60),
-			// This inserts an additional blankline for a newline added to the end of
-			// a full text row that doesn't belong there. The contents of the screen
-			// no longer match what we'd expect based on the box model. e.g.
-			// insertForcesWrap below shows that the newline should add a box without
-			// actually drawing anything. Subsequent edits then induce confusion.
-			knowntofail: true,
+			want: []string{
+				"fill (20,10)-(59,20) [0,0],[3,1]",
+				"fill (20,20)-(59,50) [0,1],[3,3]",
+				"fill (20,50)-(33,60) [0,4],[1,1]",
+				`screen-800x600 <- string "a本ポ" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "ポポポ" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "ポポh" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "ell" atpoint: (20,40) [0,3] fill: black`,
+				`screen-800x600 <- string "o" atpoint: (20,50) [0,4] fill: black`,
+				// The previously failing insertion starts here. We didn't have to do
+				// anything in this case. But we still fill blank space at the end of the
+				// line over again. This is (hopefully) harmless.
+				// TODO(rjk): Elide the 0-width draws.
+				"fill (58,10)-(59,20) [-,0],[-,1]",
+				"fill (20,20)-(20,30) [0,1],[0,1]",
+			},
+			knowntofail: false,
 		},
 		{
 			// Insert a single character that forces conversion of non-wrapped to
@@ -92,6 +103,9 @@ func TestInsertAligned(t *testing.T) {
 				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
 				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
 				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
+				"fill (58,50)-(59,60) [-,4],[-,1]",
+				// Doesn't this stick below? it's 0 wide?
+				"fill (20,60)-(20,70) [0,5],[0,1]",
 			},
 		},
 

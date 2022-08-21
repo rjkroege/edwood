@@ -26,7 +26,7 @@ func (frame *frameimpl) addifnonempty(box *frbox, inby []byte) *frbox {
 
 // bxscan divides inby into single-line, nl and tab boxes. bxscan assumes that
 // it has ownership of inby
-func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameimpl) {
+func (f *frameimpl) bxscan(inby []byte, p, bn int) (image.Point, image.Point, *frameimpl) {
 	frame := &frameimpl{
 		rect:              f.rect,
 		display:           f.display,
@@ -38,7 +38,7 @@ func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameim
 		box:               []*frbox{},
 	}
 
-	// TODO(rjk): This is (conceivably) pointless works?
+	// TODO(rjk): This is probably unnecessary.
 	copy(frame.cols[:], f.cols[:])
 
 	nl := 0
@@ -92,8 +92,19 @@ func (f *frameimpl) bxscan(inby []byte, ppt *image.Point) (image.Point, *frameim
 	}
 	frame.addifnonempty(wipbox, []byte{})
 
-	*ppt = f.cklinewrap0(*ppt, frame.box[0])
-	return frame._draw(*ppt), frame
+	newboxes := frame.box
+
+	// Temporarily create prefixboxes to find the position of (a possibly
+	// infinitely thin) rune immediately at position p.
+	prefixboxes := f.box[0:bn]
+	frame.box = prefixboxes
+	pt0 := frame.ptofcharptb(p, f.rect.Min, 0)
+
+	frame.box = newboxes
+	pt1 := frame._draw(pt0)
+	f.lastlinefull = frame.lastlinefull
+
+	return pt0, pt1, frame
 }
 
 func (f *frameimpl) chop(pt image.Point, p, bn int) {
@@ -143,9 +154,9 @@ func (f *frameimpl) insertimpl(r []rune, p0 int) bool {
 }
 
 func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
-	// log.Printf("frame.Insert. Start: %q", string(inby))
-	// defer log.Println("frame.Insert end")
-	//	f.Logboxes("at very start of insert")
+	//log.Printf("frame.Insert. Start: %q", string(inby))
+	//defer log.Println("frame.Insert end")
+	//f.Logboxes("at very start of insert")
 	f.validateboxmodel("Frame.Insert Start p0=%d, «%s»", p0, string(inby))
 	defer f.validateboxmodel("Frame.Insert End p0=%d, «%s»", p0, string(inby))
 	f.validateinputs(inby, "Frame.Insert Start")
@@ -166,26 +177,28 @@ func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
 	}
 
 	//	f.Logboxes("at end of findbox")
+	//	log.Println("n0", n0)
 
 	cn0 := p0
 	nn0 := n0
-	pt0 := f.ptofcharnb(p0, n0)
-	ppt0 := pt0
-	opt0 := pt0
 
-	pt1, nframe := f.bxscan(inby, &ppt0)
+	// ppt0 and ppt1 are start and end of insertion as they will appear when
+	// insertion is complete. pt0 is current location of insertion position.
+	// (p0); pt1 is terminal point (without line wrap) of insertion.
+	pt0, pt1, nframe := f.bxscan(inby, p0, n0)
+
+	// TODO(rjk): Figure out why opt0 needs to exist.
+	opt0 := pt0
+	ppt0 := pt0
 	ppt1 := pt1
 
+	// TODO(rjk): I am not sure what this block does. Or if it is doing the
+	// right thing.
 	if n0 < len(f.box) {
 		pt0 = f.cklinewrap(pt0, f.box[n0])
 		ppt1 = f.cklinewrap0(ppt1, f.box[n0])
 	}
 	f.modified = true
-	/*
-	 * ppt0 and ppt1 are start and end of insertion as they will appear when
-	 * insertion is complete. pt0 is current location of insertion position
-	 * (p0); pt1 is terminal point (without line wrap) of insertion.
-	 */
 
 	// Remove the selection or tick. This will redraw all selected text characters.
 	// TODO(rjk): Do not remove the selection if it's unnecessary to do so.
@@ -340,11 +353,14 @@ func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
 	f.SelectPaint(ppt0, ppt1, col)
 	nframe.drawtext(ppt0, tcol, col)
 
+	// Skip the rest if nothing is added. This means that f.lastlinefull is valid.
+	if len(nframe.box) == 0 {
+		return f.lastlinefull
+	}
+
 	// Actually add boxes.
 	f.addbox(nn0, len(nframe.box))
 	copy(f.box[nn0:], nframe.box)
-
-	// f.Logboxes("after adding")
 
 	if nn0 > 0 && f.box[nn0-1].Nrune >= 0 && ppt0.X-f.box[nn0-1].Wid >= f.rect.Min.X {
 		nn0--
@@ -356,7 +372,6 @@ func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
 		n0++
 	}
 	f.clean(ppt0, nn0, n0+1)
-	//	f.Logboxes("after clean")
 	f.nchars += nframe.nchars
 	if f.sp0 >= p0 {
 		f.sp0 += nframe.nchars

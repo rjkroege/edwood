@@ -6,6 +6,11 @@ import (
 	"unicode/utf8"
 )
 
+// ptofcharptb returns the point of run p based on the current box state.
+// NB: it is possible that a different rune at p would give a different
+// result. Consequently, the result of this function will not say where a
+// new rune at position p should be positioned, only where the current
+// rune at p is positioned.
 func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 	var w int
 	var r rune
@@ -26,6 +31,7 @@ func (f *frameimpl) ptofcharptb(p int, pt image.Point, bn int) image.Point {
 			}
 			break
 		}
+
 		p -= l
 		pt = f.advance(pt, b)
 	}
@@ -39,7 +45,7 @@ func (f *frameimpl) Ptofchar(p int) image.Point {
 	return f.ptofcharptb(p, f.rect.Min, 0)
 }
 
-func (f *frameimpl) ptofcharnb(p int, nb int) image.Point {
+func (f *frameimpl) ptofcharnb(p int, _ int) image.Point {
 	pt := image.Point{}
 	pt = f.ptofcharptb(p, f.rect.Min, 0)
 	return pt
