@@ -350,7 +350,7 @@ func (f *frameimpl) insertbyteimpl(inby []byte, p0 int) bool {
 		npts--
 	}
 
-	f.SelectPaint(ppt0, ppt1, col)
+	f.fillNonGlyphAreas(ppt0, ppt1, col)
 	nframe.drawtext(ppt0, tcol, col)
 
 	// Skip the rest if nothing is added. This means that f.lastlinefull is valid.
