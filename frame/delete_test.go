@@ -69,7 +69,7 @@ func deleteTab(t *testing.T, fr Frame, iv *invariants) {
 	fr.Insert([]rune("0	ab1cd2ef"), 0)
 	gdo(t, fr).Clear()
 
-	s := fr.Delete(1, 2) // a
+	s := fr.Delete(1, 2) // the tab
 
 	if got, want := s, 1; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -245,6 +245,8 @@ func TestDelete(t *testing.T) {
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("dump mismatch (-want +got):\n%s", diff)
 			}
+
+			visualizedoutputtest(t, fr)
 		})
 	}
 }

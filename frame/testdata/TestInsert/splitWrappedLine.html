@@ -1,0 +1,132 @@
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+</head>
+<body>
+<svg viewBox="-20 -30 190 990" xmlns="http://www.w3.org/2000/svg">
+
+<style>
+	.small { font: 8px sans-serif; }
+</style>
+
+<g transform="translate(0, 0)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">target rect (20,10)-(60,60)</text>
+	</g>
+	<g id="draw0">
+	<rect x="20" y="10" width="40" height="50" fill="none" stroke="black"/>
+	</g>
+</g>
+
+<g transform="translate(0, 90)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,10)-(60,20) [0,0],[-,1]</text>
+	</g>
+	<g id="draw1">
+	<use href="#draw0" />
+	<rect x="20" y="10" width="40" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 180)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(60,50) [0,1],[-,3]</text>
+	</g>
+	<g id="draw2">
+	<use href="#draw1" />
+	<rect x="20" y="20" width="40" height="30" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 270)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,50)-(33,60) [0,4],[1,1]</text>
+	</g>
+	<g id="draw3">
+	<use href="#draw2" />
+	<rect x="20" y="50" width="13" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 360)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;a本ポ&#34; atpoint: (20,10) [0,0] fill: black</text>
+	</g>
+	<g id="draw4">
+	<use href="#draw3" />
+	<text x="22" y="18" fill="black" class="small">a</text>
+	<text x="35" y="18" fill="black" class="small">本</text>
+	<text x="48" y="18" fill="black" class="small">ポ</text>
+	</g>
+</g>
+
+<g transform="translate(0, 450)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ポポポ&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw5">
+	<use href="#draw4" />
+	<text x="22" y="28" fill="black" class="small">ポ</text>
+	<text x="35" y="28" fill="black" class="small">ポ</text>
+	<text x="48" y="28" fill="black" class="small">ポ</text>
+	</g>
+</g>
+
+<g transform="translate(0, 540)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ポポh&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw6">
+	<use href="#draw5" />
+	<text x="22" y="38" fill="black" class="small">ポ</text>
+	<text x="35" y="38" fill="black" class="small">ポ</text>
+	<text x="48" y="38" fill="black" class="small">h</text>
+	</g>
+</g>
+
+<g transform="translate(0, 630)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ell&#34; atpoint: (20,40) [0,3] fill: black</text>
+	</g>
+	<g id="draw7">
+	<use href="#draw6" />
+	<text x="22" y="48" fill="black" class="small">e</text>
+	<text x="35" y="48" fill="black" class="small">l</text>
+	<text x="48" y="48" fill="black" class="small">l</text>
+	</g>
+</g>
+
+<g transform="translate(0, 720)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;o&#34; atpoint: (20,50) [0,4] fill: black</text>
+	</g>
+	<g id="draw8">
+	<use href="#draw7" />
+	<text x="22" y="58" fill="black" class="small">o</text>
+	</g>
+</g>
+
+<g transform="translate(0, 810)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,10)-(60,20) [3,0],[-,1]</text>
+	</g>
+	<g id="draw9">
+	<use href="#draw8" />
+	<rect x="59" y="10" width="1" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 900)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(20,30) [0,1],[0,1]</text>
+	</g>
+	<g id="draw10">
+	<use href="#draw9" />
+	<rect x="20" y="20" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+</svg>
+</body>
+</html>

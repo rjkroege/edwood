@@ -1,0 +1,245 @@
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+</head>
+<body>
+<svg viewBox="-20 -30 190 1260" xmlns="http://www.w3.org/2000/svg">
+
+<style>
+	.small { font: 8px sans-serif; }
+</style>
+
+<g transform="translate(0, 0)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">target rect (20,10)-(60,40)</text>
+	</g>
+	<g id="draw0">
+	<rect x="20" y="10" width="40" height="30" fill="none" stroke="black"/>
+	</g>
+</g>
+
+<g transform="translate(0, 70)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,10)-(60,20) [0,0],[-,1]</text>
+	</g>
+	<g id="draw1">
+	<use href="#draw0" />
+	<rect x="20" y="10" width="40" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 140)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(60,30) [0,1],[-,1]</text>
+	</g>
+	<g id="draw2">
+	<use href="#draw1" />
+	<rect x="20" y="20" width="40" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 210)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(59,40) [0,2],[3,1]</text>
+	</g>
+	<g id="draw3">
+	<use href="#draw2" />
+	<rect x="20" y="30" width="39" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 280)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;0ab&#34; atpoint: (20,10) [0,0] fill: black</text>
+	</g>
+	<g id="draw4">
+	<use href="#draw3" />
+	<text x="22" y="18" fill="black" class="small">0</text>
+	<text x="35" y="18" fill="black" class="small">a</text>
+	<text x="48" y="18" fill="black" class="small">b</text>
+	</g>
+</g>
+
+<g transform="translate(0, 350)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;1cd&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw5">
+	<use href="#draw4" />
+	<text x="22" y="28" fill="black" class="small">1</text>
+	<text x="35" y="28" fill="black" class="small">c</text>
+	<text x="48" y="28" fill="black" class="small">d</text>
+	</g>
+</g>
+
+<g transform="translate(0, 420)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;2ef&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw6">
+	<use href="#draw5" />
+	<text x="22" y="38" fill="black" class="small">2</text>
+	<text x="35" y="38" fill="black" class="small">e</text>
+	<text x="48" y="38" fill="black" class="small">f</text>
+	</g>
+</g>
+
+<g transform="translate(0, 490)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (46,10)-(59,20) [2,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]</text>
+	</g>
+	<use href="#draw6" />
+<rect x="46" y="10" width="13" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw7">
+		<use href="#draw6" />
+		<clipPath id="draw7_blitsource">
+			
+			<rect x="46" y="10" width="13" height="10" />
+		</clipPath>
+		<use href="#draw6" clip-path="url(#draw7_blitsource)" x="-13" y="0" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 560)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,10)-(46,20) [2,0],[0,1]</text>
+	</g>
+	<g id="draw8">
+	<use href="#draw7" />
+	<rect x="46" y="10" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 630)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (20,20)-(33,30) [0,1],[1,1], to (46,10)-(59,20) [2,0],[1,1]</text>
+	</g>
+	<use href="#draw8" />
+<rect x="20" y="20" width="13" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw9">
+		<use href="#draw8" />
+		<clipPath id="draw9_blitsource">
+			
+			<rect x="20" y="20" width="13" height="10" />
+		</clipPath>
+		<use href="#draw8" clip-path="url(#draw9_blitsource)" x="26" y="-10" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 700)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,10)-(60,20) [3,0],[-,1]</text>
+	</g>
+	<g id="draw10">
+	<use href="#draw9" />
+	<rect x="59" y="10" width="1" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 770)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (33,20)-(59,30) [1,1],[2,1], to (20,20)-(46,30) [0,1],[2,1]</text>
+	</g>
+	<use href="#draw10" />
+<rect x="33" y="20" width="26" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw11">
+		<use href="#draw10" />
+		<clipPath id="draw11_blitsource">
+			
+			<rect x="33" y="20" width="26" height="10" />
+		</clipPath>
+		<use href="#draw10" clip-path="url(#draw11_blitsource)" x="-13" y="0" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 840)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,20)-(46,30) [2,1],[0,1]</text>
+	</g>
+	<g id="draw12">
+	<use href="#draw11" />
+	<rect x="46" y="20" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 910)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (20,30)-(33,40) [0,2],[1,1], to (46,20)-(59,30) [2,1],[1,1]</text>
+	</g>
+	<use href="#draw12" />
+<rect x="20" y="30" width="13" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw13">
+		<use href="#draw12" />
+		<clipPath id="draw13_blitsource">
+			
+			<rect x="20" y="30" width="13" height="10" />
+		</clipPath>
+		<use href="#draw12" clip-path="url(#draw13_blitsource)" x="26" y="-10" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 980)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,20)-(60,30) [3,1],[-,1]</text>
+	</g>
+	<g id="draw14">
+	<use href="#draw13" />
+	<rect x="59" y="20" width="1" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 1050)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (33,30)-(59,40) [1,2],[2,1], to (20,30)-(46,40) [0,2],[2,1]</text>
+	</g>
+	<use href="#draw14" />
+<rect x="33" y="30" width="26" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw15">
+		<use href="#draw14" />
+		<clipPath id="draw15_blitsource">
+			
+			<rect x="33" y="30" width="26" height="10" />
+		</clipPath>
+		<use href="#draw14" clip-path="url(#draw15_blitsource)" x="-13" y="0" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 1120)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,30)-(46,40) [2,2],[0,1]</text>
+	</g>
+	<g id="draw16">
+	<use href="#draw15" />
+	<rect x="46" y="30" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 1190)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,30)-(59,40) [2,2],[1,1]</text>
+	</g>
+	<g id="draw17">
+	<use href="#draw16" />
+	<rect x="46" y="30" width="13" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+</svg>
+</body>
+</html>

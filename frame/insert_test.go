@@ -191,7 +191,7 @@ type invariants struct {
 // implementation.
 func setupFrame(t *testing.T, iv *invariants) Frame {
 	t.Helper()
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(iv.textarea)
 
 	var textcolors [NumColours]draw.Image
 
@@ -430,15 +430,8 @@ func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
-	t.Helper()
-	frimpl := fr.(*frameimpl)
-	gdo := frimpl.display.(edwoodtest.GettableDrawOps)
-	return gdo
-}
-
 func nop(t *testing.T, _ Frame, _ *invariants) {
-	t.Log("hi from nop")
+	// t.Log("hi from nop")
 }
 
 // TODO(rjk): Conceivably the bxscan test can go away once I have written
@@ -478,18 +471,19 @@ func TestInsert(t *testing.T) {
 				"fill (20,10)-(46,20) [0,0],[2,1]",
 				`screen-800x600 <- string "ab" atpoint: (20,10) [0,0] fill: black`,
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// A short but newline containing string that fits inserted at the start.
 			name: "multiInsertShortString",
 			fn:   multiInsertShortString,
-			want: []string{"fill (20,10)-(400,20) [0,0],[-,1]",
+			want: []string{
+				"fill (20,10)-(400,20) [0,0],[-,1]",
 				"fill (20,20)-(46,30) [0,1],[2,1]",
 				`screen-800x600 <- string "ab" atpoint: (20,10) [0,0] fill: black`,
 				`screen-800x600 <- string "cd" atpoint: (20,20) [0,1] fill: black`,
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// A long line inserted. Requires wrapping the inserted line and rippling
@@ -505,13 +499,15 @@ func TestInsert(t *testing.T) {
 				`screen-800x600 <- string "a本ポポポポポポポポポポポポポポポポポポポポポポポポポポ" atpoint: (33,20) [1,1] fill: black`,
 				`screen-800x600 <- string "ポポポポポポポポポポポポhello" atpoint: (20,30) [0,2] fill: black`,
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
+		// one
 		{
 			// Insert into a long line
 			name: "insertIntoLongLine",
 			fn:   insertIntoLongLine,
 			want: []string{
+				// This first blit is a nop.
 				"blit (20,40)-(46,50) [0,3],[2,1], to (20,40)-(46,50) [0,3],[2,1]",
 				"fill (267,30)-(400,40) [19,2],[-,1]",
 				"blit (20,30)-(254,40) [0,2],[18,1], to (33,30)-(267,40) [1,2],[18,1]",
@@ -521,7 +517,7 @@ func TestInsert(t *testing.T) {
 				"fill (33,20)-(46,30) [1,1],[1,1]",
 				`screen-800x600 <- string "X" atpoint: (33,20) [1,1] fill: black`,
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// Insert into a line with a tab
@@ -534,20 +530,7 @@ func TestInsert(t *testing.T) {
 				"fill (33,10)-(46,20) [1,0],[1,1]",
 				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
 			},
-			textarea: image.Rect(20, 10, 400, 500),
-		},
-		{
-			// Insert text that doesn't fit.
-			name: "insertPastEnd",
-			fn:   insertPastEnd,
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,40) [0,1],[-,2]",
-				"fill (20,40)-(20,50) [0,3],[0,1]",
-				`screen-800x600 <- string "a本ポ" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "ポポポ" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "ポポh" atpoint: (20,30) [0,2] fill: black`},
-			textarea: image.Rect(20, 10, 60, 40),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// Split a wrapped line by inserting a newline.
@@ -617,27 +600,6 @@ func TestInsert(t *testing.T) {
 		},
 
 		{
-			// Append a multibox string that hangs off the end. TODO(rjk): Draws a
-			// zero-width fill off the end of text area. This is conceivably wrong.
-			// It would (for example) make some drawing stacks unhappy.
-			name:     "appendHangingLongAtEnd",
-			fn:       appendHangingLongAtEnd,
-			textarea: image.Rect(20, 10, 60, 60),
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4" atpoint: (20,50) [0,4] fill: black`,
-				"fill (33,50)-(60,60) [1,4],[-,1]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "XX" atpoint: (33,50) [1,4] fill: black`,
-			},
-		},
-		{
 			// Insert a multibox string that forces ripple past the end.
 			name:     "insertWrappedThatForcesRipple",
 			fn:       insertWrappedThatForcesRipple,
@@ -682,35 +644,6 @@ func TestInsert(t *testing.T) {
 				"fill (33,10)-(46,20) [1,0],[1,1]",
 				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
 			},
-		},
-		{
-			// Insert into a long line
-			name: "insertIntoLongLine",
-			fn:   insertIntoLongLine,
-			want: []string{
-				"blit (20,40)-(46,50) [0,3],[2,1], to (20,40)-(46,50) [0,3],[2,1]",
-				"fill (267,30)-(400,40) [19,2],[-,1]",
-				"blit (20,30)-(254,40) [0,2],[18,1], to (33,30)-(267,40) [1,2],[18,1]",
-				"blit (384,20)-(397,30) [28,1],[1,1], to (20,30)-(33,40) [0,2],[1,1]",
-				"blit (33,20)-(384,30) [1,1],[27,1], to (46,20)-(397,30) [2,1],[27,1]",
-				"fill (397,20)-(400,30) [29,1],[-,1]",
-				"fill (33,20)-(46,30) [1,1],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,20) [1,1] fill: black`,
-			},
-			textarea: image.Rect(20, 10, 400, 500),
-		},
-		{
-			// Insert into a line with a tab
-			name: "insertTabAndChar",
-			fn:   insertTabAndChar,
-			want: []string{
-				"blit (33,10)-(46,20) [1,0],[1,1], to (124,10)-(137,20) [8,0],[1,1]",
-				"fill (33,10)-(124,20) [1,0],[7,1]",
-				"fill (46,10)-(124,20) [2,0],[6,1]",
-				"fill (33,10)-(46,20) [1,0],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
-			},
-			textarea: image.Rect(20, 10, 400, 500),
 		},
 		{
 			// Insert text that doesn't fit.
@@ -726,31 +659,6 @@ func TestInsert(t *testing.T) {
 			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
-			// Insert a single character that forces conversion of non-wrapped to
-			// wrapped with wripple to end.
-			name:     "insertForcesWrap",
-			fn:       insertForcesWrap,
-			textarea: image.Rect(20, 10, 60, 60),
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
-				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (33,20)-(60,30) [1,1],[-,1]",
-				"blit (46,10)-(59,20) [2,0],[1,1], to (20,20)-(33,30) [0,1],[1,1]",
-				"fill (46,10)-(60,20) [2,0],[-,1]",
-				"fill (20,20)-(20,30) [0,1],[0,1]",
-				`screen-800x600 <- string "X" atpoint: (46,10) [2,0] fill: black`,
-			},
-		},
-		{
 			// Append a multibox string that hangs off the end. TODO(rjk): Draws a
 			// zero-width fill off the end of text area. This is conceivably wrong.
 			// It would (for example) make some drawing stacks unhappy.
@@ -769,52 +677,6 @@ func TestInsert(t *testing.T) {
 				"fill (33,50)-(60,60) [1,4],[-,1]",
 				"fill (20,60)-(20,70) [0,5],[0,1]",
 				`screen-800x600 <- string "XX" atpoint: (33,50) [1,4] fill: black`,
-			},
-		},
-		{
-			// Insert a multibox string that forces ripple past the end.
-			name:     "insertWrappedThatForcesRipple",
-			fn:       insertWrappedThatForcesRipple,
-			textarea: image.Rect(20, 10, 60, 60),
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3b" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4" atpoint: (20,50) [0,4] fill: black`,
-				"fill (59,50)-(60,60) [3,4],[-,1]",
-				"blit (33,40)-(46,50) [1,3],[1,1], to (46,50)-(59,60) [2,4],[1,1]",
-				"fill (33,40)-(60,50) [1,3],[-,1]",
-				"fill (20,50)-(46,60) [0,4],[2,1]",
-				`screen-800x600 <- string "ij" atpoint: (33,40) [1,3] fill: black`,
-				`screen-800x600 <- string "XX" atpoint: (20,50) [0,4] fill: black`,
-			},
-		},
-		{
-			// Insert a string that pushes a blank line off the end.
-			name:     "insertPushesBlankLineOffEnd",
-			fn:       insertPushesBlankLineOffEnd,
-			textarea: image.Rect(20, 10, 60, 60),
-			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
-				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (33,20)-(60,30) [1,1],[-,1]",
-				"blit (46,10)-(59,20) [2,0],[1,1], to (20,20)-(33,30) [0,1],[1,1]",
-				"blit (33,10)-(46,20) [1,0],[1,1], to (46,10)-(59,20) [2,0],[1,1]",
-				"fill (59,10)-(60,20) [3,0],[-,1]",
-				"fill (33,10)-(46,20) [1,0],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
 			},
 		},
 		{
@@ -884,18 +746,9 @@ func TestInsert(t *testing.T) {
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("dump mismatch (-want +got):\n%s", diff)
 			}
+
+			// SVG based output and comparison.
+			visualizedoutputtest(t, fr)
 		})
 	}
-
-	// TODO(rjk): I had wanted a "nice" way to describe and validate the
-	// tests by automatically generating diagrams. I thought about this. See
-	// Thursday-Morning.md in the wiki. I eventually (reluctantly) concluded
-	// that the testing and debugging effort to make sure that the
-	// automatically generated diagrams were correct was the same effort as
-	// validating the ops here.
-	//
-	// I started drawing the op sequences in OmniGraffle. This is was only a
-	// little more work than doing it on paper.
-	//
-	// TODO(rjk): include the diagrams in the source tree.
 }

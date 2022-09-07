@@ -61,7 +61,7 @@ func TestXfidctl(t *testing.T) {
 
 	x := &Xfid{c: make(chan func(*Xfid))}
 	defer close(x.c)
-	go xfidctl(x, edwoodtest.NewDisplay())
+	go xfidctl(x, edwoodtest.NewDisplay(image.Rectangle{}))
 
 	called := false
 	x.c <- func(x *Xfid) { called = true }
@@ -255,7 +255,7 @@ func TestXfidwriteQWaddr(t *testing.T) {
 }
 
 func TestXfidopen(t *testing.T) {
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(image.Rectangle{})
 	global.configureGlobals(display)
 
 	for _, tc := range []struct {
@@ -348,7 +348,7 @@ func TestXfidopenQeditout(t *testing.T) {
 }
 
 func TestXfidopenQWeditout(t *testing.T) {
-	global.configureGlobals(edwoodtest.NewDisplay())
+	global.configureGlobals(edwoodtest.NewDisplay(image.Rectangle{}))
 	mr := new(mockResponder)
 
 	x := &Xfid{
@@ -476,7 +476,7 @@ func TestXfidclose(t *testing.T) {
 				w = NewWindow().initHeadless(nil)
 				w.tag.fr = &MockFrame{}
 				w.body.fr = &MockFrame{}
-				w.body.display = edwoodtest.NewDisplay()
+				w.body.display = edwoodtest.NewDisplay(image.Rectangle{})
 				w.col = new(Column)
 				w.rdselfd = tmpfile
 				w.nomark = true
@@ -540,7 +540,7 @@ func TestXfidclose(t *testing.T) {
 }
 
 func TestXfidwriteQWdata(t *testing.T) {
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(image.Rectangle{})
 	global.configureGlobals(display)
 
 	mr := new(mockResponder)
@@ -672,7 +672,7 @@ func TestXfidwriteQWtag(t *testing.T) {
 }
 
 func TestXfidwriteQWwrsel(t *testing.T) {
-	mockDisplay := edwoodtest.NewDisplay()
+	mockDisplay := edwoodtest.NewDisplay(image.Rectangle{})
 	global.configureGlobals(mockDisplay)
 
 	w := NewWindow().initHeadless(nil)
@@ -745,13 +745,13 @@ func TestXfidwriteQlabel(t *testing.T) {
 }
 
 func TestXfidwriteQcons(t *testing.T) {
-	global.configureGlobals(edwoodtest.NewDisplay())
+	global.configureGlobals(edwoodtest.NewDisplay(image.Rectangle{}))
 	mr := new(mockResponder)
 
 	global.row.Init(image.Rectangle{
 		image.Point{0, 0},
 		image.Point{800, 600},
-	}, edwoodtest.NewDisplay())
+	}, edwoodtest.NewDisplay(image.Rectangle{}))
 
 	data := []byte("cons error: Hello, 世界!\n")
 	x := &Xfid{
@@ -782,7 +782,7 @@ func TestXfidwriteQWerrors(t *testing.T) {
 	// be using a quality backing mock.
 	data := []byte("window error: Hello, 世界!\n")
 
-	mockdisplay := edwoodtest.NewDisplay()
+	mockdisplay := edwoodtest.NewDisplay(image.Rectangle{})
 	global.configureGlobals(mockdisplay)
 	mr := new(mockResponder)
 
@@ -892,7 +892,7 @@ func TestXfidwriteQWeditout(t *testing.T) {
 }
 
 func TestXfidwriteQWctl(t *testing.T) {
-	global.configureGlobals(edwoodtest.NewDisplay())
+	global.configureGlobals(edwoodtest.NewDisplay(image.Rectangle{}))
 	warnings = nil
 	global.cwarn = nil
 
@@ -943,7 +943,7 @@ func TestXfidwriteQWctl(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("Data=%q", tc.data), func(t *testing.T) {
 			mr := new(mockResponder)
-			display := edwoodtest.NewDisplay()
+			display := edwoodtest.NewDisplay(image.Rectangle{})
 			w := NewWindow().initHeadless(nil)
 			w.display = display
 			w.col = &Column{
@@ -1033,7 +1033,7 @@ func TestXfidwriteQWevent(t *testing.T) {
 // Issue https://github.com/rjkroege/edwood/issues/285
 func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	// Setup a new window with "Send" in the tag.
-	d := edwoodtest.NewDisplay()
+	d := edwoodtest.NewDisplay(image.Rectangle{})
 	global.row = Row{
 		display: d,
 	}
@@ -1120,7 +1120,7 @@ func TestXfidreadEmptyFiles(t *testing.T) {
 func TestXfidreadQWbodyQWtag(t *testing.T) {
 	// TODO(rjk): These tests are fragile in how they setup their skeleton.
 	// Use the common skeleton.
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(image.Rectangle{})
 	global.configureGlobals(display)
 	const data = "This is an εxαmplε sentence.\n"
 
@@ -1316,7 +1316,7 @@ func TestXfidreadQWctl(t *testing.T) {
 	global.WinID = 0
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
-	w.display = edwoodtest.NewDisplay()
+	w.display = edwoodtest.NewDisplay(image.Rectangle{})
 	w.body.fr = &MockFrame{}
 	w.tag.file = file.MakeObservableEditableBuffer("", []rune(("/etc/hosts Del Snarf | Look Get ")))
 	w.body.file = file.MakeObservableEditableBuffer("", []rune("Hello, world!\n"))

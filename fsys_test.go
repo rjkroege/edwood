@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -25,7 +26,7 @@ func TestMain(m *testing.M) {
 	switch os.Getenv("TEST_MAIN") {
 	case "edwood":
 		dump := predrawInit()
-		display := edwoodtest.NewDisplay()
+		display := edwoodtest.NewDisplay(image.Rectangle{})
 		mainWithDisplay(global, dump, display)
 	default:
 		// Prevent mounting any acme file server being run by the user running tests.

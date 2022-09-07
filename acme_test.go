@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"image"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -212,7 +213,7 @@ func startMockWaitthread(ctx context.Context) (done <-chan struct{}) {
 	global.cedit = make(chan int)
 	warnings = nil
 	global.row = Row{
-		display: edwoodtest.NewDisplay(),
+		display: edwoodtest.NewDisplay(image.Rectangle{}),
 		tag: Text{
 			file: file.MakeObservableEditableBuffer("", nil),
 		},

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image"
 	"reflect"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestSetTag1(t *testing.T) {
 		"/home/ゴーファー/src/エドウード.txt",
 		"/home/ゴーファー/src/",
 	} {
-		display := edwoodtest.NewDisplay()
+		display := edwoodtest.NewDisplay(image.Rectangle{})
 		global.configureGlobals(display)
 
 		w := NewWindow().initHeadless(nil)

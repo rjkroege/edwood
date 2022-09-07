@@ -1,0 +1,85 @@
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+</head>
+<body>
+<svg viewBox="-20 -30 190 420" xmlns="http://www.w3.org/2000/svg">
+
+<style>
+	.small { font: 8px sans-serif; }
+</style>
+
+<g transform="translate(0, 0)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">target rect (20,10)-(60,40)</text>
+	</g>
+	<g id="draw0">
+	<rect x="20" y="10" width="40" height="30" fill="none" stroke="black"/>
+	</g>
+</g>
+
+<g transform="translate(0, 70)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,10)-(59,20) [0,0],[3,1]</text>
+	</g>
+	<g id="draw1">
+	<use href="#draw0" />
+	<rect x="20" y="10" width="39" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 140)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;0ab&#34; atpoint: (20,10) [0,0] fill: black</text>
+	</g>
+	<g id="draw2">
+	<use href="#draw1" />
+	<text x="22" y="18" fill="black" class="small">0</text>
+	<text x="35" y="18" fill="black" class="small">a</text>
+	<text x="48" y="18" fill="black" class="small">b</text>
+	</g>
+</g>
+
+<g transform="translate(0, 210)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (46,10)-(59,20) [2,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]</text>
+	</g>
+	<use href="#draw2" />
+<rect x="46" y="10" width="13" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<g id="draw3">
+		<use href="#draw2" />
+		<clipPath id="draw3_blitsource">
+			
+			<rect x="46" y="10" width="13" height="10" />
+		</clipPath>
+		<use href="#draw2" clip-path="url(#draw3_blitsource)" x="-13" y="0" />
+	</g>
+</g>
+
+</g>
+
+<g transform="translate(0, 280)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,10)-(46,20) [2,0],[0,1]</text>
+	</g>
+	<g id="draw4">
+	<use href="#draw3" />
+	<rect x="46" y="10" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 350)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (46,10)-(59,20) [2,0],[1,1]</text>
+	</g>
+	<g id="draw5">
+	<use href="#draw4" />
+	<rect x="46" y="10" width="13" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+</svg>
+</body>
+</html>
