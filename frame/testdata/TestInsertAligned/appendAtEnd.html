@@ -1,0 +1,134 @@
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+</head>
+<body>
+<svg viewBox="-20 -30 188 990" xmlns="http://www.w3.org/2000/svg">
+
+<style>
+	.small { font: 8px sans-serif; }
+</style>
+
+<g transform="translate(0, 0)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">target rect (20,10)-(59,60)</text>
+	</g>
+	<g id="draw0">
+	<rect x="20" y="10" width="39" height="50" fill="none" stroke="black"/>
+	</g>
+</g>
+
+<g transform="translate(0, 90)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,10)-(59,20) [0,0],[3,1]</text>
+	</g>
+	<g id="draw1">
+	<use href="#draw0" />
+	<rect x="20" y="10" width="39" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 180)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(59,50) [0,1],[3,3]</text>
+	</g>
+	<g id="draw2">
+	<use href="#draw1" />
+	<rect x="20" y="20" width="39" height="30" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 270)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,50)-(59,60) [0,4],[3,1]</text>
+	</g>
+	<g id="draw3">
+	<use href="#draw2" />
+	<rect x="20" y="50" width="39" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 360)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;0ab&#34; atpoint: (20,10) [0,0] fill: black</text>
+	</g>
+	<g id="draw4">
+	<use href="#draw3" />
+	<text x="22" y="18" fill="black" class="small">0</text>
+	<text x="35" y="18" fill="black" class="small">a</text>
+	<text x="48" y="18" fill="black" class="small">b</text>
+	</g>
+</g>
+
+<g transform="translate(0, 450)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;1cd&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw5">
+	<use href="#draw4" />
+	<text x="22" y="28" fill="black" class="small">1</text>
+	<text x="35" y="28" fill="black" class="small">c</text>
+	<text x="48" y="28" fill="black" class="small">d</text>
+	</g>
+</g>
+
+<g transform="translate(0, 540)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;2ef&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw6">
+	<use href="#draw5" />
+	<text x="22" y="38" fill="black" class="small">2</text>
+	<text x="35" y="38" fill="black" class="small">e</text>
+	<text x="48" y="38" fill="black" class="small">f</text>
+	</g>
+</g>
+
+<g transform="translate(0, 630)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;3gh&#34; atpoint: (20,40) [0,3] fill: black</text>
+	</g>
+	<g id="draw7">
+	<use href="#draw6" />
+	<text x="22" y="48" fill="black" class="small">3</text>
+	<text x="35" y="48" fill="black" class="small">g</text>
+	<text x="48" y="48" fill="black" class="small">h</text>
+	</g>
+</g>
+
+<g transform="translate(0, 720)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;4ij&#34; atpoint: (20,50) [0,4] fill: black</text>
+	</g>
+	<g id="draw8">
+	<use href="#draw7" />
+	<text x="22" y="58" fill="black" class="small">4</text>
+	<text x="35" y="58" fill="black" class="small">i</text>
+	<text x="48" y="58" fill="black" class="small">j</text>
+	</g>
+</g>
+
+<g transform="translate(0, 810)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (58,50)-(59,60) [-,4],[-,1]</text>
+	</g>
+	<g id="draw9">
+	<use href="#draw8" />
+	<rect x="58" y="50" width="1" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+<g transform="translate(0, 900)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,60)-(20,70) [0,5],[0,1]</text>
+	</g>
+	<g id="draw10">
+	<use href="#draw9" />
+	<rect x="20" y="60" width="0" height="10" fill="#ffffdd"/>
+	</g>
+</g>
+
+</svg>
+</body>
+</html>

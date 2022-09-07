@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,10 @@ const (
 type GettableDrawOps interface {
 	DrawOps() []string
 	Clear()
+
+	// SVGDrawOps writes the accumulated SVG format drawops to w where rect
+	// is the area of interest for the drawops.
+	SVGDrawOps(w io.Writer) error
 }
 
 // mockDisplay implements draw.Display.
@@ -33,15 +38,35 @@ type mockDisplay struct {
 	snarfbuf []byte
 	mu       sync.Mutex
 	drawops  []string
+
+	// TODO(rjk): This is essentially the same as drawops above. Except that
+	// I have pruned the drawops array at various points. And that would mean
+	// that it's not the same length as svgdrawops. This would be
+	// unfortunate. So save extra stuff. Later, I can merge this and clean it
+	// up once I have finished implementing the validation of the saved
+	// testdata SVG out.
+	annotations []string
+	svgdrawops  []string
+	screenimage draw.Image
+
+	// roi is the rectangle of interest.
+	rectofi image.Rectangle
 }
 
-// NewDisplay returns a mock draw.Display.
-func NewDisplay() draw.Display {
-	return &mockDisplay{}
+// NewDisplay returns a mock draw.Display where visulizations of the output are w.r.t. rectangle rectofi.
+// Set rectofi to control SVG output.
+func NewDisplay(rectofi image.Rectangle) draw.Display {
+	md := &mockDisplay{
+		rectofi: rectofi,
+	}
+	md.screenimage = newimageimpl(md, "screen-800x600", image.Rect(0, 0, 800, 600))
+	md.svgdrawops = append(md.svgdrawops, boundingboxsvg(0, rectofi))
+	md.annotations = append(md.annotations, fmt.Sprintf("target rect %v", rectofi))
+	return md
 }
 
 func (d *mockDisplay) ScreenImage() draw.Image {
-	return newimageimpl(d, "screen-800x600", image.Rect(0, 0, 800, 600))
+	return d.screenimage
 }
 
 func (d *mockDisplay) White() draw.Image  { return newimageimpl(d, "white", image.Rectangle{}) }
@@ -112,6 +137,10 @@ func (d *mockDisplay) MoveTo(pt image.Point) error    { return nil }
 func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
 func (d *mockDisplay) DrawOps() []string              { return d.drawops }
 func (d *mockDisplay) Clear()                         { d.drawops = nil }
+
+func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
+	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
+}
 
 var _ = draw.Image((*mockImage)(nil))
 
@@ -211,10 +240,35 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 			sr, rectochars(sr),
 			r, rectochars(r),
 		)
+
+		// TODO(rjk): If this is right, fold it out and make an improved case statement.
+		if i.d.screenimage == i {
+			// TODO(rjk): Why am I failing to filter out the unnecessary draws?
+			// I'm getting a bunch of fills that are setting up colour?
+			i.d.svgdrawops = append(i.d.svgdrawops, blitsvg(
+				len(i.d.svgdrawops),
+				sr,
+				r.Min,
+				blitspace+i.d.rectofi.Dx(),
+			))
+			i.d.annotations = append(i.d.annotations, op)
+		}
 	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && src.R().Dx() == 0 && src.R().Dy() == 0:
 		op = fmt.Sprintf("fill %v %s",
 			r, rectochars(r),
 		)
+
+		// TODO(rjk): If this is right, fold it out and make an improved case statement.
+		if i.d.screenimage == i {
+			// TODO(rjk): Why am I failing to filter out the unnecessary draws?
+			// I'm getting a bunch of fills that are setting up colour?
+			i.d.svgdrawops = append(i.d.svgdrawops, fillsvg(
+				len(i.d.svgdrawops),
+				r,
+				i.d.rectofi,
+			))
+			i.d.annotations = append(i.d.annotations, op)
+		}
 	}
 	i.d.drawops = append(i.d.drawops, op)
 }
@@ -249,6 +303,18 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 		srcname,
 	)
 	i.d.drawops = append(i.d.drawops, op)
+
+	// TODO(rjk): Remove this duplication when I've switched to always using
+	// the SVG path for baselines and such.
+	shortop := fmt.Sprintf("string %q atpoint: %v %s fill: %s",
+		string(b),
+		pt,
+		pointochars(pt),
+		srcname,
+	)
+
+	i.d.svgdrawops = append(i.d.svgdrawops, bytessvg(len(i.d.svgdrawops), pt, b))
+	i.d.annotations = append(i.d.annotations, shortop)
 
 	// TODO(rjk): This assumes fixed width. Consider generalizing.
 	return pt.Add(image.Pt(f.BytesWidth(b), 0))

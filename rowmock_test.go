@@ -50,7 +50,7 @@ func updateText(t *Text, sertext *dumpfile.Text, display draw.Display) *Text {
 // reflect the state of the model under non-test operating conditions.
 // Callers of this function should adjust the dirty state externally.
 func MakeWindowScaffold(content *dumpfile.Content) {
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(image.Rectangle{})
 	global.seq = 0
 
 	global.row = Row{

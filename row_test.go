@@ -435,7 +435,7 @@ func jsonEscapePath(s string) string {
 
 func setGlobalsForLoadTesting() {
 	global.WinID = 0 // reset
-	display := edwoodtest.NewDisplay()
+	display := edwoodtest.NewDisplay(image.Rectangle{})
 
 	global.colbutton = edwoodtest.NewImage(display, "colbutton", image.Rectangle{})
 	global.button = edwoodtest.NewImage(display, "button", image.Rectangle{})

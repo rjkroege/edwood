@@ -99,9 +99,9 @@ func xfidlogflush(x *Xfid) {
 // expected calls:
 //
 // op == "new" for each new window
-// - caller of coladd or makenewwindow responsible for calling
-// 	xfidlog after setting window name
-// - exception: zerox
+//   - caller of coladd or makenewwindow responsible for calling
+//     xfidlog after setting window name
+//   - exception: zerox
 //
 // op == "zerox" for new window created via zerox
 // - called from zeroxx

@@ -198,6 +198,8 @@ func TestInsertAligned(t *testing.T) {
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("dump mismatch (-want +got):\n%s", diff)
 			}
+
+			visualizedoutputtest(t, fr)
 		})
 	}
 }
