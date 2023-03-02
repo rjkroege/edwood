@@ -941,10 +941,12 @@ func (t *Text) Type(r rune) {
 		return
 	}
 	wasrange := t.q0 != t.q1
+	removedstuff := false
 	if t.q1 > t.q0 {
 		setUndoPoint()
 		cut(t, t, nil, true, true, "")
 		t.eq0 = ^0
+		removedstuff = true
 	}
 	t.Show(t.q0, t.q0, true)
 	switch r {
@@ -985,6 +987,11 @@ func (t *Text) Type(r rune) {
 	case 0x15:
 		fallthrough // ^U: erase line
 	case 0x17: // ^W: erase word
+		if removedstuff {
+			// No further action needed.
+			return
+		}
+
 		if t.q0 == 0 { // nothing to erase
 			return
 		}
@@ -1005,6 +1012,7 @@ func (t *Text) Type(r rune) {
 		t.Delete(q0, q0+nnb, true)
 
 		// Run through the code that will update the t.w.body.file.details.Name.
+		// TODO(rjk): I'm not consistent in when I call this. Perhaps I should figure that out.
 		t.TypeCommit()
 
 		t.iq1 = t.q0
