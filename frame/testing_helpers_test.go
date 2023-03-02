@@ -71,7 +71,7 @@ func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
 
 // visualizedoutputtest generates SVG-based graphical output
 func visualizedoutputtest(t *testing.T, fr Frame) {
-
+	t.Helper()
 	oname := makeVisualizedOutputTestPath(t)
 	sf, err := os.Create(oname)
 	if err != nil {
