@@ -23,11 +23,12 @@
 //
 // The package is based on the text manipulation in the vis editor. (Some parts are
 // pure ports.) For further information please visit
-// 	https://github.com/martanne/vis.
+//
+//	https://github.com/martanne/vis.
+//
 // This package was taken from https://github.com/mibk/syd/tree/master/undo for use in edwood.
 //
-//
-// Insertion
+// # Insertion
 //
 // When inserting new data there are 2 cases to consider:
 //
@@ -56,8 +57,7 @@
 //	| |     |short|     | existing text |     | |
 //	\-+ <-- +-----+ <-- +---------------+ <-- +-/
 //
-//
-// Deletion
+// # Deletion
 //
 // The delete operation can either start/stop midway through a piece or at
 // a boundary. In the former case a new piece is created to represent the
@@ -73,8 +73,7 @@
 //	| |     | exi|     |t |     | |
 //	\-+ <-- +----+ <-- +--+ <-- +-/
 //
-//
-// Changes
+// # Changes
 //
 // Undoing and redoing works with actions (action is a group of changes: insertions
 // and deletions). An action is represented by any operations between two calls of
@@ -461,10 +460,10 @@ func (b *Buffer) Undo(_ int) (int, int, bool, int) {
 // semantics. It returns the number of affected runes. There are 4 cases:
 // undo insertion, undo deletion, redo insertion, redo deletion:
 //
-// 	- undo-insertion: dispatch a deletion operation, return 0
-//	- undo-deletion: dispatch an insert, return size of inserted text
-// 	- redo-insertion: dispatch an insert, return size of inserted
-// 	- redo-deletion: dispatch a deletion, return 0
+//   - undo-insertion: dispatch a deletion operation, return 0
+//   - undo-deletion: dispatch an insert, return size of inserted text
+//   - redo-insertion: dispatch an insert, return size of inserted
+//   - redo-deletion: dispatch a deletion, return 0
 //
 // TODO(rjk): I want a zero-copy API all the way into frame.
 func (b *Buffer) undone(c *change, undo bool) int {
@@ -739,8 +738,8 @@ func (s span) nbr() (int, int) {
 }
 
 // swapSpans swaps out an old span and replace it with a new one.
-//  - If old is an empty span do not remove anything, just insert the new one.
-//  - If new is an empty span do not insert anything, just remove the old one.
+//   - If old is an empty span do not remove anything, just insert the new one.
+//   - If new is an empty span do not insert anything, just remove the old one.
 func swapSpans(old, new span) {
 	if old.len == 0 && new.len == 0 {
 		return

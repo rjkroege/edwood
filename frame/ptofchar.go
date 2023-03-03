@@ -46,8 +46,7 @@ func (f *frameimpl) Ptofchar(p int) image.Point {
 }
 
 func (f *frameimpl) ptofcharnb(p int, _ int) image.Point {
-	pt := image.Point{}
-	pt = f.ptofcharptb(p, f.rect.Min, 0)
+	pt := f.ptofcharptb(p, f.rect.Min, 0)
 	return pt
 }
 

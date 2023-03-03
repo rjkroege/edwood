@@ -263,7 +263,6 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 // TODO(flux): Innefficient to load the file, then copy into the slice,
 // but I need the UTF-8 interpretation. I could fix this by using a UTF-8
 // -> []rune reader on top of the os.File instead.
-//
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
 	d, err := ioutil.ReadAll(fd)
 	// TODO(rjk): improve handling of read errors.
