@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"strings"
+
+	"github.com/rjkroege/edwood/draw"
 )
 
 var tmpl *template.Template
@@ -76,24 +78,32 @@ func bytessvg(id int, sp image.Point, b []byte) string {
 }
 
 // TODO(rjk): refactor this together with the other code.
+// TODO(rjk): I wrote the above at some point without saying what I was
+// actually suppose to do. Maybe figure out what I meant to fix.
 type Fillargs struct {
-	Id    int
-	SrcId int
-	Box   image.Rectangle
-	Rect  image.Rectangle
+	Id          int
+	SrcId       int
+	Box         image.Rectangle
+	Rect        image.Rectangle
+	Fillcol     string
+	Fillcolhtml string
 }
 
 const filltemplate = `<g id="draw{{.Id}}">
 	<use href="#draw{{.SrcId}}" />
-	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="#ffffdd"/>
+	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="{{.Fillcolhtml}}"/>
 	</g>`
 
-func fillsvg(id int, rect, box image.Rectangle) string {
+func fillsvg(id int, rect, box image.Rectangle, img draw.Image) string {
+	ai := img.(*mockImage)
+
 	fillargs := Fillargs{
-		Id:    id,
-		SrcId: id - 1,
-		Rect:  rect,
-		Box:   box,
+		Id:          id,
+		SrcId:       id - 1,
+		Rect:        rect,
+		Box:         box,
+		Fillcol:     ai.N(),
+		Fillcolhtml: ai.HtmlString(),
 	}
 
 	swr := new(strings.Builder)

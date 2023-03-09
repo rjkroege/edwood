@@ -29,7 +29,7 @@ func makeVisualizedOutputTestPath(t *testing.T) string {
 }
 
 // compareVisualizedOutputTestToBaseline compares the generated SVG to
-// the baseline. f
+// the baseline. The generated file is <blah>_trial.html in the testdata directory.
 func compareVisualizedOutputTestToBaseline(t *testing.T) {
 	t.Helper()
 
