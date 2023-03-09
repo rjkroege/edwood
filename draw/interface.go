@@ -111,3 +111,14 @@ type fontImpl struct {
 
 func (f *fontImpl) Name() string { return f.drawFont.Name }
 func (f *fontImpl) Height() int  { return f.drawFont.Height }
+
+// Imported from a newer version of 9fans.draw
+func WithAlpha(c Color, alpha uint8) Color {
+	r := uint32(c >> 24)
+	g := uint32(c>>16) & 0xFF
+	b := uint32(c>>8) & 0xFF
+	r = (r * uint32(alpha)) / 255
+	g = (g * uint32(alpha)) / 255
+	b = (b * uint32(alpha)) / 255
+	return Color(r<<24 | g<<16 | b<<8 | uint32(alpha))
+}

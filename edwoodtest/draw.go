@@ -59,7 +59,7 @@ func NewDisplay(rectofi image.Rectangle) draw.Display {
 	md := &mockDisplay{
 		rectofi: rectofi,
 	}
-	md.screenimage = newimageimpl(md, "screen-800x600", image.Rect(0, 0, 800, 600))
+	md.screenimage = newimageimpl(md, "screen-800x600", draw.Notacolor, image.Rect(0, 0, 800, 600))
 	md.svgdrawops = append(md.svgdrawops, boundingboxsvg(0, rectofi))
 	md.annotations = append(md.annotations, fmt.Sprintf("target rect %v", rectofi))
 	return md
@@ -69,11 +69,17 @@ func (d *mockDisplay) ScreenImage() draw.Image {
 	return d.screenimage
 }
 
-func (d *mockDisplay) White() draw.Image  { return newimageimpl(d, "white", image.Rectangle{}) }
-func (d *mockDisplay) Black() draw.Image  { return newimageimpl(d, "black", image.Rectangle{}) }
-func (d *mockDisplay) Opaque() draw.Image { return newimageimpl(d, "opaque", image.Rectangle{}) }
+func (d *mockDisplay) White() draw.Image {
+	return newimageimpl(d, "white", draw.White, image.Rectangle{})
+}
+func (d *mockDisplay) Black() draw.Image {
+	return newimageimpl(d, "black", draw.Black, image.Rectangle{})
+}
+func (d *mockDisplay) Opaque() draw.Image {
+	return newimageimpl(d, "opaque", draw.Opaque, image.Rectangle{})
+}
 func (d *mockDisplay) Transparent() draw.Image {
-	return newimageimpl(d, "transparent", image.Rectangle{})
+	return newimageimpl(d, "transparent", draw.Transparent, image.Rectangle{})
 }
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return &draw.Keyboardctl{} }
 func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{} }
@@ -84,23 +90,24 @@ func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{}
 func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(fwidth, fheight), nil }
 
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
-	name := fmt.Sprintf("%s-%v", NiceColourName(val), r)
-	if repl {
-		name += ",tiled"
-	}
-
 	return &mockImage{
-		d: d,
-		r: r,
-		n: name,
+		d:    d,
+		r:    r,
+		c:    val,
+		repl: repl,
 	}, nil
 }
 
 func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
-	name := fmt.Sprintf("mix(%s,%s)", NiceColourName(color1), NiceColourName(color3))
+	c1 := draw.WithAlpha(color1, 0x3f) >> 8
+	c3 := draw.WithAlpha(color3, 0xbf) >> 8
+	c := ((c1 + c3) << 8) | 0xff
+
 	return &mockImage{
-		d: d,
-		n: name,
+		d:    d,
+		r:    image.Rect(0, 0, 1, 1),
+		repl: true,
+		c:    c,
 	}
 }
 
@@ -146,23 +153,28 @@ var _ = draw.Image((*mockImage)(nil))
 
 // mockImage implements draw.Image.
 type mockImage struct {
-	r image.Rectangle
-	d *mockDisplay
-	n string
+	r    image.Rectangle
+	d    *mockDisplay
+	n    string
+	c    draw.Color
+	repl bool
 }
 
-func newimageimpl(d *mockDisplay, name string, r image.Rectangle) draw.Image {
+// newimage creates a new mockImage. Use Notacolor for the situation
+// where the name of the image takes precedence.
+func newimageimpl(d *mockDisplay, name string, c draw.Color, r image.Rectangle) draw.Image {
 	return &mockImage{
 		r: r,
-		n: name,
 		d: d,
+		c: c,
+		n: name,
 	}
 }
 
 // NewImage returns a mock draw.Image with the given bounds.
 func NewImage(display draw.Display, name string, r image.Rectangle) draw.Image {
 	d := display.(*mockDisplay)
-	return newimageimpl(d, name, r)
+	return newimageimpl(d, name, draw.Notacolor, r)
 }
 
 func (i *mockImage) Display() draw.Display { return i.d }
@@ -219,11 +231,11 @@ func pointochars(p image.Point) string {
 func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point) {
 	srcname := "nil"
 	if msrc, ok := src.(*mockImage); ok {
-		srcname = msrc.n
+		srcname = msrc.N()
 	}
 	maskname := "nil"
 	if mmask, ok := src.(*mockImage); ok {
-		maskname = mmask.n
+		maskname = mmask.N()
 	}
 
 	op := fmt.Sprintf("%s <- draw r: %v src: %s mask %s p1: %v",
@@ -233,6 +245,11 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 		maskname,
 		p1,
 	)
+
+	// It's arguable that my logic to separate blit from fill is slightly
+	// specious. The actual draw API deosn't (rightly) differentiate between
+	// these and the distinction that I'm creating is only to make nicer test
+	// output.
 	switch {
 	case i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && srcname == i.n:
 		sr := r.Sub(r.Min).Add(p1)
@@ -253,7 +270,7 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 			))
 			i.d.annotations = append(i.d.annotations, op)
 		}
-	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && src.R().Dx() == 0 && src.R().Dy() == 0:
+	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname:
 		op = fmt.Sprintf("fill %v %s",
 			r, rectochars(r),
 		)
@@ -266,6 +283,7 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 				len(i.d.svgdrawops),
 				r,
 				i.d.rectofi,
+				src,
 			))
 			i.d.annotations = append(i.d.annotations, op)
 		}
@@ -321,6 +339,26 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 }
 
 func (i *mockImage) Free() error { return nil }
+
+// N returns a nicename for the image colour.
+func (i *mockImage) N() string {
+	name := i.n
+	if i.c != draw.Notacolor {
+		name = fmt.Sprintf("%s-%v", NiceColourName(i.c), i.r)
+	}
+
+	if i.repl {
+		name += ",tiled"
+	}
+	return name
+}
+
+func (i *mockImage) HtmlString() string {
+	if i.c == draw.Notacolor {
+		return "white"
+	}
+	return fmt.Sprintf("#%x", i.c>>8)
+}
 
 var _ = draw.Font((*mockFont)(nil))
 

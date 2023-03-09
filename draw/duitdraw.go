@@ -21,10 +21,12 @@ const (
 	KeyRight    = draw.KeyRight
 	KeyUp       = draw.KeyUp
 
+	Black         = draw.Black
 	Darkyellow    = draw.Darkyellow
 	Medblue       = draw.Medblue
 	Nofill        = draw.Nofill
 	Notacolor     = draw.Notacolor
+	Opaque        = draw.Opaque
 	Palebluegreen = draw.Palebluegreen
 	Palegreygreen = draw.Palegreygreen
 	Paleyellow    = draw.Paleyellow
