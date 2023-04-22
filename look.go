@@ -320,9 +320,64 @@ func cleanrname(rs []rune) []rune {
 	return r
 }
 
+// PAL: If our q1==q0 selection is within ' chars, we check if it's a filename, otherwise fall
+// back to our original selection code.
+func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
+	qq0 = q0
+	qq1 = q0
+	for qq0 > 0 {
+		c := t.ReadC(qq0)
+		if c == '\'' {
+			qq0++
+			break
+		}
+		if !isfilec(c) && c != ' ' && c != '\t' {
+			return q0, q0 // No quote found left.
+		}
+		qq0--
+	}
+	for qq1 < t.file.Nr() {
+		c := t.ReadC(qq1 - 1)
+		if c == '\'' {
+			qq1-- 	// remove final quote
+			break
+		}
+		if !isfilec(c) && c != ' ' && c != '\t' {
+			return q0, q0 // No quote found left.
+		}
+		qq1++
+	}
+	return qq0, qq1
+}
+
 func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	amax := q1
 	if q1 == q0 {
+		// Check for being in a quoted string, find out if its a file.
+		qq0, qq1 := findquotedcontext(t, q0)
+		if qq0 != qq1 {
+			if expandfile(t, qq0, qq1, e) {
+				// We have a file.  If we have a colon following our qq1+1 quote
+				// we have to get it and add it to Expand.
+				// Invariant: qq0-1 and qq1 + 1 are '
+				cq1 := qq1+1
+				c := t.ReadC(cq1)
+				if c != ':' {  // We don't have any address information here.  Just return e.
+					return true
+				}
+				cq1++ 
+				// collect the address
+				e.a0 = cq1
+				for cq1 < t.file.Nr() {
+					c := t.ReadC(cq1)
+					if !isaddrc(c) && !isregexc(c) {
+						break
+					}
+					cq1++
+				}
+				e.a1 = cq1
+			}
+		} 
 		colon := int(-1)
 		// TODO(rjk): utf8 conversion work.
 		for q1 < t.file.Nr() {
@@ -478,10 +533,12 @@ func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
 
 func lookfile(s string) *Window {
 	// avoid terminal slash on directories
+	s = file.UnquoteFilename(s)
 	s = strings.TrimRight(s, "/")
 	for _, c := range global.row.col {
 		for _, w := range c.w {
-			k := strings.TrimRight(w.body.file.Name(), "/")
+			name := file.UnquoteFilename(w.body.file.Name())
+			k := strings.TrimRight(name, "/")
 			if k == s {
 				cur, ok := w.body.file.GetCurObserver().(*Text)
 				if !ok {

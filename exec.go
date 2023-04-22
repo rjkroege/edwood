@@ -583,6 +583,7 @@ func put(et *Text, _0 *Text, argt *Text, _1 bool, _2 bool, arg string) {
 		warning(nil, "no file name\n")
 		return
 	}
+	name = file.UnquoteFilename(name)
 	putfile(w.body.file, 0, f.Nr(), name)
 	xfidlog(w, "put")
 }

@@ -44,12 +44,38 @@ func (w *Window) ParseTag() string {
 	fnr := make([]rune, w.tagfilenameend)
 	w.tag.file.Read(0, fnr)
 	sfnr := string(fnr)
+	if len(sfnr) > 0 && sfnr[0] == '\'' {
+		return file.UnquoteFilename(sfnr)
+	}
 	return sfnr
 }
 
 // TODO(rjk): Consider using a regexp for this function?
+// returns the filename text scraped from the tag, including any quoting.
 func parsetaghelper(tag string) string {
 	// " |" or "\t|" ends left half of tag
+	// PAL: Filenames start at the start of the tag.  A filename in the tag may be
+	// surrounded by single quotes, at which time the filename ends at the matching quote.
+	// Otherwise the filename ends at the first space.
+	if len(tag) == 0 {
+		return ""
+	}
+	if tag[0] == '\'' {
+		endquoteidx := strings.Index(tag[1:], "'")
+		if  endquoteidx >= 0 {
+			return tag[0:endquoteidx+2]
+		}
+	}
+
+	// The filename ends at a space
+	endidx := strings.IndexAny(tag, " \t")
+	if endidx == -1 {
+		// our tag is all one word.  Unusual, but ok.
+		return tag
+	}
+	return tag[0:endidx]
+/*
+
 	// If we find " Del Snarf" in the left half of the tag
 	// (before the pipe), that ends the file name.
 	pipe := strings.Index(tag, " |")
@@ -66,6 +92,7 @@ func parsetaghelper(tag string) string {
 		return tag[:i]
 	}
 	return tag
+*/
 }
 
 // NB the sequencing: carefully. actions happen on the body. The result
@@ -171,11 +198,11 @@ func (w *Window) setTag1() {
 	// number of calls to setTag1.
 
 	var sb strings.Builder
-	sb.WriteString(w.body.file.Name())
+	sb.WriteString(file.QuoteFilename(w.body.file.Name()))
 	sb.WriteString(Ldelsnarf)
 
 	oldfnend := w.tagfilenameend
-	w.tagfilenameend = utf8.RuneCountInString(w.body.file.Name())
+	w.tagfilenameend = utf8.RuneCountInString(file.QuoteFilename(w.body.file.Name()))
 
 	if w.filemenu {
 		if w.body.file.HasUndoableChanges() {

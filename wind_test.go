@@ -85,13 +85,13 @@ func TestWindowParseTag(t *testing.T) {
 		filename string
 	}{
 		{"/foo/bar.txt Del Snarf | Look", "/foo/bar.txt"},
-		{"/foo/bar quux.txt Del Snarf | Look", "/foo/bar quux.txt"},
+		{"'/foo/bar quux.txt' Del Snarf | Look", "'/foo/bar quux.txt'"},
 		{"/foo/bar.txt", "/foo/bar.txt"},
 		{"/foo/bar.txt | Look", "/foo/bar.txt"},
 		{"/foo/bar.txt Del Snarf\t| Look", "/foo/bar.txt"},
 		{"/foo/bar.txt Del Snarf Del Snarf", "/foo/bar.txt"},
-		{"/foo/bar.txt  Del Snarf", "/foo/bar.txt "},
-		{"/foo/b|ar.txt  Del Snarf", "/foo/b|ar.txt "},
+		{"'/foo/bar.txt ' Del Snarf", "'/foo/bar.txt '"},
+		{"'/foo/b|ar.txt ' Del Snarf", "'/foo/b|ar.txt '"},
 	} {
 		if got, want := parsetaghelper(tc.tag), tc.filename; got != want {
 			t.Errorf("tag %q has filename %q; want %q", tc.tag, got, want)

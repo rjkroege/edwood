@@ -369,6 +369,9 @@ func getDirNames(f *os.File) ([]string, error) {
 		}
 	}
 	sort.Strings(names)
+	for i := range names {
+		names[i] = file.QuoteFilename(names[i])
+	}
 	return names, nil
 }
 
@@ -1636,6 +1639,7 @@ func (t *Text) dirName(name string) string {
 		return name
 	}
 	spl := t.w.ParseTag()
+
 	if !strings.HasSuffix(spl, string(filepath.Separator)) {
 		spl = filepath.Dir(spl)
 	}
