@@ -304,10 +304,7 @@ func search(ct *Text, r []rune) bool {
 
 func isfilespace(r rune) bool {
 	Lx := " \t"
-	if strings.ContainsRune(Lx, r) {
-		return true
-	}
-	return false
+	return strings.ContainsRune(Lx, r)
 }
 
 func isfilec(r rune) bool {
