@@ -307,7 +307,7 @@ func (e *ObservableEditableBuffer) Insert(p0 OffsetTuple, s []byte, nr int) {
 }
 
 func QuoteFilename(name string) string {
-	if strings.ContainsAny(name, " \t\\") {
+	if strings.ContainsAny(name, " \t") {
 		return "'" + name + "'"
 	}
 	return name
