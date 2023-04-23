@@ -325,6 +325,7 @@ func cleanrname(rs []rune) []rune {
 func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	qq0 = q0
 	qq1 = q0
+	foundquote := false
 	for qq0 > 0 {
 		c := t.ReadC(qq0)
 		if c == '\'' {
@@ -336,6 +337,7 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 		}
 		qq0--
 	}
+	if !foundquote { return q0, q0 }
 	for qq1 < t.file.Nr() {
 		c := t.ReadC(qq1 - 1)
 		if c == '\'' {
