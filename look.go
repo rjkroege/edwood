@@ -302,6 +302,14 @@ func search(ct *Text, r []rune) bool {
 
 }
 
+func isfilespace(r rune) bool {
+	Lx := " \t"
+	if strings.ContainsRune(Lx, r) {
+		return true
+	}
+	return false
+}
+
 func isfilec(r rune) bool {
 	Lx := ".-+/:@"
 	if isalnum(r) {
@@ -321,19 +329,19 @@ func cleanrname(rs []rune) []rune {
 }
 
 // PAL: If our q1==q0 selection is within ' chars, we check if it's a filename, otherwise fall
-// back to our original selection code.
+// back to our original selection code.  Returns the quoted string.
 func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	qq0 = q0
 	qq1 = q0
 	foundquote := false
-	for qq0 > 0 {
+	for qq0 >= 0 {
 		c := t.ReadC(qq0)
 		if c == '\'' {
-			qq0++
+			foundquote = true
 			break
 		}
-		if !isfilec(c) && c != ' ' && c != '\t' {
-			return q0, q0 // No quote found left.
+		if !isfilec(c) && !isfilespace(c) {
+			return q0, q0 // No quote found leftward.
 		}
 		qq0--
 	}
@@ -343,11 +351,10 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	for qq1 < t.file.Nr() {
 		c := t.ReadC(qq1 - 1)
 		if c == '\'' {
-			qq1-- // remove final quote
 			break
 		}
-		if !isfilec(c) && c != ' ' && c != '\t' {
-			return q0, q0 // No quote found left.
+		if !isfilec(c) && !isfilespace(c) {
+			return q0, q0 // No quote found rightwards.
 		}
 		qq1++
 	}
@@ -360,11 +367,11 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		// Check for being in a quoted string, find out if its a file.
 		qq0, qq1 := findquotedcontext(t, q0)
 		if qq0 != qq1 {
-			if expandfile(t, qq0, qq1, e) {
+			// Invariant: qq0 and qq1-1 are '
+			if expandfile(t, qq0+1, qq1-1, e) {
 				// We have a file.  If we have a colon following our qq1+1 quote
 				// we have to get it and add it to Expand.
-				// Invariant: qq0-1 and qq1 + 1 are '
-				cq1 := qq1 + 1
+				cq1 := qq1
 				c := t.ReadC(cq1)
 				if c != ':' { // We don't have any address information here.  Just return e.
 					return true
@@ -374,65 +381,71 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				e.a0 = cq1
 				for cq1 < t.file.Nr() {
 					c := t.ReadC(cq1)
-					if !isaddrc(c) && !isregexc(c) {
+					if !isaddrc(c) && !isregexc(c) && c != '\'' {
 						break
 					}
 					cq1++
 				}
 				e.a1 = cq1
+				q0 = qq0
+				q1 = cq1
+				e.q0 = q0
+				e.q1 = q1
+				return true
 			}
-		}
-		colon := int(-1)
-		// TODO(rjk): utf8 conversion work.
-		for q1 < t.file.Nr() {
-			c := t.ReadC(q1)
-			if !isfilec(c) {
-				break
+		} else {
+			colon := int(-1)
+			// TODO(rjk): utf8 conversion work.
+			for q1 < t.file.Nr() {
+				c := t.ReadC(q1)
+				if !isfilec(c) && !isfilespace(c) {
+					break
+				}
+				if c == ':' {
+					colon = q1
+					break
+				}
+				q1++
 			}
-			if c == ':' {
-				colon = q1
-				break
+			for q0 > 0 {
+				c := t.ReadC(q0 - 1)
+				if !isfilec(c) && !isaddrc(c) && !isregexc(c) {
+					break
+				}
+				if colon < 0 && c == ':' {
+					colon = q0 - 1
+				}
+				q0--
 			}
-			q1++
-		}
-		for q0 > 0 {
-			c := t.ReadC(q0 - 1)
-			if !isfilec(c) && !isaddrc(c) && !isregexc(c) {
-				break
+			// if it looks like it might begin file: , consume address chars after :
+			// otherwise terminate expansion at :
+			if colon >= 0 {
+				q1 = colon
+				if colon < t.file.Nr()-1 {
+					c := t.ReadC(colon + 1)
+					if isaddrc(c) {
+						q1 = colon + 1
+						for q1 < t.file.Nr() {
+							c := t.ReadC(q1)
+							if !isaddrc(c) {
+								break
+							}
+							q1++
+						}
+					}
+				}
 			}
-			if colon < 0 && c == ':' {
-				colon = q0 - 1
-			}
-			q0--
-		}
-		// if it looks like it might begin file: , consume address chars after :
-		// otherwise terminate expansion at :
-		if colon >= 0 {
-			q1 = colon
-			if colon < t.file.Nr()-1 {
-				c := t.ReadC(colon + 1)
-				if isaddrc(c) {
-					q1 = colon + 1
-					for q1 < t.file.Nr() {
-						c := t.ReadC(q1)
-						if !isaddrc(c) {
+			if q1 > q0 {
+				if colon >= 0 { // stop at white space
+					for amax = colon + 1; amax < t.file.Nr(); amax++ {
+						c := t.ReadC(amax)
+						if c == ' ' || c == '\t' || c == '\n' {
 							break
 						}
-						q1++
 					}
+				} else {
+					amax = t.file.Nr()
 				}
-			}
-		}
-		if q1 > q0 {
-			if colon >= 0 { // stop at white space
-				for amax = colon + 1; amax < t.file.Nr(); amax++ {
-					c := t.ReadC(amax)
-					if c == ' ' || c == '\t' || c == '\n' {
-						break
-					}
-				}
-			} else {
-				amax = t.file.Nr()
 			}
 		}
 	}
