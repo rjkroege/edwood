@@ -316,7 +316,7 @@ func QuoteFilename(name string) string {
 func UnquoteFilename(s string) string {
 	if len(s) > 0 && s[0] == '\'' {
 		if s[len(s)-1] == '\'' {
-			return s[1:len(s)-1]
+			return s[1 : len(s)-1]
 		}
 	}
 	return s
