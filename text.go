@@ -370,7 +370,7 @@ func getDirNames(f *os.File) ([]string, error) {
 	}
 	sort.Strings(names)
 	for i := range names {
-		names[i] = file.QuoteFilename(names[i])
+		names[i] = QuoteFilename(names[i])
 	}
 	return names, nil
 }
@@ -1666,4 +1666,22 @@ func (t *Text) AbsDirName(name string) string {
 // debugging.
 func (t *Text) DebugString() string {
 	return fmt.Sprintf("t.what (kind): %s contents: %q", t.what, t.file.String())
+}
+
+// TODO(PAL): This probably wants to check for ' in the filename
+// and escape it - that would mean understanding \ escapes in Look.
+func QuoteFilename(name string) string {
+	if strings.ContainsAny(name, " \t") {
+		return "'" + name + "'"
+	}
+	return name
+}
+
+func UnquoteFilename(s string) string {
+	if len(s) > 0 && s[0] == '\'' {
+		if s[len(s)-1] == '\'' {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }

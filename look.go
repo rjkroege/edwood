@@ -537,11 +537,11 @@ func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
 
 func lookfile(s string) *Window {
 	// avoid terminal slash on directories
-	s = file.UnquoteFilename(s)
+	s = UnquoteFilename(s)
 	s = strings.TrimRight(s, "/")
 	for _, c := range global.row.col {
 		for _, w := range c.w {
-			name := file.UnquoteFilename(w.body.file.Name())
+			name := UnquoteFilename(w.body.file.Name())
 			k := strings.TrimRight(name, "/")
 			if k == s {
 				cur, ok := w.body.file.GetCurObserver().(*Text)

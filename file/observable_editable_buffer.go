@@ -306,22 +306,6 @@ func (e *ObservableEditableBuffer) Insert(p0 OffsetTuple, s []byte, nr int) {
 	e.inserted(p0, s, nr)
 }
 
-func QuoteFilename(name string) string {
-	if strings.ContainsAny(name, " \t") {
-		return "'" + name + "'"
-	}
-	return name
-}
-
-func UnquoteFilename(s string) string {
-	if len(s) > 0 && s[0] == '\'' {
-		if s[len(s)-1] == '\'' {
-			return s[1 : len(s)-1]
-		}
-	}
-	return s
-}
-
 // SetName sets the name of the backing for this file. Some backing names
 // are "virtual": the name is displayed in the ObservableEditableBuffer's
 // corresponding tag but there is no backing. Setting e's name to its

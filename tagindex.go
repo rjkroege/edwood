@@ -45,7 +45,7 @@ func (w *Window) ParseTag() string {
 	w.tag.file.Read(0, fnr)
 	sfnr := string(fnr)
 	if len(sfnr) > 0 && sfnr[0] == '\'' {
-		return file.UnquoteFilename(sfnr)
+		return UnquoteFilename(sfnr)
 	}
 	return sfnr
 }
@@ -202,11 +202,11 @@ func (w *Window) setTag1() {
 	// number of calls to setTag1.
 
 	var sb strings.Builder
-	sb.WriteString(file.QuoteFilename(w.body.file.Name()))
+	sb.WriteString(QuoteFilename(w.body.file.Name()))
 	sb.WriteString(Ldelsnarf)
 
 	oldfnend := w.tagfilenameend
-	w.tagfilenameend = utf8.RuneCountInString(file.QuoteFilename(w.body.file.Name()))
+	w.tagfilenameend = utf8.RuneCountInString(QuoteFilename(w.body.file.Name()))
 
 	if w.filemenu {
 		if w.body.file.HasUndoableChanges() {
