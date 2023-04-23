@@ -62,8 +62,8 @@ func parsetaghelper(tag string) string {
 	}
 	if tag[0] == '\'' {
 		endquoteidx := strings.Index(tag[1:], "'")
-		if  endquoteidx >= 0 {
-			return tag[0:endquoteidx+2]
+		if endquoteidx >= 0 {
+			return tag[0 : endquoteidx+2]
 		}
 	}
 
@@ -74,25 +74,29 @@ func parsetaghelper(tag string) string {
 		return tag
 	}
 	return tag[0:endidx]
-/*
+	/*
+	   // If we find " Del Snarf" in the left half of the tag
+	   // (before the pipe), that ends the file name.
+	   pipe := strings.Index(tag, " |")
 
-	// If we find " Del Snarf" in the left half of the tag
-	// (before the pipe), that ends the file name.
-	pipe := strings.Index(tag, " |")
-	if i := strings.Index(tag, "\t|"); i >= 0 && (pipe < 0 || i < pipe) {
-		pipe = i
-	}
-	// It's arguable that we should not permit the creation of filenames with
-	// a trailing space in their names because the likelihood of doing this
-	// by accident is higher than the number of times that this is desirable.
-	if i := strings.Index(tag, " Del Snarf"); i >= 0 && (pipe < 0 || i < pipe) {
-		return tag[:i]
-	}
-	if i := strings.IndexAny(tag, " \t"); i >= 0 {
-		return tag[:i]
-	}
-	return tag
-*/
+	   	if i := strings.Index(tag, "\t|"); i >= 0 && (pipe < 0 || i < pipe) {
+	   		pipe = i
+	   	}
+
+	   // It's arguable that we should not permit the creation of filenames with
+	   // a trailing space in their names because the likelihood of doing this
+	   // by accident is higher than the number of times that this is desirable.
+
+	   	if i := strings.Index(tag, " Del Snarf"); i >= 0 && (pipe < 0 || i < pipe) {
+	   		return tag[:i]
+	   	}
+
+	   	if i := strings.IndexAny(tag, " \t"); i >= 0 {
+	   		return tag[:i]
+	   	}
+
+	   return tag
+	*/
 }
 
 // NB the sequencing: carefully. actions happen on the body. The result

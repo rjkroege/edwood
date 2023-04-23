@@ -9,8 +9,8 @@ func TestParseTagHelper(t *testing.T) {
 		offered, expected string
 	}{
 		{"''", "''"},
-		{"This is a busted tag Del Snarf | Look","This"},
-		{"'This is a newfangled tag' Del Snarf | Look","'This is a newfangled tag'"},
+		{"This is a busted tag Del Snarf | Look", "This"},
+		{"'This is a newfangled tag' Del Snarf | Look", "'This is a newfangled tag'"},
 	}
 
 	for _, v := range tests {

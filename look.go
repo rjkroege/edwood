@@ -337,11 +337,13 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 		}
 		qq0--
 	}
-	if !foundquote { return q0, q0 }
+	if !foundquote {
+		return q0, q0
+	}
 	for qq1 < t.file.Nr() {
 		c := t.ReadC(qq1 - 1)
 		if c == '\'' {
-			qq1-- 	// remove final quote
+			qq1-- // remove final quote
 			break
 		}
 		if !isfilec(c) && c != ' ' && c != '\t' {
@@ -362,12 +364,12 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				// We have a file.  If we have a colon following our qq1+1 quote
 				// we have to get it and add it to Expand.
 				// Invariant: qq0-1 and qq1 + 1 are '
-				cq1 := qq1+1
+				cq1 := qq1 + 1
 				c := t.ReadC(cq1)
-				if c != ':' {  // We don't have any address information here.  Just return e.
+				if c != ':' { // We don't have any address information here.  Just return e.
 					return true
 				}
-				cq1++ 
+				cq1++
 				// collect the address
 				e.a0 = cq1
 				for cq1 < t.file.Nr() {
@@ -379,7 +381,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				}
 				e.a1 = cq1
 			}
-		} 
+		}
 		colon := int(-1)
 		// TODO(rjk): utf8 conversion work.
 		for q1 < t.file.Nr() {
