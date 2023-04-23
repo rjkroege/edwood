@@ -331,9 +331,29 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	qq0 = q0
 	qq1 = q0
 	foundquote := false
+	foundcolon := false
 	for qq0 >= 0 {
 		c := t.ReadC(qq0)
+		if c == ':' {
+			// We are looking for the case where the click
+			// happened in an address, in which case we aren't (yet)
+			// in a quoted context.
+			foundcolon = true
+			qq0--
+			continue
+		}
+		if foundcolon && !foundquote && c != '\'' {
+			qq0++
+			break
+		}
 		if c == '\'' {
+			if foundcolon {
+				foundquote = true
+				foundcolon = false // we no longer care about the colon
+				qq1 = qq0          // Make the search rightward start from within the quotes.
+				qq0--
+				continue // Keep marching leftwards;
+			}
 			foundquote = true
 			break
 		}

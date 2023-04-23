@@ -38,6 +38,8 @@ func TestExpand(t *testing.T) {
 		name string
 		addr string
 	}{
+		{true, 0, "'testdata/has a space in name.txt':42", 36, "'testdata/has a space in name.txt':42", "testdata/has a space in name.txt", "42"},
+
 		{true, 0, "'testdata/has a space in name.txt':42", 2, "'testdata/has a space in name.txt':42", "testdata/has a space in name.txt", "42"},
 		{false, 0, "     ", 2, "", "", ""},
 		{false, 0, "@@@@", 2, "", "", ""},
