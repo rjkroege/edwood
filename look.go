@@ -391,6 +391,8 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				cq1 := qq1
 				c := t.ReadC(cq1)
 				if c != ':' { // We don't have any address information here.  Just return e.
+					e.q0 = qq0
+					e.q1 = qq1
 					return true
 				}
 				cq1++
