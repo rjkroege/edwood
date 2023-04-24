@@ -415,7 +415,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 			// TODO(rjk): utf8 conversion work.
 			for q1 < t.file.Nr() {
 				c := t.ReadC(q1)
-				if !isfilec(c) && !isfilespace(c) {
+				if !isfilec(c) {
 					break
 				}
 				if c == ':' {

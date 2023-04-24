@@ -41,6 +41,7 @@ func TestExpand(t *testing.T) {
 		{true, 0, "'testdata/has a space in name.txt':42", 36, "'testdata/has a space in name.txt':42", "testdata/has a space in name.txt", "42"},
 
 		{true, 0, "'testdata/has a space in name.txt':42", 2, "'testdata/has a space in name.txt':42", "testdata/has a space in name.txt", "42"},
+		{true, 0, "look_test.go ", 2, "look_test.go", "look_test.go", ""},
 		{false, 0, "     ", 2, "", "", ""},
 		{false, 0, "@@@@", 2, "", "", ""},
 		{true, 0, "hello", 2, "hello", "", ""},
