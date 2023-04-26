@@ -1,4 +1,5 @@
 //go:build windows
+
 package main
 
 import (
@@ -38,7 +39,9 @@ func getline(t *Text, q0 int) (qq0, qq1 int) {
 func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	// Let's try a radical departure.  Start by getting a line.
 	qq0, qq1 = getline(t, q0)
-	if qq1 == qq0 { return q0, q0 }
+	if qq1 == qq0 {
+		return q0, q0
+	}
 
 	n := qq1 - qq0
 	rb := make([]rune, n)
@@ -48,7 +51,7 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	for _, pair := range found {
 		// qq0 is zero of the range returned.
 		// The match is thus at qq0+pair[0:1], and (q0-qq0) must fall in that range
-		if q0-qq0 >= pair[0] && q0 - qq0 <= pair[1] {
+		if q0-qq0 >= pair[0] && q0-qq0 <= pair[1] {
 			return pair[0] + qq0, pair[1] + qq0
 		}
 	}
@@ -74,9 +77,9 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		for i, pair := range found {
 			// qq0 is zero of the range returned.
 			// The match is thus at qq0+pair[0:1], and (q0-qq0) must fall in that range
-			if q0-qq0 >= pair[0] && q0 - qq0 <= pair[1] {
-				q0, q1 = pair[0] + qq0, pair[1] + qq0
-				found = found[i:i+1]
+			if q0-qq0 >= pair[0] && q0-qq0 <= pair[1] {
+				q0, q1 = pair[0]+qq0, pair[1]+qq0
+				found = found[i : i+1]
 				break
 			}
 		}
@@ -107,7 +110,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	amin := amax
 	filename := ""
 	if found != nil && found[0][4] != -1 {
-		nname = found[0][5]-found[0][4] 
+		nname = found[0][5] - found[0][4]
 		filename = string(rb[found[0][4]:found[0][5]])
 		e.q0 = q0 + found[0][4]
 		e.q1 = q1 + found[0][5]

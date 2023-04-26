@@ -1,4 +1,5 @@
 //go:build !windows
+
 package main
 
 // PAL: If our q1==q0 selection is within ' chars, we check if it's a filename, otherwise fall
