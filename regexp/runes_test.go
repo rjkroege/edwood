@@ -70,10 +70,7 @@ func TestRegexpBackward(t *testing.T) {
 func runRunesTests(t *testing.T, tt []runesTest, matcher func(*Regexp, *runesTest) [][]int) {
 	for i, tc := range tt {
 		t.Run(fmt.Sprintf("test-%02d", i), func(t *testing.T) {
-			re, err := CompileAcme(tc.re)
-			if err != nil {
-				t.Fatalf("failed to compile regular expression %q", tc.re)
-			}
+			re := MustCompileAcme(tc.re)
 			rs := matcher(re, &tc)
 			if !reflect.DeepEqual(rs, tc.expected) {
 				t.Errorf("regexp %q incorrectly matches %q[%v:%v]:\nexpected: %#v\ngot: %#v",
