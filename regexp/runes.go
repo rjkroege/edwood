@@ -16,7 +16,7 @@ func CompileAcme(expr string) (*Regexp, error) {
 	return compile(expr, syntax.Perl&^syntax.OneLine, false)
 }
 
-func MustCompileAcme(expr string) (*Regexp) {
+func MustCompileAcme(expr string) *Regexp {
 	if re, err := CompileAcme(expr); err != nil {
 		panic(err)
 	} else {

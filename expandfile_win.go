@@ -10,6 +10,11 @@ import (
 // back to our original selection code.  Returns the quoted string.
 
 // Interesting parts: Group 2 is the filename/name, group 9 is the address
+const (
+	filenameGroup = 2
+	addressGroup  = 9
+)
+
 var filenameRE = regexp.MustCompileAcme(`((([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?[^<>:*|?"'\n]*)*))(:([0-9]+|(/[^ ']+)))?`)
 
 // Interesting parts: Group 2 is the path/name; group 9 is the address
@@ -109,15 +114,15 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	amax := q1
 	amin := amax
 	filename := ""
-	if found != nil && found[0][4] != -1 {
-		nname = found[0][5] - found[0][4]
-		filename = string(rb[found[0][4]:found[0][5]])
-		e.q0 = q0 + found[0][4]
-		e.q1 = q1 + found[0][5]
+	if found != nil && found[0][2*filenameGroup] != -1 {
+		nname = found[0][2*filenameGroup+1] - found[0][2*filenameGroup]
+		filename = string(rb[found[0][2*filenameGroup]:found[0][2*filenameGroup+1]])
+		e.q0 = q0 + found[0][2*filenameGroup]
+		e.q1 = q1 + found[0][2*filenameGroup+1]
 	}
-	if found != nil && found[0][18] != -1 {
-		amin = found[0][18] + q0
-		amax = found[0][19] + q0
+	if found != nil && found[0][2*addressGroup] != -1 {
+		amin = found[0][2*addressGroup] + q0
+		amax = found[0][2*addressGroup+1] + q0
 		e.a0 = amin
 		e.a1 = amax
 	}
