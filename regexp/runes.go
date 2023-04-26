@@ -16,6 +16,14 @@ func CompileAcme(expr string) (*Regexp, error) {
 	return compile(expr, syntax.Perl&^syntax.OneLine, false)
 }
 
+func MustCompileAcme(expr string) *Regexp {
+	if re, err := CompileAcme(expr); err != nil {
+		panic(err)
+	} else {
+		return re
+	}
+}
+
 // FindForward is similar to FindAllSubmatchIndex but searches
 // r[start:end], taking care to match ^ and $ correctly.
 func (re *Regexp) FindForward(r []rune, start int, end int, n int) [][]int {
