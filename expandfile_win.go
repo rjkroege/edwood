@@ -19,7 +19,7 @@ var filenameRE = regexp.MustCompileAcme(`((([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?
 
 // Interesting parts: Group 2 is the path/name; group 9 is the address
 
-var quotedfilenameRE = regexp.MustCompileAcme(`('([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?[^<>:*|?"\n]*)*')(:([0-9]+|(/[^ ']+)))?`)
+var quotedfilenameRE = regexp.MustCompileAcme(`('(([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?[^<>:*|?"'\n]*)*)')(:([0-9]+|(/[^ ']+)))?`)
 
 func getline(t *Text, q0 int) (qq0, qq1 int) {
 	qq0 = q0
@@ -107,15 +107,12 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	if found == nil {
 		return false
 	}
-	// Found now has a filename in group 2, address in group 9
-	nname := -1
 	e.q0 = q0
 	e.q1 = q1
 	amax := q1
 	amin := amax
 	filename := ""
 	if found != nil && found[0][2*filenameGroup] != -1 {
-		nname = found[0][2*filenameGroup+1] - found[0][2*filenameGroup]
 		filename = string(rb[found[0][2*filenameGroup]:found[0][2*filenameGroup+1]])
 		e.q0 = q0 + found[0][2*filenameGroup]
 		e.q1 = q1 + found[0][2*filenameGroup+1]
@@ -125,9 +122,6 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		amax = found[0][2*addressGroup+1] + q0
 		e.a0 = amin
 		e.a1 = amax
-	}
-	if nname == -1 {
-		nname = n
 	}
 	isFile := func(name string) bool {
 		e.name = name
