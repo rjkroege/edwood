@@ -53,6 +53,15 @@ func TestRegexpForward(t *testing.T) {
 	})
 }
 
+func TestMustCompileAcmePanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil  {
+			t.Errorf("Should have paniced")
+		}
+	}()
+	MustCompile(")")
+}
+
 func TestRegexpBackward(t *testing.T) {
 	tt := []runesTest{
 		{"aaaaa", 0, -1, "a", [][]int{{4, 5}, {3, 4}}, 2},
