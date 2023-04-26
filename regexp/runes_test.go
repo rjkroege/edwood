@@ -55,7 +55,7 @@ func TestRegexpForward(t *testing.T) {
 
 func TestMustCompileAcmePanics(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil  {
+		if r := recover(); r == nil {
 			t.Errorf("Should have paniced")
 		}
 	}()
