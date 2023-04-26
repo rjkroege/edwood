@@ -16,7 +16,7 @@ const (
 )
 
 // These REs are insufficiently restrictive.  In theory a windows filename
-// can have as many spaces as it wants.  But for a good experience we 
+// can have as many spaces as it wants.  But for a good experience we
 // want to limit it.  So we need to pre-process the ranges to chop off
 // at repeated whitespace.  This happens in getspan()
 var filenameRE = regexp.MustCompileAcme(`((([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?([^<>:*|?"'\n])*)*))(:([0-9]+|(/[^ ']+)))?`)
