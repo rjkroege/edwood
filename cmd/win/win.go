@@ -79,8 +79,8 @@ func (w *winWin) Printf(file string, format string, args ...interface{}) error {
 	return err
 }
 
-func (w winWin) israw() bool {
-	return (!w.cook && w.password) //&& !isecho(w.rcpty)
+func (w *winWin) israw() bool {
+	return (!w.cook && w.password) && !isecho(w.rcpty)
 }
 
 // Add text, either in the body, or at the not-yet-sent insertion point
@@ -242,7 +242,7 @@ func events(win *winWin) {
 			case 'I':
 				if e.Nr == 1 && e.Text[0] == 0x7F { // One key, it's 0x7F, delete
 					win.Printf("addr", "#%d,#%d", e.Q0, e.Q1)
-					win.Printf("data", "", 0)
+					win.Printf("data", "")
 					buf := []byte{0x7F}
 					win.rcpty.Write(buf)
 					break
