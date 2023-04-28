@@ -241,7 +241,7 @@ func events(win *winWin) {
 			switch e.C2 {
 			case 'I':
 				if e.Nr == 1 && e.Text[0] == 0x7F { // One key, it's 0x7F, delete
-					win.Printf("addr", "#%ud,#%ud", e.Q0, e.Q1)
+					win.Printf("addr", "#%d,#%d", e.Q0, e.Q1)
 					win.Printf("data", "", 0)
 					buf := []byte{0x7F}
 					win.rcpty.Write(buf)
