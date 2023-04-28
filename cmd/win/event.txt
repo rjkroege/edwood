@@ -1,0 +1,40 @@
+eventWhen a window’s event file is open, changes to the window occur as always but the actions are also reported as messages to the reader of the file. Also, user actions with buttons 2 and 3 (other than chorded Cut and Paste, which behave normally) have no immediate effect on the window; it is expected that the program reading the event file
+will interpret them. 
+The messages have a fixed format: 
+
+a character indicating the origin or cause of the action, 
+a character indicating the type of the action, 
+	four free-format blank-terminated decimal numbers, optional text, and a newline. 
+
+The first and second numbers are the character addresses of the action, 
+the third is a flag, and the final is a count of the characters in the optional text, which may itself contain newlines. 
+The origin characters are 
+	E for writes to the body or tag file, 
+	F for actions through the window’s other files, 
+	K for the keyboard, and 
+	M for the mouse. 
+
+The type characters are 
+	D for text deleted from the body, 
+	d for text deleted from the tag, 
+	I for text inserted to the body, 
+	i for text inserted to the tag, 
+	L for a button 3 action in the body, 
+	l for a button 3 action in the tag, 
+	X for a button 2 action in the body, and 
+	x for a button 2 action in the tag.
+
+If the relevant text has less than 256 characters, it is included in the message; otherwise it is elided, the fourth number is 0, and the program must read it from the data file if needed. No text is sent on a D or d message.
+
+For D, d, I, and i the flag is always zero. 
+For X and x, the flag is a bitwise OR (reported decimally) of the following: 
+	1 if the text indicated is recognized as an acme built-in command; 
+	2 if the text indicated is a null string that has a non-null expansion; if so, another complete message will follow describing the expansion exactly as if it had been indicated explicitly (its flag will always be 0); 
+	8 if the command has an extra (chorded) argument; if so, two more complete messages will follow reporting the argument (with all numbers 0 except the character count) and where it originated, in the form of a fully-qualified button 3 style address.
+
+For L and l, the flag is the bitwise OR of the following: 
+	1 if acme can interpret the action without loading a new file; 
+	2 if a second (post-expansion) message follows, analogous to that with X messages; 
+	4 if the text is a file or window name (perhaps with address) rather than plain literal text.
+
+For messages with the 1 bit on in the flag, writing the message back to the event file, but with the flag, count, and text omitted, will cause the action to be applied to the file exactly as it would have been if the event file had not been open.
