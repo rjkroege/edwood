@@ -21,7 +21,7 @@ func usage() {
 	os.Exit(0)
 }
 
-var debug = true
+var debug = false
 
 func debugf(format string, args ...interface{}) {
 	if debug {
@@ -45,7 +45,8 @@ type winWin struct {
 	rcpty *os.File
 	rctty *os.File
 
-	echo EchoManager
+	echo    EchoManager
+	sysname string
 }
 
 func NewWinWin() (*winWin, error) {
@@ -53,7 +54,8 @@ func NewWinWin() (*winWin, error) {
 	if err != nil {
 		return nil, err
 	}
-	win := &winWin{W: w, cook: true, typing: []rune{}, echo: NewEchoManager()}
+	// TODO(PAL): sysname
+	win := &winWin{W: w, cook: true, typing: []rune{}, echo: NewEchoManager(), sysname: "win"}
 	return win, nil
 }
 
@@ -159,7 +161,7 @@ lineloop:
 				}
 				w.p += len([]rune(string(w.typing[0:n])))
 				copy(w.typing[0:len(w.typing)-n], w.typing[n:])
-				w.typing = w.typing[0:len(w.typing)-n]
+				w.typing = w.typing[0 : len(w.typing)-n]
 				continue lineloop
 			}
 		}
@@ -326,7 +328,7 @@ func events(win *winWin) {
 
 			}
 		}
-		fmt.Printf("%#v\n", eToS(e))
+		debugf("%#v\n", eToS(e))
 		//win.WriteEvent(e)
 
 		win.Q.Unlock()
@@ -352,7 +354,7 @@ func startProcess(arg string, args []string, w *winWin) {
 		fmt.Fprintf(os.Stderr, "Error running: %v", err)
 	}
 
-	fmt.Println("Bash on pid %d\n", cmd.Process.Pid)
+	debugf("%s on pid %d\n", arg, cmd.Process.Pid)
 }
 
 func main() {
@@ -374,11 +376,13 @@ func main() {
 
 	win.W.Write("tag", []byte("Send"))
 
+	// TODO(PAL): Better selection of shell.
 	startProcess("rc", []string{"-i"}, win)
 	go win.stdoutproc()
 	events(win)
 }
 
+// TODO(PAL): Somehow redirection into /dev/tty isn't getting picked up by the read.
 func (w *winWin) stdoutproc() {
 	buf := make([]byte, 8192)
 
@@ -413,7 +417,7 @@ func (w *winWin) stdoutproc() {
 
 			input = squashnulls(input)
 
-			// n = label(input)  grabs escape sequences of some kind and uses them to set tag
+			input = w.label(input) // Processes the awd cookie
 
 			w.password = false
 			istring := string(input)
@@ -438,7 +442,7 @@ func (w *winWin) stdoutproc() {
 				fmt.Fprintf(os.Stderr, "Problem flushing body")
 			}
 			w.p += len([]rune(string(input)))
-			fmt.Fprintf(os.Stderr, "w.p == %d\n", w.p)
+			debugf("w.p == %d\n", w.p)
 			// Copy the partial to the front of the buffer
 			copy(buf, partialRune)
 			partialRune = partialRune[0:0]
@@ -554,4 +558,29 @@ func dropcr(p []rune) []rune {
 		r++
 	}
 	return p[:w]
+}
+
+// echo testname | awk '{printf("\033];%s\007", $0);}' >/dev/tty
+func (w *winWin) label(input []rune) []rune {
+	// Strip out the last segment of the form "\033];%s\007", form a window label from it,
+	// and send to ctl.
+
+	i := len(input) - 1
+	for ; i > 3 && input[i] != '\007'; i-- {
+	}
+	if i <= 3 {
+		return input
+	}
+	endOfString := i
+
+	for ; i > 0; i-- {
+		if input[i] == '\033' && input[i+1] == ']' && input[i+2] == ';' {
+			windowname := input[i:endOfString]
+			input = append(input[0:i], input[endOfString:]...)
+			w.Printf("ctl", "name %s/-%s", string(windowname), w.sysname)
+			return input
+		}
+	}
+
+	return input
 }
