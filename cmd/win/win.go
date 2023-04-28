@@ -78,8 +78,7 @@ func (w *winWin) Printf(file string, format string, args ...interface{}) error {
 }
 
 func (w winWin) israw() bool {
-
-	return !w.cook && w.password && !isecho(w.rcpty) // TODO(PAL)
+	return (!w.cook && w.password) //&& !isecho(w.rcpty)
 }
 
 // Add text, either in the body, or at the not-yet-sent insertion point
@@ -111,7 +110,7 @@ func (w *winWin) typetext(e *acme.Event) {
 		}
 	}
 	if w.israw() { // Obscure the text.
-		w.Printf("Addr", "#%d,#%d", e.Q0, e.Q1)
+		w.Printf("addr", "#%d,#%d", e.Q0, e.Q1)
 		w.W.Write("data", []byte(""))
 		w.p -= e.Q1 - e.Q0
 	}
@@ -160,6 +159,7 @@ lineloop:
 				}
 				w.p += len([]rune(string(w.typing[0:n])))
 				copy(w.typing[0:len(w.typing)-n], w.typing[n:])
+				w.typing = w.typing[0:len(w.typing)-n]
 				continue lineloop
 			}
 		}
@@ -415,8 +415,15 @@ func (w *winWin) stdoutproc() {
 
 			// n = label(input)  grabs escape sequences of some kind and uses them to set tag
 
-			// password elision here
-
+			w.password = false
+			istring := string(input)
+			if strings.Contains(strings.ToLower(istring), "password") || strings.Contains(strings.ToLower(istring), "passphrase") {
+				// remove trailing spaces
+				istring = strings.TrimRight(istring, " ")
+				w.password = len(istring) > 0 && istring[len(istring)-1] == ':'
+				debugf("password elision: %v\n", w.password)
+				input = []rune(istring)
+			}
 
 			w.Q.Lock()
 			//err := w.Printf("addr", "#%d", w.p)
