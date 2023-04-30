@@ -10,9 +10,9 @@ import (
 	"unicode/utf8"
 
 	"9fans.net/go/acme"
+	"github.com/creack/pty"
 	"github.com/pkg/term/termios"
 	"golang.org/x/sys/unix"
-	"github.com/creack/pty"
 )
 
 const termprog = "win"
@@ -331,16 +331,16 @@ func startProcess(arg string, args []string, w *winWin) {
 	cmd := exec.Command(arg, args...)
 	var err error
 	cmd.Env = append(os.Environ(), []string{"TERM=dumb"}...)
-/*
-	w.rcpty, w.rctty, err = termios.Pty()
-	if err != nil {
-		panic(err)
-	}
-	cmd.Stdout = w.rctty
-	cmd.Stderr = w.rctty
-	cmd.Stdin = w.rctty
-	err = cmd.Start()
-*/
+	/*
+		w.rcpty, w.rctty, err = termios.Pty()
+		if err != nil {
+			panic(err)
+		}
+		cmd.Stdout = w.rctty
+		cmd.Stderr = w.rctty
+		cmd.Stdin = w.rctty
+		err = cmd.Start()
+	*/
 	w.rcpty, err = pty.Start(cmd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running: %v", err)
@@ -504,7 +504,7 @@ func (echo *EchoManager) Cancel(input []rune) []rune {
 		break
 	}
 	copy(echo.buf, echo.buf[r:])
-	echo.buf = echo.buf[0:len(echo.buf)-r]
+	echo.buf = echo.buf[0 : len(echo.buf)-r]
 
 	return input[i:]
 }
@@ -568,9 +568,11 @@ func (w *winWin) label(input []rune) []rune {
 	endOfString := i
 	foundName := false
 	for ; i >= 0; i-- {
-		if input[i] == '-' { foundName = true }
+		if input[i] == '-' {
+			foundName = true
+		}
 		if input[i] == '\033' && input[i+1] == ']' && input[i+2] == ';' {
-			windowname := input[i+3:endOfString]
+			windowname := input[i+3 : endOfString]
 			if !foundName {
 				windowname = append(windowname, '/', '-')
 				windowname = append(windowname, []rune(w.sysname)...)
