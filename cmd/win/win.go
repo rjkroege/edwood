@@ -257,7 +257,6 @@ func events(win *winWin) {
 					//	fprint(2, "type... ");
 					win.typetext(e)
 				}
-				break
 
 			case 'D':
 				n := win.delete(e)
@@ -265,7 +264,6 @@ func events(win *winWin) {
 				if win.israw() && e.Q1 >= win.p+n {
 					win.sendbs(n)
 				}
-				break
 
 			case 'X', 'x':
 				/*
@@ -282,7 +280,6 @@ func events(win *winWin) {
 					/* send it straight back */
 					//fsfidprint(efd, "%c%c%d %d\n", e.c1, e.c2, e.q0, e.q1);
 					win.W.WriteEvent(e)
-					break
 				}
 				/*
 					if e.Q0 == e.Q1 && (e.Flag&2 != 0) {
@@ -313,16 +310,9 @@ func events(win *winWin) {
 
 			case 'l', 'L':
 				/* just send it back */
-				/*
-					if(e.flag & 2)
-						gete(efd, &e2);
-					fsfidprint(efd, "%c%c%d %d\n", e.c1, e.c2, e.q0, e.q1);
-					break;
-				*/
 				win.W.WriteEvent(e)
 
 			case 'd', 'i':
-				break
 
 			default:
 				fmt.Fprintf(os.Stderr, "Unknown event: %v\n", e)
