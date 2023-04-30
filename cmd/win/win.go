@@ -12,6 +12,7 @@ import (
 	"9fans.net/go/acme"
 	"github.com/pkg/term/termios"
 	"golang.org/x/sys/unix"
+	"github.com/creack/pty"
 )
 
 const termprog = "win"
@@ -338,8 +339,9 @@ func events(win *winWin) {
 
 func startProcess(arg string, args []string, w *winWin) {
 	cmd := exec.Command(arg, args...)
-
 	var err error
+	cmd.Env = append(os.Environ(), []string{"TERM=dumb"}...)
+/*
 	w.rcpty, w.rctty, err = termios.Pty()
 	if err != nil {
 		panic(err)
@@ -347,9 +349,9 @@ func startProcess(arg string, args []string, w *winWin) {
 	cmd.Stdout = w.rctty
 	cmd.Stderr = w.rctty
 	cmd.Stdin = w.rctty
-
-	cmd.Env = append(os.Environ(), []string{"TERM=dumb"}...)
 	err = cmd.Start()
+*/
+	w.rcpty, err = pty.Start(cmd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running: %v", err)
 	}
@@ -572,12 +574,17 @@ func (w *winWin) label(input []rune) []rune {
 		return input
 	}
 	endOfString := i
-
-	for ; i > 0; i-- {
+	foundName := false
+	for ; i >= 0; i-- {
+		if input[i] == '-' { foundName = true }
 		if input[i] == '\033' && input[i+1] == ']' && input[i+2] == ';' {
-			windowname := input[i:endOfString]
+			windowname := input[i+3:endOfString]
+			if !foundName {
+				windowname = append(windowname, '=')
+				windowname = append(windowname, []rune(w.sysname)...)
+			}
 			input = append(input[0:i], input[endOfString:]...)
-			w.Printf("ctl", "name %s/-%s", string(windowname), w.sysname)
+			w.Printf("ctl", "name %s\n", string(windowname))
 			return input
 		}
 	}
