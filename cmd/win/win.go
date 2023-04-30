@@ -379,7 +379,7 @@ func main() {
 	win.W.Write("tag", []byte("Send"))
 
 	// TODO(PAL): Better selection of shell.
-	startProcess("rc", []string{"-i"}, win)
+	startProcess("bash", []string{"-i"}, win)
 	go win.stdoutproc()
 	events(win)
 }
@@ -509,7 +509,8 @@ func (echo *EchoManager) Cancel(input []rune) []rune {
 		}
 		break
 	}
-	echo.buf = echo.buf[0:0]
+	copy(echo.buf, echo.buf[r:])
+	echo.buf = echo.buf[0:len(echo.buf)-r]
 
 	return input[i:]
 }
@@ -580,10 +581,10 @@ func (w *winWin) label(input []rune) []rune {
 		if input[i] == '\033' && input[i+1] == ']' && input[i+2] == ';' {
 			windowname := input[i+3:endOfString]
 			if !foundName {
-				windowname = append(windowname, '=')
+				windowname = append(windowname, '/', '-')
 				windowname = append(windowname, []rune(w.sysname)...)
 			}
-			input = append(input[0:i], input[endOfString:]...)
+			input = append(input[0:i], input[endOfString+1:]...)
 			w.Printf("ctl", "name %s\n", string(windowname))
 			return input
 		}
