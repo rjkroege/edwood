@@ -480,7 +480,7 @@ func min(l, r int) int {
 	return r
 }
 
-// Supress matching input from the echo manager buffer.
+// Suppress matching input from the echo manager buffer.
 func (echo *EchoManager) Cancel(input []rune) []rune {
 	echo.Lock()
 	defer echo.Unlock()
