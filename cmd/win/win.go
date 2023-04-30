@@ -328,8 +328,8 @@ func events(win *winWin) {
 func startProcess(arg string, args []string, w *winWin) {
 	cmd := exec.Command(arg, args...)
 	var err error
-	cmd.Env = append(os.Environ(), []string{"TERM=dumb", 
-				fmt.Sprintf("winid=%d", w.W.ID())}...)
+	cmd.Env = append(os.Environ(), []string{"TERM=dumb",
+		fmt.Sprintf("winid=%d", w.W.ID())}...)
 	/*
 		w.rcpty, w.rctty, err = termios.Pty()
 		if err != nil {
@@ -356,7 +356,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "win: Failed to open acme window\n")
 		os.Exit(0)
 	}
-	
+
 	pwd, _ := os.Getwd()
 	pwdSlash := strings.TrimSuffix(pwd, "/") + "/"
 	err = win.W.Name(pwdSlash + "+win")
