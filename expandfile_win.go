@@ -9,33 +9,49 @@ import (
 // PAL: If our q1==q0 selection is within ' chars, we check if it's a filename, otherwise fall
 // back to our original selection code.  Returns the quoted string.
 
-// Interesting parts: Group 2 is the filename/name, group 9 is the address
+// Interesting parts: Group 2 is the filename/name, group 10 is the address
 const (
 	filenameGroup = 2
-	addressGroup  = 9
+	addressGroup  = 10
 )
 
-var filenameRE = regexp.MustCompileAcme(`((([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?[^<>:*|?"'\n]*)*))(:([0-9]+|(/[^ ']+)))?`)
-
-// Interesting parts: Group 2 is the path/name; group 9 is the address
+// These REs are insufficiently restrictive.  In theory a windows filename
+// can have as many spaces as it wants.  But for a good experience we
+// want to limit it.  So we need to pre-process the ranges to chop off
+// at repeated whitespace.  This happens in getspan()
+var filenameRE = regexp.MustCompileAcme(`((([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?([^<>:*|?"'\n])*)*))(:([0-9]+|(/[^ ']+)))?`)
 
 var quotedfilenameRE = regexp.MustCompileAcme(`('(([a-zA-Z]:|((\\\\|//)[a-zA-Z0-9.]*))?((\\|/)?[^<>:*|?"'\n]*)*)')(:([0-9]+|(/[^ ']+)))?`)
 
-func getline(t *Text, q0 int) (qq0, qq1 int) {
+// Return a span of characters bounded by either newlines or
+// successive whitespaces.
+func getspan(t *Text, q0 int) (qq0, qq1 int) {
 	qq0 = q0
 	qq1 = q0
+	lastwaswhitespace := false
 	for qq0 > 0 {
 		c := t.ReadC(qq0 - 1)
 		if c == '\n' {
 			break
 		}
+		if isfilespace(c) && lastwaswhitespace {
+			qq0++
+			break
+		}
+		lastwaswhitespace = isfilespace(c)
 		qq0--
 	}
+	lastwaswhitespace = false
 	for qq1 < t.file.Nr() {
 		c := t.ReadC(qq1)
 		if c == '\n' {
 			break
 		}
+		if isfilespace(c) && lastwaswhitespace {
+			qq1--
+			break
+		}
+		lastwaswhitespace = isfilespace(c)
 		qq1++
 	}
 	return qq0, qq1
@@ -43,7 +59,7 @@ func getline(t *Text, q0 int) (qq0, qq1 int) {
 
 func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	// Let's try a radical departure.  Start by getting a line.
-	qq0, qq1 = getline(t, q0)
+	qq0, qq1 = getspan(t, q0)
 	if qq1 == qq0 {
 		return q0, q0
 	}
@@ -68,7 +84,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 	var found [][]int
 	var rb []rune
 	if q0 == q1 {
-		qq0, qq1 := getline(t, q0)
+		qq0, qq1 := getspan(t, q0)
 		n = qq1 - qq0
 		if n == 0 {
 			return false
