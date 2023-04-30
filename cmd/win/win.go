@@ -528,7 +528,6 @@ func dropcr(p []rune) []rune {
 			if w > 0 {
 				w--
 			}
-			break
 		case '\r':
 			for r < len(p)-2 && p[r+1] == '\r' {
 				r++
@@ -546,11 +545,9 @@ func dropcr(p []rune) []rune {
 			}
 			p[w] = '\n'
 			w++
-			break
 		default:
 			p[w] = p[r]
 			w++
-			break
 		}
 		r++
 	}
