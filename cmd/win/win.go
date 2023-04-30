@@ -536,11 +536,11 @@ func dropcr(p []rune) []rune {
 			}
 			break
 		case '\r':
-			for i < len(p)-1 && p[r+1] == '\r' {
+			for r < len(p)-1 && p[r+1] == '\r' {
 				r++
 				i++
 			}
-			if i < len(p) && p[r+1] != '\n' {
+			if r < len(p) && p[r+1] != '\n' {
 				q := r
 				for q > 0 && p[q-1] != '\n' {
 					q--
