@@ -302,8 +302,13 @@ func search(ct *Text, r []rune) bool {
 
 }
 
+func isfilespace(r rune) bool {
+	Lx := " \t"
+	return strings.ContainsRune(Lx, r)
+}
+
 func isfilec(r rune) bool {
-	Lx := ".-+/:@"
+	Lx := ".-+/:@\\"
 	if isalnum(r) {
 		return true
 	}
@@ -318,121 +323,6 @@ func cleanrname(rs []rune) []rune {
 	s := filepath.Clean(string(rs))
 	r, _, _ := util.Cvttorunes([]byte(s), len(s))
 	return r
-}
-
-func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
-	amax := q1
-	if q1 == q0 {
-		colon := int(-1)
-		// TODO(rjk): utf8 conversion work.
-		for q1 < t.file.Nr() {
-			c := t.ReadC(q1)
-			if !isfilec(c) {
-				break
-			}
-			if c == ':' {
-				colon = q1
-				break
-			}
-			q1++
-		}
-		for q0 > 0 {
-			c := t.ReadC(q0 - 1)
-			if !isfilec(c) && !isaddrc(c) && !isregexc(c) {
-				break
-			}
-			if colon < 0 && c == ':' {
-				colon = q0 - 1
-			}
-			q0--
-		}
-		// if it looks like it might begin file: , consume address chars after :
-		// otherwise terminate expansion at :
-		if colon >= 0 {
-			q1 = colon
-			if colon < t.file.Nr()-1 {
-				c := t.ReadC(colon + 1)
-				if isaddrc(c) {
-					q1 = colon + 1
-					for q1 < t.file.Nr() {
-						c := t.ReadC(q1)
-						if !isaddrc(c) {
-							break
-						}
-						q1++
-					}
-				}
-			}
-		}
-		if q1 > q0 {
-			if colon >= 0 { // stop at white space
-				for amax = colon + 1; amax < t.file.Nr(); amax++ {
-					c := t.ReadC(amax)
-					if c == ' ' || c == '\t' || c == '\n' {
-						break
-					}
-				}
-			} else {
-				amax = t.file.Nr()
-			}
-		}
-	}
-	amin := amax
-	e.q0 = q0
-	e.q1 = q1
-	n := q1 - q0
-	if n == 0 {
-		return false
-	}
-	// see if it's a file name
-	rb := make([]rune, n)
-	t.file.Read(q0, rb[:n])
-	// first, does it have bad chars?
-	nname := -1
-	for i, c := range rb {
-		if c == ':' && nname < 0 {
-			if q0+i+1 >= t.file.Nr() {
-				return false
-			}
-			if i != n-1 {
-				if cc := t.ReadC(q0 + i + 1); !isaddrc(cc) {
-					return false
-				}
-			}
-			amin = q0 + i
-			nname = i
-		}
-	}
-	if nname == -1 {
-		nname = n
-	}
-	for i := 0; i < nname; i++ {
-		if !isfilec(rb[i]) && rb[i] != ' ' {
-			return false
-		}
-	}
-	isFile := func(name string) bool {
-		e.name = name
-		e.at = t
-		e.a0 = amin + 1
-		_, _, e.a1 = address(true, nil, Range{-1, -1}, Range{0, 0}, e.a0, amax,
-			func(q int) rune { return t.ReadC(q) }, false)
-		return true
-	}
-	s := string(rb[:nname])
-	if amin == q0 {
-		return isFile(s)
-	}
-	dname := t.DirName(s)
-	// if it's already a window name, it's a file
-	if lookfile(dname) != nil {
-		return isFile(dname)
-	}
-	// if it's the name of a file, it's a file
-	if ismtpt(dname) || !access(dname) {
-		return false
-	}
-	return isFile(dname)
 }
 
 func access(name string) bool {
@@ -478,10 +368,12 @@ func expand(t *Text, q0 int, q1 int) (*Expand, bool) {
 
 func lookfile(s string) *Window {
 	// avoid terminal slash on directories
-	s = strings.TrimRight(s, "/")
+	s = UnquoteFilename(s)
+	s = strings.TrimRight(s, "\\/")
 	for _, c := range global.row.col {
 		for _, w := range c.w {
-			k := strings.TrimRight(w.body.file.Name(), "/")
+			name := UnquoteFilename(w.body.file.Name())
+			k := strings.TrimRight(name, "\\/")
 			if k == s {
 				cur, ok := w.body.file.GetCurObserver().(*Text)
 				if !ok {

@@ -1,3 +1,6 @@
+Get needs to quote filenames
+Look needs to respect quotes around filenames
+
 // Basics
 Edit X:edwood/\+Errors: 1,$d
 X:edwood/.*\.go: w

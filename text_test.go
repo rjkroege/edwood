@@ -292,8 +292,8 @@ func TestTextDirName(t *testing.T) {
 		{"RelativeFile,file=''", windowWithTag("a/b/c/d.go Del Snarf | Look "), "", "a/b/c"},
 		{"RelativeFile", windowWithTag("a/b/c/d.go Del Snarf | Look "), "e.go", "a/b/c/e.go"},
 		{"IgnoreTag", windowWithTag("/a/b/c/d.go Del Snarf | Look "), "/x/e.go", "/x/e.go"},
-		{"FileWithSpace", windowWithTag("/a/b c/d.go Del Snarf | Look "), "/a/b c/d.go", "/a/b c/d.go"},
-		{"DirWithSpace", windowWithTag("/a/b c/ Del Snarf | Look "), "", "/a/b c"},
+		{"FileWithSpace", windowWithTag("'/a/b c/d.go' Del Snarf | Look "), "/a/b c/d.go", "/a/b c/d.go"},
+		{"DirWithSpace", windowWithTag("'/a/b c/' Del Snarf | Look "), "", "/a/b c"},
 	}
 
 	for _, tc := range tt {
