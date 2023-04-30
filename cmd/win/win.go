@@ -11,8 +11,6 @@ import (
 
 	"9fans.net/go/acme"
 	"github.com/creack/pty"
-	"github.com/pkg/term/termios"
-	"golang.org/x/sys/unix"
 )
 
 const termprog = "win"
@@ -445,15 +443,6 @@ func (w *winWin) stdoutproc() {
 			w.Q.Unlock()
 		}
 	}
-}
-
-func isecho(fp *os.File) bool {
-	var ttmode unix.Termios
-	err := termios.Tcgetattr(fp.Fd(), &ttmode)
-	if err != nil {
-		debugf("tcgetattr: %v\n", err)
-	}
-	return ttmode.Lflag&unix.ECHO != 0
 }
 
 type EchoManager struct {
