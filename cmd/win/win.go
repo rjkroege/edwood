@@ -379,7 +379,11 @@ func main() {
 	win.W.Write("tag", []byte("Send"))
 
 	// TODO(PAL): Better selection of shell.
-	startProcess("bash", []string{"-i"}, win)
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "rc"
+	}
+	startProcess(shell, []string{"-i"}, win)
 	go win.stdoutproc()
 	events(win)
 }
