@@ -13,4 +13,5 @@ require (
 	github.com/creack/pty v1.1.10 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/kr/pty v1.1.8 // indirect
+	github.com/sanity-io/litter v1.5.5 // indirect
 )
