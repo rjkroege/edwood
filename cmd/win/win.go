@@ -125,7 +125,7 @@ func (w *winWin) typetext(e *acme.Event) {
 func (w *winWin) addtype(c rune, p0 int, text []rune) {
 	for _, r := range text {
 		if (r == 0x7F || r == 3) && c == 'K' { // del and ^c from keyboard
-			w.rcpty.Write([]byte{0x7F})
+			w.rcpty.Write([]byte{byte(r)})
 			/* toss all typing */
 			w.p += len(w.typing) + len(text)
 			w.typing = w.typing[0:0]
@@ -328,7 +328,8 @@ func events(win *winWin) {
 func startProcess(arg string, args []string, w *winWin) {
 	cmd := exec.Command(arg, args...)
 	var err error
-	cmd.Env = append(os.Environ(), []string{"TERM=dumb"}...)
+	cmd.Env = append(os.Environ(), []string{"TERM=dumb", 
+				fmt.Sprintf("winid=%d", w.W.ID())}...)
 	/*
 		w.rcpty, w.rctty, err = termios.Pty()
 		if err != nil {
@@ -355,7 +356,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "win: Failed to open acme window\n")
 		os.Exit(0)
 	}
-
+	
 	pwd, _ := os.Getwd()
 	pwdSlash := strings.TrimSuffix(pwd, "/") + "/"
 	err = win.W.Name(pwdSlash + "+win")
@@ -365,6 +366,9 @@ func main() {
 	}
 
 	win.W.Write("tag", []byte("Send"))
+
+	stty := exec.Command("stty", "stty", "tabs", "-onlcr", "icanon", "echo", "erase", "^h", "intr", "^?")
+	stty.Run()
 
 	// TODO(PAL): Better selection of shell.
 	shell := os.Getenv("SHELL")
