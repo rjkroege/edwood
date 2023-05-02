@@ -20,12 +20,16 @@ func usage() {
 	os.Exit(0)
 }
 
-var debug = false
+var debug = true
 
 func debugf(format string, args ...interface{}) {
 	if debug {
 		fmt.Fprintf(os.Stderr, "Debug: "+format, args...)
 	}
+}
+
+func errorf(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, "Debug: "+format, args...)
 }
 
 var blank = &acme.Event{C1: 'M', C2: 'X', Nr: 1, Nb: 1, Text: []byte(" ")}
@@ -87,8 +91,8 @@ func (w *winWin) israw() bool {
 // the data stream
 func (w *winWin) typetext(e *acme.Event) {
 	debugf("typetext %v @ w.p=%d\n", eToS(e), w.p)
-	buf := make([]byte, 256) // TODO(PAL): Don't want to allocate this every time!
-	// The C code puts it on the stack.  Maybe go does too?
+	var bufStore [256]byte
+	buf := bufStore[:]
 
 	if e.Nr > 0 {
 		w.addtype(e.C1, e.Q0-w.p, []rune(string(e.Text)))
@@ -223,6 +227,7 @@ func (w *winWin) sendbs(n int) {
 
 func events(win *winWin) {
 	for e := range win.W.EventChan() {
+		debugf("%#v\n", eToS(e))
 		win.Q.Lock()
 
 		switch e.C1 {
@@ -247,8 +252,7 @@ func events(win *winWin) {
 					break
 				}
 				if e.Q0 < win.p {
-					//if(debug)
-					//	fprint(2, "shift typing %d... ", e.q1-e.q0)
+					debugf("shift typing %d... ", e.Q1-e.Q0)
 					win.p += e.Q1 - e.Q0
 				} else if e.Q0 <= win.p+len(win.typing) {
 					//if(debug)
@@ -264,27 +268,14 @@ func events(win *winWin) {
 				}
 
 			case 'X', 'x':
-				/*
-					var e2, e3 *acme.Event
-					if e.Flag&2 != 0 {
-						e2 = <-win.W.EventChan()
-					}
-					if e.Flag&8 != 0 {
-						e3 = <-win.W.EventChan()
-						_ = <-win.W.EventChan()
-					}
-				*/
+
+				// The expansion events have already been handled by W.
+
 				if (e.Flag&1 != 0) || (e.C2 == 'x' && e.Nr == 0 /*&& e2.Nr == 0*/) {
 					/* send it straight back */
-					//fsfidprint(efd, "%c%c%d %d\n", e.c1, e.c2, e.q0, e.q1);
 					win.W.WriteEvent(e)
 				}
-				/*
-					if e.Q0 == e.Q1 && (e.Flag&2 != 0) {
-						e2.Flag = e.Flag
-						e = e2
-					}
-				*/
+
 				switch {
 				case string(e.Text) == "cook":
 					win.cook = true
@@ -292,17 +283,14 @@ func events(win *winWin) {
 					win.cook = false
 				case e.Flag&8 != 0:
 					if e.Q1 != e.Q0 {
-						win.W.WriteEvent(e)
-						//	win.W.WriteEvent(blank)
-						//sende(&e, fd0, cfd, afd, dfd, 0);
-						//sende(&blank, fd0, cfd, afd, dfd, 0);
+						win.sende(e, false)
+						win.sende(blank, false)
+					} else {
+						win.sende(e, true)
 					}
-					//win.W.WriteEvent(e3)
-					//sende(&e3, fd0, cfd, afd, dfd, 1)
 				default:
 					if e.Q1 != e.Q0 {
-						win.W.WriteEvent(e)
-						//sende(&e, fd0, cfd, afd, dfd, 1)
+						win.sende(e, true)
 					}
 				}
 
@@ -317,12 +305,57 @@ func events(win *winWin) {
 
 			}
 		}
-		debugf("%#v\n", eToS(e))
-		//win.WriteEvent(e)
-
 		win.Q.Unlock()
 	}
 	os.Exit(0)
+}
+
+func (w *winWin) sende(e *acme.Event, donl bool) {
+	end := w.p + len(w.typing)
+
+	w.Printf("addr", "#%d", end)
+	var lastrune rune
+	if len(e.Text) > 0 {
+		w.W.Write("data", e.Text)
+		w.addtype(e.C1, len(w.typing), []rune(string(e.Text)))
+		lastrune, _ = utf8.DecodeLastRune(e.Text)
+	} else {
+		m := e.Q0
+		lastrune = 0
+		buf := make([]byte, 128)
+		for m < e.Q1 {
+			w.Printf("addr", "#%d", m)
+			nread, err := w.W.Read("data", buf)
+			if err != nil || nread == 0 {
+				panic("Short read")
+			}
+			r, k := utf8.DecodeLastRune(buf[:nread])
+			if k != 0 && r == utf8.RuneError {
+				errorf("TODO(PAL): Partial rune at end of read buffer?")
+			}
+			// Now reduce our buffer to not past e.Q1 by peeling off runes?
+			intext := []rune(string(buf[0:nread]))
+			if m+len(intext) > e.Q1 {
+				intext = intext[0 : e.Q1-m]
+			}
+			if len(intext) == 0 {
+				break
+			}
+			w.Printf("addr", "#%d", end)
+			w.W.Write("data", []byte(string(intext)))
+			lastrune = intext[len(intext)-1]
+			w.addtype(e.C1, len(w.typing), intext)
+			m += len(intext)
+			end += len(intext)
+		}
+	}
+
+	if donl && lastrune != '\n' {
+		w.Printf("data", "\n")
+		w.addtype(e.C1, len(w.typing), []rune{'\n'})
+	}
+	w.Printf("ctl", "dot=addr")
+	w.sendtype()
 }
 
 func startProcess(arg string, args []string, w *winWin) {
