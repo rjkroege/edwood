@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
@@ -223,9 +224,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			}
 		}
 		if a != "" {
-			t.w.Eventf("%c0 0 0 %d %v\n", c, len(a), a)
+			t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(a), a)
 			if aa != "" {
-				t.w.Eventf("%c0 0 0 %d %v\n", c, len(aa), aa)
+				t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(aa), aa)
 			} else {
 				t.w.Eventf("%c0 0 0 0 \n", c)
 			}
