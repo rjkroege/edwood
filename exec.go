@@ -223,9 +223,9 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			}
 		}
 		if a != "" {
-			t.w.Eventf("%c0 0 0 %d %v\n", c, len([]rune(a)), a)
+			t.w.Eventf("%c0 0 0 %d %v\n", c, len(a), a)
 			if aa != "" {
-				t.w.Eventf("%c0 0 0 %d %v\n", c, len([]rune(aa)), aa)
+				t.w.Eventf("%c0 0 0 %d %v\n", c, len(aa), aa)
 			} else {
 				t.w.Eventf("%c0 0 0 0 \n", c)
 			}
