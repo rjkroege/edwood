@@ -194,7 +194,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 			t.file.Read(aq0, r)
 			f |= 2
 		}
-		aa, a := getarg(argt, true, true)
+		a, aa := getarg(argt, true, true)
 		if a != "" {
 			if len(a) > EVENTSIZE { // too big; too bad
 				warning(nil, "argument string too long\n")
