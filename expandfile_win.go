@@ -174,8 +174,8 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		if isFile(dname) {
 			return true
 		}
-
-		for q1 := e.q1; q1 >= e.q0; q1-- {
+		var q1 int
+		for q1 = e.q1; q1 >= e.q0; q1-- {
 			if rb[q1-1] == '\\' || rb[q1-1] == '/' {
 				// don't back up past a path separator
 				return false
@@ -185,6 +185,9 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				e.q1 = q1
 				break
 			}
+		}
+		if q1 < e.q0 {
+			return false
 		}
 	}
 }
