@@ -95,14 +95,19 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		if found == nil {
 			found = filenameRE.FindForward(rb, 0, n, 1)
 		}
+		matchedone := false
 		for i, pair := range found {
 			// qq0 is zero of the range returned.
 			// The match is thus at qq0+pair[0:1], and (q0-qq0) must fall in that range
 			if q0-qq0 >= pair[0] && q0-qq0 <= pair[1] {
 				q0, q1 = pair[0]+qq0, pair[1]+qq0
 				found = found[i : i+1]
+				matchedone = true
 				break
 			}
+		}
+		if !matchedone {
+			return false
 		}
 	} else {
 		n = q1 - q0
@@ -147,18 +152,39 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 			func(q int) rune { return t.ReadC(q) }, false)
 		return true
 	}
-	s := filename
-	if amin == q0 {
-		return isFile(filename)
+
+	// we iterate over the candidate filename, removing trailing words
+	for {
+		dname := t.DirName(filename)
+		switch {
+		case amin == q0:
+			if isFile(filename) {
+				return true
+			}
+		// if it's already a window name, it's a file
+		case lookfile(dname) != nil:
+			if isFile(dname) {
+				return true
+			}
+		// if it's the name of a file, it's a file
+		case ismtpt(dname) || !access(dname):
+			return false
+		}
+
+		if isFile(dname) {
+			return true
+		}
+
+		for q1 := e.q1; q1 >= e.q0; q1-- {
+			if rb[q1-1] == '\\' || rb[q1-1] == '/' {
+				// don't back up past a path separator
+				return false
+			}
+			if rb[q1-1] == ' ' || rb[q1-1] == '\t' {
+				filename = string(rb[e.q0:e.q1])
+				e.q1 = q1
+				break
+			}
+		}
 	}
-	dname := t.DirName(s)
-	// if it's already a window name, it's a file
-	if lookfile(dname) != nil {
-		return isFile(dname)
-	}
-	// if it's the name of a file, it's a file
-	if ismtpt(dname) || !access(dname) {
-		return false
-	}
-	return isFile(dname)
 }
