@@ -17,7 +17,7 @@ require (
 	github.com/sanity-io/litter v1.1.0
 	github.com/stretchr/testify v1.3.0 // indirect
 	golang.org/x/exp v0.0.0-20190212162250-21964bba6549 // indirect
-	golang.org/x/image v0.5.0 // indirect
+	golang.org/x/image v0.10.0 // indirect
 	golang.org/x/mobile v0.0.0-20190127143845-a42111704963 // indirect
-	golang.org/x/sys v0.1.0
+	golang.org/x/sys v0.5.0
 )
