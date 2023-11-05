@@ -808,7 +808,7 @@ func (t *Text) Type(r rune) {
 			}
 		}
 		return
-	case draw.KeyDown:
+	case draw.KeyDown, 0xF800:
 		if t.what == Tag {
 			Tagdown()
 			return
