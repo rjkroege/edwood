@@ -897,11 +897,11 @@ func (t *Text) Type(r rune) {
 		}
 		t.Show(q0, q0, true)
 		return
-	case draw.KeyCmd + 'c': // %C: copy
+	case 0x3, draw.KeyCmd + 'c': // %C: copy
 		t.TypeCommit()
 		cut(t, t, nil, true, false, "")
 		return
-	case draw.KeyCmd + 'z': // %Z: undo
+	case 0x1a, draw.KeyCmd + 'z': // %Z: undo
 		t.TypeCommit()
 		undo(t, nil, nil, true, false, "")
 		return
@@ -920,7 +920,7 @@ func (t *Text) Type(r rune) {
 	// These following blocks contain mutating actions.
 	// cut/paste must be done after the seq++/filemark
 	switch r {
-	case draw.KeyCmd + 'x': // %X: cut
+	case 0x18, draw.KeyCmd + 'x': // %X: cut
 		setUndoPoint()
 		t.TypeCommit()
 		if t.what == Body {
@@ -931,7 +931,7 @@ func (t *Text) Type(r rune) {
 		t.Show(t.q0, t.q0, true)
 		t.iq1 = t.q0
 		return
-	case draw.KeyCmd + 'v': // %V: paste
+	case 0x16, draw.KeyCmd + 'v': // %V: paste
 		setUndoPoint()
 		t.TypeCommit()
 		if t.what == Body {
