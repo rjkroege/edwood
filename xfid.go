@@ -600,8 +600,10 @@ forloop:
 					break forloop
 				}
 			}
-			global.seq++
-			w.body.file.Mark(global.seq)
+			if !w.nomark {
+				global.seq++
+				w.body.file.Mark(global.seq)
+			}
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
