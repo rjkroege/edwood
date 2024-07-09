@@ -532,5 +532,5 @@ func (e *ObservableEditableBuffer) MakeBufferCursor(p0, p1 OffsetTuple) *BufferC
 
 // DebugSeqState returns the seq state for debugging purposes.
 func (e *ObservableEditableBuffer) DebugSeqState() string {
-	return fmt.Sprintf("oeb seq %d putseq %d treatasclean %v", e.seq, e.putseq,  e.treatasclean)
+	return fmt.Sprintf("oeb seq %d putseq %d treatasclean %v", e.seq, e.putseq, e.treatasclean)
 }
