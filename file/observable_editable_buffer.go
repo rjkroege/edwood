@@ -191,7 +191,7 @@ func (e *ObservableEditableBuffer) notifyTagObservers(before TagStatus) {
 
 // Mark is a forwarding function for file.Mark.
 // This sets an undo point. NB: call Mark before mutating the file.
-// seq must be 1 to enable Undo/Redo on the file.
+// Argument seq should be > 0 to create a valid Undo/Redo point.
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
@@ -528,4 +528,9 @@ func (e *ObservableEditableBuffer) End() OffsetTuple {
 // MakeBufferCursor is a forwarding function.
 func (e *ObservableEditableBuffer) MakeBufferCursor(p0, p1 OffsetTuple) *BufferCursor {
 	return MakeBufferCursor(e.f, p0, p1)
+}
+
+// DebugSeqState returns the seq state for debugging purposes.
+func (e *ObservableEditableBuffer) DebugSeqState() string {
+	return fmt.Sprintf("oeb seq %d putseq %d treatasclean %v", e.seq, e.putseq, e.treatasclean)
 }

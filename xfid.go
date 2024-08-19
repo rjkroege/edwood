@@ -600,8 +600,10 @@ forloop:
 					break forloop
 				}
 			}
-			global.seq++
-			w.body.file.Mark(global.seq)
+			if !w.nomark {
+				global.seq++
+				w.body.file.Mark(global.seq)
+			}
 			w.SetName(string(r))
 		case "dump": // set dump string
 			if len(words) < 2 {
@@ -656,8 +658,9 @@ forloop:
 		case "nomark": // turn off automatic marking
 			w.nomark = true
 		case "mark": // mark file
-			global.seq++
-			w.body.file.Mark(global.seq)
+			w.nomark = false
+			// global.seq++
+			// w.body.file.Mark(global.seq)
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
 		case "menu": // enable automatic menu
