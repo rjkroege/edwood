@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -20,7 +21,7 @@ func usage() {
 	os.Exit(0)
 }
 
-var debug = true
+var debug = false
 
 func debugf(format string, args ...interface{}) {
 	if debug {
@@ -382,7 +383,9 @@ func startProcess(arg string, args []string, w *winWin) {
 }
 
 func main() {
-	//usage()
+	flag.BoolVar(&debug, "d", debug, "-d")
+	flag.Usage = usage
+	flag.Parse()
 	//signal.Notify
 	win, err := NewWinWin()
 	if err != nil {
