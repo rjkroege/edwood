@@ -53,7 +53,7 @@ type Exectab struct {
 // TODO(rjk): This could be more idiomatic: each command implements an
 // interface. Flags would then be unnecessary.
 
-var exectab = []Exectab{
+var globalexectab = []Exectab{
 	//	{ "Abort",		doabort,	false,	true /*unused*/,		true /*unused*/,		},
 	{"Cut", cut, true, true, true},
 	{"Del", del, false, false, true /*unused*/},
@@ -88,7 +88,8 @@ var exectab = []Exectab{
 
 var wsre = regexp.MustCompile("[ \t\n]+")
 
-func lookup(r string) *Exectab {
+// TODO(rjk): Exectab is sorted. Consider using a binary search
+func lookup(r string, exectab []Exectab) *Exectab {
 	r = wsre.ReplaceAllString(r, " ")
 	r = strings.TrimLeft(r, " ")
 	words := strings.SplitN(r, " ", 2)
@@ -190,7 +191,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 
 	r := make([]rune, q1-q0)
 	t.file.Read(q0, r)
-	e := lookup(string(r))
+	e := lookup(string(r), globalexectab)
 
 	// Send commands to external client if the target window's event file is
 	// in use.
