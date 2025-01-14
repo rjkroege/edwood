@@ -146,12 +146,12 @@ func getarg(argt *Text, doaddr bool, dofile bool) (string, string) {
 	return string(r), a
 }
 
-// execute must run with an existing lock on t's Window
-func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
-	var n, f int
-
-	q0 := aq0
-	q1 := aq1
+// expandRuneOffsetsToWord expands the rune offsets on a middle click to
+// the word boundaries. TODO(rjk): Conceivably, what we think of as a
+// "word boundary" should be configurable in some way and not embedded in
+// this function.
+// TODO(rjk): Consider if this method should really be part of Text.
+func expandRuneOffsetsToWord(t *Text, q0 int, q1 int) (int, int) {
 	if q1 == q0 { // expand to find word (actually file name)
 		// if in selection, choose selection
 		if t.inSelection(q0) {
@@ -175,10 +175,19 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 				}
 			}
 			if q1 == q0 {
-				return
+				return q0, q1
 			}
 		}
 	}
+	return q0, q1
+}
+
+// execute must run with an existing lock on t's Window
+func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
+	var n, f int
+
+	q0, q1 := expandRuneOffsetsToWord(t, aq0, aq1)
+
 	r := make([]rune, q1-q0)
 	t.file.Read(q0, r)
 	e := lookup(string(r))
