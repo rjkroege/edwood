@@ -183,10 +183,61 @@ func expandRuneOffsetsToWord(t *Text, q0 int, q1 int) (int, int) {
 	return q0, q1
 }
 
+// delegateExecution handles the situation where an external command is
+// using the event file to control the operation of Edwood via the
+// filesystem.
+func delegateExecution(t *Text, e *Exectab, aq0, aq1, q0, q1 int, argt *Text) {
+	var r []rune
+
+	f := 0
+	if e != nil {
+		f |= 1
+	}
+	if q0 != aq0 || q1 != aq1 {
+		r = make([]rune, aq1-aq0)
+		t.file.Read(aq0, r)
+		f |= 2
+	}
+	a, aa := getarg(argt, true, true)
+	if a != "" {
+		if len(a) > EVENTSIZE { // too big; too bad
+			warning(nil, "argument string too long\n")
+			return
+		}
+		f |= 8
+	}
+	c := 'x'
+	if t.what == Body {
+		c = 'X'
+	}
+	n := aq1 - aq0
+	if n <= EVENTSIZE {
+		t.w.Eventf("%c%d %d %d %d %v\n", c, aq0, aq1, f, n, string(r))
+	} else {
+		t.w.Eventf("%c%d %d %d 0 \n", c, aq0, aq1, f)
+	}
+	if q0 != aq0 || q1 != aq1 {
+		n = q1 - q0
+		r = make([]rune, n)
+		t.file.Read(q0, r)
+		if n <= EVENTSIZE {
+			t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
+		} else {
+			t.w.Eventf("%c%d %d 0 0 \n", c, q0, q1)
+		}
+	}
+	if a != "" {
+		t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(a), a)
+		if aa != "" {
+			t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(aa), aa)
+		} else {
+			t.w.Eventf("%c0 0 0 0 \n", c)
+		}
+	}
+}
+
 // execute must run with an existing lock on t's Window
 func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
-	var n, f int
-
 	q0, q1 := expandRuneOffsetsToWord(t, aq0, aq1)
 
 	r := make([]rune, q1-q0)
@@ -196,51 +247,7 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	// Send commands to external client if the target window's event file is
 	// in use.
 	if !external && t.w != nil && t.w.nopen[QWevent] > 0 {
-		f = 0
-		if e != nil {
-			f |= 1
-		}
-		if q0 != aq0 || q1 != aq1 {
-			r = make([]rune, aq1-aq0)
-			t.file.Read(aq0, r)
-			f |= 2
-		}
-		a, aa := getarg(argt, true, true)
-		if a != "" {
-			if len(a) > EVENTSIZE { // too big; too bad
-				warning(nil, "argument string too long\n")
-				return
-			}
-			f |= 8
-		}
-		c := 'x'
-		if t.what == Body {
-			c = 'X'
-		}
-		n = aq1 - aq0
-		if n <= EVENTSIZE {
-			t.w.Eventf("%c%d %d %d %d %v\n", c, aq0, aq1, f, n, string(r))
-		} else {
-			t.w.Eventf("%c%d %d %d 0 \n", c, aq0, aq1, f)
-		}
-		if q0 != aq0 || q1 != aq1 {
-			n = q1 - q0
-			r := make([]rune, n)
-			t.file.Read(q0, r)
-			if n <= EVENTSIZE {
-				t.w.Eventf("%c%d %d 0 %d %v\n", c, q0, q1, n, string(r))
-			} else {
-				t.w.Eventf("%c%d %d 0 0 \n", c, q0, q1)
-			}
-		}
-		if a != "" {
-			t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(a), a)
-			if aa != "" {
-				t.w.Eventf("%c0 0 0 %d %v\n", c, utf8.RuneCountInString(aa), aa)
-			} else {
-				t.w.Eventf("%c0 0 0 0 \n", c)
-			}
-		}
+		delegateExecution(t, e, aq0, aq1, q0, q1, argt)
 		return
 	}
 

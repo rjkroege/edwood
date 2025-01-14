@@ -7,6 +7,7 @@ X:edwood/.*\.go: w
 
 {go build -tags debug}
 ./testedwood.sh
+./testacme.sh
 
 {go test -covermode=count -coverprofile=count.out}
 go tool cover -html=count.out
