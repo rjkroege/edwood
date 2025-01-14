@@ -208,9 +208,9 @@ var warningsMu sync.Mutex
 func flushwarnings() {
 	// TODO(rjk): why don't we lock warningsMu?
 	var (
-		w         *Window
-		t         *Text
-		owner, q0 int
+		w     *Window
+		t     *Text
+		owner int
 	)
 	for _, warn := range warnings {
 		w = errorwin(warn.md, 'E')
@@ -222,8 +222,8 @@ func flushwarnings() {
 
 		// TODO(rjk): Ick.
 		r := []rune(warn.buf.String())
-		t.BsInsert(t.Nc(), r, true)
-
+		q0 := t.Nc()
+		t.BsInsert(q0, r, true)
 		t.Show(q0, t.Nc(), true)
 
 		// TODO(rjk): Code inspection of Show suggests that this might
