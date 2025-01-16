@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
 )
 
@@ -781,5 +783,70 @@ func TestUndoRedo(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestDelegateExecution(t *testing.T) {
+	const hello_世界 = "/Hello, 世界"
+	runic_hello_世界 := []rune(hello_世界)
+	const bye_さようなら = "Bye, さようなら"
+	runic_bye_さようなら := []rune(bye_さようなら)
+
+	// build some state...
+	display := edwoodtest.NewDisplay(image.Rectangle{})
+	global.configureGlobals(display)
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("hello_世界", runic_bye_さようなら),
+		what:    Body,
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", runic_hello_世界),
+		what:    Tag,
+	}
+	w.tag.w = w
+	w.body.w = w
+
+	// This is typically set as part of the lock regimen which is why we
+	// get different letters in Acme.
+	// TODO(rjk): Test that the Edwood sets the source letters correctly.
+	w.owner = 'T'
+
+	// Pretend that we have an event reader.
+	w.nopen[QWevent] = 1
+
+	w.tag.q0 = 8
+	w.tag.q1 = 10
+
+	for _, tc := range []struct {
+		e *Exectab
+		// NB: aq0, aq1 is the original selection.
+		// NB: q0, q1 is the expanded selection.
+		aq0, aq1 int
+		t, argt  *Text
+		want     string
+		q0, q1   int
+	}{
+		// Correctness is based on equivalence to Acme.
+		{nil, 0, 0, &w.body, nil, "TX0 0 2 0 \nTX0 3 0 3 Bye\n", 0, 0},
+		{nil, 1, 1, &w.body, &w.tag, "TX1 1 10 0 \nTX0 3 0 3 Bye\nTX0 0 0 2 世界\nTX0 0 0 0 \n", 0, 0},
+		{nil, 1, 1, &w.tag, nil, "Tx1 1 2 0 \nTx0 6 0 6 /Hello\n", 0, 0},
+		{nil, 1, 1, &w.body, &w.body, "TX1 1 10 0 \nTX0 3 0 3 Bye\nTX0 0 0 5 さようなら\nTX0 0 0 15 hello_世界:#5,#10\n", 5, 10},
+	} {
+		w.body.q0, w.body.q1 = tc.q0, tc.q1
+		q0, q1 := expandRuneOffsetsToWord(tc.t, tc.aq0, tc.aq1)
+		delegateExecution(tc.t, tc.e, tc.aq0, tc.aq1, q0, q1, tc.argt)
+		want, got := tc.want, string(w.events)
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Log(q0, q1)
+			t.Log(got)
+			t.Errorf("delegateExection mismatch (-want +got):\n%s", diff)
+		}
+		w.events = w.events[0:0]
 	}
 }
