@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/rjkroege/edwood/theme"
 	"image"
 	"log"
 	"os"
@@ -31,6 +32,7 @@ var (
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
 	ncol              = flag.Int("c", 2, "Number of columns at startup")
 	loadfile          = flag.String("l", "", "Load state from file generated with Dump command")
+	darkMode          = flag.Bool("v", false, "Enable dark (Vampira) mode colour scheme") // Added dark mode flag
 )
 
 func predrawInit() *dumpfile.Content {
@@ -76,6 +78,10 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 	if err := display.Attach(draw.Refnone); err != nil {
 		log.Fatalf("failed to attach to window %v\n", err)
 	}
+
+	// Apply the appropriate mode based on the flag
+	g.applyMode(display)
+
 	display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 
 	g.mousectl = display.InitMouse()
@@ -153,14 +159,17 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 
 func main() {
 	dump := predrawInit()
-
 	// Make the display here in the wrapper to make it possible to provide a
 	// different display for testing.
+	// Create the display within the closure to ensure proper scope
 	draw.Main(func(dd *draw.Device) {
 		display, err := dd.NewDisplay(nil, *varfontflag, "edwood", *winsize)
 		if err != nil {
 			log.Fatalf("can't open display: %v\n", err)
 		}
+
+		// Set dark mode state in theme package with display
+		theme.SetDarkMode(*darkMode, display)
 		mainWithDisplay(global, dump, display)
 	})
 }
