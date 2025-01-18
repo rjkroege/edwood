@@ -395,6 +395,7 @@ func xfidwrite(x *Xfid) {
 
 	// updateText writes x.fcall.Data to text buffer t and sends the 9P response.
 	updateText := func(t *Text) {
+		// log.Printf("updateText global.seq %d, seq state %s", global.seq, t.file.DebugSeqState())
 		r := fullrunewrite(x)
 		if len(r) != 0 {
 			w.Commit(t)
@@ -656,11 +657,22 @@ forloop:
 			w.limit.q0 = w.addr.q0
 			w.limit.q1 = w.addr.q1
 		case "nomark": // turn off automatic marking
+			// Snapshot the file state first to make sure that we do the right thing.
+			// But perhaps we are setting up the buffer. So if the seq is not 0, skip
+			// this. Are multiple undo snapshots harmful? (Perhaps this causes bugs
+			// with undo from the command language?)
+			if w.body.file.Seq() > 0 {
+				global.seq++
+				w.body.file.Mark(global.seq)
+			}
 			w.nomark = true
 		case "mark": // mark file
 			w.nomark = false
-			// global.seq++
-			// w.body.file.Mark(global.seq)
+			// Premise is that the next undoable mutation will set an undo point.
+			// TODO:(rjk): Maintaining this invariant is tricky. It should be tested
+			// and the code in text.go should be appropriately structured to make it
+			// easy to reason about and to test.
+			// TODO(rjk): The premise is wrong. The first edit does not.
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
 		case "menu": // enable automatic menu

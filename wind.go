@@ -567,6 +567,6 @@ func (w *Window) ClampAddr() {
 }
 
 func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
-	// log.Printf("Window.UpdateTag, status %+v", newtagstatus)
+	// log.Printf("Window.UpdateTag, status %+v, %d", newtagstatus, global.seq)
 	w.setTag1()
 }

@@ -192,6 +192,7 @@ func (e *ObservableEditableBuffer) notifyTagObservers(before TagStatus) {
 // Mark is a forwarding function for file.Mark.
 // This sets an undo point. NB: call Mark before mutating the file.
 // Argument seq should be > 0 to create a valid Undo/Redo point.
+// TODO(rjk): Should this update the tag?
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
@@ -294,7 +295,6 @@ func (e *ObservableEditableBuffer) InsertAt(rp0 int, rs []rune) {
 }
 
 // Insert is a forwarding function for file.Insert.
-// p0 is position in runes.
 func (e *ObservableEditableBuffer) Insert(p0 OffsetTuple, s []byte, nr int) {
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)
