@@ -415,6 +415,13 @@ func xfidwrite(x *Xfid) {
 					global.seq++
 					t.file.Mark(global.seq)
 				}
+				// To align with how Acme works, the file on disk has not been changed
+				// but Edwood's in-memory store of the file would now be different from
+				// the backing file and also not undoable back to the backign state as
+				// has been programmatically modified via the filesystem API.
+				if t.file.Seq() == 0 && w.nomark {
+					t.file.Modded()
+				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
 				t.SetSelect(t.q0, t.q1) // insert could leave it somewhere else
@@ -666,6 +673,8 @@ forloop:
 				w.body.file.Mark(global.seq)
 			}
 			w.nomark = true
+			// Once we've nomark'ed, if seq == 0, mutations will be undoable.
+			// but the file will be different than disk. So mark it dirty in update.
 		case "mark": // mark file
 			w.nomark = false
 			// Premise is that the next undoable mutation will set an undo point.
