@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/theme"
 )
 
 func (f *frameimpl) drawtext(pt image.Point, text draw.Image, back draw.Image) {
@@ -214,11 +215,19 @@ func (f *frameimpl) tick(pt image.Point, ticked bool) {
 		r.Max.X = f.rect.Max.X
 	}
 
+	// Determine the correct tick color based on dark mode
+	var tickColor draw.Image
+	if theme.IsDarkMode() {
+		tickColor = theme.TickColor // Use white tick for dark mode
+	} else {
+		tickColor = f.display.Black() // Use black tick for light mode
+	}
+
 	if ticked {
 		f.tickback.Draw(f.tickback.R(), f.background, nil, pt)
-		f.background.Draw(r, f.display.Black(), f.tickimage, image.Point{}) // draws an alpha-blended box
+		f.background.Draw(r, tickColor, f.tickimage, image.Point{}) // draws an alpha-blended box
 	} else {
-		// There is an issue with tick management
+		// Restore the background when removing the tick
 		f.background.Draw(r, f.tickback, nil, image.Point{})
 	}
 	f.ticked = ticked
