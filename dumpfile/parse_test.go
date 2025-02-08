@@ -2,7 +2,6 @@ package dumpfile
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -61,7 +60,7 @@ func TestEncodeDecode(t *testing.T) {
 func TestSaveLoad(t *testing.T) {
 	var tc Content
 
-	file, err := ioutil.TempFile("", "edwood-dumpfile-")
+	file, err := os.CreateTemp("", "edwood-dumpfile-")
 	if err != nil {
 		t.Fatalf("failed to create temporary file: %v", err)
 	}

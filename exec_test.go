@@ -2,7 +2,6 @@ package main
 
 import (
 	"image"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -99,19 +98,19 @@ func TestRunproc(t *testing.T) {
 }
 
 func TestPutfile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "edwood.test")
+	dir, err := os.MkdirTemp("", "edwood.test")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(dir)
 
 	filename := filepath.Join(dir, "hello.txt")
-	err = ioutil.WriteFile(filename, nil, 0644)
+	err = os.WriteFile(filename, nil, 0644)
 	if err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	checkFile := func(t *testing.T, content string) {
-		b, err := ioutil.ReadFile(filename)
+		b, err := os.ReadFile(filename)
 		if err != nil {
 			t.Fatalf("ReadAll failed: %v", err)
 		}
@@ -159,7 +158,7 @@ func TestPutfile(t *testing.T) {
 
 	// mtime increased and hash changed
 	want = "Hello, 世界\nThis line added outside of Edwood.\n"
-	err = ioutil.WriteFile(filename, []byte(""), 0644)
+	err = os.WriteFile(filename, []byte(""), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}

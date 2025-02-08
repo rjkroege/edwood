@@ -2,7 +2,6 @@ package file
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -378,7 +377,7 @@ func TestFileRedoSeq(t *testing.T) {
 }
 
 func TestFileUpdateInfo(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "edwood_test")
+	tmp, err := os.CreateTemp("", "edwood_test")
 	if err != nil {
 		t.Fatalf("failed to create temporary file: %v", err)
 	}

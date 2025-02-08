@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -155,7 +154,7 @@ const contents = "This is a\nshort text\nto try addressing\n"
 const alt_contents = "A different text\nWith other contents\nSo there!\n"
 
 func makeTempFile(contents string) (string, func(), error) {
-	tfd, err := ioutil.TempFile("", "example")
+	tfd, err := os.CreateTemp("", "example")
 	if err != nil {
 		return "", func() {}, err
 	}

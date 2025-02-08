@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,7 +81,7 @@ func startAcme(t *testing.T, args ...string) *Acme {
 		t.Fatalf("Test will fail unless USER is set in environment. Please set.")
 	}
 
-	ns, err := ioutil.TempDir("", "ns.fsystest")
+	ns, err := os.MkdirTemp("", "ns.fsystest")
 	if err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
 	}

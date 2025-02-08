@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -45,13 +45,13 @@ func TestRowLoadFsys(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			b, err := ioutil.ReadFile(tc.filename)
+			b, err := os.ReadFile(tc.filename)
 			if err != nil {
 				t.Fatalf("ReadFile failed: %v", err)
 			}
 			b = bytes.Replace(b, []byte(gopherEdwoodDir), []byte(cwd), -1)
 
-			f, err := ioutil.TempFile("", "edwood_test")
+			f, err := os.CreateTemp("", "edwood_test")
 			if err != nil {
 				t.Fatalf("failed to create temporary file: %v", err)
 			}
@@ -312,7 +312,7 @@ func fsysReadFile(fsys *client.Fsys, filename string) ([]byte, error) {
 	}
 	defer fid.Close()
 
-	return ioutil.ReadAll(fid)
+	return io.ReadAll(fid)
 }
 
 func fsysReadDot(fsys *client.Fsys, id int) (q0, q1 int, err error) {
@@ -333,7 +333,7 @@ func fsysReadDot(fsys *client.Fsys, id int) (q0, q1 int, err error) {
 		return 0, 0, err
 	}
 
-	b, err := ioutil.ReadAll(addr)
+	b, err := io.ReadAll(addr)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -471,13 +471,13 @@ func replacePathsForTesting(t *testing.T, b []byte, isJSON bool) []byte {
 }
 
 func editDumpFileForTesting(t *testing.T, filename string) string {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
 	}
 	b = replacePathsForTesting(t, b, true)
 
-	f, err := ioutil.TempFile("", "edwood_test")
+	f, err := os.CreateTemp("", "edwood_test")
 	if err != nil {
 		t.Fatalf("failed to create temporary file: %v", err)
 	}
