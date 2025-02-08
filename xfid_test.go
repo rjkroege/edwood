@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -463,7 +462,7 @@ func TestXfidclose(t *testing.T) {
 		{"Qeditout", Qeditout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpfile, err := ioutil.TempFile("", "edwood")
+			tmpfile, err := os.CreateTemp("", "edwood")
 			if err != nil {
 				t.Fatalf("can't create temporary file: %v", err)
 			}

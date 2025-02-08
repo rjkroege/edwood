@@ -5,7 +5,6 @@ package complete
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"strings"
 	"unicode/utf8"
@@ -63,7 +62,7 @@ func Complete(dir, s string) (*Completion, error) {
 	if strings.ContainsRune(s, os.PathSeparator) {
 		return nil, errors.New("path separator in name argument to complete()")
 	}
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func Complete(dir, s string) (*Completion, error) {
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), s) {
 			name = append(name, file.Name())
-			mode = append(mode, file.Mode())
+			mode = append(mode, file.Type())
 			if minlen > len(file.Name()) {
 				minlen = len(file.Name())
 			}
@@ -106,7 +105,7 @@ func Complete(dir, s string) (*Completion, error) {
 		// no match, so return all possible strings
 		for _, file := range files {
 			name = append(name, file.Name())
-			mode = append(mode, file.Mode())
+			mode = append(mode, file.Type())
 		}
 		c.NMatch = 0
 	}

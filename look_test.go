@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +18,7 @@ func TestExpand(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping on windows")
 	}
-	dp, err := ioutil.TempDir("", "testexpand")
+	dp, err := os.MkdirTemp("", "testexpand")
 	if err != nil {
 		t.Fatalf("can't make tempdir: %v", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -265,7 +264,7 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 // but I need the UTF-8 interpretation. I could fix this by using a UTF-8
 // -> []rune reader on top of the os.File instead.
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
-	d, err := ioutil.ReadAll(fd)
+	d, err := io.ReadAll(fd)
 	// TODO(rjk): improve handling of read errors.
 	if err != nil {
 		err = errors.New("read error in RuneArray.Load")

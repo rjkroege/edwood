@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -118,7 +117,7 @@ func xfidopen(x *Xfid) {
 			}
 			// TODO(flux): Move the TempFile and Remove
 			// into a tempfile() call
-			tmp, err := ioutil.TempFile("", "acme")
+			tmp, err := os.CreateTemp("", "acme")
 			if err != nil || testTempFileFail {
 				w.Unlock()
 				x.respond(&fc, fmt.Errorf("can't create temp file"))
