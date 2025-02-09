@@ -55,7 +55,7 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	return qq0, qq1
 }
 
-func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
+func expandfile(t *Text, q0 int, q1 int, e *Expand) bool {
 	amax := q1
 	if q1 == q0 {
 		// Check for being in a quoted string, find out if its a file.
