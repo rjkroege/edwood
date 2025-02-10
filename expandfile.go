@@ -53,7 +53,7 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 		}
 		qq1++
 	}
-	return qq0, max(qq1, qq0)
+	return qq0, qq1
 }
 
 // isselectionquoted tests if a selection is a file name in quotes.
