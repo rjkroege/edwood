@@ -42,6 +42,7 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	if !foundquote {
 		return q0, q0
 	}
+	// TODO(rjk): Should give up at a max filename length.
 	for qq1 < t.file.Nr() {
 		c := t.ReadC(qq1 - 1)
 		if c == '\'' {
@@ -52,7 +53,21 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 		}
 		qq1++
 	}
-	return qq0, qq1
+	return qq0, max(qq1, qq0)
+}
+
+// isselectionquoted tests if a selection is a file name in quotes.
+func isselectionquotedfilename(t *Text, q0, q1 int) (int, int) {
+	if c := t.ReadC(q0); c != '\'' {
+		// Definitely not a filename in single quotes as selection doesn't
+		// start with a single quote.
+		return q0, q0
+	}
+	qq0, qq1 := findquotedcontext(t, q0+1)
+	if qq0 == q0 && qq1 == q1 {
+		return qq0, qq1
+	}
+	return q0, q0
 }
 
 // quotedcontexthelper handles the situation where we have a file. If we
@@ -147,7 +162,17 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) bool {
 				}
 			}
 		}
+	} else {
+		// There is a selection. It might contain quotes wrapping a filename.
+		qq0, qq1 := isselectionquotedfilename(t, q0, q1)
+		if qq0 != qq1 {
+			// Invariant: qq0 and qq1-1 are '
+			if expandfile(t, qq0+1, qq1-1, e) {
+				return quotedcontexthelper(t, e, qq0, qq1)
+			}
+		}
 	}
+
 	amin := amax
 	e.q0 = q0
 	e.q1 = q1
