@@ -86,13 +86,22 @@ func (b *Buffer) Reader(rq0 int, rq1 int) io.Reader {
 }
 
 func (b *Buffer) String() string {
-	sr := io.NewSectionReader(b, int64(0), int64(b.Size()))
+	return b._string(0, b.Size())
+}
+
+func (b *Buffer) _string(q0 int, q1 int) string {
+	sr := io.NewSectionReader(b, int64(q0), int64(q1))
 
 	buffy := new(strings.Builder)
 
 	// TODO(rjk): Add some error checking.
 	io.Copy(buffy, sr)
 	return buffy.String()
+}
+
+func (b *Buffer) StringSlice(rq0 int, rq1 int) string {
+	buffy, _ := io.ReadAll(b.Reader(rq0, rq1))
+	return string(buffy)
 }
 
 // viewedState returns a string representation of a Buffer b good for debugging.
