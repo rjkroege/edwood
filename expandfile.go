@@ -44,9 +44,11 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	}
 	// TODO(rjk): Should give up at a max filename length.
 	for qq1 < t.file.Nr() {
-		c := t.ReadC(qq1 - 1)
+		// TODO(rjk): why -1?
+		c := t.ReadC(qq1)
+		// c := t.ReadC(qq1 - 1)
 		if c == '\'' {
-			break
+			return qq0, qq1 + 1
 		}
 		if !isfilec(c) && !isfilespace(c) {
 			return q0, q0 // No quote found rightwards.

@@ -463,6 +463,10 @@ func (e *ObservableEditableBuffer) String() string {
 	return e.f.String()
 }
 
+func (e *ObservableEditableBuffer) StringSlice(rq0 int, rq1 int) string {
+	return e.f.StringSlice(rq0, rq1)
+}
+
 // ResetBuffer is a forwarding function for rune_array.Reset. Equivalent
 // to re-creating the buffer.
 func (e *ObservableEditableBuffer) ResetBuffer() {
