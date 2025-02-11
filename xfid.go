@@ -596,22 +596,25 @@ forloop:
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
-			if nulls {
-				err = fmt.Errorf("nulls in file name")
-				break forloop
-			}
-			for _, rr := range r {
-				if rr <= ' ' {
+
+			fn := words[1]
+			for _, c := range fn {
+				if c == '\000' {
+					err = fmt.Errorf("nulls in file name")
+					break forloop
+				}
+				if c < ' ' {
 					err = fmt.Errorf("bad character in file name")
 					break forloop
 				}
 			}
+
+			// TODO(rjk): There should be some nicer way to do this.
 			if !w.nomark {
 				global.seq++
 				w.body.file.Mark(global.seq)
 			}
-			w.SetName(string(r))
+			w.SetName(fn)
 		case "dump": // set dump string
 			if len(words) < 2 {
 				err = ErrBadCtl
