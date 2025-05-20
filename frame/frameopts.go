@@ -67,6 +67,13 @@ func OptMaxTab(maxtabchars int) OptionClosure {
 	}
 }
 
+// OptTickColor sets the tick colour image used when drawing the cursor.
+func OptTickColor(col draw.Image) OptionClosure {
+	return func(f *frameimpl, ctx *optioncontext) {
+		f.tickcolor = col
+	}
+}
+
 // computemaxtab returns the new ftw value
 func (ctx *optioncontext) computemaxtab(maxtab, ftw int) int {
 	if ctx.maxtabchars < 0 {

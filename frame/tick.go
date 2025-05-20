@@ -1,18 +1,13 @@
 package frame
 
 import (
-	"github.com/rjkroege/edwood/draw"
-	"github.com/rjkroege/edwood/theme"
 	"image"
 	"log"
+
+	"github.com/rjkroege/edwood/draw"
 )
 
-// drawTick is a centralised function to render a tick with consistent logic.
-func (f *frameimpl) drawTick(target draw.Image, tickColor draw.Image, rect image.Rectangle) {
-	target.Draw(rect, tickColor, nil, image.Point{})
-}
-
-// InitTick initialises the tick with consistent dark mode logic.
+// InitTick initialises the tick used to show the insertion point.
 // TODO(rjk): doesn't appear to need to be exposed publically.
 func (f *frameimpl) InitTick() {
 	if f.cols[ColBack] == nil || f.display == nil {
@@ -38,14 +33,7 @@ func (f *frameimpl) InitTick() {
 		return
 	}
 
-	var backgroundColor draw.Color
-	if theme.IsDarkMode() {
-		backgroundColor = theme.BackgroundColor
-	} else {
-		backgroundColor = theme.White
-	}
-
-	f.tickback, err = f.display.AllocImage(f.tickimage.R(), b.Pix(), false, backgroundColor)
+	f.tickback, err = f.display.AllocImage(f.tickimage.R(), b.Pix(), false, draw.Transparent)
 	if err != nil {
 		log.Printf("InitTick: Failed to allocate tickback image: %v\n", err)
 		f.tickimage.Free()
@@ -63,11 +51,4 @@ func (f *frameimpl) InitTick() {
 	// box on each end
 	f.tickimage.Draw(image.Rect(0, 0, f.tickscale*frtickw, f.tickscale*frtickw), f.display.Opaque(), nil, image.Pt(0, 0))
 	f.tickimage.Draw(image.Rect(0, height-f.tickscale*frtickw, f.tickscale*frtickw, height), f.display.Opaque(), nil, image.Pt(0, 0))
-
-	// Flush the display buffer to ensure it's drawn
-	err = f.display.Flush()
-	if err != nil {
-		log.Printf("InitTick: Failed to flush display: %v\n", err)
-		f.tickimage = nil // Disable the tick functionality to avoid issues
-	}
 }

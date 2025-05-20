@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/rjkroege/edwood/theme"
 	"image"
 	"log"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/theme"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
 	ncol              = flag.Int("c", 2, "Number of columns at startup")
 	loadfile          = flag.String("l", "", "Load state from file generated with Dump command")
-	darkMode          = flag.Bool("v", false, "Enable dark (Vampira) mode colour scheme") // Added dark mode flag
+	darkFlag          = flag.Bool("dark", false, "Enable dark mode colour scheme")
 )
 
 func predrawInit() *dumpfile.Content {
@@ -169,7 +169,7 @@ func main() {
 		}
 
 		// Set dark mode state in theme package with display
-		theme.SetDarkMode(*darkMode, display)
+		theme.SetDarkMode(*darkFlag)
 		mainWithDisplay(global, dump, display)
 	})
 }
