@@ -30,6 +30,7 @@ type globals struct {
 	button    draw.Image
 	but2col   draw.Image
 	but3col   draw.Image
+	tickcol   draw.Image
 
 	//	boxcursor Cursor
 	row Row
@@ -155,20 +156,12 @@ func (g *globals) iconinit(display draw.Display) {
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	if *darkMode {
-		tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.ModButton)
-		g.modbutton.Draw(r, tmp, nil, image.Point{})
-	} else {
-		tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
-		g.modbutton.Draw(r, tmp, nil, image.Point{})
-	}
+	p := theme.Current()
+	tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.ModButton)
+	g.modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = g.button.R()
-	if *darkMode {
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, theme.ColButton)
-	} else {
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Purpleblue)
-	}
+	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, p.ColButton)
 
 	// These are the highlight colors for mouse buttons 2 and 3 functions
 	g.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
@@ -176,38 +169,27 @@ func (g *globals) iconinit(display draw.Display) {
 }
 
 func (g *globals) applyMode(display draw.Display) {
-	if *darkMode {
-		// Apply dark mode colours
-		g.tagcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColBack)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColHigh)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColBord)
-		g.tagcolors[frame.ColText] = display.White()
-		g.tagcolors[frame.ColHText] = display.White()
+	p := theme.Current()
 
-		g.textcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TextColBack)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TextColHigh)
-		g.textcolors[frame.ColText] = display.White()
-		g.textcolors[frame.ColHText] = display.White()
+	g.tagcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColBack)
+	g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColHigh)
+	g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColBord)
+	g.tagcolors[frame.ColText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColText)
+	g.tagcolors[frame.ColHText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagHText)
 
-		r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, 0xAA0000FF)
+	g.textcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColBack)
+	g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColHigh)
+	g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColBord)
+	g.textcolors[frame.ColText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColText)
+	g.textcolors[frame.ColHText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColHText)
 
-		// These are the highlight colors for mouse buttons 2 and 3 functions
-		g.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
-		g.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
+	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
+	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, p.ColButton)
 
-	} else {
-		// Apply light mode colours (default)
-		g.tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palegreygreen)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Purpleblue)
-		g.tagcolors[frame.ColText] = display.Black()
-		g.tagcolors[frame.ColHText] = display.Black()
+	g.modbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, p.ModButton)
 
-		g.textcolors[frame.ColBack] = display.AllocImageMix(draw.Paleyellow, draw.White)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Darkyellow)
-		g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Yellowgreen)
-		g.textcolors[frame.ColText] = display.Black()
-		g.textcolors[frame.ColHText] = display.Black()
-	}
+	g.tickcol, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TickColor)
+
+	g.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.But2Col)
+	g.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.But3Col)
 }

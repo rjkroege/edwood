@@ -285,6 +285,7 @@ type frameimpl struct {
 	tickback    draw.Image // image under tick
 	ticked      bool       // Is the tick on.
 	highlighton bool       // True if the highlight is painted.
+	tickcolor   draw.Image // colour of the tick
 
 	// Set this to true to indicate that the Frame should not emit drawing ops.
 	// Use this if the Frame is being used "headless" to measure some text.
@@ -294,9 +295,9 @@ type frameimpl struct {
 
 // NewFrame creates a new Frame with Font ft, background image b, colours cols, and
 // of the size r
-func NewFrame(r image.Rectangle, ft draw.Font, b draw.Image, cols [NumColours]draw.Image) Frame {
+func NewFrame(r image.Rectangle, ft draw.Font, b draw.Image, cols [NumColours]draw.Image, tick draw.Image) Frame {
 	f := new(frameimpl)
-	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8))
+	f.Init(r, OptColors(cols), OptFont(ft), OptBackground(b), OptMaxTab(8), OptTickColor(tick))
 	return f
 }
 
