@@ -30,14 +30,15 @@ var (
 )
 
 var lightPalette = Palette{
-	TagColBack:   0xE0E0E0FF,
-	TagColHigh:   0xC0C0C0FF,
-	TagColBord:   0x888888FF,
+	// Plan 9 defaults
+	TagColBack:   draw.Palebluegreen,
+	TagColHigh:   draw.Palegreygreen,
+	TagColBord:   draw.Purpleblue,
 	TagColText:   draw.Black,
 	TagHText:     draw.Black,
-	TextColBack:  0xFFFFFFFF,
-	TextColHigh:  0xFFFF00FF,
-	TextColBord:  0x888888FF,
+	TextColBack:  draw.Paleyellow,
+	TextColHigh:  draw.Darkyellow,
+	TextColBord:  draw.Yellowgreen,
 	TextColText:  draw.Black,
 	TextColHText: draw.Black,
 	ModButton:    0x222222FF,
@@ -46,7 +47,7 @@ var lightPalette = Palette{
 	But2Col:      0xAA0000FF,
 	But3Col:      0x006600FF,
 	Background:   draw.White,
-	TickColor:    draw.Palegreygreen,
+	TickColor:    draw.Black,
 }
 
 var darkPalette = Palette{
