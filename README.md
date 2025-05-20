@@ -38,8 +38,20 @@ Example usage:
 
 	edwood	# Use Go font at 10pt
 	edwood -f @12pt -F @12pt	# Go font at 12pt
-	edwood -f /usr/share/fonts/TTF/DejaVuSans.ttf@12pt -F /usr/share/fonts/TTF/DejaVuSansMono.ttf@12pt
-	edwood -f $PLAN9/font/lucsans/euro.8.font -F $PLAN9/font/lucm/unicode.9.font
+        edwood -f /usr/share/fonts/TTF/DejaVuSans.ttf@12pt -F /usr/share/fonts/TTF/DejaVuSansMono.ttf@12pt
+        edwood -f $PLAN9/font/lucsans/euro.8.font -F $PLAN9/font/lucm/unicode.9.font
+
+## Dark mode and colour palettes
+
+Edwood supports a dark theme that can be enabled at startup with the
+`-dark` flag:
+
+        edwood -dark
+
+When this flag is present the editor switches to the dark colour
+palette defined in `theme/theme.go`. No environment variables currently
+control theme selection. Both the light and dark palette definitions
+can be found in that file.
 
 ## Edwood on Plan 9
 
