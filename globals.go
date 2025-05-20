@@ -130,18 +130,7 @@ func makeglobals() *globals {
 
 // TODO(rjk): Can separate this out even better.
 func (g *globals) iconinit(display draw.Display) {
-	if g.tagcolors[frame.ColBack] == nil {
-		g.tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palegreygreen)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Purpleblue)
-		g.tagcolors[frame.ColText] = display.Black()
-		g.tagcolors[frame.ColHText] = display.Black()
-		g.textcolors[frame.ColBack] = display.AllocImageMix(draw.Paleyellow, draw.White)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Darkyellow)
-		g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Yellowgreen)
-		g.textcolors[frame.ColText] = display.Black()
-		g.textcolors[frame.ColHText] = display.Black()
-	}
+	// Colours are now initialised in applyMode.
 
 	// ...
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
@@ -171,13 +160,21 @@ func (g *globals) iconinit(display draw.Display) {
 func (g *globals) applyMode(display draw.Display) {
 	p := theme.Current()
 
-	g.tagcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColBack)
+	if theme.IsDarkMode() {
+		g.tagcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColBack)
+	} else {
+		g.tagcolors[frame.ColBack] = display.AllocImageMix(p.TagColBack, draw.White)
+	}
 	g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColHigh)
 	g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColBord)
 	g.tagcolors[frame.ColText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagColText)
 	g.tagcolors[frame.ColHText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TagHText)
 
-	g.textcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColBack)
+	if theme.IsDarkMode() {
+		g.textcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColBack)
+	} else {
+		g.textcolors[frame.ColBack] = display.AllocImageMix(p.TextColBack, draw.White)
+	}
 	g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColHigh)
 	g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColBord)
 	g.textcolors[frame.ColText], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, p.TextColText)

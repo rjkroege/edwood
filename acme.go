@@ -82,7 +82,11 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 	// Apply the appropriate mode based on the flag
 	g.applyMode(display)
 
-	display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+	if theme.IsDarkMode() {
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.Black(), nil, image.Point{})
+	} else {
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+	}
 
 	g.mousectl = display.InitMouse()
 	g.mouse = &g.mousectl.Mouse
@@ -238,7 +242,11 @@ func mousethread(g *globals, display draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+			if theme.IsDarkMode() {
+				display.ScreenImage().Draw(display.ScreenImage().R(), display.Black(), nil, image.Point{})
+			} else {
+				display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+			}
 			// TODO(rjk): We appear to have already done this.
 			g.iconinit(display)
 			ScrlResize(display)
