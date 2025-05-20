@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -118,7 +117,7 @@ func xfidopen(x *Xfid) {
 			}
 			// TODO(flux): Move the TempFile and Remove
 			// into a tempfile() call
-			tmp, err := ioutil.TempFile("", "acme")
+			tmp, err := os.CreateTemp("", "acme")
 			if err != nil || testTempFileFail {
 				w.Unlock()
 				x.respond(&fc, fmt.Errorf("can't create temp file"))
@@ -395,6 +394,7 @@ func xfidwrite(x *Xfid) {
 
 	// updateText writes x.fcall.Data to text buffer t and sends the 9P response.
 	updateText := func(t *Text) {
+		// log.Printf("updateText global.seq %d, seq state %s", global.seq, t.file.DebugSeqState())
 		r := fullrunewrite(x)
 		if len(r) != 0 {
 			w.Commit(t)
@@ -413,6 +413,13 @@ func xfidwrite(x *Xfid) {
 				if !w.nomark {
 					global.seq++
 					t.file.Mark(global.seq)
+				}
+				// To align with how Acme works, the file on disk has not been changed
+				// but Edwood's in-memory store of the file would now be different from
+				// the backing file and also not undoable back to the backign state as
+				// has been programmatically modified via the filesystem API.
+				if t.file.Seq() == 0 && w.nomark {
+					t.file.Modded()
 				}
 				q, nr := t.BsInsert(q0, r, true) // TODO(flux): BsInsert returns nr?
 				q0 = q
@@ -589,22 +596,25 @@ forloop:
 				err = ErrBadCtl
 				break forloop
 			}
-			r, _, nulls := util.Cvttorunes([]byte(words[1]), len(words[1]))
-			if nulls {
-				err = fmt.Errorf("nulls in file name")
-				break forloop
-			}
-			for _, rr := range r {
-				if rr <= ' ' {
+
+			fn := words[1]
+			for _, c := range fn {
+				if c == '\000' {
+					err = fmt.Errorf("nulls in file name")
+					break forloop
+				}
+				if c < ' ' {
 					err = fmt.Errorf("bad character in file name")
 					break forloop
 				}
 			}
+
+			// TODO(rjk): There should be some nicer way to do this.
 			if !w.nomark {
 				global.seq++
 				w.body.file.Mark(global.seq)
 			}
-			w.SetName(string(r))
+			w.SetName(fn)
 		case "dump": // set dump string
 			if len(words) < 2 {
 				err = ErrBadCtl
@@ -656,11 +666,24 @@ forloop:
 			w.limit.q0 = w.addr.q0
 			w.limit.q1 = w.addr.q1
 		case "nomark": // turn off automatic marking
+			// Snapshot the file state first to make sure that we do the right thing.
+			// But perhaps we are setting up the buffer. So if the seq is not 0, skip
+			// this. Are multiple undo snapshots harmful? (Perhaps this causes bugs
+			// with undo from the command language?)
+			if w.body.file.Seq() > 0 {
+				global.seq++
+				w.body.file.Mark(global.seq)
+			}
 			w.nomark = true
+			// Once we've nomark'ed, if seq == 0, mutations will be undoable.
+			// but the file will be different than disk. So mark it dirty in update.
 		case "mark": // mark file
 			w.nomark = false
-			// global.seq++
-			// w.body.file.Mark(global.seq)
+			// Premise is that the next undoable mutation will set an undo point.
+			// TODO:(rjk): Maintaining this invariant is tricky. It should be tested
+			// and the code in text.go should be appropriately structured to make it
+			// easy to reason about and to test.
+			// TODO(rjk): The premise is wrong. The first edit does not.
 		case "nomenu": // turn off automatic menu
 			w.filemenu = false
 		case "menu": // enable automatic menu

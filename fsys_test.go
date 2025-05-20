@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,7 +81,7 @@ func startAcme(t *testing.T, args ...string) *Acme {
 		t.Fatalf("Test will fail unless USER is set in environment. Please set.")
 	}
 
-	ns, err := ioutil.TempDir("", "ns.fsystest")
+	ns, err := os.MkdirTemp("", "ns.fsystest")
 	if err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
 	}
@@ -279,7 +278,7 @@ func TestFSys(t *testing.T) {
 		}{
 			{"/edwood/test1", true},
 			{"/edwood/世界.txt", true},
-			{"/edwood/name with space", false},
+			{"/edwood/name with space", true},
 			{"/edwood/\x00\x00test2", false},
 		} {
 			err := w.Name(tc.name)
@@ -298,9 +297,15 @@ func TestFSys(t *testing.T) {
 				t.Errorf("Failed to read tag: %v\n", err)
 				continue
 			}
-			tag := strings.SplitN(string(b), " ", 2)
-			if tc.name != tag[0] {
-				t.Errorf("Window name is %q; expected %q\n", tag[0], tc.name)
+			// Supporting spaces requires different parsing.
+			// TODO(rjk): Consider adding a helper to gozen for this task.
+			tags := strings.SplitN(string(b), " ", 2)
+			fn := tags[0]
+			if b[0] == '\'' {
+				fn = string(b[1 : bytes.IndexByte(b[1:], '\'')+1])
+			}
+			if tc.name != fn {
+				t.Errorf("Window name is %q; expected %q\n", fn, tc.name)
 			}
 		}
 

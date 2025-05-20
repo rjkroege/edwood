@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -268,7 +268,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 		editerror("%v is a directory", name)
 	}
 
-	d, err := ioutil.ReadAll(fd)
+	d, err := io.ReadAll(fd)
 	if err != nil {
 		editerror("%v unreadable", name)
 	}

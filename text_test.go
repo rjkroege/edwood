@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -48,11 +47,11 @@ func TestLoadReader(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	dir, err := ioutil.TempDir("", "edwood.test")
+	dir, err := os.MkdirTemp("", "edwood.test")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer os.Remove(dir)
 
 	for _, tc := range []struct {
 		in, out string
@@ -62,7 +61,7 @@ func TestLoad(t *testing.T) {
 	} {
 		text := emptyText()
 		filename := filepath.Join(dir, "tmpfile")
-		if err = ioutil.WriteFile(filename, []byte(tc.in), 0644); err != nil {
+		if err = os.WriteFile(filename, []byte(tc.in), 0644); err != nil {
 			t.Fatalf("WriteFile failed: %v", err)
 		}
 
@@ -176,7 +175,7 @@ func TestTextKindString(t *testing.T) {
 }
 
 func TestGetDirNames(t *testing.T) {
-	dir, err := ioutil.TempDir("", "edwood")
+	dir, err := os.MkdirTemp("", "edwood")
 	if err != nil {
 		t.Fatalf("TempDir failed: %v", err)
 	}
@@ -202,7 +201,7 @@ func TestGetDirNames(t *testing.T) {
 
 	// add a regular file
 	name = "example.txt"
-	err = ioutil.WriteFile(filepath.Join(dir, name), []byte("hello\n"), 0644)
+	err = os.WriteFile(filepath.Join(dir, name), []byte("hello\n"), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}

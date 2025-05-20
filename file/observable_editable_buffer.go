@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -192,6 +191,7 @@ func (e *ObservableEditableBuffer) notifyTagObservers(before TagStatus) {
 // Mark is a forwarding function for file.Mark.
 // This sets an undo point. NB: call Mark before mutating the file.
 // Argument seq should be > 0 to create a valid Undo/Redo point.
+// TODO(rjk): Should this update the tag?
 func (e *ObservableEditableBuffer) Mark(seq int) {
 	e.f.Mark()
 	e.seq = seq
@@ -264,7 +264,7 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 // but I need the UTF-8 interpretation. I could fix this by using a UTF-8
 // -> []rune reader on top of the os.File instead.
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
-	d, err := ioutil.ReadAll(fd)
+	d, err := io.ReadAll(fd)
 	// TODO(rjk): improve handling of read errors.
 	if err != nil {
 		err = errors.New("read error in RuneArray.Load")
@@ -294,7 +294,6 @@ func (e *ObservableEditableBuffer) InsertAt(rp0 int, rs []rune) {
 }
 
 // Insert is a forwarding function for file.Insert.
-// p0 is position in runes.
 func (e *ObservableEditableBuffer) Insert(p0 OffsetTuple, s []byte, nr int) {
 	before := e.getTagStatus()
 	defer e.notifyTagObservers(before)
@@ -462,6 +461,10 @@ func (e *ObservableEditableBuffer) Read(q0 int, r []rune) (int, error) {
 // on this not
 func (e *ObservableEditableBuffer) String() string {
 	return e.f.String()
+}
+
+func (e *ObservableEditableBuffer) StringSlice(rq0 int, rq1 int) string {
+	return e.f.StringSlice(rq0, rq1)
 }
 
 // ResetBuffer is a forwarding function for rune_array.Reset. Equivalent

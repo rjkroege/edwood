@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"fmt"
 	"image"
 	"log"
 	"os"
@@ -586,7 +586,7 @@ type errorWriter struct{}
 func (w errorWriter) Write(data []byte) (n int, err error) {
 	n = len(data)
 	if n > 0 {
-		global.cerr <- fmt.Errorf(string(data))
+		global.cerr <- errors.New(string(data))
 	}
 	return
 }

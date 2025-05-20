@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -463,7 +462,7 @@ func TestXfidclose(t *testing.T) {
 		{"Qeditout", Qeditout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpfile, err := ioutil.TempFile("", "edwood")
+			tmpfile, err := os.CreateTemp("", "edwood")
 			if err != nil {
 				t.Fatalf("can't create temporary file: %v", err)
 			}
@@ -911,7 +910,8 @@ func TestXfidwriteQWctl(t *testing.T) {
 		{ErrBadCtl, "name"},
 		{nil, "name /Test/Write/Ctl"},
 		{fmt.Errorf("nulls in file name"), "name /Test/Write\u0000/Ctl"},
-		{fmt.Errorf("bad character in file name"), "name /Test/Write To/Ctl"},
+		{nil, "name /Test/Write To/Ctl"},
+		{fmt.Errorf("bad character in file name"), "name /Test/\037Write To/Ctl"},
 		{nil, "dump win"},
 		{ErrBadCtl, "dump"},
 		{fmt.Errorf("nulls in dump string"), "dump win\u0000rc"},

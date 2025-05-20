@@ -42,10 +42,13 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	if !foundquote {
 		return q0, q0
 	}
+	// TODO(rjk): Should give up at a max filename length.
 	for qq1 < t.file.Nr() {
-		c := t.ReadC(qq1 - 1)
+		// TODO(rjk): why -1?
+		c := t.ReadC(qq1)
+		// c := t.ReadC(qq1 - 1)
 		if c == '\'' {
-			break
+			return qq0, qq1 + 1
 		}
 		if !isfilec(c) && !isfilespace(c) {
 			return q0, q0 // No quote found rightwards.
@@ -55,7 +58,48 @@ func findquotedcontext(t *Text, q0 int) (qq0, qq1 int) {
 	return qq0, qq1
 }
 
-func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
+// isselectionquoted tests if a selection is a file name in quotes.
+func isselectionquotedfilename(t *Text, q0, q1 int) (int, int) {
+	if c := t.ReadC(q0); c != '\'' {
+		// Definitely not a filename in single quotes as selection doesn't
+		// start with a single quote.
+		return q0, q0
+	}
+	qq0, qq1 := findquotedcontext(t, q0+1)
+	if qq0 == q0 && qq1 == q1 {
+		return qq0, qq1
+	}
+	return q0, q0
+}
+
+// quotedcontexthelper handles the situation where we have a file. If we
+// have a colon following our qq1+1 quote we have to get it and add it to
+// Expand.
+func quotedcontexthelper(t *Text, e *Expand, qq0, qq1 int) bool {
+	cq1 := qq1
+	c := t.ReadC(cq1)
+	if c != ':' { // We don't have any address information here.  Just return e.
+		e.q0 = qq0
+		e.q1 = qq1
+		return true
+	}
+	cq1++
+	// collect the address
+	e.a0 = cq1
+	for cq1 < t.file.Nr() {
+		c := t.ReadC(cq1)
+		if !isaddrc(c) && !isregexc(c) && c != '\'' {
+			break
+		}
+		cq1++
+	}
+	e.a1 = cq1
+	e.q0 = qq0
+	e.q1 = cq1
+	return true
+}
+
+func expandfile(t *Text, q0 int, q1 int, e *Expand) bool {
 	amax := q1
 	if q1 == q0 {
 		// Check for being in a quoted string, find out if its a file.
@@ -63,31 +107,7 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 		if qq0 != qq1 {
 			// Invariant: qq0 and qq1-1 are '
 			if expandfile(t, qq0+1, qq1-1, e) {
-				// We have a file.  If we have a colon following our qq1+1 quote
-				// we have to get it and add it to Expand.
-				cq1 := qq1
-				c := t.ReadC(cq1)
-				if c != ':' { // We don't have any address information here.  Just return e.
-					e.q0 = qq0
-					e.q1 = qq1
-					return true
-				}
-				cq1++
-				// collect the address
-				e.a0 = cq1
-				for cq1 < t.file.Nr() {
-					c := t.ReadC(cq1)
-					if !isaddrc(c) && !isregexc(c) && c != '\'' {
-						break
-					}
-					cq1++
-				}
-				e.a1 = cq1
-				q0 = qq0
-				q1 = cq1
-				e.q0 = q0
-				e.q1 = q1
-				return true
+				return quotedcontexthelper(t, e, qq0, qq1)
 			}
 		} else {
 			colon := int(-1)
@@ -144,7 +164,17 @@ func expandfile(t *Text, q0 int, q1 int, e *Expand) (success bool) {
 				}
 			}
 		}
+	} else {
+		// There is a selection. It might contain quotes wrapping a filename.
+		qq0, qq1 := isselectionquotedfilename(t, q0, q1)
+		if qq0 != qq1 {
+			// Invariant: qq0 and qq1-1 are '
+			if expandfile(t, qq0+1, qq1-1, e) {
+				return quotedcontexthelper(t, e, qq0, qq1)
+			}
+		}
 	}
+
 	amin := amax
 	e.q0 = q0
 	e.q1 = q1

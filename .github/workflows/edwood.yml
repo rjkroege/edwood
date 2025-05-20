@@ -8,7 +8,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.19.x, 1.20.x]
+        go-version: [1.23.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
@@ -25,25 +25,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Run Go tests
-      run: go test -v -race -coverprofile coverage.txt -covermode atomic ./...
-
-    - name: Build with duitdraw on non-windows systems
-      if: matrix.os != 'windows-latest'
-      run: go get -tags 'duitdraw mux9p' -t -v ./...
+    - name: Check gofmt
+      run: diff -u <(echo -n) <(gofmt -d -s .)
+      shell: bash
 
     - name: Run go vet
       run: go vet .
 
     - name: Install staticcheck and misspell
       run: |
-        go install honnef.co/go/tools/cmd/staticcheck@v0.4.2
+        go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
         go install github.com/client9/misspell/cmd/misspell@v0.3.4
       working-directory: /
       shell: bash
-
-    - name: Check if 'go get' modified go.mod file
-      run: git diff --exit-code
 
     - name: Run staticcheck
       run: staticcheck -checks inherit,-U1000,-SA4003 ./...
@@ -51,9 +45,16 @@ jobs:
     - name: Run misspell
       run: misspell -error .
 
-    - name: Check gofmt
-      run: diff -u <(echo -n) <(gofmt -d -s .)
-      shell: bash
+    - name: Run Go tests
+      run: go test -v -race -coverprofile coverage.txt -covermode atomic ./...
+
+    - name: Build with duitdraw on non-windows systems
+      if: matrix.os != 'windows-latest'
+      run: go get -tags 'duitdraw mux9p' -t -v ./...
+
+
+    - name: Check if 'go get' modified go.mod file
+      run: git diff --exit-code
 
     - name: Upload coverage to codecov
       # codecov can't seem to combine reports from multiple OSes correctly
