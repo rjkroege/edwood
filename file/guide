@@ -1,0 +1,8 @@
+// Basics
+Edit X:edwood/file/\+Errors: 1,$d
+X:edwood/.*\.go: w
+
+go test -covermode=count -coverprofile=count.out
+go tool cover -html=count.out
+
+go test --run 'TestLargeEditTargets' -covermode=count -coverprofile=count.out
