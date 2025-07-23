@@ -55,8 +55,3 @@ jobs:
 
     - name: Check if 'go get' modified go.mod file
       run: git diff --exit-code
-
-    - name: Upload coverage to codecov
-      # codecov can't seem to combine reports from multiple OSes correctly
-      if: matrix.os == 'ubuntu-latest'
-      run: bash <(curl -s https://codecov.io/bash)
