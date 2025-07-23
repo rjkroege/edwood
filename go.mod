@@ -11,7 +11,6 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/ktye/duitdraw v0.0.0-20190328070634-a54e9bd5a862
 	github.com/pkg/term v1.1.0
-	github.com/rjkroege/gozen v0.0.0-20250208070857-068fb3f8ce9e
 	github.com/sanity-io/litter v1.1.0
 	golang.org/x/sys v0.20.0
 )

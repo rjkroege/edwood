@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"9fans.net/go/acme"
-	"github.com/rjkroege/gozen"
+	"github.com/rjkroege/edwood/gozen"
 )
 
 var debug = flag.Bool("d", false, "set for verbose debugging")
