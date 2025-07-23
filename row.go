@@ -13,6 +13,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/theme"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -31,7 +32,11 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 		row = &Row{}
 	}
 	row.display = dis
-	row.display.ScreenImage().Draw(r, row.display.White(), nil, image.Point{})
+	if theme.IsDarkMode() {
+		row.display.ScreenImage().Draw(r, row.display.Black(), nil, image.Point{})
+	} else {
+		row.display.ScreenImage().Draw(r, row.display.White(), nil, image.Point{})
+	}
 	row.col = []*Column{}
 	row.r = r
 	r1 := r
