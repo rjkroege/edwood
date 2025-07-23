@@ -64,11 +64,28 @@ serve as drop-in replacement for Plan9 Port Acme. (But probably with
 different bugs.) Please file issues if Acme client apps don't work
 with Edwood or if your favourite Acme feature doesn't work.
 
+# Tools
+A selection of perhaps useful helpers are in `cmd`. In particular:
+
+- `cmd/win` is a slightly wip Golang version of the `win` program from p9p.
+- `cmd/B` is a Golang reimplementation of the `B` program from p9p that does a blocking open of 
+a file in Edwood. This `B` is a more 
+- `cmd/logtowin` A simple program to log stdin to a window. Useful in shell scripts if the filesystem
+implementation isn't mounted.
+
+Install with:
+
+```sh
+go install ./cmd/*
+```
+
 # Roadmap
 
 * More idiomatic Go and tests.
 * Internal API modernization.
-* Revised text handling data structures.
 * More configurability: styles, keyboard shortcuts, autocomplete.
 * See the issues list for the details.
 * Improve the testing [code coverage](https://codecov.io/gh/rjkroege/edwood)
+* More tools and documentation for an "ecosystem" (maybe this word is a bit cringe) of external
+scripts and software that make Acme/Edwood windows of text an important
+part of a larger editing system.
