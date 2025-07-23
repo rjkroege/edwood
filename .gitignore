@@ -27,6 +27,7 @@ _testmain.go
 /E
 /sendit
 /win
+/logtowin
 
 # Mac stuffs
 .DS_Store
