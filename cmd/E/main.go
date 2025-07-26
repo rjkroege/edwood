@@ -48,7 +48,9 @@ func main() {
 		}
 		log.Println(ev)
 
-		if ev.Name == ap && ev.Op == "del" {
+		// Use ID because the name as loaded might not be the same as the
+		// argument string.
+		if ev.ID == win.ID() && ev.Op == "del" {
 			edwoodlog.Close()
 			return
 		}
