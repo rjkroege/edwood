@@ -107,7 +107,7 @@ func (t *Text) Init(r image.Rectangle, rf string, cols [frame.NumColours]draw.Im
 	t.font = rf
 	t.tabstop = int(global.maxtab)
 	t.tabexpand = global.tabexpand
-	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage(), cols)
+	t.fr = frame.NewFrame(r, fontget(rf, t.display), t.display.ScreenImage(), cols, global.tickcol)
 	t.Redraw(r, -1, false /* noredraw */)
 	return t
 }
