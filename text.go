@@ -155,6 +155,12 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
+			if t.w.readme != nil {
+				if len(t.w.dirnames) > 0 {
+					t.file.InsertAt(t.file.Nr(), []rune("\n"))
+				}
+				t.file.InsertAt(t.file.Nr(), t.w.readme)
+			}
 			t.Show(0, 0, false)
 		}
 	} else {
@@ -349,6 +355,27 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
+
+		readmeNames := []string{"README.md", "README"}
+		var readmeContent []byte
+		for _, readmeName := range readmeNames {
+			readmePath := filepath.Join(filename, readmeName)
+			content, err := os.ReadFile(readmePath)
+			if err == nil {
+				readmeContent = content
+				break
+			}
+		}
+
+		t.w.readme = nil
+		if readmeContent != nil {
+			t.w.readme = bytetorune(readmeContent)
+			if len(dirNames) > 0 {
+				t.file.InsertAt(t.file.Nr(), []rune("\n"))
+			}
+			t.file.InsertAt(t.file.Nr(), t.w.readme)
+		}
+
 		q1 := t.file.Nr()
 		return q1 - q0, nil
 	}

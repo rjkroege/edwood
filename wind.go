@@ -44,6 +44,7 @@ type Window struct {
 	maxlines    int
 	dirnames    []string
 	widths      []int
+	readme      []rune
 	incl        []string
 	ctrllock    sync.Mutex // used for lock/unlock ctl mesage
 	ctlfid      uint32     // ctl file Fid which has the ctrllock
