@@ -129,7 +129,7 @@ func xfidopen(x *Xfid) {
 			_, err = io.Copy(tmp, t.file.Reader(t.q0, t.q1))
 			if err != nil || testIOCopyFail {
 				// TODO(fhs): Do we want to send an error response to the client?
-				warning(nil, fmt.Sprintf("can't write temp file for pipe command %v\n", err))
+				warning(nil, "can't write temp file for pipe command %v\n", err)
 			}
 			w.rdselfd = tmp
 		case QWwrsel:
