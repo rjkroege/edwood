@@ -155,6 +155,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
+			t.appendReadmeContent()
 			t.Show(0, 0, false)
 		}
 	} else {
@@ -349,10 +350,50 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.Columnate(dirNames, widths)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
+
+		t.w.readmeContent = loadReadmeContent(filename)
+		t.appendReadmeContent()
+
 		q1 := t.file.Nr()
 		return q1 - q0, nil
 	}
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
+}
+
+func (t *Text) appendReadmeContent() {
+	if len(t.w.readmeContent) > 0 {
+		q1 := t.file.Nr()
+		t.file.InsertAt(q1, t.w.readmeContent)
+	}
+}
+
+// loadReadmeContent reads a README file from the directory and formats it
+func loadReadmeContent(dirPath string) []rune {
+	readmeNames := []string{"README.md", "README"}
+	for _, readmeName := range readmeNames {
+		readmePath := filepath.Join(dirPath, readmeName)
+		if readmeFile, err := os.Open(readmePath); err == nil {
+			defer readmeFile.Close()
+			if readmeInfo, err := readmeFile.Stat(); err == nil && !readmeInfo.IsDir() {
+				var result []rune
+
+				result = append(result, []rune("\n"+strings.Repeat("─", 80)+"\n")...)
+				result = append(result, []rune(readmeName+":\n")...)
+
+				if readmeBytes, err := io.ReadAll(readmeFile); err == nil {
+					readmeRunes := bytetorune(readmeBytes)
+					result = append(result, readmeRunes...)
+
+					if len(readmeRunes) > 0 && readmeRunes[len(readmeRunes)-1] != '\n' {
+						result = append(result, '\n')
+					}
+				}
+				return result
+			}
+			break
+		}
+	}
+	return nil
 }
 
 func getDirNames(f *os.File) ([]string, error) {

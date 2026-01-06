@@ -18,7 +18,7 @@ func Addtotag(v string) option {
 	return func(w *acme.Win, wasnew bool) error {
 		// capture v in a closure.
 		if wasnew {
-			return w.Fprintf("tag", v)
+			return w.Fprintf("tag", "%s", v)
 		}
 		return nil
 	}

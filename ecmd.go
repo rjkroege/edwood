@@ -123,7 +123,7 @@ func edittext(w *Window, q int, r []rune) error {
 		f := w.body.file
 		err := f.Elog.Insert(q, r)
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 		return nil
 	case Collecting:
@@ -188,7 +188,7 @@ func B_cmd(t *Text, cp *Cmd) bool {
 func c_cmd(t *Text, cp *Cmd) bool {
 	err := t.file.Elog.Replace(addr.r.q0, addr.r.q1, []rune(cp.text))
 	if err != nil {
-		warning(nil, err.Error()+"\n")
+		warning(nil, "%s\n", err.Error())
 	}
 	t.q0 = addr.r.q0
 	t.q1 = addr.r.q1
@@ -199,7 +199,7 @@ func d_cmd(t *Text, cp *Cmd) bool {
 	if addr.r.q1 > addr.r.q0 {
 		err := t.file.Elog.Delete(addr.r.q0, addr.r.q1)
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 	}
 	t.q0 = addr.r.q0
@@ -232,7 +232,7 @@ func D_cmd(t *Text, cp *Cmd) bool {
 		}
 		w := lookfile(s)
 		if w == nil {
-			editerror(fmt.Sprintf("no such file %q", s))
+			editerror("no such file %q", s)
 		}
 		D1(&w.body)
 	}
@@ -275,7 +275,7 @@ func e_cmd(t *Text, cp *Cmd) bool {
 	runes, _, nulls := util.Cvttorunes(d, len(d))
 	err = file.Elog.Replace(q0, q1, runes)
 	if err != nil {
-		warning(nil, err.Error()+"\n")
+		warning(nil, "%s\n", err.Error())
 	}
 
 	if nulls {
@@ -331,7 +331,7 @@ func copyx(f *file.ObservableEditableBuffer, addr2 Address) {
 		f.Read(p, buf[:ni])
 		err := addr2.file.Elog.Insert(addr2.r.q1, buf[:ni])
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 	}
 }
@@ -340,14 +340,14 @@ func move(f *file.ObservableEditableBuffer, addr2 Address) {
 	if addr.file != addr2.file || addr.r.q1 <= addr2.r.q0 {
 		err := f.Elog.Delete(addr.r.q0, addr.r.q1)
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 		copyx(f, addr2)
 	} else if addr.r.q0 >= addr2.r.q1 {
 		copyx(f, addr2)
 		err := f.Elog.Delete(addr.r.q0, addr.r.q1)
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 	} else if addr.r.q0 == addr2.r.q0 && addr.r.q1 == addr2.r.q1 {
 		// move to self; no-op
@@ -438,7 +438,7 @@ func s_cmd(t *Text, cp *Cmd) bool {
 		}
 		err := t.file.Elog.Replace(sel[0].q0, sel[0].q1, []rune(buf))
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%v\n", err.Error())
 		}
 		delta -= sel[0].q1 - sel[0].q0
 		delta += len([]rune(buf))
@@ -523,7 +523,7 @@ func runpipe(t *Text, cmd rune, cr []rune, state int) {
 		if cmd == '<' || cmd == '|' {
 			err := t.file.Elog.Delete(t.q0, t.q1)
 			if err != nil {
-				warning(nil, err.Error()+"\n")
+				warning(nil, "%s\n", err.Error())
 			}
 		}
 	}
@@ -685,7 +685,7 @@ func appendx(file *file.ObservableEditableBuffer, cp *Cmd, p int) bool {
 	if len(cp.text) > 0 {
 		err := file.Elog.Insert(p, []rune(cp.text))
 		if err != nil {
-			warning(nil, err.Error()+"\n")
+			warning(nil, "%s\n", err.Error())
 		}
 	}
 	cur := file.GetCurObserver().(*Text)

@@ -55,7 +55,7 @@ func Editinwin(plumbstring string, opts ...option) (*acme.Win, error) {
 			return nil, fmt.Errorf("plumbhelper win.Ctl nomark: %v", err)
 		}
 
-		if err := win.Name(fn); err != nil {
+		if err := win.Name("%s", fn); err != nil {
 			return nil, fmt.Errorf("plumbhelper win.Name: %v", err)
 		}
 
@@ -72,7 +72,7 @@ func Editinwin(plumbstring string, opts ...option) (*acme.Win, error) {
 		}
 	}
 
-	if err := win.Addr(string(addr)); err != nil {
+	if err := win.Addr("%s", string(addr)); err != nil {
 		return nil, fmt.Errorf("plumbhelper win.Addr: %v", err)
 	}
 	if err := win.Ctl("dot=addr\nshow\n"); err != nil {
