@@ -2,18 +2,19 @@ package rich
 
 import (
 	"image"
+	"image/color"
 
 	"github.com/rjkroege/edwood/draw"
 )
 
 // DemoFrame creates and draws a rich.Frame for visual testing.
 // This is a temporary hook for development - remove when no longer needed.
-// It creates a frame showing plain text in the bottom-right corner.
+// It creates a frame showing styled text in the bottom-right corner.
 func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font) {
 	// Create a frame in the bottom-right corner
-	// Size: 300x200 pixels (larger to show text)
-	frameWidth := 300
-	frameHeight := 200
+	// Size: 350x250 pixels (larger to show styled text)
+	frameWidth := 350
+	frameHeight := 250
 	margin := 20
 
 	r := image.Rect(
@@ -59,25 +60,57 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font) {
 	f := NewFrame()
 	f.Init(r, withDisplay(display), withBackground(bgImage), withFont(font), withTextColor(textImage))
 
-	// Set demo content - plain text with multiple lines
-	demoText := `Rich Text Demo
-===============
-
-This is a test of the
-rich text frame rendering.
-
-Features:
-- Line wrapping
-- Multiple lines
-- Tab	stops
-
-The quick brown fox
-jumps over the lazy dog.`
-
-	f.SetContent(Plain(demoText))
+	// Set demo content - styled text with multiple styles
+	f.SetContent(createStyledDemoContent())
 
 	// Draw the frame
 	f.Redraw()
+}
+
+// createStyledDemoContent creates Content with various styles for demonstration.
+func createStyledDemoContent() Content {
+	// Define some colors
+	darkBlue := color.RGBA{R: 0, G: 0, B: 139, A: 255}
+	darkGreen := color.RGBA{R: 0, G: 100, B: 0, A: 255}
+	darkRed := color.RGBA{R: 139, G: 0, B: 0, A: 255}
+
+	return Content{
+		// H1 heading
+		{Text: "Styled Text Demo", Style: StyleH1},
+		{Text: "\n\n", Style: DefaultStyle()},
+
+		// Regular paragraph
+		{Text: "This is ", Style: DefaultStyle()},
+		{Text: "bold text", Style: StyleBold},
+		{Text: " and ", Style: DefaultStyle()},
+		{Text: "italic text", Style: StyleItalic},
+		{Text: ".\n\n", Style: DefaultStyle()},
+
+		// H2 heading
+		{Text: "Colors", Style: StyleH2},
+		{Text: "\n", Style: DefaultStyle()},
+
+		// Colored text
+		{Text: "Blue text", Style: Style{Fg: darkBlue, Scale: 1.0}},
+		{Text: ", ", Style: DefaultStyle()},
+		{Text: "green text", Style: Style{Fg: darkGreen, Scale: 1.0}},
+		{Text: ", ", Style: DefaultStyle()},
+		{Text: "red text", Style: Style{Fg: darkRed, Scale: 1.0}},
+		{Text: ".\n\n", Style: DefaultStyle()},
+
+		// H3 heading
+		{Text: "Combined Styles", Style: StyleH3},
+		{Text: "\n", Style: DefaultStyle()},
+
+		// Colored + bold
+		{Text: "Bold blue", Style: Style{Fg: darkBlue, Bold: true, Scale: 1.0}},
+		{Text: " and ", Style: DefaultStyle()},
+		{Text: "italic green", Style: Style{Fg: darkGreen, Italic: true, Scale: 1.0}},
+		{Text: ".\n\n", Style: DefaultStyle()},
+
+		// Plain text
+		{Text: "The quick brown fox\njumps over the lazy dog.", Style: DefaultStyle()},
+	}
 }
 
 // withDisplay is an Option that sets the display for the frame.
