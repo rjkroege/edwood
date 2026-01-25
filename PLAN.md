@@ -219,10 +219,10 @@
 ### 6.3 Mouse Selection
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestSelectWithMouse (mock mousectl) |
-| Code written | [ ] | Select() handles mouse drag, returns p0, p1 |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestSelectWithMouse (mock mousectl) |
+| Code written | [x] | Select() handles mouse drag, returns p0, p1 |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit f9f2866 |
 
 ### 6.4 Visual Demo - Selection
 | Stage | Status | Notes |
