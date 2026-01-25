@@ -426,3 +426,103 @@ func (rt *RichText) scrThumbRect() image.Rectangle {
 		thumbTop+thumbHeight,
 	)
 }
+
+// RichTextOption is a functional option for configuring RichText.
+type RichTextOption func(*RichText)
+
+// WithRichTextBackground sets the background image for the rich text component.
+func WithRichTextBackground(bg draw.Image) RichTextOption {
+	return func(rt *RichText) {
+		rt.background = bg
+	}
+}
+
+// WithRichTextColor sets the text color image for the rich text component.
+func WithRichTextColor(c draw.Image) RichTextOption {
+	return func(rt *RichText) {
+		rt.textColor = c
+	}
+}
+
+// WithScrollbarColors sets the scrollbar background and thumb colors.
+func WithScrollbarColors(bg, thumb draw.Image) RichTextOption {
+	return func(rt *RichText) {
+		rt.scrollBg = bg
+		rt.scrollThumb = thumb
+	}
+}
+
+// scrollWheelLines is the number of lines to scroll per mouse wheel event.
+const scrollWheelLines = 3
+
+// ScrollWheel handles mouse scroll wheel events.
+// If up is true, scroll up (show earlier content), otherwise scroll down.
+// Returns the new origin after scrolling.
+func (rt *RichText) ScrollWheel(up bool) int {
+	// If no content or frame, return 0
+	if rt.content == nil || rt.frame == nil {
+		return 0
+	}
+
+	totalRunes := rt.content.Len()
+	if totalRunes == 0 {
+		return 0
+	}
+
+	// Count lines in content and build a map of line start positions
+	lineCount := 1
+	lineStarts := []int{0}
+	for i, span := range rt.content {
+		runeOffset := 0
+		if i > 0 {
+			for j := 0; j < i; j++ {
+				runeOffset += len([]rune(rt.content[j].Text))
+			}
+		}
+		for j, r := range span.Text {
+			if r == '\n' {
+				lineCount++
+				lineStarts = append(lineStarts, runeOffset+j+1)
+			}
+		}
+	}
+
+	maxLines := rt.frame.MaxLines()
+
+	// If all content fits, no scrolling needed
+	if lineCount <= maxLines {
+		return 0
+	}
+
+	// Find current line
+	currentOrigin := rt.Origin()
+	currentLine := 0
+	for i, start := range lineStarts {
+		if currentOrigin >= start {
+			currentLine = i
+		} else {
+			break
+		}
+	}
+
+	var newLine int
+	if up {
+		// Scroll up - go back scrollWheelLines lines
+		newLine = currentLine - scrollWheelLines
+		if newLine < 0 {
+			newLine = 0
+		}
+	} else {
+		// Scroll down - go forward scrollWheelLines lines
+		newLine = currentLine + scrollWheelLines
+		// Don't go past the last line
+		maxScrollLine := len(lineStarts) - 1
+		if newLine > maxScrollLine {
+			newLine = maxScrollLine
+		}
+	}
+
+	newOrigin := lineStarts[newLine]
+	rt.SetOrigin(newOrigin)
+	return newOrigin
+}

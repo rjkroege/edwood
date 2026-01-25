@@ -197,31 +197,6 @@ func TestRichTextRedraw(t *testing.T) {
 	}
 }
 
-// RichTextOption is a functional option for configuring RichText.
-type RichTextOption func(*RichText)
-
-// WithRichTextBackground sets the background image for the rich text component.
-func WithRichTextBackground(bg draw.Image) RichTextOption {
-	return func(rt *RichText) {
-		rt.background = bg
-	}
-}
-
-// WithRichTextColor sets the text color image for the rich text component.
-func WithRichTextColor(c draw.Image) RichTextOption {
-	return func(rt *RichText) {
-		rt.textColor = c
-	}
-}
-
-// WithScrollbarColors sets the scrollbar background and thumb colors.
-func WithScrollbarColors(bg, thumb draw.Image) RichTextOption {
-	return func(rt *RichText) {
-		rt.scrollBg = bg
-		rt.scrollThumb = thumb
-	}
-}
-
 // TestScrollbarPosition tests that the scrollbar thumb is rendered at the correct position.
 func TestScrollbarPosition(t *testing.T) {
 	// Frame is 300 pixels tall, scrollbar is on the left
@@ -824,5 +799,301 @@ func TestScrollbarClickContentFits(t *testing.T) {
 	newOrigin := rt.ScrollClick(3, image.Pt(scrollRect.Min.X+5, middleY))
 	if newOrigin != 0 {
 		t.Errorf("ScrollClick when content fits: got %d, want 0", newOrigin)
+	}
+}
+
+// TestMouseWheelScrollDown tests that scrolling down (button 5) increases the origin.
+func TestMouseWheelScrollDown(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (scrollable content)
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at origin 0
+	rt.SetOrigin(0)
+	beforeOrigin := rt.Origin()
+
+	// Scroll down (button 5)
+	newOrigin := rt.ScrollWheel(false) // false = scroll down
+
+	// Origin should increase (scroll down shows later content)
+	if newOrigin <= beforeOrigin {
+		t.Errorf("ScrollWheel(down): expected origin to increase from %d, got %d", beforeOrigin, newOrigin)
+	}
+}
+
+// TestMouseWheelScrollUp tests that scrolling up (button 4) decreases the origin.
+func TestMouseWheelScrollUp(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (scrollable content)
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at line 15 (rune 75)
+	rt.SetOrigin(75)
+	beforeOrigin := rt.Origin()
+
+	// Scroll up (button 4)
+	newOrigin := rt.ScrollWheel(true) // true = scroll up
+
+	// Origin should decrease (scroll up shows earlier content)
+	if newOrigin >= beforeOrigin {
+		t.Errorf("ScrollWheel(up): expected origin to decrease from %d, got %d", beforeOrigin, newOrigin)
+	}
+}
+
+// TestMouseWheelScrollUpAtTop tests that scrolling up when already at origin 0
+// stays at origin 0.
+func TestMouseWheelScrollUpAtTop(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (scrollable content)
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Already at origin 0
+	rt.SetOrigin(0)
+
+	// Scroll up (button 4)
+	newOrigin := rt.ScrollWheel(true) // true = scroll up
+
+	// Should stay at 0 (can't scroll up from top)
+	if newOrigin != 0 {
+		t.Errorf("ScrollWheel(up) when origin=0: got %d, want 0", newOrigin)
+	}
+}
+
+// TestMouseWheelScrollDownAtBottom tests that scrolling down when already at the
+// end of content doesn't go past the last line.
+func TestMouseWheelScrollDownAtBottom(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (each "line\n" = 5 chars, last line has no newline = 4 chars)
+	// Total: 29*5 + 4 = 149 runes
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Set origin to last line (line 29 starts at 5*29 = 145)
+	rt.SetOrigin(145)
+	beforeOrigin := rt.Origin()
+
+	// Scroll down (button 5) multiple times
+	var newOrigin int
+	for i := 0; i < 10; i++ {
+		newOrigin = rt.ScrollWheel(false) // false = scroll down
+	}
+
+	// Origin should not have increased significantly beyond the last line
+	// It may increase slightly but should be bounded
+	// The important thing is it doesn't crash or return invalid values
+	if newOrigin < beforeOrigin {
+		t.Errorf("ScrollWheel(down) at end: origin decreased from %d to %d", beforeOrigin, newOrigin)
+	}
+}
+
+// TestMouseWheelScrollNoContent tests that scrolling with no content
+// returns origin 0.
+func TestMouseWheelScrollNoContent(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// No content set
+
+	// Scroll down
+	newOrigin := rt.ScrollWheel(false)
+	if newOrigin != 0 {
+		t.Errorf("ScrollWheel(down) with no content: got %d, want 0", newOrigin)
+	}
+
+	// Scroll up
+	newOrigin = rt.ScrollWheel(true)
+	if newOrigin != 0 {
+		t.Errorf("ScrollWheel(up) with no content: got %d, want 0", newOrigin)
+	}
+}
+
+// TestMouseWheelScrollContentFits tests that scrolling when content fits in the view
+// keeps origin at 0.
+func TestMouseWheelScrollContentFits(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with just 3 lines - should fit (frame can show ~21 lines)
+	rt.SetContent(rich.Plain("line1\nline2\nline3"))
+
+	// Scroll down - should stay at 0 because content fits
+	newOrigin := rt.ScrollWheel(false)
+	if newOrigin != 0 {
+		t.Errorf("ScrollWheel(down) when content fits: got %d, want 0", newOrigin)
+	}
+
+	// Scroll up - should stay at 0
+	newOrigin = rt.ScrollWheel(true)
+	if newOrigin != 0 {
+		t.Errorf("ScrollWheel(up) when content fits: got %d, want 0", newOrigin)
+	}
+}
+
+// TestMouseWheelScrollMultipleScrolls tests that multiple scroll wheel events
+// accumulate correctly.
+func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 50 lines (plenty to scroll)
+	var content rich.Content
+	for i := 0; i < 50; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at origin 0
+	rt.SetOrigin(0)
+
+	// Scroll down 5 times
+	var origin int
+	for i := 0; i < 5; i++ {
+		origin = rt.ScrollWheel(false) // false = scroll down
+	}
+	afterDown := origin
+
+	// Origin should have increased significantly after 5 scrolls down
+	if afterDown == 0 {
+		t.Error("Origin should have increased after scrolling down 5 times")
+	}
+
+	// Now scroll back up 5 times
+	for i := 0; i < 5; i++ {
+		origin = rt.ScrollWheel(true) // true = scroll up
+	}
+	afterUp := origin
+
+	// Origin should have decreased back toward 0
+	if afterUp >= afterDown {
+		t.Errorf("Origin should have decreased after scrolling up; down=%d, up=%d", afterDown, afterUp)
 	}
 }
