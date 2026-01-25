@@ -357,6 +357,9 @@ func (f *frameImpl) Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int) {
 			f.p1 = anchor
 		}
 
+		// Redraw to show updated selection during drag
+		f.Redraw()
+
 		// Check if button was released
 		if me.Buttons == 0 {
 			break
