@@ -1,6 +1,10 @@
 package rich
 
-import "unicode/utf8"
+import (
+	"unicode/utf8"
+
+	"github.com/rjkroege/edwood/draw"
+)
 
 // contentToBoxes converts Content (styled spans) into a sequence of Boxes.
 // Each Box represents either a run of text, a newline, or a tab.
@@ -71,4 +75,30 @@ func appendSpanBoxes(boxes []Box, span Span) []Box {
 	}
 
 	return boxes
+}
+
+// boxWidth calculates the width of a box in pixels using font metrics.
+// For text boxes, it measures the text width using the font.
+// For newline and tab boxes, it returns 0 (tabs are handled separately by tabBoxWidth).
+func boxWidth(box *Box, font draw.Font) int {
+	if box.IsNewline() || box.IsTab() {
+		return 0
+	}
+	if len(box.Text) == 0 {
+		return 0
+	}
+	return font.BytesWidth(box.Text)
+}
+
+// tabBoxWidth calculates the width of a tab box based on its position.
+// Tab stops are aligned to multiples of maxtab pixels, relative to minX.
+// xPos is the current X position, minX is the left edge of the frame.
+func tabBoxWidth(box *Box, xPos, minX, maxtab int) int {
+	if !box.IsTab() {
+		return 0
+	}
+	// Calculate position relative to frame origin
+	relPos := xPos - minX
+	// Find distance to next tab stop
+	return maxtab - (relPos % maxtab)
 }

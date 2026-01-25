@@ -1,6 +1,14 @@
 package rich
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/edwoodtest"
+)
+
+// ensure draw.Font is used (suppresses unused import warning until boxWidth is implemented)
+var _ draw.Font
 
 func TestContentToBoxes(t *testing.T) {
 	tests := []struct {
@@ -202,4 +210,109 @@ func formatBoxes(boxes []Box) string {
 	}
 	result += "]"
 	return result
+}
+
+func TestBoxWidth(t *testing.T) {
+	// Mock font with fixed character width of 10 pixels
+	font := edwoodtest.NewFont(10, 14)
+
+	tests := []struct {
+		name string
+		box  Box
+		want int
+	}{
+		{
+			name: "empty text box",
+			box:  Box{Text: []byte{}, Nrune: 0, Bc: 0},
+			want: 0,
+		},
+		{
+			name: "single character",
+			box:  Box{Text: []byte("a"), Nrune: 1, Bc: 0},
+			want: 10, // 1 rune * 10 pixels
+		},
+		{
+			name: "five characters",
+			box:  Box{Text: []byte("hello"), Nrune: 5, Bc: 0},
+			want: 50, // 5 runes * 10 pixels
+		},
+		{
+			name: "unicode characters",
+			box:  Box{Text: []byte("日本語"), Nrune: 3, Bc: 0},
+			want: 30, // 3 runes * 10 pixels
+		},
+		{
+			name: "newline box has zero width",
+			box:  Box{Nrune: -1, Bc: '\n'},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := boxWidth(&tt.box, font)
+			if got != tt.want {
+				t.Errorf("boxWidth() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTabBoxWidth(t *testing.T) {
+	maxtab := 80 // Tab stop every 80 pixels (8 characters * 10 pixels)
+
+	tests := []struct {
+		name   string
+		xPos   int   // Current X position on the line
+		minX   int   // Left edge of frame (for tab alignment)
+		want   int   // Expected tab width
+	}{
+		{
+			name: "tab at start of line",
+			xPos: 0,
+			minX: 0,
+			want: 80, // Full tab width
+		},
+		{
+			name: "tab after 1 character",
+			xPos: 10,
+			minX: 0,
+			want: 70, // Align to next tab stop at 80
+		},
+		{
+			name: "tab after half tab width",
+			xPos: 40,
+			minX: 0,
+			want: 40, // Align to next tab stop at 80
+		},
+		{
+			name: "tab near tab boundary",
+			xPos: 75,
+			minX: 0,
+			want: 5, // Only 5 pixels to next tab stop
+		},
+		{
+			name: "tab exactly at tab boundary",
+			xPos: 80,
+			minX: 0,
+			want: 80, // Full tab width to next stop at 160
+		},
+		{
+			name: "tab with non-zero frame origin",
+			xPos: 110, // 10 pixels into frame + 100 pixels of text
+			minX: 10,  // Frame starts at x=10
+			want: 60,  // Tab stops are at 10, 90, 170... so next is 170, 170-110=60
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			box := Box{Nrune: -1, Bc: '\t'}
+			got := tabBoxWidth(&box, tt.xPos, tt.minX, maxtab)
+			if got != tt.want {
+				t.Errorf("tabBoxWidth(xPos=%d, minX=%d, maxtab=%d) = %d, want %d",
+					tt.xPos, tt.minX, maxtab, got, tt.want)
+			}
+		})
+	}
 }
