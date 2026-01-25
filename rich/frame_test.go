@@ -69,6 +69,38 @@ func WithBackground(b draw.Image) Option {
 	}
 }
 
+// WithFont is an Option that sets the font for the frame.
+func WithFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.font = f
+	}
+}
+
+func TestFrameWithFont(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+
+	// Initialize with display and font
+	f.Init(rect, WithDisplay(display), WithFont(font))
+
+	// Verify font is stored
+	if fi.font == nil {
+		t.Error("font not stored in frame")
+	}
+	if fi.font != font {
+		t.Errorf("font = %v, want %v", fi.font, font)
+	}
+
+	// Verify font properties are accessible
+	if fi.font.Height() != 14 {
+		t.Errorf("font.Height() = %d, want 14", fi.font.Height())
+	}
+}
+
 func TestFrameRedrawFillsBackground(t *testing.T) {
 	rect := image.Rect(10, 20, 200, 300)
 	display := edwoodtest.NewDisplay(rect)

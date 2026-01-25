@@ -47,6 +47,7 @@ type frameImpl struct {
 	rect       image.Rectangle
 	display    edwooddraw.Display
 	background edwooddraw.Image // background image for filling
+	font       edwooddraw.Font  // font for text rendering
 	content    Content
 	origin     int
 	p0, p1     int // selection
