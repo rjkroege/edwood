@@ -9,6 +9,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/rich"
 )
 
 // TODO(rjk): Document what each of these are.
@@ -65,6 +66,9 @@ type globals struct {
 	editoutlk chan bool
 
 	WinID int
+
+	// Rich text demo state - temporary for development
+	richDemo *rich.DemoState
 }
 
 // Singleton global object.

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	draw9 "9fans.net/go/draw"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
@@ -135,7 +136,7 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 		ItalicFont:     tryLoadFontVariant(display, global.tagfont, "italic"),
 		BoldItalicFont: tryLoadFontVariant(display, global.tagfont, "bolditalic"),
 	}
-	rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display), demoOpts)
+	g.richDemo = rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display), demoOpts)
 	display.Flush()
 
 	// After row is initialized
@@ -317,6 +318,14 @@ func findattr(attr *plumb.Attribute, s string) string {
 }
 
 func MovedMouse(g *globals, m draw.Mouse) {
+	// Check if the rich text demo should handle this mouse event
+	if g.richDemo != nil && m.Point.In(g.richDemo.Rect) && m.Buttons&1 != 0 {
+		// Handle selection in demo frame
+		m9 := draw9.Mouse(m)
+		g.richDemo.HandleMouse(g.mousectl, &m9)
+		return
+	}
+
 	g.row.lk.Lock()
 	defer g.row.lk.Unlock()
 

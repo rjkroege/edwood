@@ -4,21 +4,30 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/rjkroege/edwood/draw"
+	"9fans.net/go/draw"
+	edwooddraw "github.com/rjkroege/edwood/draw"
 )
 
 // DemoFrameOptions holds optional font variants for the demo frame.
 type DemoFrameOptions struct {
-	BoldFont       draw.Font
-	ItalicFont     draw.Font
-	BoldItalicFont draw.Font
+	BoldFont       edwooddraw.Font
+	ItalicFont     edwooddraw.Font
+	BoldItalicFont edwooddraw.Font
+}
+
+// DemoState holds state for the interactive demo frame.
+type DemoState struct {
+	Frame   Frame
+	Rect    image.Rectangle
+	Display edwooddraw.Display
 }
 
 // DemoFrame creates and draws a rich.Frame for visual testing.
 // This is a temporary hook for development - remove when no longer needed.
 // It creates a frame showing styled text in the bottom-right corner.
 // The optional opts parameter allows passing font variants for styled text.
-func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, opts ...DemoFrameOptions) {
+// Returns a DemoState that can be used to handle mouse events.
+func DemoFrame(display edwooddraw.Display, screenR image.Rectangle, font edwooddraw.Font, opts ...DemoFrameOptions) *DemoState {
 	// Create a frame in the bottom-right corner
 	// Size: 350x250 pixels (larger to show styled text)
 	frameWidth := 350
@@ -43,17 +52,17 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, op
 	}
 
 	// Allocate a distinct background color (light yellow for readability)
-	bgColor := draw.Color(0xFFFFCCFF) // Light yellow: R=255, G=255, B=204, A=255
+	bgColor := edwooddraw.Color(0xFFFFCCFF) // Light yellow: R=255, G=255, B=204, A=255
 	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, bgColor)
 	if err != nil {
-		return
+		return nil
 	}
 
 	// Allocate text color (black)
-	textColor := draw.Black
+	textColor := edwooddraw.Black
 	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, textColor)
 	if err != nil {
-		return
+		return nil
 	}
 
 	// If no font provided, fall back to background-only display
@@ -61,7 +70,14 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, op
 		f := NewFrame()
 		f.Init(r, withDisplay(display), withBackground(bgImage))
 		f.Redraw()
-		return
+		return &DemoState{Frame: f, Rect: r, Display: display}
+	}
+
+	// Allocate selection color (light blue highlight)
+	selColor := edwooddraw.Color(0x9EEEEE99) // Light cyan with some transparency
+	selImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, selColor)
+	if err != nil {
+		selImage = nil
 	}
 
 	// Build frame options
@@ -70,6 +86,7 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, op
 		withBackground(bgImage),
 		withFont(font),
 		withTextColor(textImage),
+		WithSelectionColor(selImage),
 	}
 
 	// Add font variants if provided
@@ -95,6 +112,8 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, op
 
 	// Draw the frame
 	f.Redraw()
+
+	return &DemoState{Frame: f, Rect: r, Display: display}
 }
 
 // createStyledDemoContent creates Content with various styles for demonstration.
@@ -144,29 +163,54 @@ func createStyledDemoContent() Content {
 }
 
 // withDisplay is an Option that sets the display for the frame.
-func withDisplay(d draw.Display) Option {
+func withDisplay(d edwooddraw.Display) Option {
 	return func(f *frameImpl) {
 		f.display = d
 	}
 }
 
 // withBackground is an Option that sets the background image for the frame.
-func withBackground(b draw.Image) Option {
+func withBackground(b edwooddraw.Image) Option {
 	return func(f *frameImpl) {
 		f.background = b
 	}
 }
 
 // withFont is an Option that sets the font for the frame.
-func withFont(fnt draw.Font) Option {
+func withFont(fnt edwooddraw.Font) Option {
 	return func(f *frameImpl) {
 		f.font = fnt
 	}
 }
 
 // withTextColor is an Option that sets the text color for the frame.
-func withTextColor(c draw.Image) Option {
+func withTextColor(c edwooddraw.Image) Option {
 	return func(f *frameImpl) {
 		f.textColor = c
 	}
+}
+
+// HandleMouse handles mouse events for the demo frame.
+// Returns true if the event was handled (mouse was in the demo area).
+// If the mouse button 1 is down in the demo area, it starts a selection.
+func (ds *DemoState) HandleMouse(mc *draw.Mousectl, m *draw.Mouse) bool {
+	if ds == nil || ds.Frame == nil {
+		return false
+	}
+
+	// Check if click is in the demo frame rectangle
+	if !m.Point.In(ds.Rect) {
+		return false
+	}
+
+	// Only handle button 1 (selection)
+	if m.Buttons&1 == 0 {
+		return false
+	}
+
+	// Handle selection
+	ds.Frame.Select(mc, m)
+	ds.Frame.Redraw()
+	ds.Display.ScreenImage().Display().Flush()
+	return true
 }
