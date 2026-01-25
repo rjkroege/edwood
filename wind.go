@@ -594,3 +594,22 @@ func (w *Window) TogglePreviewMode() {
 func (w *Window) RichBody() *RichText {
 	return w.richBody
 }
+
+// Draw renders the window. In preview mode, it renders the richBody;
+// otherwise, it uses the normal body rendering.
+func (w *Window) Draw() {
+	if w.previewMode && w.richBody != nil {
+		w.richBody.Redraw()
+	} else {
+		// Normal body rendering is handled by the existing Text.Redraw
+		// mechanism which is called through Text.Resize and other paths.
+		// For explicit Draw() calls, we trigger a redraw of the body frame.
+		if w.body.fr != nil {
+			enclosing := w.body.fr.Rect()
+			if w.display != nil {
+				enclosing.Min.X -= w.display.ScaleSize(Scrollwid + Scrollgap)
+			}
+			w.body.fr.Redraw(enclosing)
+		}
+	}
+}

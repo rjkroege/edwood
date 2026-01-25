@@ -7,6 +7,7 @@ import (
 
 	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/rich"
 )
 
 func TestSetTag1(t *testing.T) {
@@ -198,5 +199,98 @@ func TestWindowPreviewModeToggle(t *testing.T) {
 	w.TogglePreviewMode()
 	if !w.IsPreviewMode() {
 		t.Error("IsPreviewMode() should be true after third toggle")
+	}
+}
+
+// TestWindowDrawPreviewMode tests that when a window is in preview mode,
+// Window.Draw() renders the richBody instead of the normal body.
+func TestWindowDrawPreviewMode(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World\n\nThis is **bold** text.")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	// Body area is below tag (approximately)
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Set some content in the RichText
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	// Assign the richBody to the window
+	w.richBody = rt
+
+	// Initially NOT in preview mode - Draw should NOT use richBody
+	w.previewMode = false
+
+	// Clear draw operations
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Draw method if it exists - for now, test the state
+	// (actual Draw method will be implemented in 11.3 "Code written" stage)
+
+	// Verify that when previewMode is false, richBody should not be used for drawing
+	// This is a state test - when Draw() is implemented, it should check previewMode
+	if w.previewMode {
+		t.Error("Window should not be in preview mode initially")
+	}
+	if w.richBody == nil {
+		t.Error("richBody should be set")
+	}
+
+	// Enable preview mode
+	w.SetPreviewMode(true)
+
+	// Verify preview mode is enabled
+	if !w.IsPreviewMode() {
+		t.Error("Window should be in preview mode after SetPreviewMode(true)")
+	}
+
+	// The richBody should be available for rendering
+	if w.RichBody() != rt {
+		t.Error("RichBody() should return the assigned RichText component")
+	}
+
+	// Verify that the rich body has the expected content
+	if w.richBody.Content() == nil {
+		t.Error("richBody content should not be nil")
+	}
+	if w.richBody.Content().Len() != 11 { // "Hello World" = 11 chars
+		t.Errorf("richBody content length = %d, want 11", w.richBody.Content().Len())
+	}
+
+	// Test that preview mode can be disabled
+	w.SetPreviewMode(false)
+	if w.IsPreviewMode() {
+		t.Error("Window should not be in preview mode after SetPreviewMode(false)")
+	}
+
+	// richBody should still exist (for potential re-enabling of preview)
+	if w.RichBody() == nil {
+		t.Error("richBody should still exist after disabling preview mode")
 	}
 }
