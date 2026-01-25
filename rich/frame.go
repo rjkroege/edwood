@@ -3,6 +3,7 @@ package rich
 import (
 	"image"
 	"image/color"
+	"unicode/utf8"
 
 	"9fans.net/go/draw"
 	edwooddraw "github.com/rjkroege/edwood/draw"
@@ -95,8 +96,92 @@ func (f *frameImpl) Rect() image.Rectangle {
 }
 
 // Ptofchar maps a character position to a screen point.
+// The position p is a rune offset into the content.
+// Returns the screen point where that character would be drawn.
 func (f *frameImpl) Ptofchar(p int) image.Point {
-	// TODO: Implement
+	if p <= 0 {
+		return f.rect.Min
+	}
+
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return f.rect.Min
+	}
+
+	// Calculate frame width and tab width for layout
+	frameWidth := f.rect.Dx()
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout boxes into lines
+	lines := layout(boxes, f.font, frameWidth, maxtab)
+	if len(lines) == 0 {
+		return f.rect.Min
+	}
+
+	// Walk through positioned boxes counting runes
+	runeCount := 0
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			boxRunes := pb.Box.Nrune
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				// Special characters count as 1 rune
+				boxRunes = 1
+			}
+
+			// Check if position p is within this box
+			if runeCount+boxRunes > p {
+				// p is within this box, calculate offset within the box
+				runeOffset := p - runeCount
+
+				// For newline/tab, just return the start position
+				if pb.Box.IsNewline() || pb.Box.IsTab() {
+					return image.Point{
+						X: f.rect.Min.X + pb.X,
+						Y: f.rect.Min.Y + line.Y,
+					}
+				}
+
+				// For text, measure the width of the first runeOffset runes
+				text := pb.Box.Text
+				byteOffset := 0
+				for i := 0; i < runeOffset && byteOffset < len(text); i++ {
+					_, size := utf8.DecodeRune(text[byteOffset:])
+					byteOffset += size
+				}
+				partialWidth := f.fontForStyle(pb.Box.Style).BytesWidth(text[:byteOffset])
+
+				return image.Point{
+					X: f.rect.Min.X + pb.X + partialWidth,
+					Y: f.rect.Min.Y + line.Y,
+				}
+			}
+
+			runeCount += boxRunes
+		}
+	}
+
+	// Position is past end of content - return position after last character
+	if len(lines) > 0 {
+		lastLine := lines[len(lines)-1]
+		// Calculate X position at end of last line
+		endX := 0
+		for _, pb := range lastLine.Boxes {
+			if pb.Box.IsNewline() {
+				// After a newline, position is at start of next line
+				return image.Point{
+					X: f.rect.Min.X,
+					Y: f.rect.Min.Y + lastLine.Y + f.font.Height(),
+				}
+			}
+			endX = pb.X + pb.Box.Wid
+		}
+		return image.Point{
+			X: f.rect.Min.X + endX,
+			Y: f.rect.Min.Y + lastLine.Y,
+		}
+	}
+
 	return f.rect.Min
 }
 

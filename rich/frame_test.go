@@ -1077,3 +1077,195 @@ func TestFontScaleWithBoldCombination(t *testing.T) {
 		t.Errorf("fontForStyle(StyleH1) should return h1BoldFont for bold+scaled style, got %v", selectedFont)
 	}
 }
+
+// TestPtofcharStart tests that position 0 returns the frame origin.
+func TestPtofcharStart(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content
+	f.SetContent(Plain("hello world"))
+
+	// Position 0 should return the frame origin (rect.Min)
+	pt := f.Ptofchar(0)
+	if pt != rect.Min {
+		t.Errorf("Ptofchar(0) = %v, want %v", pt, rect.Min)
+	}
+}
+
+// TestPtofcharMiddle tests character positions within a single line.
+func TestPtofcharMiddle(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello" = 5 chars
+	f.SetContent(Plain("hello"))
+
+	// Position 3 should be at X = rect.Min.X + 3*10 = 20 + 30 = 50
+	pt := f.Ptofchar(3)
+	want := image.Point{X: rect.Min.X + 30, Y: rect.Min.Y}
+	if pt != want {
+		t.Errorf("Ptofchar(3) = %v, want %v", pt, want)
+	}
+}
+
+// TestPtofcharEnd tests position at the end of content.
+func TestPtofcharEnd(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello" = 5 chars
+	f.SetContent(Plain("hello"))
+
+	// Position 5 (one past last char) should be at X = rect.Min.X + 5*10 = 20 + 50 = 70
+	pt := f.Ptofchar(5)
+	want := image.Point{X: rect.Min.X + 50, Y: rect.Min.Y}
+	if pt != want {
+		t.Errorf("Ptofchar(5) = %v, want %v", pt, want)
+	}
+}
+
+// TestPtofcharMultiLine tests positions on different lines.
+func TestPtofcharMultiLine(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello\nworld" = "hello" (5 chars) + newline (1 char) + "world" (5 chars)
+	f.SetContent(Plain("hello\nworld"))
+
+	// Position 6 is the 'w' of "world", first char on second line
+	// X should be at rect.Min.X, Y should be rect.Min.Y + fontHeight
+	pt := f.Ptofchar(6)
+	want := image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	if pt != want {
+		t.Errorf("Ptofchar(6) = %v, want %v", pt, want)
+	}
+
+	// Position 8 is the 'r' of "world" (3rd char on second line)
+	// X should be at rect.Min.X + 2*10
+	pt = f.Ptofchar(8)
+	want = image.Point{X: rect.Min.X + 20, Y: rect.Min.Y + 14}
+	if pt != want {
+		t.Errorf("Ptofchar(8) = %v, want %v", pt, want)
+	}
+}
+
+// TestPtofcharWrappedLine tests positions when text wraps to next line.
+func TestPtofcharWrappedLine(t *testing.T) {
+	// Frame is 50px wide (rect from 20 to 70), font is 10px per char
+	// So 5 chars fit per line before wrapping
+	rect := image.Rect(20, 10, 70, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "helloworld" = 10 chars
+	// Should wrap: "hello" on line 1, "world" on line 2
+	f.SetContent(Plain("helloworld"))
+
+	// Position 5 should be 'w', first char on second line (wrapped)
+	pt := f.Ptofchar(5)
+	want := image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	if pt != want {
+		t.Errorf("Ptofchar(5) = %v, want %v", pt, want)
+	}
+
+	// Position 7 should be 'r', 3rd char on second line
+	pt = f.Ptofchar(7)
+	want = image.Point{X: rect.Min.X + 20, Y: rect.Min.Y + 14}
+	if pt != want {
+		t.Errorf("Ptofchar(7) = %v, want %v", pt, want)
+	}
+}
+
+// TestPtofcharEmptyContent tests Ptofchar with no content.
+func TestPtofcharEmptyContent(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// No content set
+	f.SetContent(Plain(""))
+
+	// Position 0 in empty frame should still return rect.Min
+	pt := f.Ptofchar(0)
+	if pt != rect.Min {
+		t.Errorf("Ptofchar(0) on empty = %v, want %v", pt, rect.Min)
+	}
+}
+
+// TestPtofcharWithTab tests positions with tab characters.
+func TestPtofcharWithTab(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height, tab = 8*10 = 80px
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "a\tb" = 'a' (1 char) + tab (1 char) + 'b' (1 char)
+	f.SetContent(Plain("a\tb"))
+
+	// Position 0 = 'a', at origin
+	pt := f.Ptofchar(0)
+	if pt != rect.Min {
+		t.Errorf("Ptofchar(0) = %v, want %v", pt, rect.Min)
+	}
+
+	// Position 1 = tab, at X = 10 (after 'a')
+	pt = f.Ptofchar(1)
+	want := image.Point{X: 10, Y: 0}
+	if pt != want {
+		t.Errorf("Ptofchar(1) = %v, want %v", pt, want)
+	}
+
+	// Position 2 = 'b', should be at next tab stop after 'a'
+	// Tab stop at 80, so 'b' is at X = 80
+	pt = f.Ptofchar(2)
+	want = image.Point{X: 80, Y: 0}
+	if pt != want {
+		t.Errorf("Ptofchar(2) = %v, want %v", pt, want)
+	}
+}
