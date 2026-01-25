@@ -82,11 +82,130 @@ func parseLine(line string) []rich.Span {
 		}}
 	}
 
-	// Plain text
-	return []rich.Span{{
-		Text:  line,
-		Style: rich.DefaultStyle(),
-	}}
+	// Parse inline formatting (bold, italic)
+	return parseInlineFormatting(line, rich.DefaultStyle())
+}
+
+// parseInlineFormatting parses bold/italic markers in text and returns styled spans.
+func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
+	var spans []rich.Span
+	var currentText strings.Builder
+	i := 0
+
+	for i < len(text) {
+		// Check for *** (bold+italic)
+		if i+2 < len(text) && text[i:i+3] == "***" {
+			// Find closing ***
+			end := strings.Index(text[i+3:], "***")
+			if end != -1 {
+				// Flush any accumulated plain text
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				// Add bold+italic span
+				spans = append(spans, rich.Span{
+					Text: text[i+3 : i+3+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: true,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 3 + end + 3
+				continue
+			}
+		}
+
+		// Check for ** (bold)
+		if i+1 < len(text) && text[i:i+2] == "**" {
+			// Find closing **
+			end := strings.Index(text[i+2:], "**")
+			if end != -1 {
+				// Flush any accumulated plain text
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				// Add bold span
+				spans = append(spans, rich.Span{
+					Text: text[i+2 : i+2+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: baseStyle.Italic,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 2 + end + 2
+				continue
+			}
+			// No closing ** found, treat as literal text
+			currentText.WriteString("**")
+			i += 2
+			continue
+		}
+
+		// Check for * (italic)
+		if text[i] == '*' {
+			// Find closing *
+			end := strings.Index(text[i+1:], "*")
+			if end != -1 {
+				// Flush any accumulated plain text
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				// Add italic span
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   baseStyle.Bold,
+						Italic: true,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		// Regular character
+		currentText.WriteByte(text[i])
+		i++
+	}
+
+	// Flush any remaining text
+	if currentText.Len() > 0 {
+		spans = append(spans, rich.Span{
+			Text:  currentText.String(),
+			Style: baseStyle,
+		})
+	}
+
+	// If no spans were created, return a single span with original text
+	if len(spans) == 0 {
+		return []rich.Span{{
+			Text:  text,
+			Style: baseStyle,
+		}}
+	}
+
+	return spans
 }
 
 // headingLevel returns the heading level (1-6) if line starts with # prefix,

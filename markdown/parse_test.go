@@ -264,3 +264,235 @@ func TestParseHeadingNotAtLineStart(t *testing.T) {
 		t.Error("should not be bold for non-heading")
 	}
 }
+
+func TestParseBold(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			bold   bool
+			italic bool
+		}
+	}{
+		{
+			name:  "simple bold",
+			input: "**bold text**",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "bold text", bold: true, italic: false},
+			},
+		},
+		{
+			name:  "bold in middle of text",
+			input: "some **bold** text",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "some ", bold: false, italic: false},
+				{text: "bold", bold: true, italic: false},
+				{text: " text", bold: false, italic: false},
+			},
+		},
+		{
+			name:  "multiple bold sections",
+			input: "**one** and **two**",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "one", bold: true, italic: false},
+				{text: " and ", bold: false, italic: false},
+				{text: "two", bold: true, italic: false},
+			},
+		},
+		{
+			name:  "unclosed bold treated as plain",
+			input: "**unclosed",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "**unclosed", bold: false, italic: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Bold != want.bold {
+					t.Errorf("span[%d].Bold = %v, want %v", i, got[i].Style.Bold, want.bold)
+				}
+				if got[i].Style.Italic != want.italic {
+					t.Errorf("span[%d].Italic = %v, want %v", i, got[i].Style.Italic, want.italic)
+				}
+			}
+		})
+	}
+}
+
+func TestParseItalic(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			bold   bool
+			italic bool
+		}
+	}{
+		{
+			name:  "simple italic",
+			input: "*italic text*",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "italic text", bold: false, italic: true},
+			},
+		},
+		{
+			name:  "italic in middle of text",
+			input: "some *italic* text",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "some ", bold: false, italic: false},
+				{text: "italic", bold: false, italic: true},
+				{text: " text", bold: false, italic: false},
+			},
+		},
+		{
+			name:  "multiple italic sections",
+			input: "*one* and *two*",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "one", bold: false, italic: true},
+				{text: " and ", bold: false, italic: false},
+				{text: "two", bold: false, italic: true},
+			},
+		},
+		{
+			name:  "unclosed italic treated as plain",
+			input: "*unclosed",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "*unclosed", bold: false, italic: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Bold != want.bold {
+					t.Errorf("span[%d].Bold = %v, want %v", i, got[i].Style.Bold, want.bold)
+				}
+				if got[i].Style.Italic != want.italic {
+					t.Errorf("span[%d].Italic = %v, want %v", i, got[i].Style.Italic, want.italic)
+				}
+			}
+		})
+	}
+}
+
+func TestParseBoldItalic(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			bold   bool
+			italic bool
+		}
+	}{
+		{
+			name:  "bold and italic combined",
+			input: "***bold and italic***",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "bold and italic", bold: true, italic: true},
+			},
+		},
+		{
+			name:  "bold italic in middle",
+			input: "some ***bold italic*** text",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "some ", bold: false, italic: false},
+				{text: "bold italic", bold: true, italic: true},
+				{text: " text", bold: false, italic: false},
+			},
+		},
+		{
+			name:  "bold and italic separately",
+			input: "**bold** and *italic*",
+			wantSpan: []struct {
+				text   string
+				bold   bool
+				italic bool
+			}{
+				{text: "bold", bold: true, italic: false},
+				{text: " and ", bold: false, italic: false},
+				{text: "italic", bold: false, italic: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Bold != want.bold {
+					t.Errorf("span[%d].Bold = %v, want %v", i, got[i].Style.Bold, want.bold)
+				}
+				if got[i].Style.Italic != want.italic {
+					t.Errorf("span[%d].Italic = %v, want %v", i, got[i].Style.Italic, want.italic)
+				}
+			}
+		})
+	}
+}
