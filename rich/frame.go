@@ -2,6 +2,7 @@ package rich
 
 import (
 	"image"
+	"image/color"
 
 	"9fans.net/go/draw"
 	edwooddraw "github.com/rjkroege/edwood/draw"
@@ -185,10 +186,39 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 				Y: f.rect.Min.Y + line.Y,
 			}
 
+			// Determine text color: use box style Fg if set, otherwise default
+			textColorImg := f.textColor
+			if pb.Box.Style.Fg != nil {
+				// Allocate an image for this color
+				colorImg := f.allocColorImage(pb.Box.Style.Fg)
+				if colorImg != nil {
+					textColorImg = colorImg
+				}
+			}
+
 			// Render the text
-			screen.Bytes(pt, f.textColor, image.ZP, f.font, pb.Box.Text)
+			screen.Bytes(pt, textColorImg, image.ZP, f.font, pb.Box.Text)
 		}
 	}
+}
+
+// allocColorImage allocates (or retrieves from cache) an image for the given color.
+func (f *frameImpl) allocColorImage(c color.Color) edwooddraw.Image {
+	if f.display == nil {
+		return nil
+	}
+
+	// Convert color.Color to draw.Color
+	r, g, b, a := c.RGBA()
+	// RGBA returns values in 0-65535 range, scale to 0-255
+	drawColor := edwooddraw.Color(uint32(r>>8)<<24 | uint32(g>>8)<<16 | uint32(b>>8)<<8 | uint32(a>>8))
+
+	// Allocate a replicated 1x1 image with this color
+	img, err := f.display.AllocImage(image.Rect(0, 0, 1, 1), f.display.ScreenImage().Pix(), true, drawColor)
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // Full returns true if the frame is at capacity.

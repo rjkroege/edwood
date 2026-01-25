@@ -3,6 +3,7 @@ package rich
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -312,5 +313,143 @@ func TestDrawTextSecondLinePosition(t *testing.T) {
 	}
 	if !foundSecondLine {
 		t.Errorf("Redraw() did not render 'line2' at Y=%d\ngot ops: %v", secondLineY, ops)
+	}
+}
+
+func TestDrawTextWithColor(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Use named images so we can identify them in the draw ops
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	defaultTextImage := edwoodtest.NewImage(display, "default-text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(defaultTextImage))
+
+	// Create content with a colored span using blue foreground
+	// Style.Fg is image/color.Color, so we use color.RGBA
+	blueColor := color.RGBA{R: 0, G: 0, B: 153, A: 255}
+	blueStyle := Style{
+		Fg:    blueColor,
+		Scale: 1.0,
+	}
+	content := Content{
+		{Text: "blue text", Style: blueStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify text was drawn with a custom color, not the default text color
+	// When a style has Fg set, it should NOT use "default-text-color"
+	foundWithCustomColor := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "blue text"`) {
+			// Check that it's NOT using the default text color
+			if !strings.Contains(op, "default-text-color") {
+				foundWithCustomColor = true
+			}
+			break
+		}
+	}
+
+	if !foundWithCustomColor {
+		t.Errorf("Redraw() should render 'blue text' with custom color, not default-text-color\ngot ops: %v", ops)
+	}
+}
+
+func TestDrawTextWithMultipleColors(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Use named images so we can identify them in the draw ops
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	defaultTextImage := edwoodtest.NewImage(display, "default-text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(defaultTextImage))
+
+	// Create content with multiple colored spans using color.RGBA
+	blueColor := color.RGBA{R: 0, G: 0, B: 153, A: 255}
+	redColor := color.RGBA{R: 238, G: 0, B: 0, A: 255}
+	blueStyle := Style{Fg: blueColor, Scale: 1.0}
+	redStyle := Style{Fg: redColor, Scale: 1.0}
+	content := Content{
+		{Text: "blue ", Style: blueStyle},
+		{Text: "red", Style: redStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify each text segment was drawn with custom colors (not default-text-color)
+	blueNotDefault := false
+	redNotDefault := false
+	blueOp := ""
+	redOp := ""
+
+	for _, op := range ops {
+		if strings.Contains(op, `string "blue "`) {
+			blueOp = op
+			if !strings.Contains(op, "default-text-color") {
+				blueNotDefault = true
+			}
+		}
+		if strings.Contains(op, `string "red"`) {
+			redOp = op
+			if !strings.Contains(op, "default-text-color") {
+				redNotDefault = true
+			}
+		}
+	}
+
+	if !blueNotDefault {
+		t.Errorf("Redraw() should render 'blue ' with custom color, not default-text-color\ngot op: %s\nall ops: %v", blueOp, ops)
+	}
+	if !redNotDefault {
+		t.Errorf("Redraw() should render 'red' with custom color, not default-text-color\ngot op: %s\nall ops: %v", redOp, ops)
+	}
+}
+
+func TestDrawTextWithDefaultColor(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Use named images so we can identify them in the draw ops
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	defaultTextImage := edwoodtest.NewImage(display, "default-text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(defaultTextImage))
+
+	// Plain text with no Fg color specified should use the default text color
+	f.SetContent(Plain("default"))
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify text was drawn with the default text color (not a custom color)
+	foundWithDefault := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "default"`) && strings.Contains(op, "default-text-color") {
+			foundWithDefault = true
+			break
+		}
+	}
+
+	if !foundWithDefault {
+		t.Errorf("Redraw() should render 'default' with default-text-color\ngot ops: %v", ops)
 	}
 }
