@@ -453,3 +453,283 @@ func TestDrawTextWithDefaultColor(t *testing.T) {
 		t.Errorf("Redraw() should render 'default' with default-text-color\ngot ops: %v", ops)
 	}
 }
+
+// WithBoldFont is an Option that sets the bold font variant for the frame.
+func WithBoldFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.boldFont = f
+	}
+}
+
+// WithItalicFont is an Option that sets the italic font variant for the frame.
+func WithItalicFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.italicFont = f
+	}
+}
+
+// WithBoldItalicFont is an Option that sets the bold-italic font variant for the frame.
+func WithBoldItalicFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.boldItalicFont = f
+	}
+}
+
+func TestFontVariantsBoldText(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	// Create distinct fonts for each variant with different widths to distinguish them
+	regularFont := edwoodtest.NewFont(10, 14)
+	boldFont := edwoodtest.NewFont(11, 14) // slightly wider to simulate bold
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithBoldFont(boldFont),
+		WithTextColor(textImage),
+	)
+
+	// Set content with bold text
+	boldStyle := Style{Bold: true, Scale: 1.0}
+	content := Content{
+		{Text: "bold text", Style: boldStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify bold text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "bold text"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'bold text'\ngot ops: %v", ops)
+	}
+
+	// Verify the bold font was used by checking that fontForStyle returns boldFont
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(boldStyle)
+	if selectedFont != boldFont {
+		t.Errorf("fontForStyle(bold) should return boldFont, got %v", selectedFont)
+	}
+}
+
+func TestFontVariantsItalicText(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	italicFont := edwoodtest.NewFont(10, 14) // same size, different instance
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithItalicFont(italicFont),
+		WithTextColor(textImage),
+	)
+
+	// Set content with italic text
+	italicStyle := Style{Italic: true, Scale: 1.0}
+	content := Content{
+		{Text: "italic text", Style: italicStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify italic text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "italic text"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'italic text'\ngot ops: %v", ops)
+	}
+
+	// Verify the italic font was used
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(italicStyle)
+	if selectedFont != italicFont {
+		t.Errorf("fontForStyle(italic) should return italicFont, got %v", selectedFont)
+	}
+}
+
+func TestFontVariantsBoldItalicText(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	boldFont := edwoodtest.NewFont(11, 14)
+	italicFont := edwoodtest.NewFont(10, 14)
+	boldItalicFont := edwoodtest.NewFont(11, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithBoldFont(boldFont),
+		WithItalicFont(italicFont),
+		WithBoldItalicFont(boldItalicFont),
+		WithTextColor(textImage),
+	)
+
+	// Set content with bold+italic text
+	boldItalicStyle := Style{Bold: true, Italic: true, Scale: 1.0}
+	content := Content{
+		{Text: "bold italic", Style: boldItalicStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify bold+italic text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "bold italic"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'bold italic'\ngot ops: %v", ops)
+	}
+
+	// Verify the bold+italic font was used
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(boldItalicStyle)
+	if selectedFont != boldItalicFont {
+		t.Errorf("fontForStyle(bold+italic) should return boldItalicFont, got %v", selectedFont)
+	}
+}
+
+func TestFontVariantsFallbackToRegular(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	// No bold, italic, or bold-italic fonts set
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithTextColor(textImage),
+	)
+
+	fi := f.(*frameImpl)
+
+	// When no variant font is set, fontForStyle should fall back to regular font
+	boldStyle := Style{Bold: true, Scale: 1.0}
+	if got := fi.fontForStyle(boldStyle); got != regularFont {
+		t.Errorf("fontForStyle(bold) without boldFont should return regularFont, got %v", got)
+	}
+
+	italicStyle := Style{Italic: true, Scale: 1.0}
+	if got := fi.fontForStyle(italicStyle); got != regularFont {
+		t.Errorf("fontForStyle(italic) without italicFont should return regularFont, got %v", got)
+	}
+
+	boldItalicStyle := Style{Bold: true, Italic: true, Scale: 1.0}
+	if got := fi.fontForStyle(boldItalicStyle); got != regularFont {
+		t.Errorf("fontForStyle(bold+italic) without boldItalicFont should return regularFont, got %v", got)
+	}
+}
+
+func TestFontVariantsMixedContent(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	boldFont := edwoodtest.NewFont(11, 14)
+	italicFont := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithBoldFont(boldFont),
+		WithItalicFont(italicFont),
+		WithTextColor(textImage),
+	)
+
+	// Set content with mixed styles
+	content := Content{
+		{Text: "normal ", Style: DefaultStyle()},
+		{Text: "bold ", Style: Style{Bold: true, Scale: 1.0}},
+		{Text: "italic", Style: Style{Italic: true, Scale: 1.0}},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// All three text segments should be rendered
+	foundNormal := false
+	foundBold := false
+	foundItalic := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "normal "`) {
+			foundNormal = true
+		}
+		if strings.Contains(op, `string "bold "`) {
+			foundBold = true
+		}
+		if strings.Contains(op, `string "italic"`) {
+			foundItalic = true
+		}
+	}
+
+	if !foundNormal {
+		t.Errorf("Redraw() did not render 'normal '\ngot ops: %v", ops)
+	}
+	if !foundBold {
+		t.Errorf("Redraw() did not render 'bold '\ngot ops: %v", ops)
+	}
+	if !foundItalic {
+		t.Errorf("Redraw() did not render 'italic'\ngot ops: %v", ops)
+	}
+}

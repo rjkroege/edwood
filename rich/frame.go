@@ -53,6 +53,11 @@ type frameImpl struct {
 	content    Content
 	origin     int
 	p0, p1     int // selection
+
+	// Font variants for styled text
+	boldFont       edwooddraw.Font
+	italicFont     edwooddraw.Font
+	boldItalicFont edwooddraw.Font
 }
 
 // NewFrame creates a new Frame.
@@ -196,8 +201,11 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 				}
 			}
 
+			// Select the appropriate font for this box's style
+			boxFont := f.fontForStyle(pb.Box.Style)
+
 			// Render the text
-			screen.Bytes(pt, textColorImg, image.ZP, f.font, pb.Box.Text)
+			screen.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
 		}
 	}
 }
@@ -225,4 +233,23 @@ func (f *frameImpl) allocColorImage(c color.Color) edwooddraw.Image {
 func (f *frameImpl) Full() bool {
 	// TODO: Implement
 	return false
+}
+
+// fontForStyle returns the appropriate font for the given style.
+// Falls back to the regular font if the variant is not available.
+func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
+	if style.Bold && style.Italic {
+		if f.boldItalicFont != nil {
+			return f.boldItalicFont
+		}
+	} else if style.Bold {
+		if f.boldFont != nil {
+			return f.boldFont
+		}
+	} else if style.Italic {
+		if f.italicFont != nil {
+			return f.italicFont
+		}
+	}
+	return f.font
 }
