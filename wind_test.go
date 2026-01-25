@@ -7,6 +7,7 @@ import (
 
 	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/rich"
 )
 
@@ -377,6 +378,255 @@ func TestWindowMousePreviewSelection(t *testing.T) {
 	char := frame.Charofpt(image.Pt(bodyRect.Min.X+50, bodyRect.Min.Y+5))
 	if char < 0 || char > content.Len() {
 		t.Errorf("Charofpt should return valid character index, got %d for content length %d", char, content.Len())
+	}
+}
+
+// TestPreviewSnarf tests that snarf (copy) in preview mode uses the source map
+// to copy the original markdown source, not the rendered text.
+// This test verifies the basic mechanism with plain text (1:1 mapping).
+func TestPreviewSnarf(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source: plain text
+	sourceMarkdown := "Hello, World!"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", sourceRunes),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Select "World" (positions 7-12 in rendered text)
+	rt.SetSelection(7, 12)
+
+	// Verify the selection is set
+	p0, p1 := rt.Selection()
+	if p0 != 7 || p1 != 12 {
+		t.Fatalf("Selection should be (7, 12), got (%d, %d)", p0, p1)
+	}
+
+	// Use source map to convert rendered selection to source positions
+	srcStart, srcEnd := sourceMap.ToSource(p0, p1)
+
+	// For plain text, positions should be 1:1
+	if srcStart != 7 || srcEnd != 12 {
+		t.Errorf("Source positions for plain text: got (%d, %d), want (7, 12)", srcStart, srcEnd)
+	}
+
+	// Extract the text from the source body using mapped positions
+	if srcEnd > len(sourceRunes) {
+		srcEnd = len(sourceRunes)
+	}
+	if srcStart > len(sourceRunes) {
+		srcStart = len(sourceRunes)
+	}
+	snarfedText := string(sourceRunes[srcStart:srcEnd])
+
+	if snarfedText != "World" {
+		t.Errorf("Snarfed text should be %q, got %q", "World", snarfedText)
+	}
+}
+
+// TestPreviewSnarfBold tests that snarf in preview mode copies the full markdown
+// source including ** markers when selecting bold text.
+func TestPreviewSnarfBold(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with bold text
+	sourceMarkdown := "Hello **World** test"
+	// Rendered: "Hello World test" (16 chars)
+	// Source:   "Hello **World** test" (20 chars)
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", sourceRunes),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Select "World" (positions 6-11 in rendered text - after "Hello ")
+	// In rendered: "Hello World test"
+	//              012345678901234567
+	// "World" is at positions 6-11
+	rt.SetSelection(6, 11)
+
+	// Verify the selection is set
+	p0, p1 := rt.Selection()
+	if p0 != 6 || p1 != 11 {
+		t.Fatalf("Selection should be (6, 11), got (%d, %d)", p0, p1)
+	}
+
+	// Use source map to convert rendered selection to source positions
+	srcStart, srcEnd := sourceMap.ToSource(p0, p1)
+
+	// For bold text, should map to include the ** markers
+	// Source: "Hello **World** test"
+	//          012345678901234567890
+	// **World** starts at 6, ends at 15
+	if srcStart != 6 || srcEnd != 15 {
+		t.Errorf("Source positions for bold text: got (%d, %d), want (6, 15)", srcStart, srcEnd)
+	}
+
+	// Extract the text from the source body using mapped positions
+	if srcEnd > len(sourceRunes) {
+		srcEnd = len(sourceRunes)
+	}
+	if srcStart > len(sourceRunes) {
+		srcStart = len(sourceRunes)
+	}
+	snarfedText := string(sourceRunes[srcStart:srcEnd])
+
+	// When selecting the entire bold word, we should get the full markdown including markers
+	if snarfedText != "**World**" {
+		t.Errorf("Snarfed text should be %q, got %q", "**World**", snarfedText)
+	}
+}
+
+// TestPreviewSnarfHeading tests that snarf in preview mode copies the full markdown
+// source including # prefix when selecting heading text.
+func TestPreviewSnarfHeading(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with heading
+	sourceMarkdown := "# Hello World"
+	// Rendered: "Hello World" (11 chars)
+	// Source:   "# Hello World" (13 chars)
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", sourceRunes),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Select entire heading "Hello World" (positions 0-11 in rendered text)
+	// In rendered: "Hello World"
+	//              01234567890
+	rt.SetSelection(0, 11)
+
+	// Verify the selection is set
+	p0, p1 := rt.Selection()
+	if p0 != 0 || p1 != 11 {
+		t.Fatalf("Selection should be (0, 11), got (%d, %d)", p0, p1)
+	}
+
+	// Use source map to convert rendered selection to source positions
+	srcStart, srcEnd := sourceMap.ToSource(p0, p1)
+
+	// For heading, should map to include the # prefix
+	// Source: "# Hello World"
+	//          0123456789012
+	// Entire heading starts at 0, ends at 13
+	if srcStart != 0 || srcEnd != 13 {
+		t.Errorf("Source positions for heading: got (%d, %d), want (0, 13)", srcStart, srcEnd)
+	}
+
+	// Extract the text from the source body using mapped positions
+	if srcEnd > len(sourceRunes) {
+		srcEnd = len(sourceRunes)
+	}
+	if srcStart > len(sourceRunes) {
+		srcStart = len(sourceRunes)
+	}
+	snarfedText := string(sourceRunes[srcStart:srcEnd])
+
+	// When selecting the entire heading, we should get the full markdown including # prefix
+	if snarfedText != "# Hello World" {
+		t.Errorf("Snarfed text should be %q, got %q", "# Hello World", snarfedText)
 	}
 }
 

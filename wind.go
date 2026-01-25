@@ -11,6 +11,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -64,8 +65,9 @@ type Window struct {
 	editoutlk chan bool
 
 	// Preview mode fields for rich text rendering
-	previewMode bool      // true when showing rendered markdown preview
-	richBody    *RichText // rich text renderer for preview mode
+	previewMode      bool                // true when showing rendered markdown preview
+	richBody         *RichText           // rich text renderer for preview mode
+	previewSourceMap *markdown.SourceMap // maps rendered positions to source positions
 }
 
 var (
@@ -690,4 +692,52 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
 	}
 
 	return false
+}
+
+// SetPreviewSourceMap sets the source map used for mapping rendered positions
+// to source positions when in preview mode.
+func (w *Window) SetPreviewSourceMap(sm *markdown.SourceMap) {
+	w.previewSourceMap = sm
+}
+
+// PreviewSourceMap returns the current source map, or nil if not set.
+func (w *Window) PreviewSourceMap() *markdown.SourceMap {
+	return w.previewSourceMap
+}
+
+// PreviewSnarf returns the text that would be snarfed (copied) when in preview mode.
+// It uses the source map to convert the selection in the rendered rich text back to
+// positions in the source markdown, then extracts that range from the body buffer.
+// Returns empty slice if not in preview mode, no rich body, no selection, or no source map.
+func (w *Window) PreviewSnarf() []byte {
+	if !w.previewMode || w.richBody == nil || w.previewSourceMap == nil {
+		return nil
+	}
+
+	// Get selection from the rich text frame
+	p0, p1 := w.richBody.Selection()
+	if p0 == p1 {
+		return nil // No selection
+	}
+
+	// Map rendered positions to source positions
+	srcStart, srcEnd := w.previewSourceMap.ToSource(p0, p1)
+
+	// Clamp to body buffer bounds
+	bodyLen := w.body.file.Nr()
+	if srcStart < 0 {
+		srcStart = 0
+	}
+	if srcEnd > bodyLen {
+		srcEnd = bodyLen
+	}
+	if srcStart >= srcEnd {
+		return nil
+	}
+
+	// Read the source text from the body buffer
+	buf := make([]rune, srcEnd-srcStart)
+	w.body.file.Read(srcStart, buf)
+
+	return []byte(string(buf))
 }
