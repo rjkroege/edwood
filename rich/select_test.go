@@ -440,3 +440,304 @@ func TestDrawSelectionFullLine(t *testing.T) {
 		t.Errorf("Redraw() did not draw selection for full line\ngot ops: %v", ops)
 	}
 }
+
+// mockMousectl creates a mock Mousectl for testing mouse selection.
+// It creates a Mousectl with a buffered channel containing the provided events.
+// The bidirectional channel is converted to receive-only when assigned to C.
+func mockMousectl(events []draw.Mouse) *draw.Mousectl {
+	// Create a bidirectional channel, which Go can convert to receive-only
+	ch := make(chan draw.Mouse, len(events)+1)
+	for _, e := range events {
+		ch <- e
+	}
+
+	mc := &draw.Mousectl{
+		C: ch, // Bidirectional chan can be assigned to <-chan
+	}
+	return mc
+}
+
+// TestSelectWithMouseSimpleClick tests that clicking without dragging
+// sets p0 == p1 at the click position.
+func TestSelectWithMouseSimpleClick(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello world" with 10px per char
+	// Position 5 is at X=50 (the space)
+	f.SetContent(Plain("hello world"))
+
+	// Simulate click at position 5 (X=50, Y=7 in the middle of first line)
+	// Button 1 down, then immediately button 1 up
+	downEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1, // Left button down
+	}
+	// Mouse up event (buttons = 0)
+	upEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 0, // Button released
+	}
+
+	mc := mockMousectl([]draw.Mouse{upEvent})
+	p0, p1 := f.Select(mc, &downEvent)
+
+	// Should select nothing (p0 == p1) at position 5
+	if p0 != p1 {
+		t.Errorf("Select() click without drag: got p0=%d, p1=%d, want p0 == p1", p0, p1)
+	}
+	if p0 != 5 {
+		t.Errorf("Select() click position: got p0=%d, want 5", p0)
+	}
+}
+
+// TestSelectWithMouseDragForward tests dragging from left to right
+// to select text.
+func TestSelectWithMouseDragForward(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello world" - selecting "ello" (positions 1-5)
+	f.SetContent(Plain("hello world"))
+
+	// Mouse down at position 1 (X=10)
+	downEvent := draw.Mouse{
+		Point:   image.Pt(10, 7),
+		Buttons: 1,
+	}
+	// Drag to position 5 (X=50), then release
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1, // Still held
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 0, // Released
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, upEvent})
+	p0, p1 := f.Select(mc, &downEvent)
+
+	// Should select positions 1-5 ("ello")
+	if p0 != 1 {
+		t.Errorf("Select() drag forward: got p0=%d, want 1", p0)
+	}
+	if p1 != 5 {
+		t.Errorf("Select() drag forward: got p1=%d, want 5", p1)
+	}
+}
+
+// TestSelectWithMouseDragBackward tests dragging from right to left
+// to select text.
+func TestSelectWithMouseDragBackward(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello world"
+	f.SetContent(Plain("hello world"))
+
+	// Mouse down at position 5 (X=50)
+	downEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1,
+	}
+	// Drag backward to position 1 (X=10), then release
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(10, 7),
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(10, 7),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, upEvent})
+	p0, p1 := f.Select(mc, &downEvent)
+
+	// Should select positions 1-5 (p0 should be <= p1)
+	if p0 != 1 {
+		t.Errorf("Select() drag backward: got p0=%d, want 1", p0)
+	}
+	if p1 != 5 {
+		t.Errorf("Select() drag backward: got p1=%d, want 5", p1)
+	}
+}
+
+// TestSelectWithMouseDragMultiLine tests dragging across multiple lines.
+func TestSelectWithMouseDragMultiLine(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello\nworld" = 6 + 5 = 11 chars total
+	// Position 2 is "l" on first line
+	// Position 8 is "r" on second line
+	f.SetContent(Plain("hello\nworld"))
+
+	// Mouse down at position 2 (X=20, Y=7 on line 1)
+	downEvent := draw.Mouse{
+		Point:   image.Pt(20, 7),
+		Buttons: 1,
+	}
+	// Drag to position 8 (X=20, Y=21 on line 2), then release
+	// "world" starts at position 6, so position 8 is at X=20 on line 2
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(20, 21), // Line 2 (Y=14-28)
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(20, 21),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, upEvent})
+	p0, p1 := f.Select(mc, &downEvent)
+
+	// Should select from position 2 to 8
+	if p0 != 2 {
+		t.Errorf("Select() multi-line drag: got p0=%d, want 2", p0)
+	}
+	if p1 != 8 {
+		t.Errorf("Select() multi-line drag: got p1=%d, want 8", p1)
+	}
+}
+
+// TestSelectWithMouseSetsFrameSelection tests that Select() updates
+// the frame's internal selection state.
+func TestSelectWithMouseSetsFrameSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello world"))
+
+	// Mouse down at position 0, drag to position 5
+	downEvent := draw.Mouse{
+		Point:   image.Pt(0, 7),
+		Buttons: 1,
+	}
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, upEvent})
+	f.Select(mc, &downEvent)
+
+	// Verify that GetSelection returns the same values
+	p0, p1 := f.GetSelection()
+	if p0 != 0 || p1 != 5 {
+		t.Errorf("GetSelection() after Select(): got (%d, %d), want (0, 5)", p0, p1)
+	}
+}
+
+// TestSelectWithMouseAtFrameEdge tests selection behavior at frame boundaries.
+func TestSelectWithMouseAtFrameEdge(t *testing.T) {
+	rect := image.Rect(10, 10, 100, 50)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello"))
+
+	// Click at position 2 (accounting for frame offset: X=10+20=30)
+	downEvent := draw.Mouse{
+		Point:   image.Pt(30, 17), // Y=10+7=17
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(30, 17),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{upEvent})
+	p0, p1 := f.Select(mc, &downEvent)
+
+	if p0 != 2 || p1 != 2 {
+		t.Errorf("Select() at frame offset: got (%d, %d), want (2, 2)", p0, p1)
+	}
+}

@@ -334,8 +334,36 @@ func (f *frameImpl) runeAtX(text []byte, style Style, x int) int {
 }
 
 // Select handles mouse selection.
+// It takes the Mousectl for reading subsequent mouse events and the
+// initial mouse-down event. It tracks the mouse drag and returns the
+// selection range (p0, p1) where p0 <= p1. The frame's internal
+// selection state is also updated.
 func (f *frameImpl) Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int) {
-	// TODO: Implement
+	// Get the initial position from the mouse-down event
+	anchor := f.Charofpt(m.Point)
+	current := anchor
+
+	// Read mouse events until button is released
+	for {
+		me := <-mc.C
+		current = f.Charofpt(me.Point)
+
+		// Update selection as we drag (for visual feedback)
+		if anchor <= current {
+			f.p0 = anchor
+			f.p1 = current
+		} else {
+			f.p0 = current
+			f.p1 = anchor
+		}
+
+		// Check if button was released
+		if me.Buttons == 0 {
+			break
+		}
+	}
+
+	// Return normalized selection (p0 <= p1)
 	return f.p0, f.p1
 }
 
