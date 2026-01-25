@@ -90,6 +90,76 @@ func (pw *PreviewWindow) Redraw() {
 	}
 }
 
+// SyncToSourcePosition synchronizes the preview scroll position based on a
+// position in the source document. This enables the preview to follow along
+// as the user scrolls in the source editor.
+// sourcePos is the current position in the source document (e.g., cursor or
+// top of visible area), and totalSourceRunes is the total length of the source.
+func (pw *PreviewWindow) SyncToSourcePosition(sourcePos, totalSourceRunes int) {
+	if pw.richText == nil || pw.content == nil {
+		return
+	}
+
+	totalPreviewRunes := pw.content.Len()
+	if totalPreviewRunes == 0 || totalSourceRunes == 0 {
+		return
+	}
+
+	// Check if content fits on screen - no scrolling needed
+	frame := pw.richText.Frame()
+	if frame == nil {
+		return
+	}
+
+	// Count lines in preview content
+	lineCount := 1
+	lineStarts := []int{0}
+	for i, span := range pw.content {
+		runeOffset := 0
+		if i > 0 {
+			for j := 0; j < i; j++ {
+				runeOffset += len([]rune(pw.content[j].Text))
+			}
+		}
+		for j, r := range span.Text {
+			if r == '\n' {
+				lineCount++
+				lineStarts = append(lineStarts, runeOffset+j+1)
+			}
+		}
+	}
+
+	maxLines := frame.MaxLines()
+
+	// If all content fits, no scrolling needed
+	if lineCount <= maxLines {
+		pw.richText.SetOrigin(0)
+		return
+	}
+
+	// Calculate the proportion through the source document
+	proportion := float64(sourcePos) / float64(totalSourceRunes)
+	if proportion < 0 {
+		proportion = 0
+	}
+	if proportion > 1 {
+		proportion = 1
+	}
+
+	// Map proportion to a line in the preview content
+	targetLine := int(float64(lineCount-1) * proportion)
+	if targetLine < 0 {
+		targetLine = 0
+	}
+	if targetLine >= len(lineStarts) {
+		targetLine = len(lineStarts) - 1
+	}
+
+	// Set the origin to the start of the target line
+	newOrigin := lineStarts[targetLine]
+	pw.richText.SetOrigin(newOrigin)
+}
+
 // PreviewOption is a functional option for configuring PreviewWindow.
 type PreviewOption struct {
 	bg        draw.Image

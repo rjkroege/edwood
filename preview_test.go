@@ -275,6 +275,121 @@ func TestPreviewUpdatesMultipleTimes(t *testing.T) {
 	}
 }
 
+// TestScrollSync tests that the preview window can synchronize its scroll
+// position based on a source position (e.g., from the source editor window).
+// This enables the preview to follow along as the user scrolls in the source.
+func TestScrollSync(t *testing.T) {
+	rect := image.Rect(0, 0, 600, 400)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	pw := NewPreviewWindow()
+	pw.Init(rect, display, font,
+		WithPreviewBackground(bgImage),
+		WithPreviewTextColor(textImage),
+	)
+
+	// Create multi-line markdown content - 20+ lines to ensure scrolling is needed
+	var mdContent string
+	for i := 1; i <= 30; i++ {
+		mdContent += "# Heading " + string(rune('A'+i-1)) + "\n\n"
+		mdContent += "Paragraph " + string(rune('0'+i%10)) + " with some content.\n\n"
+	}
+	pw.SetMarkdown(mdContent)
+
+	// Get the rich.Content to work with
+	content := pw.Content()
+	if content == nil || content.Len() == 0 {
+		t.Fatal("Content is empty")
+	}
+
+	totalRunes := content.Len()
+
+	// Initially, origin should be 0
+	if got := pw.RichText().Origin(); got != 0 {
+		t.Errorf("Initial origin = %d, want 0", got)
+	}
+
+	// Sync to a source position that's ~50% through the document
+	// This simulates the source editor being scrolled to middle of the document
+	sourcePos := totalRunes / 2
+	pw.SyncToSourcePosition(sourcePos, totalRunes)
+
+	// After syncing, the preview origin should have changed
+	newOrigin := pw.RichText().Origin()
+	if newOrigin == 0 {
+		t.Error("After SyncToSourcePosition(50%), origin should not be 0")
+	}
+
+	// The origin should be somewhere in the middle range of the content
+	// (roughly between 25% and 75% of total runes)
+	minExpected := totalRunes / 4
+	maxExpected := totalRunes * 3 / 4
+	if newOrigin < minExpected || newOrigin > maxExpected {
+		t.Errorf("After 50%% sync, origin = %d, expected between %d and %d", newOrigin, minExpected, maxExpected)
+	}
+
+	// Sync to the beginning - origin should go back to 0
+	pw.SyncToSourcePosition(0, totalRunes)
+	if got := pw.RichText().Origin(); got != 0 {
+		t.Errorf("After SyncToSourcePosition(0), origin = %d, want 0", got)
+	}
+
+	// Sync to the end - origin should be near the end
+	pw.SyncToSourcePosition(totalRunes-1, totalRunes)
+	endOrigin := pw.RichText().Origin()
+	// The origin should be past the midpoint for end-of-document sync
+	if endOrigin < totalRunes/2 {
+		t.Errorf("After 100%% sync, origin = %d, expected > %d", endOrigin, totalRunes/2)
+	}
+}
+
+// TestScrollSyncNoContent tests that scroll sync handles empty content gracefully.
+func TestScrollSyncNoContent(t *testing.T) {
+	rect := image.Rect(0, 0, 600, 400)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	pw := NewPreviewWindow()
+	pw.Init(rect, display, font)
+
+	// No content set - SyncToSourcePosition should not panic
+	pw.SyncToSourcePosition(100, 1000)
+
+	// Origin should still be 0
+	if got := pw.RichText().Origin(); got != 0 {
+		t.Errorf("Origin with no content = %d, want 0", got)
+	}
+}
+
+// TestScrollSyncContentFits tests scroll sync when all content fits on screen.
+func TestScrollSyncContentFits(t *testing.T) {
+	rect := image.Rect(0, 0, 600, 400)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	pw := NewPreviewWindow()
+	pw.Init(rect, display, font)
+
+	// Small content that fits on screen
+	pw.SetMarkdown("# Short\n\nBrief content.")
+
+	content := pw.Content()
+	if content == nil {
+		t.Fatal("Content is nil")
+	}
+
+	// Try to sync to various positions - origin should stay at 0
+	// since all content fits
+	pw.SyncToSourcePosition(content.Len()/2, content.Len())
+	if got := pw.RichText().Origin(); got != 0 {
+		t.Errorf("Origin when content fits = %d, want 0", got)
+	}
+}
+
 // Verify that PreviewWindow uses markdown.Parse (compile-time check)
 var _ = markdown.Parse
 var _ = rich.Plain
