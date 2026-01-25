@@ -227,28 +227,28 @@
 ### 6.4 Visual Demo - Selection
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | N/A - visual demo |
-| Code written | [ ] | Demo with clickable, selectable text |
-| Tests pass | [ ] | Manual verification - can select text |
-| Code committed | [ ] | |
+| Tests exist | [x] | N/A - visual demo |
+| Code written | [x] | Demo with clickable, selectable text |
+| Tests pass | [x] | Manual verification - can select text |
+| Code committed | [x] | Commit a2b6c00 |
 
 ## Phase 7: Scrolling
 
 ### 7.1 Origin Tracking
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestSetOrigin, TestGetOrigin |
-| Code written | [ ] | Frame stores origin offset |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestSetOrigin, TestGetOrigin, TestOriginZero, TestOriginClear, TestOriginUpdateOverwrites |
+| Code written | [x] | Frame stores origin offset |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit fcb1f25 |
 
 ### 7.2 Partial Content Display
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestDisplayFromOrigin |
-| Code written | [ ] | Redraw starts from origin, not beginning |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestDisplayFromOrigin |
+| Code written | [x] | Redraw starts from origin, not beginning |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 72310f9 |
 
 ### 7.3 Frame Fill Status
 | Stage | Status | Notes |
@@ -418,3 +418,16 @@ go test ./rich/
 | markdown/parse.go | Markdown to Content parser |
 | richtext.go | RichText component |
 | preview.go | Preview window integration |
+
+---
+
+## Known Issues
+
+### Selection Not Displayed During Drag
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Issue identified | [x] | Hand-validation: text is selectable but selection highlight doesn't update as you drag |
+| Root cause found | [ ] | Select() loop likely not calling Redraw() during drag |
+| Fix implemented | [ ] | |
+| Fix tested | [ ] | |
+| Fix committed | [ ] | |
