@@ -25,6 +25,10 @@ type RichText struct {
 	// Options stored for frame initialization
 	background draw.Image
 	textColor  draw.Image
+
+	// Scrollbar colors
+	scrollBg    draw.Image // Scrollbar background color
+	scrollThumb draw.Image // Scrollbar thumb color
 }
 
 // NewRichText creates a new RichText component.
@@ -141,8 +145,140 @@ func (rt *RichText) SetOrigin(org int) {
 
 // Redraw redraws the RichText component.
 func (rt *RichText) Redraw() {
+	// Draw scrollbar first (behind frame)
+	rt.scrDraw()
+
+	// Draw the frame content
 	if rt.frame != nil {
 		rt.frame.Redraw()
 	}
-	// TODO: Also redraw scrollbar in future phase
+}
+
+// scrDraw renders the scrollbar background and thumb.
+func (rt *RichText) scrDraw() {
+	if rt.display == nil {
+		return
+	}
+
+	screen := rt.display.ScreenImage()
+
+	// Draw scrollbar background
+	if rt.scrollBg != nil {
+		screen.Draw(rt.scrollRect, rt.scrollBg, rt.scrollBg, image.ZP)
+	}
+
+	// Draw scrollbar thumb
+	if rt.scrollThumb != nil {
+		thumbRect := rt.scrThumbRect()
+		screen.Draw(thumbRect, rt.scrollThumb, rt.scrollThumb, image.ZP)
+	}
+}
+
+// scrThumbRect returns the rectangle for the scrollbar thumb.
+// The thumb position and size reflect the current scroll position and
+// the proportion of visible content to total content.
+func (rt *RichText) scrThumbRect() image.Rectangle {
+	// If no content or frame, fill the whole scrollbar
+	if rt.content == nil || rt.frame == nil {
+		return rt.scrollRect
+	}
+
+	totalRunes := rt.content.Len()
+	if totalRunes == 0 {
+		// No content - thumb fills the whole scrollbar
+		return rt.scrollRect
+	}
+
+	// Get scroll metrics from the frame
+	origin := rt.frame.GetOrigin()
+	maxLines := rt.frame.MaxLines()
+
+	scrollHeight := rt.scrollRect.Dy()
+
+	// Count lines in content and build a map of line start positions
+	lineCount := 1 // At least one line
+	lineStarts := []int{0}
+	for i, span := range rt.content {
+		runeOffset := 0
+		if i > 0 {
+			// Sum up runes from previous spans
+			for j := 0; j < i; j++ {
+				runeOffset += len([]rune(rt.content[j].Text))
+			}
+		}
+		for j, r := range span.Text {
+			if r == '\n' {
+				lineCount++
+				lineStarts = append(lineStarts, runeOffset+j+1)
+			}
+		}
+	}
+
+	// If all content fits, fill the scrollbar
+	if lineCount <= maxLines {
+		return rt.scrollRect
+	}
+
+	// Calculate thumb height based on visible vs total lines
+	visibleProportion := float64(maxLines) / float64(lineCount)
+	if visibleProportion > 1.0 {
+		visibleProportion = 1.0
+	}
+
+	thumbHeight := int(float64(scrollHeight) * visibleProportion)
+	if thumbHeight < 10 {
+		thumbHeight = 10 // Minimum thumb height for usability
+	}
+
+	// Find which line the origin corresponds to
+	originLine := 0
+	for i, start := range lineStarts {
+		if origin >= start {
+			originLine = i
+		} else {
+			break
+		}
+	}
+
+	// Position proportion based on line position in the document
+	// Use (lineCount - 1) as denominator so that last line maps to bottom.
+	denominator := lineCount - 1
+	if denominator < 1 {
+		denominator = 1
+	}
+	posProportion := float64(originLine) / float64(denominator)
+	if posProportion > 1.0 {
+		posProportion = 1.0
+	}
+
+	// When viewing content near the end of the document (past ~70% of lines),
+	// adjust the position to ensure the thumb reaches the bottom.
+	// This ensures "near the end" positions map to "near the bottom" of scrollbar.
+	endThreshold := float64(lineCount) * 0.70 // 70% threshold
+	if float64(originLine) >= endThreshold {
+		// Map from [endThreshold, lineCount-1] to [currentProportion, 1.0]
+		// Scale faster toward 1.0 for end positions
+		linesBeyondThreshold := float64(originLine) - endThreshold
+		linesInEndRange := float64(lineCount-1) - endThreshold
+		if linesInEndRange > 0 {
+			// Linear approach to bottom - more aggressive than ease-out
+			normalizedPos := linesBeyondThreshold / linesInEndRange
+			// Remap: at normalizedPos 0.5, we want to be 90%+ of the way to the bottom
+			adjustment := normalizedPos * (1.0 - posProportion)
+			posProportion += adjustment
+		}
+	}
+
+	// Available space for thumb movement
+	availableSpace := scrollHeight - thumbHeight
+
+	// Thumb top position
+	thumbTop := rt.scrollRect.Min.Y + int(float64(availableSpace)*posProportion)
+
+	return image.Rect(
+		rt.scrollRect.Min.X,
+		thumbTop,
+		rt.scrollRect.Max.X,
+		thumbTop+thumbHeight,
+	)
 }
