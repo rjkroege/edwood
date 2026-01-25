@@ -44,11 +44,12 @@ type Frame interface {
 
 // frameImpl is the concrete implementation of Frame.
 type frameImpl struct {
-	rect    image.Rectangle
-	display edwooddraw.Display
-	content Content
-	origin  int
-	p0, p1  int // selection
+	rect       image.Rectangle
+	display    edwooddraw.Display
+	background edwooddraw.Image // background image for filling
+	content    Content
+	origin     int
+	p0, p1     int // selection
 }
 
 // NewFrame creates a new Frame.
@@ -135,7 +136,12 @@ func (f *frameImpl) VisibleLines() int {
 
 // Redraw redraws the frame.
 func (f *frameImpl) Redraw() {
-	// TODO: Implement
+	if f.display == nil || f.background == nil {
+		return
+	}
+	// Fill the frame rectangle with the background color
+	screen := f.display.ScreenImage()
+	screen.Draw(f.rect, f.background, f.background, image.ZP)
 }
 
 // Full returns true if the frame is at capacity.

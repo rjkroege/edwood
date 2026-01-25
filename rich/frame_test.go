@@ -61,3 +61,51 @@ func WithDisplay(d draw.Display) Option {
 		f.display = d
 	}
 }
+
+// WithBackground is an Option that sets the background image for the frame.
+func WithBackground(b draw.Image) Option {
+	return func(f *frameImpl) {
+		f.background = b
+	}
+}
+
+func TestFrameRedrawFillsBackground(t *testing.T) {
+	rect := image.Rect(10, 20, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	// Allocate a distinct background color image (use Medblue as a visually distinct color)
+	bgColor := draw.Medblue
+	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, bgColor)
+	if err != nil {
+		t.Fatalf("AllocImage failed: %v", err)
+	}
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage))
+
+	// Clear any draw ops from init
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Redraw
+	f.Redraw()
+
+	// Verify that a fill operation occurred for the frame's rectangle
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Fatal("Redraw() did not produce any draw operations")
+	}
+
+	// Look for a fill operation covering the frame rectangle
+	found := false
+	expectedFill := "fill " + rect.String()
+	for _, op := range ops {
+		if len(op) >= len(expectedFill) && op[:len(expectedFill)] == expectedFill {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not fill the background rectangle %v\ngot ops: %v", rect, ops)
+	}
+}
