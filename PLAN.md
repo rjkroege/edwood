@@ -271,26 +271,26 @@
 ### 8.1 RichText Struct
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestRichTextInit |
-| Code written | [ ] | RichText struct wrapping rich.Frame |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestRichTextInit, TestRichTextScrollRect, TestRichTextFrameRect, TestRichTextSetContent, TestRichTextSelection, TestRichTextOrigin, TestRichTextRedraw |
+| Code written | [x] | RichText struct wrapping rich.Frame |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 6141b9b |
 
 ### 8.2 Scrollbar Rendering
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestScrollbarPosition |
-| Code written | [ ] | scrDraw() renders scrollbar thumb |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestScrollbarPosition, TestScrollbarThumbAtTop, TestScrollbarThumbAtBottom, TestScrollbarThumbMiddle, TestScrollbarNoContent, TestScrollbarContentFits |
+| Code written | [x] | scrDraw() renders scrollbar thumb |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 6541d1d |
 
 ### 8.3 Scrollbar Interaction
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestScrollbarClick |
-| Code written | [ ] | Handle scrollbar mouse events |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestScrollbarClickButton1, TestScrollbarClickButton2, TestScrollbarClickButton3, TestScrollbarClickAtTop, TestScrollbarClickAtBottom, TestScrollbarClickNoContent, TestScrollbarClickContentFits |
+| Code written | [x] | Handle scrollbar mouse events |
+| Tests pass | [x] | |
+| Code committed | [x] | Commit 6b85ee2 |
 
 ### 8.4 Mouse Wheel Scrolling
 | Stage | Status | Notes |
