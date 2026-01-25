@@ -777,3 +777,83 @@ func (w *Window) PreviewSnarf() []byte {
 
 	return []byte(string(buf))
 }
+
+// PreviewLookText returns the selected text from the preview for a Look (B3) operation.
+// In preview mode, this returns the rendered text (not the source markdown).
+// Returns empty string if not in preview mode or no selection.
+func (w *Window) PreviewLookText() string {
+	if !w.previewMode || w.richBody == nil {
+		return ""
+	}
+
+	// Get selection from the rich text frame
+	p0, p1 := w.richBody.Selection()
+	if p0 == p1 {
+		return "" // No selection
+	}
+
+	// Get the plain text from the rendered content
+	content := w.richBody.Content()
+	if content == nil {
+		return ""
+	}
+
+	plainText := content.Plain()
+	if p0 < 0 || p1 > len(plainText) {
+		return ""
+	}
+
+	return string(plainText[p0:p1])
+}
+
+// PreviewExecText returns the selected text from the preview for an Exec (B2) operation.
+// In preview mode, this returns the rendered text (not the source markdown).
+// Returns empty string if not in preview mode or no selection.
+func (w *Window) PreviewExecText() string {
+	// Exec and Look use the same text extraction logic
+	return w.PreviewLookText()
+}
+
+// PreviewExpandWord expands a click position to the full word in preview mode.
+// Given a position in the rendered text, returns the word containing that position
+// along with its start and end positions. Used for B3 Look when there's no selection.
+func (w *Window) PreviewExpandWord(pos int) (word string, start, end int) {
+	if !w.previewMode || w.richBody == nil {
+		return "", pos, pos
+	}
+
+	content := w.richBody.Content()
+	if content == nil {
+		return "", pos, pos
+	}
+
+	plainText := content.Plain()
+	n := len(plainText)
+
+	if pos < 0 || pos >= n {
+		return "", pos, pos
+	}
+
+	// Expand left to find word start
+	start = pos
+	for start > 0 && isWordChar(plainText[start-1]) {
+		start--
+	}
+
+	// Expand right to find word end
+	end = pos
+	for end < n && isWordChar(plainText[end]) {
+		end++
+	}
+
+	if start >= end {
+		return "", pos, pos
+	}
+
+	return string(plainText[start:end]), start, end
+}
+
+// isWordChar returns true if the rune is part of a word (alphanumeric or underscore).
+func isWordChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+}

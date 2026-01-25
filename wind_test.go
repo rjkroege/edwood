@@ -1217,3 +1217,297 @@ func TestPreviewLiveUpdateMultipleTimes(t *testing.T) {
 		}
 	}
 }
+
+// TestPreviewLook tests that B3 (Look) chord in preview mode operates on the rendered text.
+// When the user B3-clicks text in preview mode, the search should look for the rendered text
+// (e.g., "World" from "**World**"), not the raw markdown source.
+func TestPreviewLook(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with bold text
+	sourceMarkdown := "# Hello World\n\nSome **important** text here.\n\nFind important word."
+	// Rendered text will be: "Hello World\n\nSome important text here.\n\nFind important word."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// In the rendered text, find "important" and select it
+	// The rendered text should be "Hello World\n\nSome important text here.\n\nFind important word."
+	// "important" first appears at position 17 (after "Hello World\n\nSome ")
+	// Rendered: "Hello World" (11) + "\n\n" (2) + "Some " (5) = 18, then "important" starts
+	// Let's find it more precisely by looking at the rendered content
+
+	// For a B3 (Look) operation in preview mode, we need to:
+	// 1. Determine what text is at the click position (using Charofpt)
+	// 2. Expand to get the word
+	// 3. The Look operation should search for this rendered text
+
+	// Test: Set selection on a word in the rendered text
+	// Select "important" in the rendered preview
+	// The exact position depends on how the parser renders the content
+
+	// Verify the window is in preview mode
+	if !w.IsPreviewMode() {
+		t.Fatal("Window should be in preview mode")
+	}
+
+	// Verify we can get the rendered text from the selection
+	// When selecting text in preview and executing Look, the text should be
+	// from the rendered content, not the source.
+
+	// Simulate: select "important" (without the ** markers) in the rendered text
+	// The rendered content after parsing should have "important" as plain text (styled as bold)
+
+	// Get the rich text content and verify it exists
+	richContent := rt.Content()
+	if richContent == nil {
+		t.Fatal("Rich content should not be nil")
+	}
+
+	// Find "important" in the rendered plain text
+	plainText := richContent.Plain()
+	importantIdx := -1
+	for i := 0; i < len(plainText)-8; i++ {
+		if string(plainText[i:i+9]) == "important" {
+			importantIdx = i
+			break
+		}
+	}
+
+	if importantIdx < 0 {
+		t.Fatalf("Could not find 'important' in rendered text: %q", string(plainText))
+	}
+
+	// Set selection to "important" in the rendered text
+	rt.SetSelection(importantIdx, importantIdx+9)
+
+	// Verify selection
+	p0, p1 := rt.Selection()
+	if p0 != importantIdx || p1 != importantIdx+9 {
+		t.Errorf("Selection should be (%d, %d), got (%d, %d)", importantIdx, importantIdx+9, p0, p1)
+	}
+
+	// Test that PreviewLookText returns the rendered text, not the source markdown
+	lookText := w.PreviewLookText()
+	if lookText != "important" {
+		t.Errorf("PreviewLookText() should return 'important', got %q", lookText)
+	}
+}
+
+// TestPreviewExec tests that B2 (Exec) chord in preview mode operates on the rendered text.
+// When the user B2-clicks text in preview mode, the command should be taken from the rendered
+// text (e.g., "ls" from "**ls**"), not the raw markdown source.
+func TestPreviewExec(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with commands that might be styled
+	sourceMarkdown := "# Commands\n\nRun **Echo** to test.\n\nOr try `Look` command."
+	// Rendered: "Commands\n\nRun Echo to test.\n\nOr try Look command."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Verify the window is in preview mode
+	if !w.IsPreviewMode() {
+		t.Fatal("Window should be in preview mode")
+	}
+
+	// Get the rich text content and verify it exists
+	richContent := rt.Content()
+	if richContent == nil {
+		t.Fatal("Rich content should not be nil")
+	}
+
+	// Find "Echo" in the rendered plain text (it's rendered without ** markers)
+	plainText := richContent.Plain()
+	echoIdx := -1
+	for i := 0; i < len(plainText)-3; i++ {
+		if string(plainText[i:i+4]) == "Echo" {
+			echoIdx = i
+			break
+		}
+	}
+
+	if echoIdx < 0 {
+		t.Fatalf("Could not find 'Echo' in rendered text: %q", string(plainText))
+	}
+
+	// Set selection to "Echo" in the rendered text
+	rt.SetSelection(echoIdx, echoIdx+4)
+
+	// Verify selection
+	p0, p1 := rt.Selection()
+	if p0 != echoIdx || p1 != echoIdx+4 {
+		t.Errorf("Selection should be (%d, %d), got (%d, %d)", echoIdx, echoIdx+4, p0, p1)
+	}
+
+	// Test that PreviewExecText returns the rendered text, not the source markdown
+	execText := w.PreviewExecText()
+	if execText != "Echo" {
+		t.Errorf("PreviewExecText() should return 'Echo', got %q", execText)
+	}
+
+	// Also test the code span case - find "Look" which comes from `Look`
+	lookIdx := -1
+	for i := 0; i < len(plainText)-3; i++ {
+		if string(plainText[i:i+4]) == "Look" {
+			lookIdx = i
+			break
+		}
+	}
+
+	if lookIdx < 0 {
+		t.Fatalf("Could not find 'Look' in rendered text: %q", string(plainText))
+	}
+
+	// Set selection to "Look" in the rendered text
+	rt.SetSelection(lookIdx, lookIdx+4)
+
+	// Verify selection
+	p0, p1 = rt.Selection()
+	if p0 != lookIdx || p1 != lookIdx+4 {
+		t.Errorf("Selection should be (%d, %d), got (%d, %d)", lookIdx, lookIdx+4, p0, p1)
+	}
+
+	// Test that PreviewExecText returns the rendered text from code span
+	execText = w.PreviewExecText()
+	if execText != "Look" {
+		t.Errorf("PreviewExecText() should return 'Look', got %q", execText)
+	}
+}
+
+// TestPreviewLookExpand tests that B3 Look with no selection expands to word at click point.
+func TestPreviewLookExpand(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Simple markdown
+	sourceMarkdown := "Hello World test"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/test.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Set cursor position in the middle of "World" (no selection, just click position)
+	// "Hello World test" - "World" is at positions 6-11
+	// Clicking at position 8 (middle of "World") should expand to select "World"
+	rt.SetSelection(8, 8) // No selection, just cursor position
+
+	// Test that PreviewExpandWord expands the click position to the full word
+	word, wordStart, wordEnd := w.PreviewExpandWord(8)
+	if word != "World" {
+		t.Errorf("PreviewExpandWord(8) should return 'World', got %q", word)
+	}
+	if wordStart != 6 || wordEnd != 11 {
+		t.Errorf("PreviewExpandWord(8) should return positions (6, 11), got (%d, %d)", wordStart, wordEnd)
+	}
+}
