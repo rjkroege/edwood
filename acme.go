@@ -17,6 +17,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/rich"
 )
 
 var (
@@ -125,6 +126,11 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 			}
 		}
 	}
+	display.Flush()
+
+	// Rich text demo - temporary visual test hook
+	// TODO(rjk): Remove this demo when rich text is fully integrated
+	rich.DemoFrame(display, display.ScreenImage().R())
 	display.Flush()
 
 	// After row is initialized
