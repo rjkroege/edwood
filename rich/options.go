@@ -36,3 +36,10 @@ func WithScaledFont(scale float64, f draw.Font) Option {
 		fi.scaledFonts[scale] = f
 	}
 }
+
+// WithSelectionColor is an Option that sets the selection highlight color image.
+func WithSelectionColor(c draw.Image) Option {
+	return func(fi *frameImpl) {
+		fi.selectionColor = c
+	}
+}

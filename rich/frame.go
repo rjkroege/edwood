@@ -46,14 +46,15 @@ type Frame interface {
 
 // frameImpl is the concrete implementation of Frame.
 type frameImpl struct {
-	rect       image.Rectangle
-	display    edwooddraw.Display
-	background edwooddraw.Image // background image for filling
-	textColor  edwooddraw.Image // text color image for rendering
-	font       edwooddraw.Font  // font for text rendering
-	content    Content
-	origin     int
-	p0, p1     int // selection
+	rect           image.Rectangle
+	display        edwooddraw.Display
+	background     edwooddraw.Image // background image for filling
+	textColor      edwooddraw.Image // text color image for rendering
+	selectionColor edwooddraw.Image // selection highlight color
+	font           edwooddraw.Font  // font for text rendering
+	content        Content
+	origin         int
+	p0, p1         int // selection
 
 	// Font variants for styled text
 	boldFont       edwooddraw.Font
@@ -380,6 +381,11 @@ func (f *frameImpl) Redraw() {
 	screen := f.display.ScreenImage()
 	screen.Draw(f.rect, f.background, f.background, image.ZP)
 
+	// Draw selection highlight (before text so text appears on top)
+	if f.content != nil && f.font != nil && f.selectionColor != nil && f.p0 != f.p1 {
+		f.drawSelection(screen)
+	}
+
 	// Draw text if we have content, font, and text color
 	if f.content != nil && f.font != nil && f.textColor != nil {
 		f.drawText(screen)
@@ -437,6 +443,140 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 			screen.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
 		}
 	}
+}
+
+// drawSelection renders the selection highlight rectangles.
+// The selection spans from p0 to p1 (rune offsets).
+// For multi-line selections, multiple rectangles are drawn.
+func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return
+	}
+
+	// Calculate frame width and tab width for layout
+	frameWidth := f.rect.Dx()
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout boxes into lines
+	lines := layout(boxes, f.font, frameWidth, maxtab)
+	if len(lines) == 0 {
+		return
+	}
+
+	fontHeight := f.font.Height()
+	p0, p1 := f.p0, f.p1
+	if p0 > p1 {
+		p0, p1 = p1, p0
+	}
+
+	// Walk through lines and boxes, tracking rune position
+	runePos := 0
+	for _, line := range lines {
+		lineStartRune := runePos
+		lineEndRune := lineStartRune
+
+		// Calculate the end rune position for this line
+		for _, pb := range line.Boxes {
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				lineEndRune++
+			} else {
+				lineEndRune += pb.Box.Nrune
+			}
+		}
+
+		// Check if this line overlaps with the selection
+		if lineEndRune <= p0 || lineStartRune >= p1 {
+			// No overlap with selection, skip this line
+			runePos = lineEndRune
+			continue
+		}
+
+		// This line has selected content - calculate the selection rectangle
+		selStartX := -1 // Start of selection on this line (relative to line start)
+		selEndX := 0    // End of selection on this line
+
+		boxRunePos := lineStartRune
+		for _, pb := range line.Boxes {
+			boxRunes := pb.Box.Nrune
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				boxRunes = 1
+			}
+
+			boxStartRune := boxRunePos
+			boxEndRune := boxStartRune + boxRunes
+
+			// Check if selection starts in or before this box (only set once)
+			if selStartX < 0 {
+				if p0 <= boxStartRune {
+					// Selection starts at or before this box
+					selStartX = pb.X
+				} else if p0 > boxStartRune && p0 < boxEndRune {
+					// Selection starts within this box
+					if pb.Box.IsNewline() || pb.Box.IsTab() {
+						selStartX = pb.X
+					} else {
+						// Calculate partial position within the box
+						runeOffset := p0 - boxStartRune
+						selStartX = pb.X + f.runeWidthInBox(&pb.Box, runeOffset)
+					}
+				}
+			}
+
+			// Check if selection ends in or after this box
+			if p1 >= boxEndRune {
+				// Selection extends past this box
+				selEndX = pb.X + pb.Box.Wid
+			} else if p1 > boxStartRune && p1 < boxEndRune {
+				// Selection ends within this box
+				if pb.Box.IsNewline() || pb.Box.IsTab() {
+					selEndX = pb.X + pb.Box.Wid
+				} else {
+					// Calculate partial position within the box
+					runeOffset := p1 - boxStartRune
+					selEndX = pb.X + f.runeWidthInBox(&pb.Box, runeOffset)
+				}
+			}
+
+			boxRunePos = boxEndRune
+		}
+
+		// If selStartX wasn't set, default to 0
+		if selStartX < 0 {
+			selStartX = 0
+		}
+		if selEndX > frameWidth {
+			selEndX = frameWidth
+		}
+
+		// Draw the selection rectangle for this line
+		if selEndX > selStartX {
+			selRect := image.Rect(
+				f.rect.Min.X+selStartX,
+				f.rect.Min.Y+line.Y,
+				f.rect.Min.X+selEndX,
+				f.rect.Min.Y+line.Y+fontHeight,
+			)
+			screen.Draw(selRect, f.selectionColor, f.selectionColor, image.ZP)
+		}
+
+		runePos = lineEndRune
+	}
+}
+
+// runeWidthInBox calculates the pixel width of the first n runes in a text box.
+func (f *frameImpl) runeWidthInBox(box *Box, n int) int {
+	if n <= 0 {
+		return 0
+	}
+	text := box.Text
+	byteOffset := 0
+	for i := 0; i < n && byteOffset < len(text); i++ {
+		_, size := utf8.DecodeRune(text[byteOffset:])
+		byteOffset += size
+	}
+	return f.fontForStyle(box.Style).BytesWidth(text[:byteOffset])
 }
 
 // allocColorImage allocates (or retrieves from cache) an image for the given color.

@@ -2,6 +2,7 @@ package rich
 
 import (
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/rjkroege/edwood/draw"
@@ -163,5 +164,279 @@ func TestSelectionUpdateOverwrites(t *testing.T) {
 	p0, p1 = f.GetSelection()
 	if p0 != 6 || p1 != 11 {
 		t.Errorf("Second GetSelection() = (%d, %d), want (6, 11)", p0, p1)
+	}
+}
+
+// TestDrawSelectionHighlightsRegion tests that Redraw draws a highlight for the selection.
+func TestDrawSelectionHighlightsRegion(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// Set content: "hello world" = 11 chars
+	f.SetContent(Plain("hello world"))
+
+	// Select "ello" (positions 1-5)
+	f.SetSelection(1, 5)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Look for a fill operation at the selection rectangle
+	// The selection should span from X=10 (position 1) to X=50 (position 5)
+	// at Y=0 with height=14
+	expectedRect := image.Rect(10, 0, 50, 14)
+	foundSelection := false
+	for _, op := range ops {
+		if strings.Contains(op, "fill") && strings.Contains(op, expectedRect.String()) {
+			foundSelection = true
+			break
+		}
+	}
+
+	if !foundSelection {
+		t.Errorf("Redraw() did not draw selection highlight at %v\ngot ops: %v", expectedRect, ops)
+	}
+}
+
+// TestDrawSelectionNoHighlightWhenEmpty tests that no highlight is drawn when p0 == p1.
+func TestDrawSelectionNoHighlightWhenEmpty(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello"))
+
+	// Set cursor position (no selection, p0 == p1)
+	f.SetSelection(2, 2)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Count fill operations (starts with "fill ") - should only be the background fill
+	fillCount := 0
+	for _, op := range ops {
+		if strings.HasPrefix(op, "fill ") {
+			fillCount++
+		}
+	}
+
+	// Only one fill should exist (the background)
+	if fillCount != 1 {
+		t.Errorf("Redraw() should only draw background fill when p0 == p1, got %d fills\nops: %v", fillCount, ops)
+	}
+}
+
+// TestDrawSelectionMultiLine tests that selection spanning multiple lines is drawn correctly.
+func TestDrawSelectionMultiLine(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello\nworld" = "hello" (5) + newline (1) + "world" (5)
+	f.SetContent(Plain("hello\nworld"))
+
+	// Select from "llo" on first line through "wor" on second line (positions 2-9)
+	f.SetSelection(2, 9)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Count fill operations excluding background
+	// Background is the full rect (0,0)-(400,300)
+	bgRect := rect.String()
+	selectionFills := 0
+	for _, op := range ops {
+		if strings.Contains(op, "fill") && !strings.Contains(op, bgRect) {
+			selectionFills++
+		}
+	}
+
+	// Multi-line selection should produce multiple fill rectangles (at least 2)
+	if selectionFills < 2 {
+		t.Errorf("Redraw() should draw multiple selection rectangles for multi-line selection, got %d fills\nops: %v", selectionFills, ops)
+	}
+}
+
+// TestDrawSelectionWrappedLine tests selection on wrapped lines.
+func TestDrawSelectionWrappedLine(t *testing.T) {
+	// Frame is 50px wide, font is 10px per char
+	// So 5 chars fit per line before wrapping
+	rect := image.Rect(0, 0, 50, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "helloworld" wraps: "hello" on line 1, "world" on line 2
+	f.SetContent(Plain("helloworld"))
+
+	// Select "oworl" - spans across the wrap point (positions 4-9)
+	f.SetSelection(4, 9)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Count fill operations excluding background
+	bgRect := rect.String()
+	selectionFills := 0
+	for _, op := range ops {
+		if strings.Contains(op, "fill") && !strings.Contains(op, bgRect) {
+			selectionFills++
+		}
+	}
+
+	// Wrapped selection should produce multiple fill rectangles
+	if selectionFills < 2 {
+		t.Errorf("Redraw() should draw multiple selection rectangles for wrapped selection, got %d fills\nops: %v", selectionFills, ops)
+	}
+}
+
+// TestDrawSelectionCorrectPosition tests that the selection highlight is at the correct pixel position.
+func TestDrawSelectionCorrectPosition(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello"))
+
+	// Select "ell" (positions 1-4)
+	// Should highlight from X = 20 + 10 = 30 to X = 20 + 40 = 60
+	f.SetSelection(1, 4)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Look for a fill operation at the correct rectangle
+	// Expected: fill (30,10)-(60,24)
+	expectedRect := image.Rect(30, 10, 60, 24)
+	foundCorrectRect := false
+	for _, op := range ops {
+		if strings.Contains(op, "fill") && strings.Contains(op, expectedRect.String()) {
+			foundCorrectRect = true
+			break
+		}
+	}
+
+	if !foundCorrectRect {
+		t.Errorf("Redraw() did not draw selection at correct position %v\ngot ops: %v", expectedRect, ops)
+	}
+}
+
+// TestDrawSelectionFullLine tests selecting an entire line.
+func TestDrawSelectionFullLine(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello\nworld"
+	f.SetContent(Plain("hello\nworld"))
+
+	// Select entire first line including newline (positions 0-6)
+	f.SetSelection(0, 6)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Should have a selection fill (not the background fill)
+	bgRect := rect.String()
+	foundSelection := false
+	for _, op := range ops {
+		if strings.Contains(op, "fill") && !strings.Contains(op, bgRect) {
+			foundSelection = true
+			break
+		}
+	}
+
+	if !foundSelection {
+		t.Errorf("Redraw() did not draw selection for full line\ngot ops: %v", ops)
 	}
 }
