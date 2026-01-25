@@ -1,7 +1,9 @@
 package rich
 
 import (
+	"fmt"
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/rjkroege/edwood/draw"
@@ -76,6 +78,13 @@ func WithFont(f draw.Font) Option {
 	}
 }
 
+// WithTextColor is an Option that sets the text color image for the frame.
+func WithTextColor(c draw.Image) Option {
+	return func(fi *frameImpl) {
+		fi.textColor = c
+	}
+}
+
 func TestFrameWithFont(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300)
 	display := edwoodtest.NewDisplay(rect)
@@ -139,5 +148,169 @@ func TestFrameRedrawFillsBackground(t *testing.T) {
 
 	if !found {
 		t.Errorf("Redraw() did not fill the background rectangle %v\ngot ops: %v", rect, ops)
+	}
+}
+
+func TestDrawText(t *testing.T) {
+	rect := image.Rect(10, 20, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Allocate background and text color images
+	bgColor := draw.Medblue
+	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, bgColor)
+	if err != nil {
+		t.Fatalf("AllocImage for background failed: %v", err)
+	}
+
+	textColor := draw.Black
+	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, textColor)
+	if err != nil {
+		t.Fatalf("AllocImage for text color failed: %v", err)
+	}
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content
+	f.SetContent(Plain("hello"))
+
+	// Clear any draw ops from init
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Redraw
+	f.Redraw()
+
+	// Verify that text was rendered
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Look for a string draw operation containing "hello"
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "hello"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render text 'hello'\ngot ops: %v", ops)
+	}
+}
+
+func TestDrawTextMultipleBoxes(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with two lines
+	f.SetContent(Plain("hello\nworld"))
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Both "hello" and "world" should be rendered
+	foundHello := false
+	foundWorld := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "hello"`) {
+			foundHello = true
+		}
+		if strings.Contains(op, `string "world"`) {
+			foundWorld = true
+		}
+	}
+
+	if !foundHello {
+		t.Errorf("Redraw() did not render 'hello'\ngot ops: %v", ops)
+	}
+	if !foundWorld {
+		t.Errorf("Redraw() did not render 'world'\ngot ops: %v", ops)
+	}
+}
+
+func TestDrawTextAtCorrectPosition(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set simple content
+	f.SetContent(Plain("test"))
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Text should be rendered at the frame origin (rect.Min)
+	// The mock records: "string \"test\" atpoint: (20,10)"
+	foundAtOrigin := false
+	expectedPos := fmt.Sprintf("atpoint: %v", rect.Min)
+	for _, op := range ops {
+		if strings.Contains(op, `string "test"`) && strings.Contains(op, expectedPos) {
+			foundAtOrigin = true
+			break
+		}
+	}
+
+	if !foundAtOrigin {
+		t.Errorf("Redraw() did not render 'test' at frame origin %v\ngot ops: %v", rect.Min, ops)
+	}
+}
+
+func TestDrawTextSecondLinePosition(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // height = 14
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with newline
+	f.SetContent(Plain("line1\nline2"))
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// First line at Y=10, second line at Y=10+14=24
+	firstLineY := rect.Min.Y
+	secondLineY := rect.Min.Y + 14
+
+	foundFirstLine := false
+	foundSecondLine := false
+
+	for _, op := range ops {
+		if strings.Contains(op, `string "line1"`) && strings.Contains(op, fmt.Sprintf("(%d,%d)", rect.Min.X, firstLineY)) {
+			foundFirstLine = true
+		}
+		if strings.Contains(op, `string "line2"`) && strings.Contains(op, fmt.Sprintf("(%d,%d)", rect.Min.X, secondLineY)) {
+			foundSecondLine = true
+		}
+	}
+
+	if !foundFirstLine {
+		t.Errorf("Redraw() did not render 'line1' at Y=%d\ngot ops: %v", firstLineY, ops)
+	}
+	if !foundSecondLine {
+		t.Errorf("Redraw() did not render 'line2' at Y=%d\ngot ops: %v", secondLineY, ops)
 	}
 }

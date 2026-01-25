@@ -47,6 +47,7 @@ type frameImpl struct {
 	rect       image.Rectangle
 	display    edwooddraw.Display
 	background edwooddraw.Image // background image for filling
+	textColor  edwooddraw.Image // text color image for rendering
 	font       edwooddraw.Font  // font for text rendering
 	content    Content
 	origin     int
@@ -143,6 +144,51 @@ func (f *frameImpl) Redraw() {
 	// Fill the frame rectangle with the background color
 	screen := f.display.ScreenImage()
 	screen.Draw(f.rect, f.background, f.background, image.ZP)
+
+	// Draw text if we have content, font, and text color
+	if f.content != nil && f.font != nil && f.textColor != nil {
+		f.drawText(screen)
+	}
+}
+
+// drawText renders the content boxes onto the screen.
+func (f *frameImpl) drawText(screen edwooddraw.Image) {
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return
+	}
+
+	// Calculate frame width for layout
+	frameWidth := f.rect.Dx()
+
+	// Default tab width (8 characters worth)
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout boxes into lines
+	lines := layout(boxes, f.font, frameWidth, maxtab)
+
+	// Render each line
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			// Skip newlines and tabs - they don't render visible text
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				continue
+			}
+			if len(pb.Box.Text) == 0 {
+				continue
+			}
+
+			// Calculate screen position
+			pt := image.Point{
+				X: f.rect.Min.X + pb.X,
+				Y: f.rect.Min.Y + line.Y,
+			}
+
+			// Render the text
+			screen.Bytes(pt, f.textColor, image.ZP, f.font, pb.Box.Text)
+		}
+	}
 }
 
 // Full returns true if the frame is at capacity.
