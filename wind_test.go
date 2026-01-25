@@ -971,3 +971,249 @@ func TestPreviewCommandExit(t *testing.T) {
 		t.Error("Content should still be available after re-entering preview mode")
 	}
 }
+
+// TestPreviewLiveUpdate tests that when the body buffer changes while in preview mode,
+// the richBody is automatically updated with re-parsed markdown content.
+func TestPreviewLiveUpdate(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content
+	initialMarkdown := "# Hello World\n\nSome text here."
+	sourceRunes := []rune(initialMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Set up preview mode components
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse initial markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+
+	// Verify initial content
+	initialContent := rt.Content()
+	if initialContent == nil || initialContent.Len() == 0 {
+		t.Fatal("Initial content should not be empty")
+	}
+
+	// Get the initial rendered text length
+	initialLen := initialContent.Len()
+
+	// Now simulate editing the body buffer (simulating user typing in source)
+	// Insert " Updated" after "World" - this tests that preview updates when body changes
+	updatedMarkdown := "# Hello Updated World\n\nSome new text here."
+	w.body.file.DeleteAt(0, w.body.file.Nr())
+	w.body.file.InsertAt(0, []rune(updatedMarkdown))
+
+	// Call the update method that should be triggered when in preview mode
+	w.UpdatePreview()
+
+	// Verify the preview was updated
+	updatedContent := w.RichBody().Content()
+	if updatedContent == nil {
+		t.Fatal("Updated content should not be nil after UpdatePreview")
+	}
+
+	// The content length should have changed
+	updatedLen := updatedContent.Len()
+	if updatedLen == initialLen {
+		// Only fail if content length is exactly the same AND the text didn't change
+		// Since "Updated" was added, the length should be different
+		t.Errorf("Content should have changed after body edit: initial len=%d, updated len=%d", initialLen, updatedLen)
+	}
+
+	// Verify the source map was also updated
+	if w.PreviewSourceMap() == nil {
+		t.Error("Source map should still be set after update")
+	}
+}
+
+// TestPreviewLiveUpdatePreservesScroll tests that live updates preserve the scroll position
+// (origin) when possible, so the user doesn't lose their place while editing.
+func TestPreviewLiveUpdatePreservesScroll(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with multi-line markdown content that requires scrolling
+	var mdBuilder string
+	for i := 1; i <= 50; i++ {
+		mdBuilder += "# Heading " + string(rune('A'+i%26)) + "\n\n"
+		mdBuilder += "Paragraph " + string(rune('0'+i%10)) + " with some content to make it longer.\n\n"
+	}
+	initialMarkdown := mdBuilder
+	sourceRunes := []rune(initialMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/long.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Set up preview mode components
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse initial markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+
+	// Scroll to somewhere in the middle
+	totalLen := rt.Content().Len()
+	targetOrigin := totalLen / 3 // About 1/3 through the content
+	rt.SetOrigin(targetOrigin)
+
+	// Verify the origin was set
+	beforeOrigin := rt.Origin()
+	if beforeOrigin == 0 {
+		t.Fatal("Origin should be non-zero after scrolling")
+	}
+
+	// Make a small edit to the body buffer (append a line at the end)
+	w.body.file.InsertAt(w.body.file.Nr(), []rune("\n\n# New Heading at End\n"))
+
+	// Call update preview
+	w.UpdatePreview()
+
+	// The origin should be preserved (approximately - may need to adjust if content length changed significantly)
+	afterOrigin := rt.Origin()
+
+	// The origin should be close to what it was before (allow some tolerance for content changes)
+	// Since we only added content at the end, the origin position relative to the beginning shouldn't change much
+	tolerance := 50 // Allow 50 rune difference due to reparsing
+	if afterOrigin < beforeOrigin-tolerance || afterOrigin > beforeOrigin+tolerance {
+		t.Errorf("Origin should be preserved: before=%d, after=%d (tolerance=%d)", beforeOrigin, afterOrigin, tolerance)
+	}
+}
+
+// TestPreviewLiveUpdateMultipleTimes tests that multiple consecutive updates work correctly.
+func TestPreviewLiveUpdateMultipleTimes(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content
+	initialMarkdown := "# Version 1"
+	sourceRunes := []rune(initialMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/versions.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Set up preview mode components
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse initial markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+
+	// Perform multiple updates
+	versions := []string{
+		"# Version 2\n\nAdded paragraph.",
+		"# Version 3\n\nAdded **bold** text.",
+		"# Version 4\n\nNow with *italics* too.",
+		"# Final Version\n\nComplete content.",
+	}
+
+	for i, md := range versions {
+		// Update body buffer
+		w.body.file.DeleteAt(0, w.body.file.Nr())
+		w.body.file.InsertAt(0, []rune(md))
+
+		// Trigger update
+		w.UpdatePreview()
+
+		// Verify content was updated
+		updatedContent := w.RichBody().Content()
+		if updatedContent == nil || updatedContent.Len() == 0 {
+			t.Errorf("Update %d: Content should not be empty", i+1)
+		}
+
+		// Verify source map exists
+		if w.PreviewSourceMap() == nil {
+			t.Errorf("Update %d: Source map should exist", i+1)
+		}
+	}
+}

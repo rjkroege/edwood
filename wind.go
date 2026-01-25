@@ -705,6 +705,42 @@ func (w *Window) PreviewSourceMap() *markdown.SourceMap {
 	return w.previewSourceMap
 }
 
+// UpdatePreview updates the preview content from the body buffer.
+// This should be called when the body buffer changes and the window is in preview mode.
+// It re-parses the markdown and updates the richBody, preserving the scroll position.
+func (w *Window) UpdatePreview() {
+	if !w.previewMode || w.richBody == nil {
+		return
+	}
+
+	// Get the current scroll position to preserve it
+	currentOrigin := w.richBody.Origin()
+
+	// Read the current body content
+	bodyContent := w.body.file.String()
+
+	// Parse the markdown with source map
+	content, sourceMap := markdown.ParseWithSourceMap(bodyContent)
+
+	// Update the rich body content
+	w.richBody.SetContent(content)
+	w.previewSourceMap = sourceMap
+
+	// Try to restore the scroll position
+	// Clamp to the new content length if necessary
+	newLen := content.Len()
+	if currentOrigin > newLen {
+		currentOrigin = newLen
+	}
+	w.richBody.SetOrigin(currentOrigin)
+
+	// Redraw the preview
+	w.richBody.Redraw()
+	if w.display != nil {
+		w.display.Flush()
+	}
+}
+
 // PreviewSnarf returns the text that would be snarfed (copied) when in preview mode.
 // It uses the source map to convert the selection in the rendered rich text back to
 // positions in the source markdown, then extracts that range from the body buffer.
