@@ -857,3 +857,154 @@ func (w *Window) PreviewExpandWord(pos int) (word string, start, end int) {
 func isWordChar(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
 }
+
+// HandlePreviewKey handles keyboard input when the window is in preview mode.
+// Returns true if the key was handled (navigation keys), false otherwise (typing keys).
+// Navigation keys (Page Up/Down, arrows, Home, End) scroll the preview.
+// Escape exits preview mode.
+// Typing keys are ignored in preview mode (returns false to indicate not handled).
+func (w *Window) HandlePreviewKey(key rune) bool {
+	if !w.previewMode || w.richBody == nil {
+		return false
+	}
+
+	rt := w.richBody
+	frame := rt.Frame()
+	if frame == nil {
+		return false
+	}
+
+	// Helper to count lines and get line start positions in the content
+	getLineInfo := func() (lineCount int, lineStarts []int) {
+		content := rt.Content()
+		if content == nil {
+			return 1, []int{0}
+		}
+		lineCount = 1
+		lineStarts = []int{0}
+		runeOffset := 0
+		for _, span := range content {
+			for _, r := range span.Text {
+				if r == '\n' {
+					lineCount++
+					lineStarts = append(lineStarts, runeOffset+1)
+				}
+				runeOffset++
+			}
+		}
+		return lineCount, lineStarts
+	}
+
+	// Helper to find origin for a specific line
+	findOriginForLine := func(line int, lineStarts []int) int {
+		if line < 0 {
+			return 0
+		}
+		if line >= len(lineStarts) {
+			return lineStarts[len(lineStarts)-1]
+		}
+		return lineStarts[line]
+	}
+
+	// Helper to find current line from origin
+	findCurrentLine := func(origin int, lineStarts []int) int {
+		currentLine := 0
+		for i, start := range lineStarts {
+			if origin >= start {
+				currentLine = i
+			} else {
+				break
+			}
+		}
+		return currentLine
+	}
+
+	switch key {
+	case draw.KeyPageDown:
+		// Scroll down by a page
+		lineCount, lineStarts := getLineInfo()
+		maxLines := frame.MaxLines()
+		if maxLines <= 0 {
+			maxLines = 10
+		}
+		currentLine := findCurrentLine(rt.Origin(), lineStarts)
+		newLine := currentLine + maxLines
+		if newLine >= lineCount {
+			newLine = lineCount - 1
+		}
+		rt.SetOrigin(findOriginForLine(newLine, lineStarts))
+		rt.Redraw()
+		return true
+
+	case draw.KeyPageUp:
+		// Scroll up by a page
+		_, lineStarts := getLineInfo()
+		maxLines := frame.MaxLines()
+		if maxLines <= 0 {
+			maxLines = 10
+		}
+		currentLine := findCurrentLine(rt.Origin(), lineStarts)
+		newLine := currentLine - maxLines
+		if newLine < 0 {
+			newLine = 0
+		}
+		rt.SetOrigin(findOriginForLine(newLine, lineStarts))
+		rt.Redraw()
+		return true
+
+	case draw.KeyDown:
+		// Scroll down by one line
+		lineCount, lineStarts := getLineInfo()
+		currentLine := findCurrentLine(rt.Origin(), lineStarts)
+		newLine := currentLine + 1
+		if newLine >= lineCount {
+			newLine = lineCount - 1
+		}
+		rt.SetOrigin(findOriginForLine(newLine, lineStarts))
+		rt.Redraw()
+		return true
+
+	case draw.KeyUp:
+		// Scroll up by one line
+		_, lineStarts := getLineInfo()
+		currentLine := findCurrentLine(rt.Origin(), lineStarts)
+		newLine := currentLine - 1
+		if newLine < 0 {
+			newLine = 0
+		}
+		rt.SetOrigin(findOriginForLine(newLine, lineStarts))
+		rt.Redraw()
+		return true
+
+	case draw.KeyHome:
+		// Scroll to beginning
+		rt.SetOrigin(0)
+		rt.Redraw()
+		return true
+
+	case draw.KeyEnd:
+		// Scroll to end
+		lineCount, lineStarts := getLineInfo()
+		maxLines := frame.MaxLines()
+		if maxLines <= 0 {
+			maxLines = 10
+		}
+		// Position so that last lines are visible
+		endLine := lineCount - maxLines
+		if endLine < 0 {
+			endLine = 0
+		}
+		rt.SetOrigin(findOriginForLine(endLine, lineStarts))
+		rt.Redraw()
+		return true
+
+	case 0x1B: // Escape
+		// Exit preview mode
+		w.SetPreviewMode(false)
+		return true
+
+	default:
+		// Typing keys and other keys are not handled in preview mode
+		return false
+	}
+}

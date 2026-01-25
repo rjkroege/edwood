@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/markdown"
@@ -1509,5 +1510,228 @@ func TestPreviewLookExpand(t *testing.T) {
 	}
 	if wordStart != 6 || wordEnd != 11 {
 		t.Errorf("PreviewExpandWord(8) should return positions (6, 11), got (%d, %d)", wordStart, wordEnd)
+	}
+}
+
+// TestPreviewKeyScroll tests that Page Up/Down keys scroll the preview content.
+// In preview mode, keyboard navigation keys should scroll the view.
+func TestPreviewKeyScroll(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create markdown content with many lines to enable scrolling
+	var mdBuilder string
+	for i := 1; i <= 50; i++ {
+		mdBuilder += "# Heading " + string(rune('A'+i%26)) + "\n\n"
+		mdBuilder += "Paragraph " + string(rune('0'+i%10)) + " with content.\n\n"
+	}
+	sourceMarkdown := mdBuilder
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/scroll.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Verify initial origin is 0
+	if rt.Origin() != 0 {
+		t.Errorf("Initial origin should be 0, got %d", rt.Origin())
+	}
+
+	// Test Page Down key handling
+	handled := w.HandlePreviewKey(draw.KeyPageDown)
+	if !handled {
+		t.Error("HandlePreviewKey(PageDown) should return true in preview mode")
+	}
+
+	// Origin should have increased after Page Down
+	afterPageDown := rt.Origin()
+	if afterPageDown <= 0 {
+		t.Errorf("Origin should be > 0 after Page Down, got %d", afterPageDown)
+	}
+
+	// Test Page Up key handling
+	handled = w.HandlePreviewKey(draw.KeyPageUp)
+	if !handled {
+		t.Error("HandlePreviewKey(PageUp) should return true in preview mode")
+	}
+
+	// Origin should have decreased after Page Up
+	afterPageUp := rt.Origin()
+	if afterPageUp >= afterPageDown {
+		t.Errorf("Origin should have decreased after Page Up: before=%d, after=%d", afterPageDown, afterPageUp)
+	}
+
+	// Test Down Arrow - should scroll by a smaller amount
+	beforeDown := rt.Origin()
+	handled = w.HandlePreviewKey(draw.KeyDown)
+	if !handled {
+		t.Error("HandlePreviewKey(Down) should return true in preview mode")
+	}
+	afterDown := rt.Origin()
+	if afterDown <= beforeDown {
+		t.Errorf("Origin should have increased after Down arrow: before=%d, after=%d", beforeDown, afterDown)
+	}
+
+	// Test Up Arrow - should scroll by a smaller amount
+	beforeUp := rt.Origin()
+	handled = w.HandlePreviewKey(draw.KeyUp)
+	if !handled {
+		t.Error("HandlePreviewKey(Up) should return true in preview mode")
+	}
+	afterUp := rt.Origin()
+	if afterUp >= beforeUp {
+		t.Errorf("Origin should have decreased after Up arrow: before=%d, after=%d", beforeUp, afterUp)
+	}
+
+	// Test Home key - should scroll to beginning
+	rt.SetOrigin(1000) // Scroll to middle
+	handled = w.HandlePreviewKey(draw.KeyHome)
+	if !handled {
+		t.Error("HandlePreviewKey(Home) should return true in preview mode")
+	}
+	if rt.Origin() != 0 {
+		t.Errorf("Origin should be 0 after Home key, got %d", rt.Origin())
+	}
+
+	// Test End key - should scroll to end
+	handled = w.HandlePreviewKey(draw.KeyEnd)
+	if !handled {
+		t.Error("HandlePreviewKey(End) should return true in preview mode")
+	}
+	// Origin should be near the end of content
+	if rt.Origin() == 0 {
+		t.Error("Origin should not be 0 after End key")
+	}
+}
+
+// TestPreviewKeyIgnoresTyping tests that normal typing keys are ignored in preview mode.
+// Preview mode is read-only; typing should not modify content or be processed.
+func TestPreviewKeyIgnoresTyping(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Simple markdown content
+	sourceMarkdown := "# Hello World\n\nSome text here."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readonly.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown and set content with source map
+	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Record initial state
+	initialBodyContent := w.body.file.String()
+	initialRichContentLen := rt.Content().Len()
+
+	// Test regular character keys - should be ignored (return false to indicate not handled)
+	typingKeys := []rune{'a', 'b', 'c', '1', '2', '3', ' ', '\t'}
+	for _, key := range typingKeys {
+		handled := w.HandlePreviewKey(key)
+		if handled {
+			t.Errorf("HandlePreviewKey(%q) should return false for typing keys in preview mode", key)
+		}
+	}
+
+	// Verify body buffer is unchanged
+	afterBodyContent := w.body.file.String()
+	if afterBodyContent != initialBodyContent {
+		t.Errorf("Body content should be unchanged after typing keys:\nbefore: %q\nafter:  %q", initialBodyContent, afterBodyContent)
+	}
+
+	// Verify rich content length is unchanged
+	afterRichContentLen := rt.Content().Len()
+	if afterRichContentLen != initialRichContentLen {
+		t.Errorf("Rich content length should be unchanged: before=%d, after=%d", initialRichContentLen, afterRichContentLen)
+	}
+
+	// Test special editing keys that should also be ignored
+	editingKeys := []rune{'\b', 0x7F, '\n'} // Backspace, Delete, Enter
+	for _, key := range editingKeys {
+		handled := w.HandlePreviewKey(key)
+		if handled {
+			t.Errorf("HandlePreviewKey(%q) should return false for editing keys in preview mode", key)
+		}
+	}
+
+	// Verify body buffer is still unchanged
+	finalBodyContent := w.body.file.String()
+	if finalBodyContent != initialBodyContent {
+		t.Errorf("Body content should be unchanged after editing keys:\nbefore: %q\nafter:  %q", initialBodyContent, finalBodyContent)
+	}
+
+	// Test Escape key - should exit preview mode
+	handled := w.HandlePreviewKey(0x1B) // Escape
+	if !handled {
+		t.Error("HandlePreviewKey(Escape) should return true in preview mode")
+	}
+	if w.IsPreviewMode() {
+		t.Error("Escape key should exit preview mode")
 	}
 }
