@@ -11,6 +11,7 @@ type Style struct {
 	// Font variations
 	Bold   bool
 	Italic bool
+	Code   bool // Monospace font for code spans
 
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
@@ -29,5 +30,5 @@ var (
 	StyleH3     = Style{Bold: true, Scale: 1.25}
 	StyleBold   = Style{Bold: true, Scale: 1.0}
 	StyleItalic = Style{Italic: true, Scale: 1.0}
-	StyleCode   = Style{Scale: 1.0} // Will use monospace font
+	StyleCode   = Style{Code: true, Scale: 1.0} // Monospace font
 )

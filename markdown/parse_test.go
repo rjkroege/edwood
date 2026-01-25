@@ -496,3 +496,118 @@ func TestParseBoldItalic(t *testing.T) {
 		})
 	}
 }
+
+func TestParseInlineCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isCode bool
+		}
+	}{
+		{
+			name:  "simple inline code",
+			input: "`code`",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "code", isCode: true},
+			},
+		},
+		{
+			name:  "code in middle of text",
+			input: "use the `fmt.Println` function",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "use the ", isCode: false},
+				{text: "fmt.Println", isCode: true},
+				{text: " function", isCode: false},
+			},
+		},
+		{
+			name:  "multiple code spans",
+			input: "`one` and `two`",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "one", isCode: true},
+				{text: " and ", isCode: false},
+				{text: "two", isCode: true},
+			},
+		},
+		{
+			name:  "unclosed backtick treated as plain",
+			input: "`unclosed",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "`unclosed", isCode: false},
+			},
+		},
+		{
+			name:  "empty code span",
+			input: "``",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "", isCode: true},
+			},
+		},
+		{
+			name:  "code with special characters",
+			input: "`x := y + z`",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "x := y + z", isCode: true},
+			},
+		},
+		{
+			name:  "code span preserves asterisks",
+			input: "`**not bold**`",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "**not bold**", isCode: true},
+			},
+		},
+		{
+			name:  "code and bold mixed",
+			input: "**bold** and `code`",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "bold", isCode: false},   // bold, not code
+				{text: " and ", isCode: false},  // plain
+				{text: "code", isCode: true},    // code
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Code != want.isCode {
+					t.Errorf("span[%d].Code = %v, want %v (style: %+v)", i, got[i].Style.Code, want.isCode, got[i].Style)
+				}
+			}
+		})
+	}
+}

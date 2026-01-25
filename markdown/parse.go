@@ -86,13 +86,46 @@ func parseLine(line string) []rich.Span {
 	return parseInlineFormatting(line, rich.DefaultStyle())
 }
 
-// parseInlineFormatting parses bold/italic markers in text and returns styled spans.
+// parseInlineFormatting parses code spans, bold/italic markers in text and returns styled spans.
 func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 	var spans []rich.Span
 	var currentText strings.Builder
 	i := 0
 
 	for i < len(text) {
+		// Check for ` (code span) - must be checked before bold/italic
+		// so that asterisks inside code spans are preserved literally
+		if text[i] == '`' {
+			// Find closing `
+			end := strings.Index(text[i+1:], "`")
+			if end != -1 {
+				// Flush any accumulated plain text
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				// Add code span (content between backticks is NOT further parsed)
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:    baseStyle.Fg,
+						Bg:    baseStyle.Bg,
+						Code:  true,
+						Scale: baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+			// No closing ` found, treat as literal text
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
 		// Check for *** (bold+italic)
 		if i+2 < len(text) && text[i:i+3] == "***" {
 			// Find closing ***
