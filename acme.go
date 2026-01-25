@@ -130,7 +130,7 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 
 	// Rich text demo - temporary visual test hook
 	// TODO(rjk): Remove this demo when rich text is fully integrated
-	rich.DemoFrame(display, display.ScreenImage().R())
+	rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display))
 	display.Flush()
 
 	// After row is initialized

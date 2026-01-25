@@ -8,12 +8,12 @@ import (
 
 // DemoFrame creates and draws a rich.Frame for visual testing.
 // This is a temporary hook for development - remove when no longer needed.
-// It creates a 200x150 pixel magenta rectangle in the specified display area.
-func DemoFrame(display draw.Display, screenR image.Rectangle) {
+// It creates a frame showing plain text in the bottom-right corner.
+func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font) {
 	// Create a frame in the bottom-right corner
-	// Size: 200x150 pixels
-	frameWidth := 200
-	frameHeight := 150
+	// Size: 300x200 pixels (larger to show text)
+	frameWidth := 300
+	frameHeight := 200
 	margin := 20
 
 	r := image.Rect(
@@ -33,17 +33,48 @@ func DemoFrame(display draw.Display, screenR image.Rectangle) {
 		r.Max.Y = r.Min.Y + frameHeight
 	}
 
-	// Allocate a distinct background color (magenta for high visibility)
-	bgColor := draw.Color(0xFF00FFFF) // Magenta: R=255, G=0, B=255, A=255
+	// Allocate a distinct background color (light yellow for readability)
+	bgColor := draw.Color(0xFFFFCCFF) // Light yellow: R=255, G=255, B=204, A=255
 	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, bgColor)
 	if err != nil {
-		// Silently fail if we can't allocate the image
 		return
 	}
 
-	// Create and initialize the frame
+	// Allocate text color (black)
+	textColor := draw.Black
+	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, textColor)
+	if err != nil {
+		return
+	}
+
+	// If no font provided, fall back to background-only display
+	if font == nil {
+		f := NewFrame()
+		f.Init(r, withDisplay(display), withBackground(bgImage))
+		f.Redraw()
+		return
+	}
+
+	// Create and initialize the frame with font and text color
 	f := NewFrame()
-	f.Init(r, withDisplay(display), withBackground(bgImage))
+	f.Init(r, withDisplay(display), withBackground(bgImage), withFont(font), withTextColor(textImage))
+
+	// Set demo content - plain text with multiple lines
+	demoText := `Rich Text Demo
+===============
+
+This is a test of the
+rich text frame rendering.
+
+Features:
+- Line wrapping
+- Multiple lines
+- Tab	stops
+
+The quick brown fox
+jumps over the lazy dog.`
+
+	f.SetContent(Plain(demoText))
 
 	// Draw the frame
 	f.Redraw()
@@ -60,5 +91,19 @@ func withDisplay(d draw.Display) Option {
 func withBackground(b draw.Image) Option {
 	return func(f *frameImpl) {
 		f.background = b
+	}
+}
+
+// withFont is an Option that sets the font for the frame.
+func withFont(fnt draw.Font) Option {
+	return func(f *frameImpl) {
+		f.font = fnt
+	}
+}
+
+// withTextColor is an Option that sets the text color for the frame.
+func withTextColor(c draw.Image) Option {
+	return func(f *frameImpl) {
+		f.textColor = c
 	}
 }
