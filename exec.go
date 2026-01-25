@@ -74,6 +74,7 @@ var globalexectab = []Exectab{
 	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
+	{"Preview", previewcmd, false, true /*unused*/, true /*unused*/},
 	{"Put", put, false, true /*unused*/, true /*unused*/},
 	{"Putall", putall, false, true /*unused*/, true /*unused*/},
 	{"Redo", undo, false, false, true /*unused*/},
@@ -1120,4 +1121,74 @@ func dump(et *Text, _ *Text, argt *Text, isdump bool, _ bool, arg string) {
 	} else {
 		global.row.Load(nil, name, false)
 	}
+}
+
+// previewcmd opens a markdown preview window for the current file.
+func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
+	if et == nil || et.w == nil {
+		return
+	}
+	w := et.w
+	t := &w.body
+
+	// Get the file name
+	name := t.file.Name()
+	if name == "" {
+		warning(nil, "Preview: no file name\n")
+		return
+	}
+
+	// Check if it's a markdown file
+	if !strings.HasSuffix(strings.ToLower(name), ".md") {
+		warning(nil, "Preview: %s is not a markdown file\n", name)
+		return
+	}
+
+	// Check if we already have a preview for this file
+	for _, ps := range global.previews {
+		if ps != nil && ps.Source == name {
+			// Update existing preview
+			content := t.file.String()
+			ps.Window.SetMarkdown(content)
+			ps.Window.Redraw()
+			global.row.display.Flush()
+			return
+		}
+	}
+
+	// Create a new preview window
+	display := global.row.display
+	screen := display.ScreenImage()
+	screenR := screen.R()
+
+	// Position the preview in the right portion of the screen
+	// Take roughly the right third
+	previewWidth := screenR.Dx() / 3
+	if previewWidth < 300 {
+		previewWidth = 300
+	}
+	margin := 10
+	r := image.Rect(
+		screenR.Max.X-previewWidth-margin,
+		screenR.Min.Y+margin,
+		screenR.Max.X-margin,
+		screenR.Max.Y-margin,
+	)
+
+	// Get the font
+	font := fontget(global.tagfont, display)
+
+	// Create the preview state
+	ps := NewPreviewState(name, r, display, font)
+
+	// Read the file content and set as markdown
+	content := t.file.String()
+	ps.Window.SetMarkdown(content)
+
+	// Draw the preview
+	ps.Window.Redraw()
+	display.Flush()
+
+	// Add to global previews list
+	global.previews = append(global.previews, ps)
 }

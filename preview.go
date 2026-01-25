@@ -133,3 +133,121 @@ func WithPreviewTextColor(c draw.Image) PreviewOption {
 func WithPreviewScrollbarColors(bg, thumb draw.Image) PreviewOption {
 	return PreviewOption{scrBg: bg, scrThumb: thumb, optType: optScrollbarColors}
 }
+
+// PreviewState holds the state for an active preview window.
+// It tracks the preview window, its source, and provides mouse handling.
+type PreviewState struct {
+	Window *PreviewWindow
+	Source string // Source file path being previewed
+}
+
+// NewPreviewState creates a preview state for a given source file.
+func NewPreviewState(source string, r image.Rectangle, display draw.Display, font draw.Font) *PreviewState {
+	pw := NewPreviewWindow()
+
+	// Allocate colors for the preview window
+	bgColor := draw.Color(0xFFFFF0FF) // Light ivory background
+	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, bgColor)
+	if err != nil {
+		bgImage = nil
+	}
+
+	textColor := draw.Black
+	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, textColor)
+	if err != nil {
+		textImage = nil
+	}
+
+	scrBgColor := draw.Color(0xEEEEEEFF) // Light gray scrollbar background
+	scrBgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, scrBgColor)
+	if err != nil {
+		scrBgImage = nil
+	}
+
+	scrThumbColor := draw.Color(0x999999FF) // Darker gray scrollbar thumb
+	scrThumbImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, scrThumbColor)
+	if err != nil {
+		scrThumbImage = nil
+	}
+
+	var opts []PreviewOption
+	if bgImage != nil {
+		opts = append(opts, WithPreviewBackground(bgImage))
+	}
+	if textImage != nil {
+		opts = append(opts, WithPreviewTextColor(textImage))
+	}
+	if scrBgImage != nil && scrThumbImage != nil {
+		opts = append(opts, WithPreviewScrollbarColors(scrBgImage, scrThumbImage))
+	}
+
+	pw.Init(r, display, font, opts...)
+	pw.SetSource(source)
+
+	return &PreviewState{
+		Window: pw,
+		Source: source,
+	}
+}
+
+// Rect returns the preview window's rectangle.
+func (ps *PreviewState) Rect() image.Rectangle {
+	if ps.Window == nil {
+		return image.Rectangle{}
+	}
+	return ps.Window.Rect()
+}
+
+// HandleMouse handles mouse events for the preview window.
+// Returns true if the event was handled.
+func (ps *PreviewState) HandleMouse(m *draw.Mouse) bool {
+	if ps == nil || ps.Window == nil || ps.Window.richText == nil {
+		return false
+	}
+
+	r := ps.Window.Rect()
+	if !m.Point.In(r) {
+		return false
+	}
+
+	rt := ps.Window.richText
+
+	// Handle scroll wheel (buttons 4 and 5)
+	if m.Buttons&8 != 0 { // Button 4 - scroll up
+		rt.ScrollWheel(true)
+		ps.Window.Redraw()
+		ps.Window.display.Flush()
+		return true
+	}
+	if m.Buttons&16 != 0 { // Button 5 - scroll down
+		rt.ScrollWheel(false)
+		ps.Window.Redraw()
+		ps.Window.display.Flush()
+		return true
+	}
+
+	// Handle scrollbar clicks (buttons 1, 2, 3 in scrollbar area)
+	scrRect := rt.ScrollRect()
+	if m.Point.In(scrRect) {
+		if m.Buttons&1 != 0 { // Button 1
+			rt.ScrollClick(1, m.Point)
+			ps.Window.Redraw()
+			ps.Window.display.Flush()
+			return true
+		}
+		if m.Buttons&2 != 0 { // Button 2
+			rt.ScrollClick(2, m.Point)
+			ps.Window.Redraw()
+			ps.Window.display.Flush()
+			return true
+		}
+		if m.Buttons&4 != 0 { // Button 3
+			rt.ScrollClick(3, m.Point)
+			ps.Window.Redraw()
+			ps.Window.display.Flush()
+			return true
+		}
+	}
+
+	return false
+}
