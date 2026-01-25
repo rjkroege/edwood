@@ -389,15 +389,26 @@ func (f *frameImpl) GetOrigin() int {
 }
 
 // MaxLines returns the maximum number of lines that can be displayed.
+// This is based on the frame height divided by the font height.
 func (f *frameImpl) MaxLines() int {
-	// TODO: Implement
-	return 0
+	if f.font == nil {
+		return 0
+	}
+	fontHeight := f.font.Height()
+	if fontHeight <= 0 {
+		return 0
+	}
+	return f.rect.Dy() / fontHeight
 }
 
 // VisibleLines returns the number of lines currently visible.
+// This accounts for the origin offset and line wrapping.
 func (f *frameImpl) VisibleLines() int {
-	// TODO: Implement
-	return 0
+	if f.font == nil || f.content == nil {
+		return 0
+	}
+	lines, _ := f.layoutFromOrigin()
+	return len(lines)
 }
 
 // Redraw redraws the frame.
@@ -693,9 +704,9 @@ func (f *frameImpl) allocColorImage(c color.Color) edwooddraw.Image {
 }
 
 // Full returns true if the frame is at capacity.
+// A frame is full when more content is visible than can fit in the frame.
 func (f *frameImpl) Full() bool {
-	// TODO: Implement
-	return false
+	return f.VisibleLines() > f.MaxLines()
 }
 
 // fontForStyle returns the appropriate font for the given style.

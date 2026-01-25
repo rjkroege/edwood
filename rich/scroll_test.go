@@ -230,3 +230,293 @@ func TestDisplayFromOrigin(t *testing.T) {
 		t.Errorf("With origin=6, 'world' should be drawn at top of frame %s, ops: %v", expectedPos, ops)
 	}
 }
+
+// TestMaxLines tests that MaxLines returns the maximum number of lines that can fit in the frame.
+func TestMaxLines(t *testing.T) {
+	// Frame is 300 pixels tall, font is 14 pixels high
+	// So 300 / 14 = 21 lines can fit
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	maxLines := f.MaxLines()
+	// 300 / 14 = 21.4, so 21 full lines fit
+	if maxLines != 21 {
+		t.Errorf("MaxLines() = %d, want 21 (frame height 300, font height 14)", maxLines)
+	}
+}
+
+// TestMaxLinesSmallFrame tests MaxLines with a frame that can only fit a few lines.
+func TestMaxLinesSmallFrame(t *testing.T) {
+	// Frame is 42 pixels tall, font is 14 pixels high
+	// So 42 / 14 = 3 lines can fit
+	rect := image.Rect(0, 0, 400, 42)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	maxLines := f.MaxLines()
+	if maxLines != 3 {
+		t.Errorf("MaxLines() = %d, want 3 (frame height 42, font height 14)", maxLines)
+	}
+}
+
+// TestMaxLinesNoFont tests MaxLines when no font is set.
+func TestMaxLinesNoFont(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage))
+
+	// Without a font, MaxLines should return 0
+	maxLines := f.MaxLines()
+	if maxLines != 0 {
+		t.Errorf("MaxLines() without font = %d, want 0", maxLines)
+	}
+}
+
+// TestVisibleLines tests that VisibleLines returns the number of lines currently displayed.
+func TestVisibleLines(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with 3 lines: "line1\nline2\nline3"
+	f.SetContent(Plain("line1\nline2\nline3"))
+
+	visibleLines := f.VisibleLines()
+	if visibleLines != 3 {
+		t.Errorf("VisibleLines() = %d, want 3 for 3-line content", visibleLines)
+	}
+}
+
+// TestVisibleLinesEmpty tests VisibleLines with no content.
+func TestVisibleLinesEmpty(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// No content set
+	visibleLines := f.VisibleLines()
+	if visibleLines != 0 {
+		t.Errorf("VisibleLines() with no content = %d, want 0", visibleLines)
+	}
+}
+
+// TestVisibleLinesWithOrigin tests VisibleLines when origin is set.
+func TestVisibleLinesWithOrigin(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with 3 lines: "line1\nline2\nline3"
+	// Rune positions: l=0, i=1, n=2, e=3, 1=4, \n=5, l=6, ...
+	f.SetContent(Plain("line1\nline2\nline3"))
+
+	// With origin at 0, all 3 lines visible
+	f.SetOrigin(0)
+	if visibleLines := f.VisibleLines(); visibleLines != 3 {
+		t.Errorf("VisibleLines() with origin=0 = %d, want 3", visibleLines)
+	}
+
+	// With origin at 6 (start of line2), 2 lines visible (line2 and line3)
+	f.SetOrigin(6)
+	if visibleLines := f.VisibleLines(); visibleLines != 2 {
+		t.Errorf("VisibleLines() with origin=6 = %d, want 2", visibleLines)
+	}
+}
+
+// TestVisibleLinesSingleLine tests VisibleLines with single-line content.
+func TestVisibleLinesSingleLine(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Single line content
+	f.SetContent(Plain("hello world"))
+
+	visibleLines := f.VisibleLines()
+	if visibleLines != 1 {
+		t.Errorf("VisibleLines() = %d, want 1 for single-line content", visibleLines)
+	}
+}
+
+// TestVisibleLinesWrapped tests VisibleLines when text wraps.
+func TestVisibleLinesWrapped(t *testing.T) {
+	// Frame is 50px wide, font is 10px per char
+	// So 5 chars fit per line before wrapping
+	rect := image.Rect(0, 0, 50, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "helloworld" = 10 chars, wraps to 2 lines (hello, world)
+	f.SetContent(Plain("helloworld"))
+
+	visibleLines := f.VisibleLines()
+	if visibleLines != 2 {
+		t.Errorf("VisibleLines() = %d, want 2 for wrapped content", visibleLines)
+	}
+}
+
+// TestFullNotFull tests that Full returns false when content fits in the frame.
+func TestFullNotFull(t *testing.T) {
+	// Frame is 300 pixels tall, font is 14 pixels high
+	// 21 lines can fit
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with only 3 lines - should not be full
+	f.SetContent(Plain("line1\nline2\nline3"))
+
+	if f.Full() {
+		t.Errorf("Full() = true, want false for content with 3 lines (max 21)")
+	}
+}
+
+// TestFullIsFull tests that Full returns true when content exceeds frame capacity.
+func TestFullIsFull(t *testing.T) {
+	// Frame is 42 pixels tall (3 lines at 14px per line)
+	rect := image.Rect(0, 0, 400, 42)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with 5 lines - should be full (only 3 fit)
+	f.SetContent(Plain("line1\nline2\nline3\nline4\nline5"))
+
+	if !f.Full() {
+		t.Errorf("Full() = false, want true for content with 5 lines (max 3)")
+	}
+}
+
+// TestFullEmpty tests that Full returns false for empty content.
+func TestFullEmpty(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// No content
+	if f.Full() {
+		t.Errorf("Full() = true, want false for empty frame")
+	}
+}
+
+// TestFullExactFit tests Full when content exactly fills the frame.
+func TestFullExactFit(t *testing.T) {
+	// Frame is 42 pixels tall (exactly 3 lines at 14px per line)
+	rect := image.Rect(0, 0, 400, 42)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with exactly 3 lines - should not be full (exact fit is not overfilled)
+	f.SetContent(Plain("line1\nline2\nline3"))
+
+	if f.Full() {
+		t.Errorf("Full() = true, want false for content that exactly fills frame (3 lines)")
+	}
+}
+
+// TestFullWithOrigin tests Full when origin is set (scrolled).
+func TestFullWithOrigin(t *testing.T) {
+	// Frame is 42 pixels tall (3 lines at 14px per line)
+	rect := image.Rect(0, 0, 400, 42)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with 5 lines
+	f.SetContent(Plain("line1\nline2\nline3\nline4\nline5"))
+
+	// With origin at 0, should be full (5 lines, only 3 fit)
+	f.SetOrigin(0)
+	if !f.Full() {
+		t.Errorf("Full() with origin=0 = false, want true for 5 lines (max 3)")
+	}
+
+	// With origin at start of line3 (12), only 3 lines visible (line3, line4, line5)
+	// Still full because all 3 remaining lines are shown and exactly fill
+	f.SetOrigin(12)
+	if f.Full() {
+		t.Errorf("Full() with origin=12 = true, want false for remaining 3 lines (max 3)")
+	}
+
+	// With origin at start of line4 (18), only 2 lines visible (line4, line5)
+	// Not full because only 2 lines are visible
+	f.SetOrigin(18)
+	if f.Full() {
+		t.Errorf("Full() with origin=18 = true, want false for remaining 2 lines (max 3)")
+	}
+}
