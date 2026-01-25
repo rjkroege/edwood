@@ -327,13 +327,6 @@ func MovedMouse(g *globals, m draw.Mouse) {
 		return
 	}
 
-	// Check if any preview window should handle this mouse event
-	for _, ps := range g.previews {
-		if ps != nil && ps.HandleMouse(&m) {
-			return
-		}
-	}
-
 	g.row.lk.Lock()
 	defer g.row.lk.Unlock()
 

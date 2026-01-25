@@ -69,9 +69,6 @@ type globals struct {
 
 	// Rich text demo state - temporary for development
 	richDemo *rich.DemoState
-
-	// Preview windows for markdown preview
-	previews []*PreviewState
 }
 
 // Singleton global object.

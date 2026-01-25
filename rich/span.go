@@ -23,3 +23,12 @@ func (c Content) Len() int {
 	}
 	return n
 }
+
+// Plain returns the plain text content (all text without styling, as a rune slice).
+func (c Content) Plain() []rune {
+	var result []rune
+	for _, s := range c {
+		result = append(result, []rune(s.Text)...)
+	}
+	return result
+}
