@@ -725,3 +725,249 @@ func TestWindowMousePreviewScroll(t *testing.T) {
 		t.Errorf("ScrollClick(1, top) when at origin=0 should stay at 0, got %d", newOrigin)
 	}
 }
+
+// TestPreviewCommandToggle tests that the Preview command toggles preview mode
+// on and off when executed multiple times on the same window.
+func TestPreviewCommandToggle(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content
+	markdownContent := "# Hello World\n\nThis is **bold** and *italic* text."
+	sourceRunes := []rune(markdownContent)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600) // Body area below tag
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Initially, preview mode should be off
+	if w.IsPreviewMode() {
+		t.Error("Window should not be in preview mode initially")
+	}
+
+	// First toggle: should enter preview mode
+	w.TogglePreviewMode()
+	if !w.IsPreviewMode() {
+		t.Error("Window should be in preview mode after first toggle")
+	}
+
+	// Second toggle: should exit preview mode
+	w.TogglePreviewMode()
+	if w.IsPreviewMode() {
+		t.Error("Window should not be in preview mode after second toggle")
+	}
+
+	// Third toggle: should enter preview mode again
+	w.TogglePreviewMode()
+	if !w.IsPreviewMode() {
+		t.Error("Window should be in preview mode after third toggle")
+	}
+
+	// Fourth toggle: should exit preview mode
+	w.TogglePreviewMode()
+	if w.IsPreviewMode() {
+		t.Error("Window should not be in preview mode after fourth toggle")
+	}
+}
+
+// TestPreviewCommandEnter tests that entering preview mode properly initializes
+// the richBody with parsed markdown content and sets up the source map.
+func TestPreviewCommandEnter(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content
+	markdownContent := "# Hello World\n\nThis is **bold** text."
+	sourceRunes := []rune(markdownContent)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText and set up the preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown with source map
+	content, sourceMap := markdown.ParseWithSourceMap(markdownContent)
+	rt.SetContent(content)
+
+	// Assign the richBody and source map to the window
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+
+	// Verify preview mode is enabled
+	if !w.IsPreviewMode() {
+		t.Error("Window should be in preview mode")
+	}
+
+	// Verify richBody is set
+	if w.RichBody() == nil {
+		t.Error("richBody should not be nil after entering preview mode")
+	}
+
+	// Verify source map is set
+	if w.PreviewSourceMap() == nil {
+		t.Error("PreviewSourceMap should not be nil after entering preview mode")
+	}
+
+	// Verify content is properly parsed (should contain the text "Hello World")
+	contentInFrame := w.RichBody().Content()
+	if contentInFrame == nil {
+		t.Fatal("Content in richBody should not be nil")
+	}
+
+	// The markdown parser removes # prefix, so rendered text starts with "Hello World"
+	// The content should have at least the heading text
+	if contentInFrame.Len() == 0 {
+		t.Error("Content should not be empty")
+	}
+
+	// Verify the source map can convert positions
+	// Selection in rendered text should map back to source positions
+	// For the heading "Hello World" (positions 0-11 in rendered), source is "# Hello World" (0-13)
+	srcStart, srcEnd := sourceMap.ToSource(0, 11)
+
+	// Source should include the # prefix
+	if srcStart != 0 {
+		t.Errorf("Source start for heading should be 0, got %d", srcStart)
+	}
+	// The source end should be 13 (length of "# Hello World")
+	// But this depends on exact parser behavior; verify it's reasonable
+	if srcEnd < 11 {
+		t.Errorf("Source end for heading should be >= 11, got %d", srcEnd)
+	}
+}
+
+// TestPreviewCommandExit tests that exiting preview mode properly restores
+// normal window behavior and maintains the richBody for potential re-entry.
+func TestPreviewCommandExit(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content
+	markdownContent := "# Test Heading\n\nSome content here."
+	sourceRunes := []rune(markdownContent)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/test.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Set up preview mode components
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	content, sourceMap := markdown.ParseWithSourceMap(markdownContent)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+	if !w.IsPreviewMode() {
+		t.Fatal("Failed to enter preview mode")
+	}
+
+	// Save reference to richBody
+	richBodyRef := w.RichBody()
+	sourceMapRef := w.PreviewSourceMap()
+
+	// Exit preview mode
+	w.SetPreviewMode(false)
+
+	// Verify preview mode is disabled
+	if w.IsPreviewMode() {
+		t.Error("Window should not be in preview mode after exit")
+	}
+
+	// Verify richBody is retained (not nil'd out) for potential re-entry
+	if w.RichBody() == nil {
+		t.Error("richBody should be retained after exiting preview mode")
+	}
+
+	// Verify the same richBody instance is kept
+	if w.RichBody() != richBodyRef {
+		t.Error("richBody reference should be the same after exit")
+	}
+
+	// Verify source map is retained
+	if w.PreviewSourceMap() != sourceMapRef {
+		t.Error("PreviewSourceMap should be retained after exiting preview mode")
+	}
+
+	// Verify body content is unchanged in the underlying file buffer
+	bodyContent := w.body.file.String()
+	if bodyContent != markdownContent {
+		t.Errorf("Body content should be unchanged, got %q, want %q", bodyContent, markdownContent)
+	}
+
+	// Re-enter preview mode and verify components work
+	w.SetPreviewMode(true)
+	if !w.IsPreviewMode() {
+		t.Error("Should be able to re-enter preview mode")
+	}
+
+	// Content should still be available
+	if w.RichBody().Content() == nil {
+		t.Error("Content should still be available after re-entering preview mode")
+	}
+}

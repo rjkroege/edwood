@@ -19,6 +19,7 @@ import (
 	"9fans.net/go/plan9/client"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/markdown"
 )
 
 type Exectab struct {
@@ -1144,54 +1145,65 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		return
 	}
 
-	// Check if we already have a preview for this file
-	for _, ps := range global.previews {
-		if ps != nil && ps.Source == name {
-			// Update existing preview
-			content := t.file.String()
-			ps.Window.SetMarkdown(content)
-			ps.Window.Redraw()
-			global.row.display.Flush()
-			return
+	// If already in preview mode, toggle it off
+	if w.IsPreviewMode() {
+		w.SetPreviewMode(false)
+		// Redraw to show the original body text
+		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
+		w.body.SetSelect(w.body.q0, w.body.q1)
+		if w.display != nil {
+			w.display.Flush()
 		}
+		return
 	}
 
-	// Create a new preview window
-	display := global.row.display
-	screen := display.ScreenImage()
-	screenR := screen.R()
-
-	// Position the preview in the right portion of the screen
-	// Take roughly the right third
-	previewWidth := screenR.Dx() / 3
-	if previewWidth < 300 {
-		previewWidth = 300
+	// Enter preview mode - initialize the richBody if needed
+	display := w.display
+	if display == nil {
+		display = global.row.display
 	}
-	margin := 10
-	r := image.Rect(
-		screenR.Max.X-previewWidth-margin,
-		screenR.Min.Y+margin,
-		screenR.Max.X-margin,
-		screenR.Max.Y-margin,
-	)
+
+	// Get the body rectangle for the rich text renderer
+	bodyRect := w.body.all
 
 	// Get the font
 	font := fontget(global.tagfont, display)
 
-	// Create the preview state
-	ps := NewPreviewState(name, r, display, font)
+	// Create or reinitialize the rich text renderer
+	rt := NewRichText()
 
-	// Connect to the source buffer for live updates
-	ps.SetBuffer(t.file)
+	// Allocate colors for the preview
+	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	if err != nil {
+		warning(nil, "Preview: failed to allocate background: %v\n", err)
+		return
+	}
+	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+	if err != nil {
+		warning(nil, "Preview: failed to allocate text color: %v\n", err)
+		return
+	}
 
-	// Read the file content and set as markdown
-	content := t.file.String()
-	ps.Window.SetMarkdown(content)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
 
-	// Draw the preview
-	ps.Window.Redraw()
-	display.Flush()
+	// Parse the markdown content with source mapping
+	mdContent := t.file.String()
+	content, sourceMap := markdown.ParseWithSourceMap(mdContent)
+	rt.SetContent(content)
 
-	// Add to global previews list
-	global.previews = append(global.previews, ps)
+	// Set up the window's preview components
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+
+	// Enter preview mode
+	w.SetPreviewMode(true)
+
+	// Redraw the preview
+	w.Draw()
+	if display != nil {
+		display.Flush()
+	}
 }
