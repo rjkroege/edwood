@@ -174,6 +174,150 @@ func (rt *RichText) scrDraw() {
 	}
 }
 
+// ScrollClick handles a click on the scrollbar.
+// It takes the button number (1, 2, or 3) and the click point,
+// calculates the new origin based on the button behavior, and returns it.
+// Button 1 (left): scroll up (backward in content)
+// Button 2 (middle): jump to absolute position
+// Button 3 (right): scroll down (forward in content)
+// The origin is also updated in the RichText component.
+func (rt *RichText) ScrollClick(button int, pt image.Point) int {
+	// If no content or frame, return 0
+	if rt.content == nil || rt.frame == nil {
+		return 0
+	}
+
+	totalRunes := rt.content.Len()
+	if totalRunes == 0 {
+		return 0
+	}
+
+	// Count lines in content and build a map of line start positions
+	lineCount := 1
+	lineStarts := []int{0}
+	for i, span := range rt.content {
+		runeOffset := 0
+		if i > 0 {
+			for j := 0; j < i; j++ {
+				runeOffset += len([]rune(rt.content[j].Text))
+			}
+		}
+		for j, r := range span.Text {
+			if r == '\n' {
+				lineCount++
+				lineStarts = append(lineStarts, runeOffset+j+1)
+			}
+		}
+	}
+
+	maxLines := rt.frame.MaxLines()
+
+	// If all content fits, no scrolling needed
+	if lineCount <= maxLines {
+		return 0
+	}
+
+	// Calculate click position as a proportion of the scrollbar height
+	scrollHeight := rt.scrollRect.Dy()
+	if scrollHeight <= 0 {
+		return rt.Origin()
+	}
+
+	clickY := pt.Y - rt.scrollRect.Min.Y
+	if clickY < 0 {
+		clickY = 0
+	}
+	if clickY > scrollHeight {
+		clickY = scrollHeight
+	}
+	clickProportion := float64(clickY) / float64(scrollHeight)
+
+	// Calculate the number of lines that can be scrolled
+	// (total lines minus the lines that fit in the visible area)
+	scrollableLines := lineCount - maxLines
+	if scrollableLines < 0 {
+		scrollableLines = 0
+	}
+
+	var newOrigin int
+
+	switch button {
+	case 1:
+		// Button 1 (left): scroll up - move back by a number of lines based on click position
+		// Clicking higher in the scrollbar scrolls up more
+		linesToMove := int(float64(maxLines) * (1.0 - clickProportion))
+		if linesToMove < 1 {
+			linesToMove = 1
+		}
+
+		// Find current line
+		currentOrigin := rt.Origin()
+		currentLine := 0
+		for i, start := range lineStarts {
+			if currentOrigin >= start {
+				currentLine = i
+			} else {
+				break
+			}
+		}
+
+		// Calculate new line
+		newLine := currentLine - linesToMove
+		if newLine < 0 {
+			newLine = 0
+		}
+
+		newOrigin = lineStarts[newLine]
+
+	case 2:
+		// Button 2 (middle): jump to absolute position based on click location
+		// The click proportion maps to the entire content range (all lines)
+		targetLine := int(float64(lineCount-1) * clickProportion)
+		if targetLine < 0 {
+			targetLine = 0
+		}
+		if targetLine >= len(lineStarts) {
+			targetLine = len(lineStarts) - 1
+		}
+		newOrigin = lineStarts[targetLine]
+
+	case 3:
+		// Button 3 (right): scroll down - move forward by a number of lines based on click position
+		// Clicking lower in the scrollbar scrolls down more
+		linesToMove := int(float64(maxLines) * clickProportion)
+		if linesToMove < 1 {
+			linesToMove = 1
+		}
+
+		// Find current line
+		currentOrigin := rt.Origin()
+		currentLine := 0
+		for i, start := range lineStarts {
+			if currentOrigin >= start {
+				currentLine = i
+			} else {
+				break
+			}
+		}
+
+		// Calculate new line (can't go past the last scrollable line)
+		newLine := currentLine + linesToMove
+		maxScrollLine := len(lineStarts) - 1
+		if newLine > maxScrollLine {
+			newLine = maxScrollLine
+		}
+
+		newOrigin = lineStarts[newLine]
+
+	default:
+		return rt.Origin()
+	}
+
+	// Update the origin
+	rt.SetOrigin(newOrigin)
+	return newOrigin
+}
+
 // scrThumbRect returns the rectangle for the scrollbar thumb.
 // The thumb position and size reflect the current scroll position and
 // the proportion of visible content to total content.

@@ -534,3 +534,295 @@ func containsRect(op string, r image.Rectangle) bool {
 	// For now, just check if any draw happened (a more thorough check would parse the op string)
 	return len(op) > 0 && r.Dx() > 0 && r.Dy() > 0
 }
+
+// TestScrollbarClickButton2 tests that middle-clicking on the scrollbar sets the origin
+// to an absolute position based on where the click occurred.
+func TestScrollbarClickButton2(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (each "line\n" = 5 chars)
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Initially at origin 0
+	rt.SetOrigin(0)
+
+	// Click at the middle of the scrollbar (button 2 = middle click)
+	scrollRect := rt.ScrollRect()
+	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
+
+	// Simulate middle-click in scrollbar
+	newOrigin := rt.ScrollClick(2, image.Pt(scrollRect.Min.X+5, middleY))
+
+	// With 30 lines and clicking at the middle of the scrollbar,
+	// the origin should be set to approximately the middle of the content.
+	// Total content is 30 lines. Middle click should set origin to line ~15.
+	// Each line is 5 runes ("line" + "\n"), so middle should be around rune 75.
+	// Allow some flexibility in the exact position.
+	if newOrigin < 50 || newOrigin > 100 {
+		t.Errorf("ScrollClick(2, middle): got origin %d, want approximately 75", newOrigin)
+	}
+}
+
+// TestScrollbarClickButton1 tests that left-clicking on the scrollbar scrolls up
+// (backs up content based on click position).
+func TestScrollbarClickButton1(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at line 15 (rune 75)
+	rt.SetOrigin(75)
+	beforeOrigin := rt.Origin()
+
+	// Left-click (button 1) at the top of the scrollbar should scroll up
+	scrollRect := rt.ScrollRect()
+	topY := scrollRect.Min.Y + 10
+
+	// Simulate left-click in scrollbar
+	newOrigin := rt.ScrollClick(1, image.Pt(scrollRect.Min.X+5, topY))
+
+	// Button 1 should scroll up (decrease origin), backing up content
+	if newOrigin >= beforeOrigin {
+		t.Errorf("ScrollClick(1, top): expected origin to decrease from %d, got %d", beforeOrigin, newOrigin)
+	}
+}
+
+// TestScrollbarClickButton3 tests that right-clicking on the scrollbar scrolls down
+// (advances content based on click position).
+func TestScrollbarClickButton3(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at origin 0
+	rt.SetOrigin(0)
+	beforeOrigin := rt.Origin()
+
+	// Right-click (button 3) at the middle of the scrollbar should scroll down
+	scrollRect := rt.ScrollRect()
+	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
+
+	// Simulate right-click in scrollbar
+	newOrigin := rt.ScrollClick(3, image.Pt(scrollRect.Min.X+5, middleY))
+
+	// Button 3 should scroll down (increase origin)
+	if newOrigin <= beforeOrigin {
+		t.Errorf("ScrollClick(3, middle): expected origin to increase from %d, got %d", beforeOrigin, newOrigin)
+	}
+}
+
+// TestScrollbarClickAtTop tests that clicking at the very top of the scrollbar
+// with button 1 scrolls up minimally (or doesn't scroll if already at top).
+func TestScrollbarClickAtTop(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Already at origin 0
+	rt.SetOrigin(0)
+
+	// Left-click at the very top
+	scrollRect := rt.ScrollRect()
+
+	newOrigin := rt.ScrollClick(1, image.Pt(scrollRect.Min.X+5, scrollRect.Min.Y))
+
+	// Should stay at 0 (can't scroll up from top)
+	if newOrigin != 0 {
+		t.Errorf("ScrollClick(1, top) when origin=0: got %d, want 0", newOrigin)
+	}
+}
+
+// TestScrollbarClickAtBottom tests that clicking at the bottom of the scrollbar
+// with button 3 advances to near the end of the content.
+func TestScrollbarClickAtBottom(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Start at origin 0
+	rt.SetOrigin(0)
+
+	// Right-click at the bottom of the scrollbar
+	scrollRect := rt.ScrollRect()
+
+	newOrigin := rt.ScrollClick(3, image.Pt(scrollRect.Min.X+5, scrollRect.Max.Y-1))
+
+	// Should scroll to near the end (significant forward movement)
+	// 30 lines * 5 runes = 150 total runes
+	// Clicking at the bottom should advance significantly
+	if newOrigin < 50 {
+		t.Errorf("ScrollClick(3, bottom): got origin %d, expected larger value", newOrigin)
+	}
+}
+
+// TestScrollbarClickNoContent tests that clicking the scrollbar with no content
+// returns origin 0.
+func TestScrollbarClickNoContent(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// No content set
+
+	scrollRect := rt.ScrollRect()
+	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
+
+	// Any click should return 0 when there's no content
+	newOrigin := rt.ScrollClick(2, image.Pt(scrollRect.Min.X+5, middleY))
+	if newOrigin != 0 {
+		t.Errorf("ScrollClick with no content: got %d, want 0", newOrigin)
+	}
+}
+
+// TestScrollbarClickContentFits tests that clicking the scrollbar when content fits
+// keeps origin at 0.
+func TestScrollbarClickContentFits(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content that fits (just 3 lines, frame can show ~21 lines)
+	rt.SetContent(rich.Plain("line1\nline2\nline3"))
+
+	scrollRect := rt.ScrollRect()
+	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
+
+	// When content fits, scrolling shouldn't change origin
+	newOrigin := rt.ScrollClick(3, image.Pt(scrollRect.Min.X+5, middleY))
+	if newOrigin != 0 {
+		t.Errorf("ScrollClick when content fits: got %d, want 0", newOrigin)
+	}
+}
