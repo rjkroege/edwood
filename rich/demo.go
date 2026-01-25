@@ -117,6 +117,7 @@ func DemoFrame(display edwooddraw.Display, screenR image.Rectangle, font edwoodd
 }
 
 // createStyledDemoContent creates Content with various styles for demonstration.
+// The content is longer than the frame height to demonstrate scrolling.
 func createStyledDemoContent() Content {
 	// Define some colors
 	darkBlue := color.RGBA{R: 0, G: 0, B: 139, A: 255}
@@ -159,6 +160,40 @@ func createStyledDemoContent() Content {
 
 		// Plain text
 		{Text: "The quick brown fox\njumps over the lazy dog.", Style: DefaultStyle()},
+		{Text: "\n\n", Style: DefaultStyle()},
+
+		// Additional content for scrolling demo
+		{Text: "Scrolling Demo", Style: StyleH2},
+		{Text: "\n", Style: DefaultStyle()},
+		{Text: "Use scroll wheel or button 4/5", Style: DefaultStyle()},
+		{Text: "\nto scroll this content up/down.", Style: DefaultStyle()},
+		{Text: "\n\n", Style: DefaultStyle()},
+
+		// More lines to ensure content is longer than frame
+		{Text: "Line 1: ", Style: StyleBold},
+		{Text: "Lorem ipsum dolor sit amet.\n", Style: DefaultStyle()},
+		{Text: "Line 2: ", Style: StyleBold},
+		{Text: "Consectetur adipiscing elit.\n", Style: DefaultStyle()},
+		{Text: "Line 3: ", Style: StyleBold},
+		{Text: "Sed do eiusmod tempor.\n", Style: DefaultStyle()},
+		{Text: "Line 4: ", Style: StyleBold},
+		{Text: "Incididunt ut labore et dolore.\n", Style: DefaultStyle()},
+		{Text: "Line 5: ", Style: StyleBold},
+		{Text: "Magna aliqua ut enim.\n", Style: DefaultStyle()},
+		{Text: "Line 6: ", Style: StyleBold},
+		{Text: "Ad minim veniam quis.\n", Style: DefaultStyle()},
+		{Text: "Line 7: ", Style: StyleBold},
+		{Text: "Nostrud exercitation ullamco.\n", Style: DefaultStyle()},
+		{Text: "Line 8: ", Style: StyleBold},
+		{Text: "Laboris nisi ut aliquip.\n", Style: DefaultStyle()},
+		{Text: "Line 9: ", Style: StyleBold},
+		{Text: "Ex ea commodo consequat.\n", Style: DefaultStyle()},
+		{Text: "Line 10: ", Style: StyleBold},
+		{Text: "Duis aute irure dolor.\n", Style: DefaultStyle()},
+		{Text: "\n", Style: DefaultStyle()},
+
+		// End marker
+		{Text: "--- End of Content ---", Style: Style{Fg: darkRed, Italic: true, Scale: 1.0}},
 	}
 }
 
@@ -192,7 +227,9 @@ func withTextColor(c edwooddraw.Image) Option {
 
 // HandleMouse handles mouse events for the demo frame.
 // Returns true if the event was handled (mouse was in the demo area).
-// If the mouse button 1 is down in the demo area, it starts a selection.
+// - Button 1: starts a selection
+// - Button 4 (scroll up): scrolls content up (decreases origin)
+// - Button 5 (scroll down): scrolls content down (increases origin)
 func (ds *DemoState) HandleMouse(mc *draw.Mousectl, m *draw.Mouse) bool {
 	if ds == nil || ds.Frame == nil {
 		return false
@@ -203,14 +240,72 @@ func (ds *DemoState) HandleMouse(mc *draw.Mousectl, m *draw.Mouse) bool {
 		return false
 	}
 
-	// Only handle button 1 (selection)
-	if m.Buttons&1 == 0 {
-		return false
+	// Handle scroll wheel (buttons 4 and 5)
+	// Button 4 = scroll up (show earlier content)
+	// Button 5 = scroll down (show later content)
+	if m.Buttons&8 != 0 { // Button 4 - scroll up
+		ds.scrollLines(-3)
+		return true
+	}
+	if m.Buttons&16 != 0 { // Button 5 - scroll down
+		ds.scrollLines(3)
+		return true
 	}
 
-	// Handle selection
-	ds.Frame.Select(mc, m)
+	// Handle button 1 (selection)
+	if m.Buttons&1 != 0 {
+		ds.Frame.Select(mc, m)
+		ds.Frame.Redraw()
+		ds.Display.ScreenImage().Display().Flush()
+		return true
+	}
+
+	return false
+}
+
+// scrollLines scrolls the demo frame by the given number of lines.
+// Positive n scrolls down (shows later content), negative scrolls up.
+func (ds *DemoState) scrollLines(n int) {
+	if ds == nil || ds.Frame == nil {
+		return
+	}
+
+	// Get current origin
+	origin := ds.Frame.GetOrigin()
+
+	// Calculate new origin
+	// We need to find the rune offset of lines relative to current position
+	// For simplicity, we'll estimate based on average characters per line
+	// A more accurate approach would track line boundaries
+
+	// Get content length for bounds checking
+	content := ds.getContentLength()
+
+	// Approximate characters per line (rough estimate)
+	// This scrolls roughly 3 lines worth of content
+	charsPerLine := 30
+	delta := n * charsPerLine
+
+	newOrigin := origin + delta
+	if newOrigin < 0 {
+		newOrigin = 0
+	}
+	if newOrigin > content {
+		newOrigin = content
+	}
+
+	ds.Frame.SetOrigin(newOrigin)
 	ds.Frame.Redraw()
 	ds.Display.ScreenImage().Display().Flush()
-	return true
+}
+
+// getContentLength returns the total length of the demo content in runes.
+func (ds *DemoState) getContentLength() int {
+	// Create the demo content and count runes
+	content := createStyledDemoContent()
+	total := 0
+	for _, span := range content {
+		total += len([]rune(span.Text))
+	}
+	return total
 }

@@ -319,8 +319,9 @@ func findattr(attr *plumb.Attribute, s string) string {
 
 func MovedMouse(g *globals, m draw.Mouse) {
 	// Check if the rich text demo should handle this mouse event
-	if g.richDemo != nil && m.Point.In(g.richDemo.Rect) && m.Buttons&1 != 0 {
-		// Handle selection in demo frame
+	// Handle button 1 (selection) and buttons 4/5 (scroll wheel)
+	if g.richDemo != nil && m.Point.In(g.richDemo.Rect) && (m.Buttons&1 != 0 || m.Buttons&8 != 0 || m.Buttons&16 != 0) {
+		// Handle selection or scrolling in demo frame
 		m9 := draw9.Mouse(m)
 		g.richDemo.HandleMouse(g.mousectl, &m9)
 		return
