@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"9fans.net/go/draw"
+	edwooddraw "github.com/rjkroege/edwood/draw"
 )
 
 // Option is a functional option for configuring a Frame.
@@ -44,6 +45,7 @@ type Frame interface {
 // frameImpl is the concrete implementation of Frame.
 type frameImpl struct {
 	rect    image.Rectangle
+	display edwooddraw.Display
 	content Content
 	origin  int
 	p0, p1  int // selection
