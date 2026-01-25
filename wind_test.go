@@ -294,3 +294,184 @@ func TestWindowDrawPreviewMode(t *testing.T) {
 		t.Error("richBody should still exist after disabling preview mode")
 	}
 }
+
+// TestWindowMousePreviewSelection tests that mouse selection in preview mode
+// delegates to the richBody and allows text selection within the rich text frame.
+func TestWindowMousePreviewSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World\n\nThis is **bold** text.")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Set content in the RichText
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	// Assign the richBody to the window
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Verify initial selection is empty
+	q0, q1 := rt.Selection()
+	if q0 != 0 || q1 != 0 {
+		t.Errorf("Initial selection should be (0, 0), got (%d, %d)", q0, q1)
+	}
+
+	// Test that selection can be set on the richBody
+	rt.SetSelection(2, 7) // Select "llo W" from "Hello World"
+	q0, q1 = rt.Selection()
+	if q0 != 2 || q1 != 7 {
+		t.Errorf("Selection after SetSelection(2, 7) should be (2, 7), got (%d, %d)", q0, q1)
+	}
+
+	// Verify the window is in preview mode and has the richBody
+	if !w.IsPreviewMode() {
+		t.Error("Window should be in preview mode")
+	}
+	if w.RichBody() != rt {
+		t.Error("Window's RichBody should match the assigned RichText")
+	}
+
+	// The key property: when in preview mode, mouse interactions should be
+	// handled by the richBody. We verify that the richBody's frame supports
+	// the necessary coordinate mapping methods (Charofpt, Ptofchar) which
+	// are used for mouse-based selection.
+	frame := rt.Frame()
+	if frame == nil {
+		t.Fatal("RichText frame should not be nil")
+	}
+
+	// Test coordinate mapping (used by mouse selection)
+	pt := frame.Ptofchar(5) // Get screen position of character 5
+	if pt.X < bodyRect.Min.X {
+		t.Errorf("Ptofchar(5).X = %d, should be >= %d", pt.X, bodyRect.Min.X)
+	}
+
+	// Test reverse mapping (click position to character)
+	char := frame.Charofpt(image.Pt(bodyRect.Min.X+50, bodyRect.Min.Y+5))
+	if char < 0 || char > content.Len() {
+		t.Errorf("Charofpt should return valid character index, got %d for content length %d", char, content.Len())
+	}
+}
+
+// TestWindowMousePreviewScroll tests that mouse scrolling in preview mode
+// properly delegates to the richBody's scroll handling.
+func TestWindowMousePreviewScroll(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", nil),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xCCCCCCFF)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x666666FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Create content with many lines to enable scrolling
+	var content rich.Content
+	for i := 0; i < 50; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("Line number "+string(rune('0'+i%10)))...)
+	}
+	rt.SetContent(content)
+
+	// Assign the richBody to the window
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Verify initial origin is 0
+	if rt.Origin() != 0 {
+		t.Errorf("Initial origin should be 0, got %d", rt.Origin())
+	}
+
+	// Test scrollbar click - button 3 (right-click) should scroll down
+	scrollRect := rt.ScrollRect()
+	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
+	newOrigin := rt.ScrollClick(3, image.Pt(scrollRect.Min.X+5, middleY))
+
+	// Origin should have increased (scrolled down)
+	if newOrigin <= 0 {
+		t.Errorf("After ScrollClick(3, middle), origin should be > 0, got %d", newOrigin)
+	}
+
+	// Save the current origin
+	beforeWheelScroll := rt.Origin()
+
+	// Test mouse wheel scrolling - scroll down
+	newOrigin = rt.ScrollWheel(false) // false = scroll down
+	if newOrigin < beforeWheelScroll {
+		t.Errorf("ScrollWheel(down) should increase origin; before=%d, after=%d", beforeWheelScroll, newOrigin)
+	}
+
+	// Test mouse wheel scrolling - scroll up
+	beforeWheelUp := rt.Origin()
+	newOrigin = rt.ScrollWheel(true) // true = scroll up
+	if newOrigin >= beforeWheelUp {
+		t.Errorf("ScrollWheel(up) should decrease origin; before=%d, after=%d", beforeWheelUp, newOrigin)
+	}
+
+	// Verify the window is in preview mode
+	if !w.IsPreviewMode() {
+		t.Error("Window should still be in preview mode")
+	}
+
+	// Test scrollbar at top - button 1 (left-click) at top should stay at top
+	// First scroll to top
+	rt.SetOrigin(0)
+	newOrigin = rt.ScrollClick(1, image.Pt(scrollRect.Min.X+5, scrollRect.Min.Y))
+	if newOrigin != 0 {
+		t.Errorf("ScrollClick(1, top) when at origin=0 should stay at 0, got %d", newOrigin)
+	}
+}

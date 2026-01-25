@@ -613,3 +613,81 @@ func (w *Window) Draw() {
 		}
 	}
 }
+
+// HandlePreviewMouse handles mouse events when the window is in preview mode.
+// Returns true if the event was handled by the preview mode, false otherwise.
+// When false is returned, the caller should handle the event normally.
+func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
+	if !w.previewMode || w.richBody == nil {
+		return false
+	}
+
+	// Check if the mouse is in the body area
+	if !m.Point.In(w.body.all) {
+		return false
+	}
+
+	rt := w.richBody
+
+	// Handle scroll wheel (buttons 4 and 5)
+	if m.Buttons&8 != 0 { // Button 4 - scroll up
+		rt.ScrollWheel(true)
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
+		}
+		return true
+	}
+	if m.Buttons&16 != 0 { // Button 5 - scroll down
+		rt.ScrollWheel(false)
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
+		}
+		return true
+	}
+
+	// Handle scrollbar clicks (buttons 1, 2, 3 in scrollbar area)
+	scrRect := rt.ScrollRect()
+	if m.Point.In(scrRect) {
+		if m.Buttons&1 != 0 { // Button 1
+			rt.ScrollClick(1, m.Point)
+			w.Draw()
+			if w.display != nil {
+				w.display.Flush()
+			}
+			return true
+		}
+		if m.Buttons&2 != 0 { // Button 2
+			rt.ScrollClick(2, m.Point)
+			w.Draw()
+			if w.display != nil {
+				w.display.Flush()
+			}
+			return true
+		}
+		if m.Buttons&4 != 0 { // Button 3
+			rt.ScrollClick(3, m.Point)
+			w.Draw()
+			if w.display != nil {
+				w.display.Flush()
+			}
+			return true
+		}
+	}
+
+	// Handle button 1 in frame area for text selection
+	frameRect := rt.Frame().Rect()
+	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
+		// Get character position at click point
+		charPos := rt.Frame().Charofpt(m.Point)
+		rt.SetSelection(charPos, charPos)
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
+		}
+		return true
+	}
+
+	return false
+}
