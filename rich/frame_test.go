@@ -454,27 +454,6 @@ func TestDrawTextWithDefaultColor(t *testing.T) {
 	}
 }
 
-// WithBoldFont is an Option that sets the bold font variant for the frame.
-func WithBoldFont(f draw.Font) Option {
-	return func(fi *frameImpl) {
-		fi.boldFont = f
-	}
-}
-
-// WithItalicFont is an Option that sets the italic font variant for the frame.
-func WithItalicFont(f draw.Font) Option {
-	return func(fi *frameImpl) {
-		fi.italicFont = f
-	}
-}
-
-// WithBoldItalicFont is an Option that sets the bold-italic font variant for the frame.
-func WithBoldItalicFont(f draw.Font) Option {
-	return func(fi *frameImpl) {
-		fi.boldItalicFont = f
-	}
-}
-
 func TestFontVariantsBoldText(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300)
 	display := edwoodtest.NewDisplay(rect)
@@ -758,17 +737,6 @@ func (sf *ScaledFont) StringWidth(s string) int {
 // NewScaledFont creates a font with scaled metrics for testing.
 func NewScaledFont(base draw.Font, scale float64) draw.Font {
 	return &ScaledFont{base: base, scale: scale}
-}
-
-// WithScaledFont is an Option that sets a scaled font for a specific scale factor.
-// The frame stores a map of scale factors to fonts.
-func WithScaledFont(scale float64, f draw.Font) Option {
-	return func(fi *frameImpl) {
-		if fi.scaledFonts == nil {
-			fi.scaledFonts = make(map[float64]draw.Font)
-		}
-		fi.scaledFonts[scale] = f
-	}
 }
 
 func TestFontScaleH1Text(t *testing.T) {
