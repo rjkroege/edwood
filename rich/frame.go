@@ -58,6 +58,9 @@ type frameImpl struct {
 	boldFont       edwooddraw.Font
 	italicFont     edwooddraw.Font
 	boldItalicFont edwooddraw.Font
+
+	// Scaled fonts for headings (key is scale factor: 2.0 for H1, 1.5 for H2, etc.)
+	scaledFonts map[float64]edwooddraw.Font
 }
 
 // NewFrame creates a new Frame.
@@ -237,7 +240,18 @@ func (f *frameImpl) Full() bool {
 
 // fontForStyle returns the appropriate font for the given style.
 // Falls back to the regular font if the variant is not available.
+// When a style has a Scale != 1.0, the scaled font takes precedence
+// since it provides the correct metrics for heading layout.
 func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
+	// Check for scaled fonts first (for headings like H1, H2, H3)
+	// Scale takes precedence because heading layout requires the correct metrics
+	if style.Scale != 1.0 && f.scaledFonts != nil {
+		if scaledFont, ok := f.scaledFonts[style.Scale]; ok {
+			return scaledFont
+		}
+	}
+
+	// Check for bold/italic variants for non-scaled text
 	if style.Bold && style.Italic {
 		if f.boldItalicFont != nil {
 			return f.boldItalicFont

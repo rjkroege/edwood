@@ -733,3 +733,379 @@ func TestFontVariantsMixedContent(t *testing.T) {
 		t.Errorf("Redraw() did not render 'italic'\ngot ops: %v", ops)
 	}
 }
+
+// ScaledFont wraps a font and applies a scale factor to its metrics.
+// This is used for testing scaled fonts for headings.
+type ScaledFont struct {
+	base  draw.Font
+	scale float64
+}
+
+func (sf *ScaledFont) Name() string { return sf.base.Name() }
+func (sf *ScaledFont) Height() int {
+	return int(float64(sf.base.Height()) * sf.scale)
+}
+func (sf *ScaledFont) BytesWidth(b []byte) int {
+	return int(float64(sf.base.BytesWidth(b)) * sf.scale)
+}
+func (sf *ScaledFont) RunesWidth(r []rune) int {
+	return int(float64(sf.base.RunesWidth(r)) * sf.scale)
+}
+func (sf *ScaledFont) StringWidth(s string) int {
+	return int(float64(sf.base.StringWidth(s)) * sf.scale)
+}
+
+// NewScaledFont creates a font with scaled metrics for testing.
+func NewScaledFont(base draw.Font, scale float64) draw.Font {
+	return &ScaledFont{base: base, scale: scale}
+}
+
+// WithScaledFont is an Option that sets a scaled font for a specific scale factor.
+// The frame stores a map of scale factors to fonts.
+func WithScaledFont(scale float64, f draw.Font) Option {
+	return func(fi *frameImpl) {
+		if fi.scaledFonts == nil {
+			fi.scaledFonts = make(map[float64]draw.Font)
+		}
+		fi.scaledFonts[scale] = f
+	}
+}
+
+func TestFontScaleH1Text(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	// Regular font: 10px wide, 14px tall
+	regularFont := edwoodtest.NewFont(10, 14)
+	// H1 font should be 2x scale: 20px wide, 28px tall
+	h1Font := NewScaledFont(regularFont, 2.0)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithScaledFont(2.0, h1Font),
+		WithTextColor(textImage),
+	)
+
+	// Set content with H1 heading style (Scale: 2.0)
+	content := Content{
+		{Text: "Big Heading", Style: StyleH1},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify H1 text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "Big Heading"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'Big Heading'\ngot ops: %v", ops)
+	}
+
+	// Verify the H1 scaled font is returned for StyleH1
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(StyleH1)
+	if selectedFont != h1Font {
+		t.Errorf("fontForStyle(StyleH1) should return h1Font, got %v", selectedFont)
+	}
+
+	// Verify the scaled font has correct metrics
+	if h1Font.Height() != 28 {
+		t.Errorf("H1 font height = %d, want 28", h1Font.Height())
+	}
+	// "test" is 4 chars, at 20px per char = 80px
+	if h1Font.StringWidth("test") != 80 {
+		t.Errorf("H1 font StringWidth(\"test\") = %d, want 80", h1Font.StringWidth("test"))
+	}
+}
+
+func TestFontScaleH2Text(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	// H2 font should be 1.5x scale: 15px wide, 21px tall
+	h2Font := NewScaledFont(regularFont, 1.5)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithScaledFont(1.5, h2Font),
+		WithTextColor(textImage),
+	)
+
+	// Set content with H2 heading style (Scale: 1.5)
+	content := Content{
+		{Text: "Medium Heading", Style: StyleH2},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify H2 text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "Medium Heading"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'Medium Heading'\ngot ops: %v", ops)
+	}
+
+	// Verify the H2 scaled font is returned for StyleH2
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(StyleH2)
+	if selectedFont != h2Font {
+		t.Errorf("fontForStyle(StyleH2) should return h2Font, got %v", selectedFont)
+	}
+
+	// Verify the scaled font has correct metrics
+	if h2Font.Height() != 21 {
+		t.Errorf("H2 font height = %d, want 21", h2Font.Height())
+	}
+}
+
+func TestFontScaleH3Text(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	// H3 font should be 1.25x scale: 12px wide (truncated), 17px tall (truncated)
+	h3Font := NewScaledFont(regularFont, 1.25)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithScaledFont(1.25, h3Font),
+		WithTextColor(textImage),
+	)
+
+	// Set content with H3 heading style (Scale: 1.25)
+	content := Content{
+		{Text: "Small Heading", Style: StyleH3},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify H3 text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "Small Heading"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'Small Heading'\ngot ops: %v", ops)
+	}
+
+	// Verify the H3 scaled font is returned for StyleH3
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(StyleH3)
+	if selectedFont != h3Font {
+		t.Errorf("fontForStyle(StyleH3) should return h3Font, got %v", selectedFont)
+	}
+
+	// Verify the scaled font has correct metrics (int truncation)
+	// 14 * 1.25 = 17.5, truncated to 17
+	if h3Font.Height() != 17 {
+		t.Errorf("H3 font height = %d, want 17", h3Font.Height())
+	}
+}
+
+func TestFontScaleFallbackToRegular(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	// No scaled fonts configured
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithTextColor(textImage),
+	)
+
+	fi := f.(*frameImpl)
+
+	// When no scaled font is available, fontForStyle should fall back to regular font
+	if got := fi.fontForStyle(StyleH1); got != regularFont {
+		t.Errorf("fontForStyle(StyleH1) without scaled font should return regularFont, got %v", got)
+	}
+
+	if got := fi.fontForStyle(StyleH2); got != regularFont {
+		t.Errorf("fontForStyle(StyleH2) without scaled font should return regularFont, got %v", got)
+	}
+
+	if got := fi.fontForStyle(StyleH3); got != regularFont {
+		t.Errorf("fontForStyle(StyleH3) without scaled font should return regularFont, got %v", got)
+	}
+}
+
+func TestFontScaleMixedContent(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	h1Font := NewScaledFont(regularFont, 2.0)
+	h2Font := NewScaledFont(regularFont, 1.5)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithScaledFont(2.0, h1Font),
+		WithScaledFont(1.5, h2Font),
+		WithTextColor(textImage),
+	)
+
+	// Content with multiple heading levels and body text
+	content := Content{
+		{Text: "Title\n", Style: StyleH1},
+		{Text: "Subtitle\n", Style: StyleH2},
+		{Text: "Body text", Style: DefaultStyle()},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// All text segments should be rendered
+	foundTitle := false
+	foundSubtitle := false
+	foundBody := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "Title"`) {
+			foundTitle = true
+		}
+		if strings.Contains(op, `string "Subtitle"`) {
+			foundSubtitle = true
+		}
+		if strings.Contains(op, `string "Body text"`) {
+			foundBody = true
+		}
+	}
+
+	if !foundTitle {
+		t.Errorf("Redraw() did not render 'Title'\ngot ops: %v", ops)
+	}
+	if !foundSubtitle {
+		t.Errorf("Redraw() did not render 'Subtitle'\ngot ops: %v", ops)
+	}
+	if !foundBody {
+		t.Errorf("Redraw() did not render 'Body text'\ngot ops: %v", ops)
+	}
+
+	// Verify correct fonts are selected for each style
+	fi := f.(*frameImpl)
+	if got := fi.fontForStyle(StyleH1); got != h1Font {
+		t.Errorf("fontForStyle(StyleH1) = %v, want h1Font", got)
+	}
+	if got := fi.fontForStyle(StyleH2); got != h2Font {
+		t.Errorf("fontForStyle(StyleH2) = %v, want h2Font", got)
+	}
+	if got := fi.fontForStyle(DefaultStyle()); got != regularFont {
+		t.Errorf("fontForStyle(DefaultStyle()) = %v, want regularFont", got)
+	}
+}
+
+func TestFontScaleWithBoldCombination(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	boldFont := edwoodtest.NewFont(11, 14)
+	// H1 is Bold:true, Scale:2.0 - we need a bold scaled font
+	h1BoldFont := NewScaledFont(boldFont, 2.0)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithBoldFont(boldFont),
+		WithScaledFont(2.0, h1BoldFont), // Scaled bold for H1
+		WithTextColor(textImage),
+	)
+
+	// StyleH1 has both Bold:true and Scale:2.0
+	content := Content{
+		{Text: "Bold Heading", Style: StyleH1},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify text was rendered
+	found := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "Bold Heading"`) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Redraw() did not render 'Bold Heading'\ngot ops: %v", ops)
+	}
+
+	// For StyleH1 (Bold:true, Scale:2.0), the scaled font should take precedence
+	// since it provides the scaled metrics needed for heading layout
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(StyleH1)
+	if selectedFont != h1BoldFont {
+		t.Errorf("fontForStyle(StyleH1) should return h1BoldFont for bold+scaled style, got %v", selectedFont)
+	}
+}
