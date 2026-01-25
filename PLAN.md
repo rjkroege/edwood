@@ -253,18 +253,18 @@
 ### 7.3 Frame Fill Status
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestFullStatus, TestVisibleLines |
-| Code written | [ ] | Full(), MaxLines(), VisibleLines() methods |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestMaxLines*, TestVisibleLines*, TestFull* in scroll_test.go |
+| Code written | [x] | Full(), MaxLines(), VisibleLines() methods |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 54a9c9a |
 
 ### 7.4 Visual Demo - Scrolling
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | N/A - visual demo |
-| Code written | [ ] | Demo with scrollable content |
-| Tests pass | [ ] | Manual verification - can scroll |
-| Code committed | [ ] | |
+| Tests exist | [x] | N/A - visual demo |
+| Code written | [x] | Demo with scrollable content |
+| Tests pass | [x] | Manual verification - can scroll |
+| Code committed | [x] | Commit 64f093b |
 
 ## Phase 8: RichText Component
 
