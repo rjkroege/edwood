@@ -102,3 +102,188 @@ func tabBoxWidth(box *Box, xPos, minX, maxtab int) int {
 	// Find distance to next tab stop
 	return maxtab - (relPos % maxtab)
 }
+
+// Line represents a line of positioned boxes in the layout.
+// This is the output of the layout algorithm.
+type Line struct {
+	Boxes []PositionedBox // Boxes on this line
+	Y     int             // Y position of the line (top)
+}
+
+// PositionedBox is a Box with its computed screen position.
+type PositionedBox struct {
+	Box Box
+	X   int // X position on screen
+}
+
+// layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
+// It computes the Wid field for each box and assigns X/Y positions.
+// The returned Lines contain positioned boxes ready for rendering.
+func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
+	if len(boxes) == 0 {
+		return nil
+	}
+
+	fontHeight := font.Height()
+	var lines []Line
+	var currentLine Line
+	currentLine.Y = 0
+	xPos := 0
+
+	for i := range boxes {
+		box := &boxes[i]
+
+		// Handle newlines - they end the current line and start a new one
+		if box.IsNewline() {
+			box.Wid = 0
+			currentLine.Boxes = append(currentLine.Boxes, PositionedBox{
+				Box: *box,
+				X:   xPos,
+			})
+			lines = append(lines, currentLine)
+
+			// Start new line
+			currentLine = Line{
+				Y: currentLine.Y + fontHeight,
+			}
+			xPos = 0
+			continue
+		}
+
+		// Calculate width for this box
+		var width int
+		if box.IsTab() {
+			width = tabBoxWidth(box, xPos, 0, maxtab)
+		} else {
+			width = boxWidth(box, font)
+		}
+
+		// Check if we need to wrap
+		if xPos+width > frameWidth && xPos > 0 {
+			// Need to wrap - but only if we're not at the start of a line
+			// First, check if this box can fit on a new line
+			// If the box is wider than frameWidth, we'll need to split it
+
+			if width <= frameWidth {
+				// Box fits on new line, start new line
+				lines = append(lines, currentLine)
+				currentLine = Line{
+					Y: currentLine.Y + fontHeight,
+				}
+				xPos = 0
+
+				// Recalculate tab width at new position
+				if box.IsTab() {
+					width = tabBoxWidth(box, xPos, 0, maxtab)
+				}
+			} else {
+				// Box is wider than frame, need to split it
+				lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, fontHeight)
+				continue
+			}
+		} else if xPos == 0 && width > frameWidth {
+			// Box is at start of line but still too wide - split it
+			lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, fontHeight)
+			continue
+		}
+
+		// Add box to current line
+		box.Wid = width
+		currentLine.Boxes = append(currentLine.Boxes, PositionedBox{
+			Box: *box,
+			X:   xPos,
+		})
+		xPos += width
+	}
+
+	// Don't forget the last line (if it has content)
+	if len(currentLine.Boxes) > 0 {
+		lines = append(lines, currentLine)
+	}
+
+	// A trailing newline creates an empty final line
+	// Check if the last box was a newline - if so, add the empty line
+	if len(boxes) > 0 && boxes[len(boxes)-1].IsNewline() && len(currentLine.Boxes) == 0 {
+		lines = append(lines, currentLine)
+	}
+
+	return lines
+}
+
+// splitBoxAcrossLines splits a text box that's too wide to fit on a single line.
+// It creates multiple boxes, each fitting within frameWidth.
+func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, font draw.Font, frameWidth, fontHeight int) ([]Line, Line, int) {
+	// Tabs and newlines should never need splitting
+	if box.IsTab() || box.IsNewline() {
+		box.Wid = 0
+		currentLine.Boxes = append(currentLine.Boxes, PositionedBox{
+			Box: *box,
+			X:   0,
+		})
+		return lines, currentLine, 0
+	}
+
+	text := box.Text
+	style := box.Style
+	xPos := 0
+
+	for len(text) > 0 {
+		// Find how many bytes fit on this line
+		bytesOnLine, widthOnLine := fitBytes(text, font, frameWidth)
+
+		if bytesOnLine == 0 {
+			// At least one rune must fit (even if it exceeds frameWidth)
+			_, runeLen := utf8.DecodeRune(text)
+			bytesOnLine = runeLen
+			widthOnLine = font.BytesWidth(text[:runeLen])
+		}
+
+		// Create box for this portion
+		portionText := text[:bytesOnLine]
+		portionBox := Box{
+			Text:  portionText,
+			Nrune: utf8.RuneCount(portionText),
+			Bc:    0,
+			Style: style,
+			Wid:   widthOnLine,
+		}
+		currentLine.Boxes = append(currentLine.Boxes, PositionedBox{
+			Box: portionBox,
+			X:   xPos,
+		})
+		xPos = widthOnLine
+
+		text = text[bytesOnLine:]
+
+		if len(text) > 0 {
+			// More text remaining, start a new line
+			lines = append(lines, currentLine)
+			currentLine = Line{
+				Y: currentLine.Y + fontHeight,
+			}
+			xPos = 0
+		}
+	}
+
+	return lines, currentLine, xPos
+}
+
+// fitBytes returns how many bytes of text fit within maxWidth pixels,
+// along with the actual width of those bytes.
+func fitBytes(text []byte, font draw.Font, maxWidth int) (bytesCount int, width int) {
+	totalWidth := 0
+	for i := 0; i < len(text); {
+		_, runeLen := utf8.DecodeRune(text[i:])
+		runeWidth := font.BytesWidth(text[i : i+runeLen])
+
+		if totalWidth+runeWidth > maxWidth && bytesCount > 0 {
+			// This rune would exceed maxWidth, stop here
+			break
+		}
+
+		bytesCount += runeLen
+		totalWidth += runeWidth
+		i += runeLen
+	}
+	return bytesCount, totalWidth
+}
