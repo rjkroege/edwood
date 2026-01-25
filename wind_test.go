@@ -113,3 +113,90 @@ func TestWindowClearTag(t *testing.T) {
 		t.Errorf("got %q; want %q", got, want)
 	}
 }
+
+// TestWindowPreviewMode tests that a Window has preview mode fields and
+// that they can be accessed via the appropriate methods.
+func TestWindowPreviewMode(t *testing.T) {
+	display := edwoodtest.NewDisplay(image.Rect(0, 0, 800, 600))
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", nil),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+
+	// Initially, preview mode should be off
+	if w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be false initially")
+	}
+
+	// RichBody should be nil initially
+	if w.RichBody() != nil {
+		t.Error("RichBody() should be nil initially")
+	}
+
+	// After enabling preview mode, it should be on
+	w.SetPreviewMode(true)
+	if !w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be true after SetPreviewMode(true)")
+	}
+
+	// After disabling preview mode, it should be off again
+	w.SetPreviewMode(false)
+	if w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be false after SetPreviewMode(false)")
+	}
+}
+
+// TestWindowPreviewModeToggle tests that preview mode can be toggled on and off,
+// and that each toggle properly updates the state.
+func TestWindowPreviewModeToggle(t *testing.T) {
+	display := edwoodtest.NewDisplay(image.Rect(0, 0, 800, 600))
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", nil),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+
+	// Initially off
+	if w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should start false")
+	}
+
+	// Toggle on
+	w.TogglePreviewMode()
+	if !w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be true after first toggle")
+	}
+
+	// Toggle off
+	w.TogglePreviewMode()
+	if w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be false after second toggle")
+	}
+
+	// Toggle on again
+	w.TogglePreviewMode()
+	if !w.IsPreviewMode() {
+		t.Error("IsPreviewMode() should be true after third toggle")
+	}
+}

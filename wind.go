@@ -62,6 +62,10 @@ type Window struct {
 	tagtop             image.Rectangle
 
 	editoutlk chan bool
+
+	// Preview mode fields for rich text rendering
+	previewMode bool      // true when showing rendered markdown preview
+	richBody    *RichText // rich text renderer for preview mode
 }
 
 var (
@@ -569,4 +573,24 @@ func (w *Window) ClampAddr() {
 func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
 	// log.Printf("Window.UpdateTag, status %+v, %d", newtagstatus, global.seq)
 	w.setTag1()
+}
+
+// IsPreviewMode returns true if the window is in preview mode (showing rendered markdown).
+func (w *Window) IsPreviewMode() bool {
+	return w.previewMode
+}
+
+// SetPreviewMode enables or disables preview mode.
+func (w *Window) SetPreviewMode(enabled bool) {
+	w.previewMode = enabled
+}
+
+// TogglePreviewMode toggles the preview mode state.
+func (w *Window) TogglePreviewMode() {
+	w.previewMode = !w.previewMode
+}
+
+// RichBody returns the rich text renderer for preview mode, or nil if not initialized.
+func (w *Window) RichBody() *RichText {
+	return w.richBody
 }
