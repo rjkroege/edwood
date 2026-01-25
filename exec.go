@@ -1181,6 +1181,9 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Create the preview state
 	ps := NewPreviewState(name, r, display, font)
 
+	// Connect to the source buffer for live updates
+	ps.SetBuffer(t.file)
+
 	// Read the file content and set as markdown
 	content := t.file.String()
 	ps.Window.SetMarkdown(content)

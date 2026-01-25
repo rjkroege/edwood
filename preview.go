@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/rich"
 )
@@ -136,10 +137,16 @@ func WithPreviewScrollbarColors(bg, thumb draw.Image) PreviewOption {
 
 // PreviewState holds the state for an active preview window.
 // It tracks the preview window, its source, and provides mouse handling.
+// PreviewState implements file.BufferObserver to receive live updates
+// when the source file is edited.
 type PreviewState struct {
 	Window *PreviewWindow
 	Source string // Source file path being previewed
+	buffer *file.ObservableEditableBuffer // Source buffer for live updates
 }
+
+// Compile-time check that PreviewState implements file.BufferObserver
+var _ file.BufferObserver = (*PreviewState)(nil)
 
 // NewPreviewState creates a preview state for a given source file.
 func NewPreviewState(source string, r image.Rectangle, display draw.Display, font draw.Font) *PreviewState {
@@ -250,4 +257,46 @@ func (ps *PreviewState) HandleMouse(m *draw.Mouse) bool {
 	}
 
 	return false
+}
+
+// SetBuffer sets the source buffer for live updates.
+// The PreviewState will register itself as an observer to receive
+// notifications when the buffer changes.
+func (ps *PreviewState) SetBuffer(buf *file.ObservableEditableBuffer) {
+	if ps == nil {
+		return
+	}
+	// Unregister from previous buffer if any
+	if ps.buffer != nil {
+		ps.buffer.DelObserver(ps)
+	}
+	ps.buffer = buf
+	if buf != nil {
+		buf.AddObserver(ps)
+	}
+}
+
+// Inserted implements file.BufferObserver.
+// Called when text is inserted into the source buffer.
+func (ps *PreviewState) Inserted(q0 file.OffsetTuple, b []byte, nr int) {
+	ps.updateFromBuffer()
+}
+
+// Deleted implements file.BufferObserver.
+// Called when text is deleted from the source buffer.
+func (ps *PreviewState) Deleted(q0, q1 file.OffsetTuple) {
+	ps.updateFromBuffer()
+}
+
+// updateFromBuffer reads the current content from the buffer and updates the preview.
+func (ps *PreviewState) updateFromBuffer() {
+	if ps == nil || ps.Window == nil || ps.buffer == nil {
+		return
+	}
+	content := ps.buffer.String()
+	ps.Window.SetMarkdown(content)
+	ps.Window.Redraw()
+	if ps.Window.display != nil {
+		ps.Window.display.Flush()
+	}
 }
