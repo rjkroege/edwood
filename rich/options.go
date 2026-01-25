@@ -4,6 +4,34 @@ import (
 	"github.com/rjkroege/edwood/draw"
 )
 
+// WithDisplay is an Option that sets the display for the frame.
+func WithDisplay(d draw.Display) Option {
+	return func(f *frameImpl) {
+		f.display = d
+	}
+}
+
+// WithBackground is an Option that sets the background image for the frame.
+func WithBackground(b draw.Image) Option {
+	return func(f *frameImpl) {
+		f.background = b
+	}
+}
+
+// WithFont is an Option that sets the font for the frame.
+func WithFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.font = f
+	}
+}
+
+// WithTextColor is an Option that sets the text color image for the frame.
+func WithTextColor(c draw.Image) Option {
+	return func(fi *frameImpl) {
+		fi.textColor = c
+	}
+}
+
 // WithBoldFont is an Option that sets the bold font variant for the frame.
 func WithBoldFont(f draw.Font) Option {
 	return func(fi *frameImpl) {
