@@ -177,44 +177,44 @@
 ### 5.1 Ptofchar Implementation
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestPtofchar for start, middle, end, wrapped lines |
-| Code written | [ ] | Ptofchar() maps rune offset to screen point |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestPtofchar for start, middle, end, wrapped lines |
+| Code written | [x] | Ptofchar() maps rune offset to screen point |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 600a0c8 |
 
 ### 5.2 Charofpt Implementation
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestCharofpt for various screen positions |
-| Code written | [ ] | Charofpt() maps screen point to rune offset |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestCharofpt for various screen positions |
+| Code written | [x] | Charofpt() maps screen point to rune offset |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 320d176 |
 
 ### 5.3 Coordinate Round-Trip
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestCoordinateRoundTrip verifies Charofpt(Ptofchar(n)) == n |
-| Code written | [ ] | Ensure consistency between mappings |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestCoordinateRoundTrip verifies Charofpt(Ptofchar(n)) == n |
+| Code written | [x] | Ensure consistency between mappings |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 6bf0dc3 |
 
 ## Phase 6: Selection
 
 ### 6.1 Selection State
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestSetSelection, TestGetSelection |
-| Code written | [ ] | Frame stores p0, p1 selection bounds |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestSetSelection, TestGetSelection |
+| Code written | [x] | Frame stores p0, p1 selection bounds |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 7c27e13 |
 
 ### 6.2 Selection Drawing
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestDrawSelection highlights correct region |
-| Code written | [ ] | drawSelection() renders highlight background |
-| Tests pass | [ ] | |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestDrawSelection highlights correct region |
+| Code written | [x] | drawSelection() renders highlight background |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 5540491 |
 
 ### 6.3 Mouse Selection
 | Stage | Status | Notes |
