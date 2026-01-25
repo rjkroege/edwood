@@ -255,9 +255,10 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 
 		// Handle newline boxes (width 0, but still represent a character)
 		if pb.Box.IsNewline() {
-			// Point is at or after the newline position
+			// Point at or after the newline position returns the newline's position
+			// We return here because we've found the position
 			if relX >= boxStart {
-				runeCount++
+				return runeCount
 			}
 			continue
 		}

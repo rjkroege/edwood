@@ -1510,3 +1510,129 @@ func TestCharofptOutsideFrame(t *testing.T) {
 		t.Errorf("Charofpt(%v) above frame = %d, want 0", pt, pos)
 	}
 }
+
+// TestCoordinateRoundTrip verifies that Charofpt(Ptofchar(n)) == n for all valid positions.
+// This is a critical property for correct cursor positioning and selection behavior.
+func TestCoordinateRoundTrip(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Test with simple text
+	f.SetContent(Plain("hello"))
+
+	// Test every position from 0 to len(content)+1
+	for i := 0; i <= 5; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+}
+
+// TestCoordinateRoundTripMultiLine tests round-trip with multi-line content.
+func TestCoordinateRoundTripMultiLine(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "hello\nworld" = 11 characters (5 + 1 + 5)
+	f.SetContent(Plain("hello\nworld"))
+
+	// Test every position from 0 to len(content)+1
+	for i := 0; i <= 11; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+}
+
+// TestCoordinateRoundTripWrapped tests round-trip with wrapped lines.
+func TestCoordinateRoundTripWrapped(t *testing.T) {
+	// Frame is 50px wide, font is 10px per char
+	// So 5 chars fit per line before wrapping
+	rect := image.Rect(20, 10, 70, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "helloworld" = 10 chars, wraps after 5
+	f.SetContent(Plain("helloworld"))
+
+	// Test every position from 0 to len(content)+1
+	for i := 0; i <= 10; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+}
+
+// TestCoordinateRoundTripWithTabs tests round-trip with tab characters.
+func TestCoordinateRoundTripWithTabs(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "a\tb" = 3 characters
+	f.SetContent(Plain("a\tb"))
+
+	// Test every position from 0 to len(content)+1
+	for i := 0; i <= 3; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+}
+
+// TestCoordinateRoundTripEmpty tests round-trip with empty content.
+func TestCoordinateRoundTripEmpty(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Empty content
+	f.SetContent(Plain(""))
+
+	// Position 0 should round-trip
+	pt := f.Ptofchar(0)
+	got := f.Charofpt(pt)
+	if got != 0 {
+		t.Errorf("Charofpt(Ptofchar(0)) on empty = %d, want 0 (pt=%v)", got, pt)
+	}
+}
