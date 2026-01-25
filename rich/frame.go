@@ -422,20 +422,11 @@ func (f *frameImpl) Redraw() {
 
 // drawText renders the content boxes onto the screen.
 func (f *frameImpl) drawText(screen edwooddraw.Image) {
-	// Convert content to boxes
-	boxes := contentToBoxes(f.content)
-	if len(boxes) == 0 {
+	// Get layout lines starting from origin
+	lines, _ := f.layoutFromOrigin()
+	if len(lines) == 0 {
 		return
 	}
-
-	// Calculate frame width for layout
-	frameWidth := f.rect.Dx()
-
-	// Default tab width (8 characters worth)
-	maxtab := 8 * f.font.StringWidth("0")
-
-	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab)
 
 	// Render each line
 	for _, line := range lines {
@@ -471,6 +462,81 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 			screen.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
 		}
 	}
+}
+
+// layoutFromOrigin returns the layout lines starting from the origin position.
+// It skips content before the origin and adjusts Y coordinates so that the
+// first visible content starts at Y=0.
+// Returns the lines and the rune offset of the first visible content.
+func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return nil, 0
+	}
+
+	// Calculate frame width for layout
+	frameWidth := f.rect.Dx()
+
+	// Default tab width (8 characters worth)
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// If origin is 0, just return the normal layout
+	if f.origin == 0 {
+		return layout(boxes, f.font, frameWidth, maxtab), 0
+	}
+
+	// Layout all boxes first
+	allLines := layout(boxes, f.font, frameWidth, maxtab)
+	if len(allLines) == 0 {
+		return nil, 0
+	}
+
+	// Find which line contains the origin position
+	runeCount := 0
+	startLineIdx := 0
+	originY := 0
+
+	for lineIdx, line := range allLines {
+		lineStartRune := runeCount
+		for _, pb := range line.Boxes {
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				runeCount++
+			} else {
+				runeCount += pb.Box.Nrune
+			}
+		}
+
+		// Check if origin is within or at the start of this line
+		if f.origin >= lineStartRune && f.origin < runeCount {
+			startLineIdx = lineIdx
+			originY = line.Y
+			break
+		}
+		// If we've passed the origin position, the origin was at the end of the previous line
+		if f.origin < runeCount {
+			startLineIdx = lineIdx
+			originY = line.Y
+			break
+		}
+		// Keep track of the last line in case origin is past all content
+		startLineIdx = lineIdx
+		originY = line.Y
+	}
+
+	// Extract lines from the origin line onwards and adjust Y coordinates
+	visibleLines := make([]Line, 0, len(allLines)-startLineIdx)
+	for i := startLineIdx; i < len(allLines); i++ {
+		line := allLines[i]
+		// Adjust Y coordinate to start from 0
+		adjustedLine := Line{
+			Y:     line.Y - originY,
+			Boxes: line.Boxes,
+		}
+		visibleLines = append(visibleLines, adjustedLine)
+	}
+
+	return visibleLines, f.origin
 }
 
 // drawSelection renders the selection highlight rectangles.

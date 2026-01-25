@@ -1,7 +1,9 @@
 package rich
 
 import (
+	"fmt"
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/rjkroege/edwood/draw"
@@ -145,5 +147,86 @@ func TestOriginUpdateOverwrites(t *testing.T) {
 	org = f.GetOrigin()
 	if org != 12 {
 		t.Errorf("Second GetOrigin() = %d, want 12", org)
+	}
+}
+
+// TestDisplayFromOrigin tests that Redraw starts displaying content from the origin offset.
+// When origin is non-zero, text before the origin should not be displayed.
+func TestDisplayFromOrigin(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello\nworld" (hello + newline + world)
+	// Rune positions: h=0, e=1, l=2, l=3, o=4, \n=5, w=6, o=7, r=8, l=9, d=10
+	f.SetContent(Plain("hello\nworld"))
+
+	// Test 1: With origin at 0, both "hello" and "world" should be displayed
+	f.SetOrigin(0)
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	foundHello := false
+	foundWorld := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "hello"`) {
+			foundHello = true
+		}
+		if strings.Contains(op, `string "world"`) {
+			foundWorld = true
+		}
+	}
+
+	if !foundHello {
+		t.Errorf("With origin=0, expected 'hello' to be drawn, ops: %v", ops)
+	}
+	if !foundWorld {
+		t.Errorf("With origin=0, expected 'world' to be drawn, ops: %v", ops)
+	}
+
+	// Test 2: With origin at 6 (start of "world"), only "world" should be displayed
+	f.SetOrigin(6)
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops = display.(edwoodtest.GettableDrawOps).DrawOps()
+	foundHello = false
+	foundWorld = false
+	for _, op := range ops {
+		if strings.Contains(op, `string "hello"`) {
+			foundHello = true
+		}
+		if strings.Contains(op, `string "world"`) {
+			foundWorld = true
+		}
+	}
+
+	if foundHello {
+		t.Errorf("With origin=6, 'hello' should NOT be drawn, ops: %v", ops)
+	}
+	if !foundWorld {
+		t.Errorf("With origin=6, expected 'world' to be drawn, ops: %v", ops)
+	}
+
+	// Test 3: With origin at 6, "world" should be drawn at the frame's top (Y=0, not Y=14)
+	// Since we're starting from origin, the first visible content should be at rect.Min.Y
+	worldAtTop := false
+	expectedPos := fmt.Sprintf("(%d,%d)", rect.Min.X, rect.Min.Y)
+	for _, op := range ops {
+		if strings.Contains(op, `string "world"`) && strings.Contains(op, expectedPos) {
+			worldAtTop = true
+			break
+		}
+	}
+
+	if !worldAtTop {
+		t.Errorf("With origin=6, 'world' should be drawn at top of frame %s, ops: %v", expectedPos, ops)
 	}
 }
