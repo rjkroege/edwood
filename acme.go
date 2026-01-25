@@ -130,7 +130,12 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 
 	// Rich text demo - temporary visual test hook
 	// TODO(rjk): Remove this demo when rich text is fully integrated
-	rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display))
+	demoOpts := rich.DemoFrameOptions{
+		BoldFont:       tryLoadFontVariant(display, global.tagfont, "bold"),
+		ItalicFont:     tryLoadFontVariant(display, global.tagfont, "italic"),
+		BoldItalicFont: tryLoadFontVariant(display, global.tagfont, "bolditalic"),
+	}
+	rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display), demoOpts)
 	display.Flush()
 
 	// After row is initialized
@@ -198,6 +203,50 @@ func fontget(name string, display draw.Display) draw.Font {
 		font = f
 	}
 	return font
+}
+
+// tryLoadFontVariant attempts to load a font variant (bold, italic, bolditalic)
+// based on the base font path. Returns nil if no variant is found.
+//
+// Supported font path formats:
+//   - /mnt/font/GoRegular/16a/font -> /mnt/font/GoBold/16a/font
+//   - /lib/font/bit/lucsans/euro.8.font (plan9 bitmap - no variant support)
+func tryLoadFontVariant(display draw.Display, baseFont, variant string) draw.Font {
+	if baseFont == "" {
+		return nil
+	}
+
+	// Map of base family names to their variants
+	// Font names from fontsrv (9p ls font | grep -i go):
+	//   Go-Bold, Go-BoldItalic, Go-Italic, GoMono, GoMono-Bold, etc.
+	variantMap := map[string]map[string]string{
+		"GoRegular": {
+			"bold":       "Go-Bold",
+			"italic":     "Go-Italic",
+			"bolditalic": "Go-BoldItalic",
+		},
+		"GoMono": {
+			"bold":       "GoMono-Bold",
+			"italic":     "GoMono-Italic",
+			"bolditalic": "GoMono-BoldItalic",
+		},
+	}
+
+	// Try to find and replace a known family name in the path
+	for family, variants := range variantMap {
+		if strings.Contains(baseFont, "/"+family+"/") {
+			if variantFamily, ok := variants[variant]; ok {
+				variantPath := strings.Replace(baseFont, "/"+family+"/", "/"+variantFamily+"/", 1)
+				f, err := display.OpenFont(variantPath)
+				if err == nil {
+					return f
+				}
+			}
+			return nil
+		}
+	}
+
+	return nil
 }
 
 var boxcursor = draw.Cursor{

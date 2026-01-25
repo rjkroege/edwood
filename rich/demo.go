@@ -7,10 +7,18 @@ import (
 	"github.com/rjkroege/edwood/draw"
 )
 
+// DemoFrameOptions holds optional font variants for the demo frame.
+type DemoFrameOptions struct {
+	BoldFont       draw.Font
+	ItalicFont     draw.Font
+	BoldItalicFont draw.Font
+}
+
 // DemoFrame creates and draws a rich.Frame for visual testing.
 // This is a temporary hook for development - remove when no longer needed.
 // It creates a frame showing styled text in the bottom-right corner.
-func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font) {
+// The optional opts parameter allows passing font variants for styled text.
+func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font, opts ...DemoFrameOptions) {
 	// Create a frame in the bottom-right corner
 	// Size: 350x250 pixels (larger to show styled text)
 	frameWidth := 350
@@ -56,9 +64,31 @@ func DemoFrame(display draw.Display, screenR image.Rectangle, font draw.Font) {
 		return
 	}
 
+	// Build frame options
+	frameOpts := []Option{
+		withDisplay(display),
+		withBackground(bgImage),
+		withFont(font),
+		withTextColor(textImage),
+	}
+
+	// Add font variants if provided
+	if len(opts) > 0 {
+		o := opts[0]
+		if o.BoldFont != nil {
+			frameOpts = append(frameOpts, WithBoldFont(o.BoldFont))
+		}
+		if o.ItalicFont != nil {
+			frameOpts = append(frameOpts, WithItalicFont(o.ItalicFont))
+		}
+		if o.BoldItalicFont != nil {
+			frameOpts = append(frameOpts, WithBoldItalicFont(o.BoldItalicFont))
+		}
+	}
+
 	// Create and initialize the frame with font and text color
 	f := NewFrame()
-	f.Init(r, withDisplay(display), withBackground(bgImage), withFont(font), withTextColor(textImage))
+	f.Init(r, frameOpts...)
 
 	// Set demo content - styled text with multiple styles
 	f.SetContent(createStyledDemoContent())
