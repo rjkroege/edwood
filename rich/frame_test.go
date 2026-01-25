@@ -1269,3 +1269,244 @@ func TestPtofcharWithTab(t *testing.T) {
 		t.Errorf("Ptofchar(2) = %v, want %v", pt, want)
 	}
 }
+
+// TestCharofptStart tests that a point at the frame origin returns position 0.
+func TestCharofptStart(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content
+	f.SetContent(Plain("hello world"))
+
+	// Point at frame origin should return position 0
+	pos := f.Charofpt(rect.Min)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) = %d, want 0", rect.Min, pos)
+	}
+}
+
+// TestCharofptMiddle tests character positions within a single line.
+func TestCharofptMiddle(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello" = 5 chars, each 10px wide
+	f.SetContent(Plain("hello"))
+
+	// Point at X = rect.Min.X + 35 (middle of 4th char 'l') should return position 3
+	pt := image.Point{X: rect.Min.X + 35, Y: rect.Min.Y}
+	pos := f.Charofpt(pt)
+	if pos != 3 {
+		t.Errorf("Charofpt(%v) = %d, want 3", pt, pos)
+	}
+
+	// Point at X = rect.Min.X + 5 (middle of 1st char 'h') should return position 0
+	pt = image.Point{X: rect.Min.X + 5, Y: rect.Min.Y}
+	pos = f.Charofpt(pt)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) = %d, want 0", pt, pos)
+	}
+
+	// Point at X = rect.Min.X + 15 (middle of 2nd char 'e') should return position 1
+	pt = image.Point{X: rect.Min.X + 15, Y: rect.Min.Y}
+	pos = f.Charofpt(pt)
+	if pos != 1 {
+		t.Errorf("Charofpt(%v) = %d, want 1", pt, pos)
+	}
+}
+
+// TestCharofptEnd tests position at and beyond the end of content.
+func TestCharofptEnd(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello" = 5 chars, total width 50px
+	f.SetContent(Plain("hello"))
+
+	// Point at X = rect.Min.X + 50 (end of last char) should return position 5
+	pt := image.Point{X: rect.Min.X + 50, Y: rect.Min.Y}
+	pos := f.Charofpt(pt)
+	if pos != 5 {
+		t.Errorf("Charofpt(%v) = %d, want 5", pt, pos)
+	}
+
+	// Point beyond end of content should return last position
+	pt = image.Point{X: rect.Min.X + 200, Y: rect.Min.Y}
+	pos = f.Charofpt(pt)
+	if pos != 5 {
+		t.Errorf("Charofpt(%v) beyond content = %d, want 5", pt, pos)
+	}
+}
+
+// TestCharofptMultiLine tests positions on different lines.
+func TestCharofptMultiLine(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "hello\nworld" = "hello" (5 chars) + newline (1 char) + "world" (5 chars)
+	f.SetContent(Plain("hello\nworld"))
+
+	// Point on second line at X = rect.Min.X should return position 6 ('w' of "world")
+	pt := image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	pos := f.Charofpt(pt)
+	if pos != 6 {
+		t.Errorf("Charofpt(%v) = %d, want 6", pt, pos)
+	}
+
+	// Point on second line at X = rect.Min.X + 25 (middle of 'r') should return position 8
+	pt = image.Point{X: rect.Min.X + 25, Y: rect.Min.Y + 14}
+	pos = f.Charofpt(pt)
+	if pos != 8 {
+		t.Errorf("Charofpt(%v) = %d, want 8", pt, pos)
+	}
+}
+
+// TestCharofptWrappedLine tests positions when text wraps to next line.
+func TestCharofptWrappedLine(t *testing.T) {
+	// Frame is 50px wide (rect from 20 to 70), font is 10px per char
+	// So 5 chars fit per line before wrapping
+	rect := image.Rect(20, 10, 70, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content: "helloworld" = 10 chars
+	// Should wrap: "hello" on line 1, "world" on line 2
+	f.SetContent(Plain("helloworld"))
+
+	// Point on second line at X = rect.Min.X should return position 5 ('w')
+	pt := image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	pos := f.Charofpt(pt)
+	if pos != 5 {
+		t.Errorf("Charofpt(%v) = %d, want 5", pt, pos)
+	}
+
+	// Point on second line at X = rect.Min.X + 25 (middle of 'r') should return position 7
+	pt = image.Point{X: rect.Min.X + 25, Y: rect.Min.Y + 14}
+	pos = f.Charofpt(pt)
+	if pos != 7 {
+		t.Errorf("Charofpt(%v) = %d, want 7", pt, pos)
+	}
+}
+
+// TestCharofptEmptyContent tests Charofpt with no content.
+func TestCharofptEmptyContent(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// No content set
+	f.SetContent(Plain(""))
+
+	// Any point in empty frame should return 0
+	pos := f.Charofpt(rect.Min)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) on empty = %d, want 0", rect.Min, pos)
+	}
+}
+
+// TestCharofptWithTab tests positions with tab characters.
+func TestCharofptWithTab(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height, tab = 8*10 = 80px
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// "a\tb" = 'a' (1 char) + tab (1 char) + 'b' (1 char)
+	// Layout: 'a' at 0-10, tab from 10-80, 'b' at 80-90
+	f.SetContent(Plain("a\tb"))
+
+	// Point at X = 5 (middle of 'a') should return position 0
+	pt := image.Point{X: 5, Y: 0}
+	pos := f.Charofpt(pt)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) = %d, want 0", pt, pos)
+	}
+
+	// Point at X = 40 (middle of tab) should return position 1
+	pt = image.Point{X: 40, Y: 0}
+	pos = f.Charofpt(pt)
+	if pos != 1 {
+		t.Errorf("Charofpt(%v) = %d, want 1", pt, pos)
+	}
+
+	// Point at X = 85 (middle of 'b') should return position 2
+	pt = image.Point{X: 85, Y: 0}
+	pos = f.Charofpt(pt)
+	if pos != 2 {
+		t.Errorf("Charofpt(%v) = %d, want 2", pt, pos)
+	}
+}
+
+// TestCharofptOutsideFrame tests points outside the frame rectangle.
+func TestCharofptOutsideFrame(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	f.SetContent(Plain("hello"))
+
+	// Point to the left of frame should return 0
+	pt := image.Point{X: 0, Y: rect.Min.Y}
+	pos := f.Charofpt(pt)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) left of frame = %d, want 0", pt, pos)
+	}
+
+	// Point above frame should return 0
+	pt = image.Point{X: rect.Min.X, Y: 0}
+	pos = f.Charofpt(pt)
+	if pos != 0 {
+		t.Errorf("Charofpt(%v) above frame = %d, want 0", pt, pos)
+	}
+}

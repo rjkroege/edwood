@@ -186,9 +186,149 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 }
 
 // Charofpt maps a screen point to a character position.
+// The point is in screen coordinates. Returns the rune offset
+// of the character at that position.
 func (f *frameImpl) Charofpt(pt image.Point) int {
-	// TODO: Implement
-	return 0
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return 0
+	}
+
+	// Calculate frame width and tab width for layout
+	frameWidth := f.rect.Dx()
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout boxes into lines
+	lines := layout(boxes, f.font, frameWidth, maxtab)
+	if len(lines) == 0 {
+		return 0
+	}
+
+	fontHeight := f.font.Height()
+
+	// Convert point to frame-relative coordinates
+	relX := pt.X - f.rect.Min.X
+	relY := pt.Y - f.rect.Min.Y
+
+	// Handle points above or to the left of frame
+	if relX < 0 {
+		relX = 0
+	}
+	if relY < 0 {
+		relY = 0
+	}
+
+	// Find which line the point is on
+	lineIdx := 0
+	for i, line := range lines {
+		// Check if point is within this line's Y range
+		lineTop := line.Y
+		lineBottom := line.Y + fontHeight
+		if relY >= lineTop && relY < lineBottom {
+			lineIdx = i
+			break
+		}
+		// If we're past this line, keep updating lineIdx
+		if relY >= lineTop {
+			lineIdx = i
+		}
+	}
+
+	// Count runes up to the target line
+	runeCount := 0
+	for i := 0; i < lineIdx; i++ {
+		for _, pb := range lines[i].Boxes {
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				runeCount++
+			} else {
+				runeCount += pb.Box.Nrune
+			}
+		}
+	}
+
+	// Now find the position within the target line
+	targetLine := lines[lineIdx]
+	for _, pb := range targetLine.Boxes {
+		boxStart := pb.X
+		boxEnd := pb.X + pb.Box.Wid
+
+		// Handle newline boxes (width 0, but still represent a character)
+		if pb.Box.IsNewline() {
+			// Point is at or after the newline position
+			if relX >= boxStart {
+				runeCount++
+			}
+			continue
+		}
+
+		// Handle tab boxes
+		if pb.Box.IsTab() {
+			if relX >= boxEnd {
+				// Point is past this tab
+				runeCount++
+				continue
+			}
+			if relX >= boxStart {
+				// Point is within the tab
+				return runeCount
+			}
+			// Point is before this box
+			return runeCount
+		}
+
+		// Handle text boxes
+		if relX >= boxEnd {
+			// Point is past this box
+			runeCount += pb.Box.Nrune
+			continue
+		}
+
+		if relX >= boxStart {
+			// Point is within this box - find which character
+			localX := relX - boxStart
+			return runeCount + f.runeAtX(pb.Box.Text, pb.Box.Style, localX)
+		}
+
+		// Point is before this box (shouldn't normally happen
+		// since boxes are laid out left to right)
+		return runeCount
+	}
+
+	// Point is past all content on this line
+	return runeCount
+}
+
+// runeAtX finds which rune in text corresponds to pixel offset x.
+// Returns the rune index (0-based) within the text.
+func (f *frameImpl) runeAtX(text []byte, style Style, x int) int {
+	font := f.fontForStyle(style)
+	cumWidth := 0
+	runeIdx := 0
+
+	for i := 0; i < len(text); {
+		_, runeLen := utf8.DecodeRune(text[i:])
+		runeWidth := font.BytesWidth(text[i : i+runeLen])
+
+		// Check if x falls within this rune
+		// We use midpoint - if x is in the first half, return current index
+		// if in second half, return next index
+		if cumWidth+runeWidth > x {
+			// x is within this rune's span
+			midpoint := cumWidth + runeWidth/2
+			if x < midpoint {
+				return runeIdx
+			}
+			return runeIdx
+		}
+
+		cumWidth += runeWidth
+		runeIdx++
+		i += runeLen
+	}
+
+	// x is past all runes
+	return runeIdx
 }
 
 // Select handles mouse selection.
