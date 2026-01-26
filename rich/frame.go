@@ -23,6 +23,7 @@ type Frame interface {
 
 	// Geometry
 	Rect() image.Rectangle
+	SetRect(r image.Rectangle)   // Update the frame's rectangle
 	Ptofchar(p int) image.Point  // Character position → screen point
 	Charofpt(pt image.Point) int // Screen point → character position
 
@@ -97,6 +98,14 @@ func (f *frameImpl) SetContent(c Content) {
 // Rect returns the frame's rectangle.
 func (f *frameImpl) Rect() image.Rectangle {
 	return f.rect
+}
+
+// SetRect updates the frame's rectangle.
+// This is used when the frame needs to be resized without full re-initialization.
+// Subsequent calls to layout-dependent methods (TotalLines, Redraw, etc.)
+// will use the new rectangle dimensions.
+func (f *frameImpl) SetRect(r image.Rectangle) {
+	f.rect = r
 }
 
 // Ptofchar maps a character position to a screen point.

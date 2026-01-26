@@ -2069,3 +2069,123 @@ func TestHorizontalRuleFullWidth(t *testing.T) {
 		t.Errorf("Horizontal rule line should span full frame width (500px)\ngot ops: %v", ops)
 	}
 }
+
+// TestFrameSetRect verifies that SetRect() updates the frame's rectangle.
+func TestFrameSetRect(t *testing.T) {
+	// Create a frame with an initial rectangle
+	initialRect := image.Rect(10, 20, 200, 300)
+	display := edwoodtest.NewDisplay(initialRect)
+
+	f := NewFrame()
+	f.Init(initialRect, WithDisplay(display))
+
+	// Verify initial rect
+	if got := f.Rect(); got != initialRect {
+		t.Errorf("Initial Rect() = %v, want %v", got, initialRect)
+	}
+
+	// Set a new rectangle
+	newRect := image.Rect(0, 0, 400, 500)
+	f.SetRect(newRect)
+
+	// Verify rect was updated
+	if got := f.Rect(); got != newRect {
+		t.Errorf("After SetRect(), Rect() = %v, want %v", got, newRect)
+	}
+}
+
+// TestFrameSetRectNoChange verifies that SetRect() with same rectangle is a no-op.
+func TestFrameSetRectNoChange(t *testing.T) {
+	rect := image.Rect(10, 20, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display))
+
+	// Set the same rectangle
+	f.SetRect(rect)
+
+	// Verify rect is unchanged
+	if got := f.Rect(); got != rect {
+		t.Errorf("Rect() = %v, want %v", got, rect)
+	}
+}
+
+// TestFrameSetRectRelayout verifies that layout uses the new width after SetRect().
+// When the rectangle width changes, text wrapping should adapt accordingly.
+func TestFrameSetRectRelayout(t *testing.T) {
+	// Start with a narrow frame where "hello world" will wrap
+	narrowRect := image.Rect(0, 0, 60, 200) // Only ~6 chars wide with mock font
+	display := edwoodtest.NewDisplay(narrowRect)
+	font := edwoodtest.NewFont(10, 14) // 10px per character
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(narrowRect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content that won't fit on one line at narrow width
+	f.SetContent(Plain("hello world"))
+
+	// Count visible lines at narrow width
+	narrowLines := f.TotalLines()
+	if narrowLines < 2 {
+		t.Logf("Expected multiple lines at narrow width, got %d", narrowLines)
+	}
+
+	// Now widen the frame so everything fits on one line
+	wideRect := image.Rect(0, 0, 200, 200) // Wide enough for "hello world"
+	f.SetRect(wideRect)
+
+	// After SetRect, TotalLines() should use the new width
+	wideLines := f.TotalLines()
+
+	// At 200px wide with 10px per char, "hello world" (11 chars = 110px) should fit
+	if wideLines != 1 {
+		t.Errorf("After SetRect to wider frame, TotalLines() = %d, want 1 (text should fit on one line)", wideLines)
+	}
+
+	// Verify Rect() returns the new rectangle
+	if got := f.Rect(); got != wideRect {
+		t.Errorf("Rect() = %v, want %v", got, wideRect)
+	}
+}
+
+// TestFrameSetRectRedraw verifies that Redraw() uses the new rectangle after SetRect().
+func TestFrameSetRectRedraw(t *testing.T) {
+	initialRect := image.Rect(0, 0, 100, 100)
+	display := edwoodtest.NewDisplay(initialRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(initialRect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+	f.SetContent(Plain("test"))
+
+	// Change to a new rectangle
+	newRect := image.Rect(50, 50, 300, 400)
+	f.SetRect(newRect)
+
+	// Clear draw ops and redraw
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	// Verify the background fill uses the new rectangle
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	expectedFill := fmt.Sprintf("fill %s", newRect)
+	foundNewRect := false
+	for _, op := range ops {
+		if strings.HasPrefix(op, expectedFill) {
+			foundNewRect = true
+			break
+		}
+	}
+
+	if !foundNewRect {
+		t.Errorf("Redraw() should fill new rectangle %v\ngot ops: %v", newRect, ops)
+	}
+}
