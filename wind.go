@@ -68,6 +68,7 @@ type Window struct {
 	previewMode      bool                // true when showing rendered markdown preview
 	richBody         *RichText           // rich text renderer for preview mode
 	previewSourceMap *markdown.SourceMap // maps rendered positions to source positions
+	previewLinkMap   *markdown.LinkMap   // maps rendered positions to link URLs
 }
 
 var (
@@ -723,6 +724,17 @@ func (w *Window) PreviewSourceMap() *markdown.SourceMap {
 	return w.previewSourceMap
 }
 
+// SetPreviewLinkMap sets the link map used for mapping rendered positions
+// to link URLs when in preview mode.
+func (w *Window) SetPreviewLinkMap(lm *markdown.LinkMap) {
+	w.previewLinkMap = lm
+}
+
+// PreviewLinkMap returns the current link map, or nil if not set.
+func (w *Window) PreviewLinkMap() *markdown.LinkMap {
+	return w.previewLinkMap
+}
+
 // UpdatePreview updates the preview content from the body buffer.
 // This should be called when the body buffer changes and the window is in preview mode.
 // It re-parses the markdown and updates the richBody, preserving the scroll position.
@@ -737,12 +749,13 @@ func (w *Window) UpdatePreview() {
 	// Read the current body content
 	bodyContent := w.body.file.String()
 
-	// Parse the markdown with source map
-	content, sourceMap := markdown.ParseWithSourceMap(bodyContent)
+	// Parse the markdown with source map and link map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(bodyContent)
 
 	// Update the rich body content
 	w.richBody.SetContent(content)
 	w.previewSourceMap = sourceMap
+	w.previewLinkMap = linkMap
 
 	// Try to restore the scroll position
 	// Clamp to the new content length if necessary

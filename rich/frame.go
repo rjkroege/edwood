@@ -115,7 +115,7 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
 	if len(lines) == 0 {
 		return f.rect.Min
 	}
@@ -201,12 +201,10 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
 	if len(lines) == 0 {
 		return 0
 	}
-
-	fontHeight := f.font.Height()
 
 	// Convert point to frame-relative coordinates
 	relX := pt.X - f.rect.Min.X
@@ -225,7 +223,7 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 	for i, line := range lines {
 		// Check if point is within this line's Y range
 		lineTop := line.Y
-		lineBottom := line.Y + fontHeight
+		lineBottom := line.Y + line.Height
 		if relY >= lineTop && relY < lineBottom {
 			lineIdx = i
 			break
@@ -497,11 +495,11 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 
 	// If origin is 0, just return the normal layout
 	if f.origin == 0 {
-		return layout(boxes, f.font, frameWidth, maxtab), 0
+		return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle), 0
 	}
 
 	// Layout all boxes first
-	allLines := layout(boxes, f.font, frameWidth, maxtab)
+	allLines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
 	if len(allLines) == 0 {
 		return nil, 0
 	}
@@ -568,12 +566,11 @@ func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
 	if len(lines) == 0 {
 		return
 	}
 
-	fontHeight := f.font.Height()
 	p0, p1 := f.p0, f.p1
 	if p0 > p1 {
 		p0, p1 = p1, p0
@@ -664,7 +661,7 @@ func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
 				f.rect.Min.X+selStartX,
 				f.rect.Min.Y+line.Y,
 				f.rect.Min.X+selEndX,
-				f.rect.Min.Y+line.Y+fontHeight,
+				f.rect.Min.Y+line.Y+line.Height,
 			)
 			screen.Draw(selRect, f.selectionColor, f.selectionColor, image.ZP)
 		}
@@ -710,6 +707,12 @@ func (f *frameImpl) allocColorImage(c color.Color) edwooddraw.Image {
 // A frame is full when more content is visible than can fit in the frame.
 func (f *frameImpl) Full() bool {
 	return f.VisibleLines() > f.MaxLines()
+}
+
+// fontHeightForStyle returns the font height for a given style.
+// This is used by the layout algorithm to calculate line heights.
+func (f *frameImpl) fontHeightForStyle(style Style) int {
+	return f.fontForStyle(style).Height()
 }
 
 // fontForStyle returns the appropriate font for the given style.

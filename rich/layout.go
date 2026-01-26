@@ -106,8 +106,9 @@ func tabBoxWidth(box *Box, xPos, minX, maxtab int) int {
 // Line represents a line of positioned boxes in the layout.
 // This is the output of the layout algorithm.
 type Line struct {
-	Boxes []PositionedBox // Boxes on this line
-	Y     int             // Y position of the line (top)
+	Boxes  []PositionedBox // Boxes on this line
+	Y      int             // Y position of the line (top)
+	Height int             // Height of this line (max font height of boxes)
 }
 
 // PositionedBox is a Box with its computed screen position.
@@ -116,22 +117,42 @@ type PositionedBox struct {
 	X   int // X position on screen
 }
 
+// FontHeightFunc returns the font height for a given style.
+type FontHeightFunc func(style Style) int
+
 // layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
 // It computes the Wid field for each box and assigns X/Y positions.
 // The returned Lines contain positioned boxes ready for rendering.
-func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
+// If fontHeightFn is nil, the default font height is used for all lines.
+func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc) []Line {
 	if len(boxes) == 0 {
 		return nil
 	}
 
-	fontHeight := font.Height()
+	defaultFontHeight := font.Height()
+
+	// Helper to get font height for a style
+	getFontHeight := func(style Style) int {
+		if fontHeightFn != nil {
+			return fontHeightFn(style)
+		}
+		return defaultFontHeight
+	}
+
 	var lines []Line
 	var currentLine Line
 	currentLine.Y = 0
+	currentLine.Height = defaultFontHeight
 	xPos := 0
 
 	for i := range boxes {
 		box := &boxes[i]
+
+		// Update line height if this box uses a taller font
+		boxHeight := getFontHeight(box.Style)
+		if boxHeight > currentLine.Height {
+			currentLine.Height = boxHeight
+		}
 
 		// Handle newlines - they end the current line and start a new one
 		if box.IsNewline() {
@@ -142,9 +163,10 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
 			})
 			lines = append(lines, currentLine)
 
-			// Start new line
+			// Start new line - use previous line's height for Y offset
 			currentLine = Line{
-				Y: currentLine.Y + fontHeight,
+				Y:      currentLine.Y + currentLine.Height,
+				Height: defaultFontHeight,
 			}
 			xPos = 0
 			continue
@@ -168,7 +190,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
 				// Box fits on new line, start new line
 				lines = append(lines, currentLine)
 				currentLine = Line{
-					Y: currentLine.Y + fontHeight,
+					Y:      currentLine.Y + currentLine.Height,
+					Height: defaultFontHeight,
 				}
 				xPos = 0
 
@@ -178,12 +201,12 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
 				}
 			} else {
 				// Box is wider than frame, need to split it
-				lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, fontHeight)
+				lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight)
 				continue
 			}
 		} else if xPos == 0 && width > frameWidth {
 			// Box is at start of line but still too wide - split it
-			lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, fontHeight)
+			lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight)
 			continue
 		}
 
@@ -212,7 +235,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int) []Line {
 
 // splitBoxAcrossLines splits a text box that's too wide to fit on a single line.
 // It creates multiple boxes, each fitting within frameWidth.
-func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, font draw.Font, frameWidth, fontHeight int) ([]Line, Line, int) {
+func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, font draw.Font, frameWidth, defaultFontHeight int, fontHeightFn func(Style) int) ([]Line, Line, int) {
 	// Tabs and newlines should never need splitting
 	if box.IsTab() || box.IsNewline() {
 		box.Wid = 0
@@ -226,6 +249,15 @@ func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, font draw.Fon
 	text := box.Text
 	style := box.Style
 	xPos := 0
+
+	// Get font height for this box's style
+	boxHeight := defaultFontHeight
+	if fontHeightFn != nil {
+		boxHeight = fontHeightFn(style)
+	}
+	if boxHeight > currentLine.Height {
+		currentLine.Height = boxHeight
+	}
 
 	for len(text) > 0 {
 		// Find how many bytes fit on this line
@@ -259,7 +291,8 @@ func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, font draw.Fon
 			// More text remaining, start a new line
 			lines = append(lines, currentLine)
 			currentLine = Line{
-				Y: currentLine.Y + fontHeight,
+				Y:      currentLine.Y + currentLine.Height,
+				Height: boxHeight, // New line continues with same style
 			}
 			xPos = 0
 		}

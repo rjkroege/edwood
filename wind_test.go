@@ -422,7 +422,7 @@ func TestPreviewSnarf(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -501,7 +501,7 @@ func TestPreviewSnarfBold(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -587,7 +587,7 @@ func TestPreviewSnarfHeading(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -824,7 +824,7 @@ func TestPreviewCommandEnter(t *testing.T) {
 	)
 
 	// Parse markdown with source map
-	content, sourceMap := markdown.ParseWithSourceMap(markdownContent)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(markdownContent)
 	rt.SetContent(content)
 
 	// Assign the richBody and source map to the window
@@ -916,7 +916,7 @@ func TestPreviewCommandExit(t *testing.T) {
 		WithRichTextColor(textImage),
 	)
 
-	content, sourceMap := markdown.ParseWithSourceMap(markdownContent)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(markdownContent)
 	rt.SetContent(content)
 
 	w.richBody = rt
@@ -1013,7 +1013,7 @@ func TestPreviewLiveUpdate(t *testing.T) {
 	)
 
 	// Parse initial markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
 	rt.SetContent(content)
 
 	w.richBody = rt
@@ -1105,7 +1105,7 @@ func TestPreviewLiveUpdatePreservesScroll(t *testing.T) {
 	)
 
 	// Parse initial markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
 	rt.SetContent(content)
 
 	w.richBody = rt
@@ -1181,7 +1181,7 @@ func TestPreviewLiveUpdateMultipleTimes(t *testing.T) {
 	)
 
 	// Parse initial markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(initialMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
 	rt.SetContent(content)
 
 	w.richBody = rt
@@ -1261,7 +1261,7 @@ func TestPreviewLook(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -1374,7 +1374,7 @@ func TestPreviewExec(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -1490,7 +1490,7 @@ func TestPreviewLookExpand(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -1558,7 +1558,7 @@ func TestPreviewKeyScroll(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -1678,7 +1678,7 @@ func TestPreviewKeyIgnoresTyping(t *testing.T) {
 	)
 
 	// Parse markdown and set content with source map
-	content, sourceMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
 	rt.SetContent(content)
 
 	// Assign the richBody to the window and enable preview mode
@@ -1733,5 +1733,131 @@ func TestPreviewKeyIgnoresTyping(t *testing.T) {
 	}
 	if w.IsPreviewMode() {
 		t.Error("Escape key should exit preview mode")
+	}
+}
+
+// TestWindowPreviewLinkMap tests that a Window stores the LinkMap when entering preview mode.
+// The LinkMap is populated by ParseWithSourceMap and allows the window to identify links
+// at rendered text positions (used for Look action on links).
+func TestWindowPreviewLinkMap(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown with links
+	sourceMarkdown := "Check out [Google](https://google.com) and [GitHub](https://github.com) for more info."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/links.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown with source map and link map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Initially, link map should not be set on window
+	if w.PreviewLinkMap() != nil {
+		t.Error("PreviewLinkMap should be nil initially")
+	}
+
+	// Assign the richBody to the window and set both source and link maps
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verify link map is set
+	if w.PreviewLinkMap() == nil {
+		t.Fatal("PreviewLinkMap should not be nil after SetPreviewLinkMap")
+	}
+
+	// Verify the link map matches what we set
+	if w.PreviewLinkMap() != linkMap {
+		t.Error("PreviewLinkMap should return the same link map that was set")
+	}
+
+	// Verify the link map has the correct links
+	// The rendered text will be: "Check out Google and GitHub for more info."
+	// "Google" is at positions 10-16, "GitHub" is at positions 21-27
+
+	// Find "Google" in rendered text and verify it maps to the correct URL
+	plainText := content.Plain()
+	googleIdx := -1
+	for i := 0; i < len(plainText)-5; i++ {
+		if string(plainText[i:i+6]) == "Google" {
+			googleIdx = i
+			break
+		}
+	}
+	if googleIdx < 0 {
+		t.Fatal("Could not find 'Google' in rendered text")
+	}
+
+	// Check URL at Google's position
+	url := linkMap.URLAt(googleIdx)
+	if url != "https://google.com" {
+		t.Errorf("URLAt(Google) = %q, want %q", url, "https://google.com")
+	}
+
+	// Find "GitHub" in rendered text
+	githubIdx := -1
+	for i := 0; i < len(plainText)-5; i++ {
+		if string(plainText[i:i+6]) == "GitHub" {
+			githubIdx = i
+			break
+		}
+	}
+	if githubIdx < 0 {
+		t.Fatal("Could not find 'GitHub' in rendered text")
+	}
+
+	// Check URL at GitHub's position
+	url = linkMap.URLAt(githubIdx)
+	if url != "https://github.com" {
+		t.Errorf("URLAt(GitHub) = %q, want %q", url, "https://github.com")
+	}
+
+	// Check that non-link text doesn't return a URL
+	// "Check" is at position 0, which is not a link
+	url = linkMap.URLAt(0)
+	if url != "" {
+		t.Errorf("URLAt(0) should be empty for non-link text, got %q", url)
+	}
+
+	// Verify that exiting preview mode preserves the link map
+	w.SetPreviewMode(false)
+	if w.PreviewLinkMap() == nil {
+		t.Error("PreviewLinkMap should be preserved after exiting preview mode")
+	}
+
+	// Re-entering preview should still have the link map
+	w.SetPreviewMode(true)
+	if w.PreviewLinkMap() != linkMap {
+		t.Error("PreviewLinkMap should still be the same after re-entering preview mode")
 	}
 }

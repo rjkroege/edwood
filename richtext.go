@@ -23,6 +23,14 @@ type RichText struct {
 	background draw.Image
 	textColor  draw.Image
 
+	// Font variants for styled text
+	boldFont       draw.Font
+	italicFont     draw.Font
+	boldItalicFont draw.Font
+
+	// Scaled fonts for headings (key is scale factor)
+	scaledFonts map[float64]draw.Font
+
 	// Scrollbar colors
 	scrollBg    draw.Image // Scrollbar background color
 	scrollThumb draw.Image // Scrollbar thumb color
@@ -75,6 +83,18 @@ func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font
 	}
 	if rt.textColor != nil {
 		frameOpts = append(frameOpts, rich.WithTextColor(rt.textColor))
+	}
+	if rt.boldFont != nil {
+		frameOpts = append(frameOpts, rich.WithBoldFont(rt.boldFont))
+	}
+	if rt.italicFont != nil {
+		frameOpts = append(frameOpts, rich.WithItalicFont(rt.italicFont))
+	}
+	if rt.boldItalicFont != nil {
+		frameOpts = append(frameOpts, rich.WithBoldItalicFont(rt.boldItalicFont))
+	}
+	for scale, f := range rt.scaledFonts {
+		frameOpts = append(frameOpts, rich.WithScaledFont(scale, f))
 	}
 
 	rt.frame.Init(frameRect, frameOpts...)
@@ -449,6 +469,37 @@ func WithScrollbarColors(bg, thumb draw.Image) RichTextOption {
 	return func(rt *RichText) {
 		rt.scrollBg = bg
 		rt.scrollThumb = thumb
+	}
+}
+
+// WithRichTextBoldFont sets the bold font variant for the RichText frame.
+func WithRichTextBoldFont(f draw.Font) RichTextOption {
+	return func(rt *RichText) {
+		rt.boldFont = f
+	}
+}
+
+// WithRichTextItalicFont sets the italic font variant for the RichText frame.
+func WithRichTextItalicFont(f draw.Font) RichTextOption {
+	return func(rt *RichText) {
+		rt.italicFont = f
+	}
+}
+
+// WithRichTextBoldItalicFont sets the bold-italic font variant for the RichText frame.
+func WithRichTextBoldItalicFont(f draw.Font) RichTextOption {
+	return func(rt *RichText) {
+		rt.boldItalicFont = f
+	}
+}
+
+// WithRichTextScaledFont sets a scaled font for a specific scale factor (e.g., 2.0 for H1).
+func WithRichTextScaledFont(scale float64, f draw.Font) RichTextOption {
+	return func(rt *RichText) {
+		if rt.scaledFonts == nil {
+			rt.scaledFonts = make(map[float64]draw.Font)
+		}
+		rt.scaledFonts[scale] = f
 	}
 }
 

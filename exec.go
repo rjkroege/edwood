@@ -1166,8 +1166,16 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Get the body rectangle for the rich text renderer
 	bodyRect := w.body.all
 
-	// Get the font
+	// Get the font and font variants for styled text
 	font := fontget(global.tagfont, display)
+	boldFont := tryLoadFontVariant(display, global.tagfont, "bold")
+	italicFont := tryLoadFontVariant(display, global.tagfont, "italic")
+	boldItalicFont := tryLoadFontVariant(display, global.tagfont, "bolditalic")
+
+	// Get scaled fonts for headings (H1=2.0, H2=1.5, H3=1.25)
+	h1Font := tryLoadScaledFont(display, global.tagfont, 2.0)
+	h2Font := tryLoadScaledFont(display, global.tagfont, 1.5)
+	h3Font := tryLoadScaledFont(display, global.tagfont, 1.25)
 
 	// Create or reinitialize the rich text renderer
 	rt := NewRichText()
@@ -1184,20 +1192,42 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		return
 	}
 
-	rt.Init(bodyRect, display, font,
+	// Build RichText options
+	rtOpts := []RichTextOption{
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(global.textcolors[frame.ColBord], global.textcolors[frame.ColBack]),
-	)
+	}
+	if boldFont != nil {
+		rtOpts = append(rtOpts, WithRichTextBoldFont(boldFont))
+	}
+	if italicFont != nil {
+		rtOpts = append(rtOpts, WithRichTextItalicFont(italicFont))
+	}
+	if boldItalicFont != nil {
+		rtOpts = append(rtOpts, WithRichTextBoldItalicFont(boldItalicFont))
+	}
+	if h1Font != nil {
+		rtOpts = append(rtOpts, WithRichTextScaledFont(2.0, h1Font))
+	}
+	if h2Font != nil {
+		rtOpts = append(rtOpts, WithRichTextScaledFont(1.5, h2Font))
+	}
+	if h3Font != nil {
+		rtOpts = append(rtOpts, WithRichTextScaledFont(1.25, h3Font))
+	}
 
-	// Parse the markdown content with source mapping
+	rt.Init(bodyRect, display, font, rtOpts...)
+
+	// Parse the markdown content with source mapping and link tracking
 	mdContent := t.file.String()
-	content, sourceMap := markdown.ParseWithSourceMap(mdContent)
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(mdContent)
 	rt.SetContent(content)
 
 	// Set up the window's preview components
 	w.richBody = rt
 	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
 
 	// Enter preview mode
 	w.SetPreviewMode(true)

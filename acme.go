@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"image"
 	"log"
 	"os"
@@ -244,6 +245,55 @@ func tryLoadFontVariant(display draw.Display, baseFont, variant string) draw.Fon
 				}
 			}
 			return nil
+		}
+	}
+
+	return nil
+}
+
+// tryLoadScaledFont attempts to load a font at a scaled size.
+// Given a base font path like /mnt/font/GoRegular/16a/font, it extracts the size,
+// multiplies by scale, and tries to load that size.
+// Returns nil if the font cannot be loaded.
+func tryLoadScaledFont(display draw.Display, baseFont string, scale float64) draw.Font {
+	if baseFont == "" || scale == 1.0 {
+		return nil
+	}
+
+	// Parse font path to find size component
+	// Expected format: /mnt/font/Family/SIZEa/font
+	parts := strings.Split(baseFont, "/")
+	if len(parts) < 3 {
+		return nil
+	}
+
+	// Find the size component (e.g., "16a")
+	for i, part := range parts {
+		if len(part) >= 2 && part[len(part)-1] == 'a' {
+			sizeStr := part[:len(part)-1]
+			size := 0
+			for _, c := range sizeStr {
+				if c >= '0' && c <= '9' {
+					size = size*10 + int(c-'0')
+				} else {
+					size = 0
+					break
+				}
+			}
+			if size > 0 {
+				// Calculate new size
+				newSize := int(float64(size)*scale + 0.5)
+				if newSize < 8 {
+					newSize = 8 // minimum size
+				}
+				newSizeStr := fmt.Sprintf("%da", newSize)
+				parts[i] = newSizeStr
+				newPath := strings.Join(parts, "/")
+				f, err := display.OpenFont(newPath)
+				if err == nil {
+					return f
+				}
+			}
 		}
 	}
 
