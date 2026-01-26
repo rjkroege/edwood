@@ -20,6 +20,7 @@ import (
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/markdown"
+	"github.com/rjkroege/edwood/rich"
 )
 
 type Exectab struct {
@@ -75,7 +76,7 @@ var globalexectab = []Exectab{
 	{"New", newx, false, true /*unused*/, true /*unused*/},
 	{"Newcol", newcol, false, true /*unused*/, true /*unused*/},
 	{"Paste", paste, true, true, true /*unused*/},
-	{"Preview", previewcmd, false, true /*unused*/, true /*unused*/},
+	{"Markdeep", previewcmd, false, true /*unused*/, true /*unused*/},
 	{"Put", put, false, true /*unused*/, true /*unused*/},
 	{"Putall", putall, false, true /*unused*/, true /*unused*/},
 	{"Redo", undo, false, false, true /*unused*/},
@@ -1135,18 +1136,23 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Get the file name
 	name := t.file.Name()
 	if name == "" {
-		warning(nil, "Preview: no file name\n")
+		warning(nil, "Markdeep: no file name\n")
 		return
 	}
 
 	// Check if it's a markdown file
 	if !strings.HasSuffix(strings.ToLower(name), ".md") {
-		warning(nil, "Preview: %s is not a markdown file\n", name)
+		warning(nil, "Markdeep: %s is not a markdown file\n", name)
 		return
 	}
 
 	// If already in preview mode, toggle it off
 	if w.IsPreviewMode() {
+		// Clean up image cache before exiting preview mode
+		if w.imageCache != nil {
+			w.imageCache.Clear()
+			w.imageCache = nil
+		}
 		w.SetPreviewMode(false)
 		// Redraw to show the original body text
 		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
@@ -1184,12 +1190,12 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Allocate colors for the preview
 	bgImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
 	if err != nil {
-		warning(nil, "Preview: failed to allocate background: %v\n", err)
+		warning(nil, "Markdeep: failed to allocate background: %v\n", err)
 		return
 	}
 	textImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
 	if err != nil {
-		warning(nil, "Preview: failed to allocate text color: %v\n", err)
+		warning(nil, "Markdeep: failed to allocate text color: %v\n", err)
 		return
 	}
 
@@ -1229,10 +1235,16 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 
 	rt.SetContent(content)
 
+	// Set the scroll origin to match the text body's current position
+	rt.SetOrigin(w.body.org)
+
 	// Set up the window's preview components
 	w.richBody = rt
 	w.SetPreviewSourceMap(sourceMap)
 	w.SetPreviewLinkMap(linkMap)
+
+	// Initialize the image cache for loading images in the markdown
+	w.imageCache = rich.NewImageCache(0) // 0 means use default size
 
 	// Enter preview mode
 	w.SetPreviewMode(true)

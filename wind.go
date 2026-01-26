@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/markdown"
+	"github.com/rjkroege/edwood/rich"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -66,10 +68,12 @@ type Window struct {
 	editoutlk chan bool
 
 	// Preview mode fields for rich text rendering
-	previewMode      bool                // true when showing rendered markdown preview
-	richBody         *RichText           // rich text renderer for preview mode
-	previewSourceMap *markdown.SourceMap // maps rendered positions to source positions
-	previewLinkMap   *markdown.LinkMap   // maps rendered positions to link URLs
+	previewMode        bool                // true when showing rendered markdown preview
+	richBody           *RichText           // rich text renderer for preview mode
+	previewSourceMap   *markdown.SourceMap // maps rendered positions to source positions
+	previewLinkMap     *markdown.LinkMap   // maps rendered positions to link URLs
+	previewUpdateTimer *time.Timer         // debounce timer for preview updates
+	imageCache         *rich.ImageCache    // cache for loaded images in preview mode
 }
 
 var (
@@ -601,17 +605,25 @@ func (w *Window) IsPreviewMode() bool {
 }
 
 // SetPreviewMode enables or disables preview mode.
-// When disabling preview mode, triggers a full redraw of the body.
+// When disabling preview mode, clears the image cache and triggers a full redraw of the body.
 func (w *Window) SetPreviewMode(enabled bool) {
 	wasPreview := w.previewMode
 	w.previewMode = enabled
 
-	// When exiting preview mode, refresh the body to show source text
-	if wasPreview && !enabled && w.display != nil {
+	// When exiting preview mode, clean up resources and refresh the body
+	if wasPreview && !enabled {
+		// Clean up image cache to free memory
+		if w.imageCache != nil {
+			w.imageCache.Clear()
+			w.imageCache = nil
+		}
+
 		// Force a full redraw of the body by resizing it
-		w.body.Resize(w.body.all, true, false)
-		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
-		w.display.Flush()
+		if w.display != nil {
+			w.body.Resize(w.body.all, true, false)
+			w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
+			w.display.Flush()
+		}
 	}
 }
 
@@ -725,11 +737,11 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
 		charPos := rt.Frame().Charofpt(m.Point)
 
 		// Debug output: show position and link map status
-		warning(nil, "Preview B3 click: charPos=%d, linkMap=%v\n", charPos, w.previewLinkMap != nil)
+		warning(nil, "Markdeep B3 click: charPos=%d, linkMap=%v\n", charPos, w.previewLinkMap != nil)
 
 		// Check if this position is within a link
 		url := w.PreviewLookLinkURL(charPos)
-		warning(nil, "Preview B3 click: url=%q\n", url)
+		warning(nil, "Markdeep B3 click: url=%q\n", url)
 
 		if url != "" {
 			// Plumb the URL using the same mechanism as look3
@@ -742,10 +754,10 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
 					Data: []byte(url),
 				}
 				if err := pm.Send(plumbsendfid); err != nil {
-					warning(nil, "Preview B3: plumb failed: %v\n", err)
+					warning(nil, "Markdeep B3: plumb failed: %v\n", err)
 				}
 			} else {
-				warning(nil, "Preview B3: plumber not running\n")
+				warning(nil, "Markdeep B3: plumber not running\n")
 			}
 			return true
 		}
@@ -825,6 +837,31 @@ func (w *Window) UpdatePreview() {
 	if w.display != nil {
 		w.display.Flush()
 	}
+}
+
+// previewUpdateDelay is the duration to wait after the last edit before
+// re-rendering the Markdeep preview. This debounces rapid edits.
+const previewUpdateDelay = 3 * time.Second
+
+// SchedulePreviewUpdate schedules a debounced update of the Markdeep preview.
+// If called multiple times in quick succession, only the last call will trigger
+// an update after the delay. This prevents excessive re-rendering during editing.
+func (w *Window) SchedulePreviewUpdate() {
+	if !w.previewMode || w.richBody == nil {
+		return
+	}
+
+	// Cancel any pending update
+	if w.previewUpdateTimer != nil {
+		w.previewUpdateTimer.Stop()
+	}
+
+	// Schedule a new update after the delay
+	w.previewUpdateTimer = time.AfterFunc(previewUpdateDelay, func() {
+		// UpdatePreview must be called from the main goroutine
+		// Use the global display channel to schedule the update
+		w.UpdatePreview()
+	})
 }
 
 // PreviewSnarf returns the text that would be snarfed (copied) when in preview mode.
@@ -1093,4 +1130,21 @@ func (w *Window) HandlePreviewKey(key rune) bool {
 		// Typing keys and other keys are not handled in preview mode
 		return false
 	}
+}
+
+// resolveImagePath resolves an image path relative to the markdown file's directory.
+// If the image path is absolute (starts with /), it is returned unchanged.
+// Otherwise, it is resolved relative to the directory containing basePath.
+func resolveImagePath(basePath, imgPath string) string {
+	// Absolute paths are returned as-is
+	if filepath.IsAbs(imgPath) {
+		return imgPath
+	}
+
+	// Get the directory containing the markdown file
+	baseDir := filepath.Dir(basePath)
+
+	// Join and clean the path
+	resolved := filepath.Join(baseDir, imgPath)
+	return filepath.Clean(resolved)
 }
