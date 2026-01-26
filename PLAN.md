@@ -564,58 +564,58 @@ See `docs/codeblock-design.md` for full design.
 ### 13.1 Background Rendering Infrastructure
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestDrawBoxBackground, TestDrawBoxBackgroundMultiple |
-| Code written | [ ] | Enable `Style.Bg` rendering in `drawText()` for individual boxes |
-| Tests pass | [ ] | go test ./rich/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestDrawBoxBackground, TestDrawBoxBackgroundMultiple |
+| Code written | [x] | Enable `Style.Bg` rendering in `drawText()` for individual boxes |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit bf4ff87 |
 
 ### 13.2 Code Font Selection
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestCodeFontSelection, TestCodeFontFallback |
-| Code written | [ ] | `fontForStyle()` checks `Style.Code`, add `WithCodeFont()` option |
-| Tests pass | [ ] | go test ./rich/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestCodeFontSelection, TestCodeFontFallback |
+| Code written | [x] | `fontForStyle()` checks `Style.Code`, add `WithCodeFont()` option |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 5c86397 |
 
 ### 13.3 Inline Code Background
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestInlineCodeBackground, TestInlineCodeWithSurroundingText |
-| Code written | [ ] | Parser sets `Style.Bg` for inline code spans |
-| Tests pass | [ ] | go test ./markdown/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestInlineCodeBackground, TestInlineCodeWithSurroundingText |
+| Code written | [x] | Parser sets `Style.Bg` to `rich.InlineCodeBg` (light gray) for inline code spans |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit e060b44 |
 
 ### 13.4 Parse Fenced Code Blocks
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestParseFencedCodeBlock, TestParseFencedCodeBlockWithLanguage, TestParseFencedCodeBlockPreservesWhitespace |
-| Code written | [ ] | Detect ` ``` ` lines, emit code-styled spans, handle multi-line |
-| Tests pass | [ ] | go test ./markdown/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestParseFencedCodeBlock, TestParseFencedCodeBlockWithLanguage, TestParseFencedCodeBlockPreservesWhitespace, TestParseFencedCodeBlockHasBackground |
+| Code written | [x] | Detect ` ``` ` lines, emit code-styled spans, handle multi-line |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 7add578 |
 
 ### 13.5 Fenced Code Block Source Mapping
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestFencedCodeBlockSourceMap |
-| Code written | [ ] | SourceMap correctly maps rendered code to source (excluding fence lines) |
-| Tests pass | [ ] | go test ./markdown/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestFencedCodeBlockSourceMap |
+| Code written | [x] | SourceMap correctly maps rendered code to source (excluding fence lines) |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit c2fa25d |
 
 ### 13.6 Block-Level Background Rendering
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestDrawBlockBackground, TestDrawBlockBackgroundMultiLine |
-| Code written | [ ] | BlockRegion type, full-width background for fenced code blocks |
-| Tests pass | [ ] | go test ./rich/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestDrawBlockBackground, TestDrawBlockBackgroundMultiLine added. Style.Block field added. |
+| Code written | [x] | drawBlockBackground() for full-width backgrounds when Style.Block=true |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 94711b4 |
 
 ### 13.7 Wire Code Font in Preview
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | N/A - integration |
-| Code written | [ ] | Load monospace font, pass via `WithCodeFont()` to preview frame |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | N/A - integration |
+| Code written | [x] | Load monospace font, pass via `WithCodeFont()` to preview frame |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 94dea68 |
 
 ### 13.8 Code Block Visual Verification
 | Stage | Status | Notes |
