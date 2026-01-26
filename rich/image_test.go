@@ -1433,3 +1433,121 @@ func (f *testFont) Height() int              { return f.height }
 func (f *testFont) BytesWidth(b []byte) int  { return f.width * len(b) }
 func (f *testFont) RunesWidth(r []rune) int  { return f.width * len(r) }
 func (f *testFont) StringWidth(s string) int { return f.width * len(s) }
+
+// =============================================================================
+// Phase 16I: Image Pipeline Integration Tests
+// =============================================================================
+
+// TestFrameWithImageCache verifies that Frame can be configured with an ImageCache
+// via the WithImageCache option. The cache should be stored in the frame and
+// used during layout to load and populate image data.
+func TestFrameWithImageCache(t *testing.T) {
+	// Create an image cache
+	cache := NewImageCache(10)
+
+	// Create a frame and verify it can be configured with the cache
+	frame := NewFrame()
+	mockFont := &testFont{width: 10, height: 14}
+
+	// Initialize frame with the image cache option
+	// The frame should accept WithImageCache as a valid option
+	frame.Init(
+		image.Rect(0, 0, 400, 300),
+		WithFont(mockFont),
+		WithImageCache(cache),
+	)
+
+	// After init, the frame should have the cache stored
+	// We verify this indirectly by checking that frame operations
+	// don't panic and that the frame is in a valid state
+	if frame.Rect().Empty() {
+		t.Error("frame should have non-empty rectangle after Init")
+	}
+}
+
+// TestFrameWithImageCacheNil verifies that Frame works correctly when
+// WithImageCache is called with nil (no cache).
+func TestFrameWithImageCacheNil(t *testing.T) {
+	frame := NewFrame()
+	mockFont := &testFont{width: 10, height: 14}
+
+	// Should not panic with nil cache
+	frame.Init(
+		image.Rect(0, 0, 400, 300),
+		WithFont(mockFont),
+		WithImageCache(nil),
+	)
+
+	// Frame should still work
+	if frame.Rect().Empty() {
+		t.Error("frame should have non-empty rectangle after Init")
+	}
+}
+
+// TestFrameWithImageCacheUsedInLayout verifies that when a frame has an
+// ImageCache, images in the content are loaded and their data is populated.
+func TestFrameWithImageCacheUsedInLayout(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "layout_test.png")
+
+	// Create a simple 25x20 image
+	img := image.NewRGBA(image.Rect(0, 0, 25, 20))
+	cyan := color.RGBA{0, 255, 255, 255}
+	for y := 0; y < 20; y++ {
+		for x := 0; x < 25; x++ {
+			img.Set(x, y, cyan)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Create cache and frame
+	cache := NewImageCache(10)
+	frame := NewFrame()
+	mockFont := &testFont{width: 10, height: 14}
+
+	frame.Init(
+		image.Rect(0, 0, 400, 300),
+		WithFont(mockFont),
+		WithImageCache(cache),
+	)
+
+	// Set content with an image span
+	content := Content{
+		Span{
+			Text: "[Image: test]",
+			Style: Style{
+				Image:    true,
+				ImageURL: pngPath,
+				ImageAlt: "test",
+			},
+		},
+	}
+	frame.SetContent(content)
+
+	// Trigger layout by calling TotalLines (which internally calls layout)
+	totalLines := frame.TotalLines()
+	if totalLines == 0 {
+		t.Error("frame should have at least 1 line after setting content")
+	}
+
+	// Verify that the image was loaded into the cache
+	cached, ok := cache.Get(pngPath)
+	if !ok {
+		t.Error("image should have been loaded into cache during layout")
+	}
+	if cached != nil && cached.Err != nil {
+		t.Errorf("cached image has unexpected error: %v", cached.Err)
+	}
+	if cached != nil && cached.Width != 25 {
+		t.Errorf("cached image width = %d, want 25", cached.Width)
+	}
+}

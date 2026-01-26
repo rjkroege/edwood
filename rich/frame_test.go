@@ -1838,9 +1838,9 @@ func TestCodeFontFallback(t *testing.T) {
 	}
 }
 
-// TestDrawBlockBackground tests that BlockRegions cause full-width background fills.
-// This is used for fenced code blocks where the background extends to the frame edge,
-// not just the width of the text.
+// TestDrawBlockBackground tests that BlockRegions cause indented background fills.
+// This is used for fenced code blocks where the background extends from the indent
+// to the frame edge, not from the left edge.
 func TestDrawBlockBackground(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300) // Frame is 400px wide
 	display := edwoodtest.NewDisplay(rect)
@@ -1853,7 +1853,7 @@ func TestDrawBlockBackground(t *testing.T) {
 	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
 
 	// Create content with block-level background (like fenced code)
-	// The Block flag indicates this should have full-width background
+	// The Block flag indicates this should have indented background
 	grayBg := color.RGBA{R: 240, G: 240, B: 240, A: 255}
 	codeBlockStyle := Style{Code: true, Bg: grayBg, Block: true, Scale: 1.0}
 	content := Content{
@@ -1866,32 +1866,33 @@ func TestDrawBlockBackground(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// There should be a fill operation that spans the FULL width of the frame
-	// (400px), not just the text width (40px)
+	// Code blocks are indented by CodeBlockIndentChars * M-width = 4 * 10 = 40 pixels
+	// Background should start at x=40 and extend to frame width (400px)
 	foundBlockFill := false
 	frameBackgroundRect := "(0,0)-(400,300)"
+	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 40 pixels
 
 	for _, op := range ops {
 		// Look for fill operations that are NOT the frame background
-		// but ARE full-width (x from 0 to 400)
+		// but extend from indent to right edge
 		if strings.HasPrefix(op, "fill ") {
 			if strings.Contains(op, frameBackgroundRect) {
 				continue // Skip the frame background
 			}
-			// Check if this fill extends to the full frame width
-			// The fill should be from X=0 to X=400 (full width)
-			// Format: "fill (0,0)-(400,14)" for first line
-			if strings.Contains(op, "(0,0)-(400,") {
+			// Check if this fill starts at the indent and extends to full frame width
+			// Format: "fill (40,0)-(400,14)" for first line with 40px indent
+			expectedPrefix := fmt.Sprintf("(%d,", expectedIndent)
+			if strings.Contains(op, expectedPrefix) && strings.Contains(op, "-(400,") {
 				foundBlockFill = true
 			}
 		}
 	}
 
 	if !foundBlockFill {
-		t.Errorf("Redraw() did not render full-width block background for code block\nExpected fill from x=0 to x=400, got ops: %v", ops)
+		t.Errorf("Redraw() did not render indented block background for code block\nExpected fill from x=%d to x=400, got ops: %v", expectedIndent, ops)
 	}
 
-	// Also verify text was rendered
+	// Also verify text was rendered at the indented position
 	foundText := false
 	for _, op := range ops {
 		if strings.Contains(op, `string "code"`) {
@@ -1904,7 +1905,7 @@ func TestDrawBlockBackground(t *testing.T) {
 	}
 }
 
-// TestDrawBlockBackgroundMultiLine tests full-width backgrounds spanning multiple lines.
+// TestDrawBlockBackgroundMultiLine tests indented backgrounds spanning multiple lines.
 func TestDrawBlockBackgroundMultiLine(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300) // Frame is 400px wide
 	display := edwoodtest.NewDisplay(rect)
@@ -1930,25 +1931,29 @@ func TestDrawBlockBackgroundMultiLine(t *testing.T) {
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 	frameBackgroundRect := "(0,0)-(400,300)"
 
-	// Count full-width fill operations (excluding frame background)
-	// Each line should have its own full-width background fill
+	// Code blocks are indented by CodeBlockIndentChars * M-width = 4 * 10 = 40 pixels
+	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 40 pixels
+
+	// Count indented fill operations (excluding frame background)
+	// Each line should have its own background fill starting at the indent
 	blockFillCount := 0
+	expectedPrefix := fmt.Sprintf("(%d,", expectedIndent)
 	for _, op := range ops {
 		if strings.HasPrefix(op, "fill ") {
 			if strings.Contains(op, frameBackgroundRect) {
 				continue // Skip the frame background
 			}
-			// Check if this fill is full-width (x from 0 to 400)
-			if strings.Contains(op, "-(400,") && strings.Contains(op, "(0,") {
+			// Check if this fill starts at indent and extends to right edge
+			if strings.Contains(op, "-(400,") && strings.Contains(op, expectedPrefix) {
 				blockFillCount++
 			}
 		}
 	}
 
-	// Should have 3 full-width fills for 3 lines of code
+	// Should have 3 indented fills for 3 lines of code
 	// (newlines create separate lines, each with their own fill)
 	if blockFillCount < 3 {
-		t.Errorf("Expected at least 3 full-width block background fills for 3-line code block, got %d\ngot ops: %v", blockFillCount, ops)
+		t.Errorf("Expected at least 3 indented block background fills for 3-line code block, got %d\ngot ops: %v", blockFillCount, ops)
 	}
 
 	// Verify all text lines were rendered

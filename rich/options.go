@@ -78,3 +78,12 @@ func WithSelectionColor(c draw.Image) Option {
 		fi.selectionColor = c
 	}
 }
+
+// WithImageCache is an Option that sets the image cache for the frame.
+// When set, the frame will use this cache to load images during layout.
+// If nil, images will not be loaded and will display placeholders.
+func WithImageCache(cache *ImageCache) Option {
+	return func(fi *frameImpl) {
+		fi.imageCache = cache
+	}
+}

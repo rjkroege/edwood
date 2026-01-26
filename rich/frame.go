@@ -72,6 +72,9 @@ type frameImpl struct {
 	// then blitted to screen. This ensures text doesn't overflow frame bounds.
 	scratchImage edwooddraw.Image
 	scratchRect  image.Rectangle // size of current scratch image
+
+	// Image cache for loading images during layout
+	imageCache *ImageCache
 }
 
 // NewFrame creates a new Frame.
@@ -131,8 +134,8 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 	frameWidth := f.rect.Dx()
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout boxes into lines (using cache if available)
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	if len(lines) == 0 {
 		return f.rect.Min
 	}
@@ -217,8 +220,8 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 	frameWidth := f.rect.Dx()
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout boxes into lines (using cache if available)
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	if len(lines) == 0 {
 		return 0
 	}
@@ -448,8 +451,8 @@ func (f *frameImpl) TotalLines() int {
 	// Default tab width (8 characters worth)
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// Layout all boxes
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout all boxes (using cache if available)
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	return len(lines)
 }
 
@@ -472,8 +475,8 @@ func (f *frameImpl) LineStartRunes() []int {
 	// Default tab width (8 characters worth)
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// Layout all boxes
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout all boxes (using cache if available)
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	if len(lines) == 0 {
 		return []int{0}
 	}
@@ -736,11 +739,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 // drawBlockBackgroundTo draws a full-width background for a line.
 // This is used for fenced code blocks where the background extends to the frame edge.
 func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, offset image.Point, frameWidth, frameHeight int) {
-	// Find the background color from a block-styled box on this line
+	// Find the background color and left indent from a block-styled box on this line
 	var bgColor color.Color
+	leftIndent := 0
 	for _, pb := range line.Boxes {
 		if pb.Box.Style.Block && pb.Box.Style.Bg != nil {
 			bgColor = pb.Box.Style.Bg
+			leftIndent = pb.X // Use the box's X position as the left edge
 			break
 		}
 	}
@@ -753,9 +758,9 @@ func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, of
 		return
 	}
 
-	// Full-width background: from left edge to right edge
+	// Background from indent to right edge (not full-width)
 	bgRect := image.Rect(
-		offset.X,
+		offset.X+leftIndent,
 		offset.Y+line.Y,
 		offset.X+frameWidth,
 		offset.Y+line.Y+line.Height,
@@ -850,13 +855,13 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 	// Default tab width (8 characters worth)
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// If origin is 0, just return the normal layout
+	// If origin is 0, just return the normal layout (using cache if available)
 	if f.origin == 0 {
-		return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle), 0
+		return f.layoutBoxes(boxes, frameWidth, maxtab), 0
 	}
 
-	// Layout all boxes first
-	allLines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout all boxes first (using cache if available)
+	allLines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	if len(allLines) == 0 {
 		return nil, 0
 	}
@@ -924,8 +929,8 @@ func (f *frameImpl) drawSelectionTo(target edwooddraw.Image, offset image.Point)
 	frameHeight := f.rect.Dy()
 	maxtab := 8 * f.font.StringWidth("0")
 
-	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	// Layout boxes into lines (using cache if available)
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
 	if len(lines) == 0 {
 		return
 	}
@@ -1117,6 +1122,16 @@ func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
 		}
 	}
 	return f.font
+}
+
+// layoutBoxes runs the layout algorithm on the given boxes.
+// If an imageCache is set on the frame, it uses layoutWithCache to load
+// images and populate their ImageData. Otherwise, it uses the regular layout.
+func (f *frameImpl) layoutBoxes(boxes []Box, frameWidth, maxtab int) []Line {
+	if f.imageCache != nil {
+		return layoutWithCache(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle, f.imageCache)
+	}
+	return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 }
 
 // drawImageTo renders an image box to the target at the appropriate position.

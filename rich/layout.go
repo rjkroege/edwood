@@ -476,7 +476,23 @@ func fitBytes(text []byte, font draw.Font, maxWidth int) (bytesCount int, width 
 // This allows image boxes to be sized based on their actual image dimensions.
 // If cache is nil, images will use placeholder sizing based on text width.
 func layoutWithCache(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc, fontForStyleFn FontForStyleFunc, cache *ImageCache) []Line {
-	// TODO: Implement image loading from cache and sizing
-	// For now, delegate to layout without cache support
+	// If no cache, fall back to regular layout
+	if cache == nil {
+		return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
+	}
+
+	// Load images into cache and populate ImageData for image boxes
+	for i := range boxes {
+		box := &boxes[i]
+		if box.Style.Image && box.Style.ImageURL != "" {
+			// Load image from cache (this will cache it for future use)
+			cached, _ := cache.Load(box.Style.ImageURL)
+			if cached != nil {
+				box.ImageData = cached
+			}
+		}
+	}
+
+	// Now run layout with populated ImageData
 	return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
 }
