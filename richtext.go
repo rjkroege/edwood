@@ -27,6 +27,7 @@ type RichText struct {
 	boldFont       draw.Font
 	italicFont     draw.Font
 	boldItalicFont draw.Font
+	codeFont       draw.Font
 
 	// Scaled fonts for headings (key is scale factor)
 	scaledFonts map[float64]draw.Font
@@ -92,6 +93,9 @@ func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font
 	}
 	if rt.boldItalicFont != nil {
 		frameOpts = append(frameOpts, rich.WithBoldItalicFont(rt.boldItalicFont))
+	}
+	if rt.codeFont != nil {
+		frameOpts = append(frameOpts, rich.WithCodeFont(rt.codeFont))
 	}
 	for scale, f := range rt.scaledFonts {
 		frameOpts = append(frameOpts, rich.WithScaledFont(scale, f))
@@ -490,6 +494,13 @@ func WithRichTextItalicFont(f draw.Font) RichTextOption {
 func WithRichTextBoldItalicFont(f draw.Font) RichTextOption {
 	return func(rt *RichText) {
 		rt.boldItalicFont = f
+	}
+}
+
+// WithRichTextCodeFont sets the monospace font for code spans and code blocks.
+func WithRichTextCodeFont(f draw.Font) RichTextOption {
+	return func(rt *RichText) {
+		rt.codeFont = f
 	}
 }
 

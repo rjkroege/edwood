@@ -1171,6 +1171,7 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	boldFont := tryLoadFontVariant(display, global.tagfont, "bold")
 	italicFont := tryLoadFontVariant(display, global.tagfont, "italic")
 	boldItalicFont := tryLoadFontVariant(display, global.tagfont, "bolditalic")
+	codeFont := tryLoadCodeFont(display, global.tagfont)
 
 	// Get scaled fonts for headings (H1=2.0, H2=1.5, H3=1.25)
 	h1Font := tryLoadScaledFont(display, global.tagfont, 2.0)
@@ -1206,6 +1207,9 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	}
 	if boldItalicFont != nil {
 		rtOpts = append(rtOpts, WithRichTextBoldItalicFont(boldItalicFont))
+	}
+	if codeFont != nil {
+		rtOpts = append(rtOpts, WithRichTextCodeFont(codeFont))
 	}
 	if h1Font != nil {
 		rtOpts = append(rtOpts, WithRichTextScaledFont(2.0, h1Font))

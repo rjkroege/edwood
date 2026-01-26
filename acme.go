@@ -300,6 +300,36 @@ func tryLoadScaledFont(display draw.Display, baseFont string, scale float64) dra
 	return nil
 }
 
+// tryLoadCodeFont attempts to load a monospace code font variant of the given base font.
+// Given a base font path like /mnt/font/GoRegular/16a/font, it replaces the family
+// with a monospace equivalent (e.g., GoMono).
+// Returns nil if the font cannot be loaded.
+func tryLoadCodeFont(display draw.Display, baseFont string) draw.Font {
+	if baseFont == "" {
+		return nil
+	}
+
+	// Map of proportional fonts to their monospace equivalents
+	monoMap := map[string]string{
+		"GoRegular": "GoMono",
+		"Go-Bold":   "GoMono-Bold",
+	}
+
+	// Try to find and replace a known family name in the path
+	for family, monoFamily := range monoMap {
+		if strings.Contains(baseFont, "/"+family+"/") {
+			monoPath := strings.Replace(baseFont, "/"+family+"/", "/"+monoFamily+"/", 1)
+			f, err := display.OpenFont(monoPath)
+			if err == nil {
+				return f
+			}
+			return nil
+		}
+	}
+
+	return nil
+}
+
 var boxcursor = draw.Cursor{
 	Point: image.Point{-7, -7},
 	Clr: [32]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
