@@ -1730,3 +1730,78 @@ func TestDrawBoxBackgroundMultiple(t *testing.T) {
 		}
 	}
 }
+
+// TestCodeFontSelection tests that Style.Code causes the code font to be used.
+func TestCodeFontSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	// Create distinct fonts: regular (10px per char) and code (12px per char, monospace)
+	regularFont := edwoodtest.NewFont(10, 14)
+	codeFont := edwoodtest.NewFont(12, 14) // Different width to simulate monospace
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		WithCodeFont(codeFont),
+		WithTextColor(textImage),
+	)
+
+	// Verify the code font is returned for StyleCode
+	fi := f.(*frameImpl)
+	selectedFont := fi.fontForStyle(StyleCode)
+	if selectedFont != codeFont {
+		t.Errorf("fontForStyle(StyleCode) should return codeFont, got %v", selectedFont)
+	}
+
+	// Also test with explicitly constructed code style
+	codeStyle := Style{Code: true, Scale: 1.0}
+	selectedFont = fi.fontForStyle(codeStyle)
+	if selectedFont != codeFont {
+		t.Errorf("fontForStyle(Code:true) should return codeFont, got %v", selectedFont)
+	}
+
+	// Regular style should still return regular font
+	selectedFont = fi.fontForStyle(DefaultStyle())
+	if selectedFont != regularFont {
+		t.Errorf("fontForStyle(DefaultStyle()) should return regularFont, got %v", selectedFont)
+	}
+}
+
+// TestCodeFontFallback tests that Style.Code falls back to regular font when no code font is set.
+func TestCodeFontFallback(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+
+	regularFont := edwoodtest.NewFont(10, 14)
+	// No code font set
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(regularFont),
+		// Note: WithCodeFont is NOT called
+		WithTextColor(textImage),
+	)
+
+	fi := f.(*frameImpl)
+
+	// When no code font is set, fontForStyle should fall back to regular font
+	if got := fi.fontForStyle(StyleCode); got != regularFont {
+		t.Errorf("fontForStyle(StyleCode) without codeFont should return regularFont, got %v", got)
+	}
+
+	codeStyle := Style{Code: true, Scale: 1.0}
+	if got := fi.fontForStyle(codeStyle); got != regularFont {
+		t.Errorf("fontForStyle(Code:true) without codeFont should return regularFont, got %v", got)
+	}
+}

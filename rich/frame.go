@@ -60,6 +60,7 @@ type frameImpl struct {
 	boldFont       edwooddraw.Font
 	italicFont     edwooddraw.Font
 	boldItalicFont edwooddraw.Font
+	codeFont       edwooddraw.Font // monospace font for code spans
 
 	// Scaled fonts for headings (key is scale factor: 2.0 for H1, 1.5 for H2, etc.)
 	scaledFonts map[float64]edwooddraw.Font
@@ -766,6 +767,11 @@ func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
 		if scaledFont, ok := f.scaledFonts[style.Scale]; ok {
 			return scaledFont
 		}
+	}
+
+	// Check for code font (monospace for inline code and code blocks)
+	if style.Code && f.codeFont != nil {
+		return f.codeFont
 	}
 
 	// Check for bold/italic variants for non-scaled text

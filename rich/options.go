@@ -53,6 +53,13 @@ func WithBoldItalicFont(f draw.Font) Option {
 	}
 }
 
+// WithCodeFont is an Option that sets the monospace font for code spans.
+func WithCodeFont(f draw.Font) Option {
+	return func(fi *frameImpl) {
+		fi.codeFont = f
+	}
+}
+
 // WithScaledFont is an Option that sets a scaled font for a specific scale factor.
 // The frame stores a map of scale factors to fonts.
 // Common scale factors: 2.0 for H1, 1.5 for H2, 1.25 for H3.
