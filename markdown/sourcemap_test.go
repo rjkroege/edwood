@@ -589,11 +589,11 @@ func TestParseWithSourceMapLinks(t *testing.T) {
 // ParseWithSourceMap have the Block flag set to true.
 func TestFencedCodeBlockHasBlockFlag(t *testing.T) {
 	content, _, _ := ParseWithSourceMap("```\ncode\n```")
-	
+
 	if len(content) != 1 {
 		t.Fatalf("got %d spans, want 1", len(content))
 	}
-	
+
 	span := content[0]
 	if !span.Style.Code {
 		t.Error("span.Style.Code = false, want true")
@@ -603,5 +603,152 @@ func TestFencedCodeBlockHasBlockFlag(t *testing.T) {
 	}
 	if span.Style.Bg == nil {
 		t.Error("span.Style.Bg is nil, want background color")
+	}
+}
+
+// TestListSourceMap tests source mapping for list items (- item, 1. item).
+// List items render as "• content\n" or "1. content\n" where the bullet/number
+// replaces the original marker, but the content position should map correctly.
+func TestListSourceMap(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		renderedPos  int
+		renderedEnd  int
+		wantSrcStart int
+		wantSrcEnd   int
+	}{
+		{
+			name: "simple unordered list item",
+			// Source: "- item\n" (7 bytes)
+			// Rendered: "• item\n" (7 runes: bullet + space + "item" + newline)
+			// The bullet "•" (pos 0) maps to "-" in source (pos 0-1)
+			// The space (pos 1) maps to space (pos 1-2)
+			// "item" (pos 2-5) maps to "item" (pos 2-6)
+			// newline (pos 6) maps to newline (pos 6-7)
+			input:        "- item\n",
+			renderedPos:  0,
+			renderedEnd:  7, // "• item\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   7, // "- item\n"
+		},
+		{
+			name: "unordered list bullet only",
+			// Select just the bullet "•"
+			input:        "- item\n",
+			renderedPos:  0,
+			renderedEnd:  1, // just "•"
+			wantSrcStart: 0,
+			wantSrcEnd:   1, // just "-"
+		},
+		{
+			name: "unordered list content only",
+			// Select just "item" (without bullet/space/newline)
+			input:        "- item\n",
+			renderedPos:  2,
+			renderedEnd:  6, // "item"
+			wantSrcStart: 2,
+			wantSrcEnd:   6, // "item"
+		},
+		{
+			name: "simple ordered list item",
+			// Source: "1. item\n" (8 bytes)
+			// Rendered: "1. item\n" (8 runes: "1." + space + "item" + newline)
+			input:        "1. item\n",
+			renderedPos:  0,
+			renderedEnd:  8, // "1. item\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   8, // "1. item\n"
+		},
+		{
+			name: "ordered list number only",
+			// Select just "1."
+			input:        "1. item\n",
+			renderedPos:  0,
+			renderedEnd:  2, // "1."
+			wantSrcStart: 0,
+			wantSrcEnd:   2, // "1."
+		},
+		{
+			name: "ordered list content only",
+			// Select just "item" (after "1. ")
+			input:        "1. item\n",
+			renderedPos:  3,
+			renderedEnd:  7, // "item"
+			wantSrcStart: 3,
+			wantSrcEnd:   7, // "item"
+		},
+		{
+			name: "nested unordered list item",
+			// Source: "  - nested\n" (11 bytes, 2-space indent)
+			// Rendered: "• nested\n" (9 runes) - indent handled in layout, not rendered text
+			input:        "  - nested\n",
+			renderedPos:  0,
+			renderedEnd:  9, // "• nested\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   11, // "  - nested\n"
+		},
+		{
+			name: "list item with bold",
+			// Source: "- **bold** text\n" (16 bytes)
+			// Rendered: "• bold text\n" (12 runes)
+			input:        "- **bold** text\n",
+			renderedPos:  2,
+			renderedEnd:  6, // "bold"
+			wantSrcStart: 2,
+			wantSrcEnd:   10, // "**bold**"
+		},
+		{
+			name: "multiple list items - first item",
+			// Source: "- one\n- two\n" (12 bytes)
+			// Rendered: "• one\n• two\n" (12 runes)
+			input:        "- one\n- two\n",
+			renderedPos:  0,
+			renderedEnd:  6, // "• one\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   6, // "- one\n"
+		},
+		{
+			name: "multiple list items - second item",
+			// Source: "- one\n- two\n" (12 bytes)
+			// Rendered: "• one\n• two\n" (12 runes)
+			input:        "- one\n- two\n",
+			renderedPos:  6,
+			renderedEnd:  12, // "• two\n"
+			wantSrcStart: 6,
+			wantSrcEnd:   12, // "- two\n"
+		},
+		{
+			name: "text before list",
+			// Source: "Intro\n- item\n" (13 bytes)
+			// Rendered: "Intro\n• item\n" (13 runes)
+			input:        "Intro\n- item\n",
+			renderedPos:  0,
+			renderedEnd:  6, // "Intro\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   6, // "Intro\n"
+		},
+		{
+			name: "list between text",
+			// Source: "Before\n- item\nAfter" (19 bytes)
+			// Rendered: "Before\n• item\nAfter" (19 runes)
+			input:        "Before\n- item\nAfter",
+			renderedPos:  7,
+			renderedEnd:  14, // "• item\n"
+			wantSrcStart: 7,
+			wantSrcEnd:   14, // "- item\n"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+					tt.wantSrcStart, tt.wantSrcEnd)
+			}
+		})
 	}
 }
