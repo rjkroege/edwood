@@ -331,3 +331,309 @@ func createMinimalPNG(width, height int, c color.Color) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// =============================================================================
+// Phase 16C: Plan 9 Conversion Tests
+// =============================================================================
+
+// TestConvertRGBA verifies that RGBA images are converted correctly to Plan 9 format.
+func TestConvertRGBA(t *testing.T) {
+	// Create a 4x4 RGBA image with distinct colors in each quadrant
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+
+	// Top-left: red
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			img.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+	// Top-right: green
+	for y := 0; y < 2; y++ {
+		for x := 2; x < 4; x++ {
+			img.Set(x, y, color.RGBA{0, 255, 0, 255})
+		}
+	}
+	// Bottom-left: blue
+	for y := 2; y < 4; y++ {
+		for x := 0; x < 2; x++ {
+			img.Set(x, y, color.RGBA{0, 0, 255, 255})
+		}
+	}
+	// Bottom-right: white
+	for y := 2; y < 4; y++ {
+		for x := 2; x < 4; x++ {
+			img.Set(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+
+	// Test that ConvertToPlan9 returns valid data
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Expected size: 4x4 pixels * 4 bytes/pixel (RGBA32) = 64 bytes
+	expectedSize := 4 * 4 * 4
+	if len(data) != expectedSize {
+		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
+	}
+
+	// Verify first pixel (red) - should be R=255, G=0, B=0, A=255
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		if r != 255 || g != 0 || b != 0 || a != 255 {
+			t.Errorf("first pixel (red) = (%d, %d, %d, %d), want (255, 0, 0, 255)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertRGB verifies that RGB images (no alpha channel) are converted correctly.
+func TestConvertRGB(t *testing.T) {
+	// Create a 3x3 image using NRGBA (no premultiplied alpha) with full opacity
+	// Go's image package doesn't have a pure RGB type, but we can test with NRGBA
+	img := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+
+	// Fill with cyan (R=0, G=255, B=255)
+	cyan := color.NRGBA{0, 255, 255, 255}
+	for y := 0; y < 3; y++ {
+		for x := 0; x < 3; x++ {
+			img.Set(x, y, cyan)
+		}
+	}
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Expected size: 3x3 pixels * 4 bytes/pixel = 36 bytes
+	expectedSize := 3 * 3 * 4
+	if len(data) != expectedSize {
+		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
+	}
+
+	// Verify first pixel - should be cyan with full alpha
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		if r != 0 || g != 255 || b != 255 || a != 255 {
+			t.Errorf("first pixel (cyan) = (%d, %d, %d, %d), want (0, 255, 255, 255)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertGrayscale verifies that grayscale images are converted correctly.
+func TestConvertGrayscale(t *testing.T) {
+	// Create a 2x2 grayscale image
+	img := image.NewGray(image.Rect(0, 0, 2, 2))
+
+	// Set different gray levels
+	img.SetGray(0, 0, color.Gray{0})   // Black
+	img.SetGray(1, 0, color.Gray{85})  // Dark gray
+	img.SetGray(0, 1, color.Gray{170}) // Light gray
+	img.SetGray(1, 1, color.Gray{255}) // White
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Expected size: 2x2 pixels * 4 bytes/pixel = 16 bytes
+	expectedSize := 2 * 2 * 4
+	if len(data) != expectedSize {
+		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
+	}
+
+	// Verify black pixel (0,0) - should be R=0, G=0, B=0, A=255
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		if r != 0 || g != 0 || b != 0 || a != 255 {
+			t.Errorf("black pixel = (%d, %d, %d, %d), want (0, 0, 0, 255)", r, g, b, a)
+		}
+	}
+
+	// Verify white pixel (1,1) - should be R=255, G=255, B=255, A=255
+	// Position in data: pixel at (1,1) is at index (1*2 + 1) * 4 = 12
+	if len(data) >= 16 {
+		r, g, b, a := data[12], data[13], data[14], data[15]
+		if r != 255 || g != 255 || b != 255 || a != 255 {
+			t.Errorf("white pixel = (%d, %d, %d, %d), want (255, 255, 255, 255)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertAlphaPreMultiplied verifies that alpha is properly pre-multiplied.
+// Plan 9's draw model uses pre-multiplied alpha, so colors with partial
+// transparency need to have their RGB values multiplied by the alpha value.
+func TestConvertAlphaPreMultiplied(t *testing.T) {
+	// Create a 2x1 image with:
+	// - Pixel 0: Red at 50% alpha (should become R=127, G=0, B=0, A=127)
+	// - Pixel 1: White at 50% alpha (should become R=127, G=127, B=127, A=127)
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+
+	// Set red at 50% alpha
+	img.SetNRGBA(0, 0, color.NRGBA{255, 0, 0, 128})
+	// Set white at 50% alpha
+	img.SetNRGBA(1, 0, color.NRGBA{255, 255, 255, 128})
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Expected size: 2x1 pixels * 4 bytes/pixel = 8 bytes
+	if len(data) != 8 {
+		t.Errorf("converted data size = %d, want 8", len(data))
+	}
+
+	// Verify first pixel (red at 50% alpha)
+	// Pre-multiplied: R = 255 * 128 / 255 ≈ 128, G = 0, B = 0, A = 128
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		// Allow some tolerance due to integer rounding
+		if r < 126 || r > 130 || g != 0 || b != 0 || a != 128 {
+			t.Errorf("red 50%% alpha pixel = (%d, %d, %d, %d), want approximately (128, 0, 0, 128)", r, g, b, a)
+		}
+	}
+
+	// Verify second pixel (white at 50% alpha)
+	// Pre-multiplied: R = G = B = 255 * 128 / 255 ≈ 128, A = 128
+	if len(data) >= 8 {
+		r, g, b, a := data[4], data[5], data[6], data[7]
+		// Allow some tolerance
+		if r < 126 || r > 130 || g < 126 || g > 130 || b < 126 || b > 130 || a != 128 {
+			t.Errorf("white 50%% alpha pixel = (%d, %d, %d, %d), want approximately (128, 128, 128, 128)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertTransparent verifies that fully transparent pixels are handled correctly.
+// Fully transparent pixels (alpha=0) should have RGB=0 as well (pre-multiplied).
+func TestConvertTransparent(t *testing.T) {
+	// Create a 2x2 image with varying transparency
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+
+	// Fully opaque red
+	img.SetNRGBA(0, 0, color.NRGBA{255, 0, 0, 255})
+	// Fully transparent red (should become all zeros)
+	img.SetNRGBA(1, 0, color.NRGBA{255, 0, 0, 0})
+	// Fully transparent white (should become all zeros)
+	img.SetNRGBA(0, 1, color.NRGBA{255, 255, 255, 0})
+	// Fully opaque blue
+	img.SetNRGBA(1, 1, color.NRGBA{0, 0, 255, 255})
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Verify fully transparent red pixel (1,0) is all zeros
+	// Position: (1 + 0*2) * 4 = 4
+	if len(data) >= 8 {
+		r, g, b, a := data[4], data[5], data[6], data[7]
+		if r != 0 || g != 0 || b != 0 || a != 0 {
+			t.Errorf("transparent red pixel = (%d, %d, %d, %d), want (0, 0, 0, 0)", r, g, b, a)
+		}
+	}
+
+	// Verify fully transparent white pixel (0,1) is all zeros
+	// Position: (0 + 1*2) * 4 = 8
+	if len(data) >= 12 {
+		r, g, b, a := data[8], data[9], data[10], data[11]
+		if r != 0 || g != 0 || b != 0 || a != 0 {
+			t.Errorf("transparent white pixel = (%d, %d, %d, %d), want (0, 0, 0, 0)", r, g, b, a)
+		}
+	}
+
+	// Verify fully opaque blue pixel (1,1) is correct
+	// Position: (1 + 1*2) * 4 = 12
+	if len(data) >= 16 {
+		r, g, b, a := data[12], data[13], data[14], data[15]
+		if r != 0 || g != 0 || b != 255 || a != 255 {
+			t.Errorf("opaque blue pixel = (%d, %d, %d, %d), want (0, 0, 255, 255)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertNilImage verifies that nil images return an error.
+func TestConvertNilImage(t *testing.T) {
+	_, err := ConvertToPlan9(nil)
+	if err == nil {
+		t.Error("ConvertToPlan9 should return an error for nil image")
+	}
+}
+
+// TestConvertEmptyImage verifies that zero-size images are handled.
+func TestConvertEmptyImage(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 0, 0))
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed on empty image: %v", err)
+	}
+	if len(data) != 0 {
+		t.Errorf("converted empty image should have 0 bytes, got %d", len(data))
+	}
+}
+
+// TestConvertSinglePixel verifies conversion of a 1x1 image.
+func TestConvertSinglePixel(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{100, 150, 200, 255})
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	if len(data) != 4 {
+		t.Errorf("single pixel should produce 4 bytes, got %d", len(data))
+	}
+
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		if r != 100 || g != 150 || b != 200 || a != 255 {
+			t.Errorf("pixel = (%d, %d, %d, %d), want (100, 150, 200, 255)", r, g, b, a)
+		}
+	}
+}
+
+// TestConvertPalettedImage verifies that paletted (indexed color) images are converted.
+func TestConvertPalettedImage(t *testing.T) {
+	// Create a paletted image (like GIF)
+	palette := []color.Color{
+		color.RGBA{255, 0, 0, 255},   // Red
+		color.RGBA{0, 255, 0, 255},   // Green
+		color.RGBA{0, 0, 255, 255},   // Blue
+		color.RGBA{255, 255, 0, 255}, // Yellow
+	}
+	img := image.NewPaletted(image.Rect(0, 0, 2, 2), palette)
+	img.SetColorIndex(0, 0, 0) // Red
+	img.SetColorIndex(1, 0, 1) // Green
+	img.SetColorIndex(0, 1, 2) // Blue
+	img.SetColorIndex(1, 1, 3) // Yellow
+
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Expected size: 2x2 pixels * 4 bytes/pixel = 16 bytes
+	if len(data) != 16 {
+		t.Errorf("converted data size = %d, want 16", len(data))
+	}
+
+	// Verify red pixel (0,0)
+	if len(data) >= 4 {
+		r, g, b, a := data[0], data[1], data[2], data[3]
+		if r != 255 || g != 0 || b != 0 || a != 255 {
+			t.Errorf("red pixel = (%d, %d, %d, %d), want (255, 0, 0, 255)", r, g, b, a)
+		}
+	}
+
+	// Verify yellow pixel (1,1)
+	if len(data) >= 16 {
+		r, g, b, a := data[12], data[13], data[14], data[15]
+		if r != 255 || g != 255 || b != 0 || a != 255 {
+			t.Errorf("yellow pixel = (%d, %d, %d, %d), want (255, 255, 0, 255)", r, g, b, a)
+		}
+	}
+}
