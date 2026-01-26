@@ -1608,3 +1608,125 @@ func TestCoordinateRoundTripEmpty(t *testing.T) {
 		t.Errorf("Charofpt(Ptofchar(0)) on empty = %d, want 0 (pt=%v)", got, pt)
 	}
 }
+
+// TestDrawBoxBackground tests that Style.Bg causes a background fill before text.
+func TestDrawBoxBackground(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // "code" is 4 chars = 40px wide
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with a background color (like inline code)
+	grayBg := color.RGBA{R: 240, G: 240, B: 240, A: 255}
+	codeStyle := Style{Bg: grayBg, Scale: 1.0}
+	content := Content{
+		{Text: "code", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// There should be a fill operation for the box background before the text
+	// The fill should happen BEFORE the text rendering
+	// The box background fill should be roughly the size of the text (4 chars * 10px = 40px wide)
+	foundBoxFill := false
+	foundText := false
+	fillBeforeText := false
+	frameBackgroundRect := "(0,0)-(400,300)"
+
+	for _, op := range ops {
+		// Look for fill operation that's NOT the frame background fill
+		// Fill ops start with "fill " - this distinguishes from "fill:" in string ops
+		if strings.HasPrefix(op, "fill ") {
+			if strings.Contains(op, frameBackgroundRect) {
+				continue // Skip the frame background
+			}
+			// This must be a box background fill (smaller than full frame)
+			foundBoxFill = true
+			if !foundText {
+				fillBeforeText = true
+			}
+		}
+		// Look for text rendering
+		if strings.Contains(op, `string "code"`) {
+			foundText = true
+		}
+	}
+
+	if !foundBoxFill {
+		t.Errorf("Redraw() did not render box background fill for styled text with Bg\ngot ops: %v", ops)
+	}
+	if !foundText {
+		t.Errorf("Redraw() did not render 'code' text\ngot ops: %v", ops)
+	}
+	if foundBoxFill && !fillBeforeText {
+		t.Errorf("Box background fill should occur before text rendering\ngot ops: %v", ops)
+	}
+}
+
+// TestDrawBoxBackgroundMultiple tests multiple boxes with backgrounds.
+func TestDrawBoxBackgroundMultiple(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with multiple background-styled spans and regular text
+	grayBg := color.RGBA{R: 240, G: 240, B: 240, A: 255}
+	codeStyle := Style{Bg: grayBg, Scale: 1.0}
+	content := Content{
+		{Text: "normal ", Style: DefaultStyle()},
+		{Text: "code1", Style: codeStyle},
+		{Text: " more ", Style: DefaultStyle()},
+		{Text: "code2", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	frameBackgroundRect := "(0,0)-(400,300)"
+
+	// Count fill operations (excluding the initial frame background fill)
+	fillCount := 0
+	for _, op := range ops {
+		// Fill ops start with "fill " - this distinguishes from "fill:" in string ops
+		if strings.HasPrefix(op, "fill ") && !strings.Contains(op, frameBackgroundRect) {
+			fillCount++
+		}
+	}
+
+	// Should have 2 fills for the two code spans
+	if fillCount != 2 {
+		t.Errorf("Expected 2 box background fills, got %d\ngot ops: %v", fillCount, ops)
+	}
+
+	// Verify all text was rendered
+	texts := []string{"normal ", "code1", " more ", "code2"}
+	for _, text := range texts {
+		found := false
+		for _, op := range ops {
+			if strings.Contains(op, fmt.Sprintf(`string "%s"`, text)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Redraw() did not render '%s'\ngot ops: %v", text, ops)
+		}
+	}
+}

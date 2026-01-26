@@ -440,7 +440,26 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 		return
 	}
 
-	// Render each line
+	// Phase 1: Draw box backgrounds (for inline code, etc.)
+	// This must happen before text rendering so backgrounds appear behind text
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			// Skip newlines and tabs - they don't have backgrounds
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				continue
+			}
+			if len(pb.Box.Text) == 0 {
+				continue
+			}
+
+			// Draw background if style has Bg color set
+			if pb.Box.Style.Bg != nil {
+				f.drawBoxBackground(screen, pb, line)
+			}
+		}
+	}
+
+	// Phase 2: Render text on top of backgrounds
 	for _, line := range lines {
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't render visible text
@@ -474,6 +493,27 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 			screen.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
 		}
 	}
+}
+
+// drawBoxBackground draws the background color for a positioned box.
+// This is used for inline code backgrounds and other text-width backgrounds.
+func (f *frameImpl) drawBoxBackground(screen edwooddraw.Image, pb PositionedBox, line Line) {
+	bgImg := f.allocColorImage(pb.Box.Style.Bg)
+	if bgImg == nil {
+		return
+	}
+
+	// Calculate the background rectangle for this box
+	// X: from box start to box start + box width
+	// Y: from line top to line top + line height
+	bgRect := image.Rect(
+		f.rect.Min.X+pb.X,
+		f.rect.Min.Y+line.Y,
+		f.rect.Min.X+pb.X+pb.Box.Wid,
+		f.rect.Min.Y+line.Y+line.Height,
+	)
+
+	screen.Draw(bgRect, bgImg, bgImg, image.ZP)
 }
 
 // layoutFromOrigin returns the layout lines starting from the origin position.
