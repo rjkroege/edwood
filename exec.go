@@ -1227,6 +1227,11 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		rtOpts = append(rtOpts, WithRichTextScaledFont(1.25, h3Font))
 	}
 
+	// Initialize the image cache for loading images in the markdown
+	// Must be created before rt.Init() so it can be passed via options
+	w.imageCache = rich.NewImageCache(0) // 0 means use default size
+	rtOpts = append(rtOpts, WithRichTextImageCache(w.imageCache))
+
 	rt.Init(display, font, rtOpts...)
 
 	// Parse the markdown content with source mapping and link tracking
@@ -1242,9 +1247,6 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	w.richBody = rt
 	w.SetPreviewSourceMap(sourceMap)
 	w.SetPreviewLinkMap(linkMap)
-
-	// Initialize the image cache for loading images in the markdown
-	w.imageCache = rich.NewImageCache(0) // 0 means use default size
 
 	// Enter preview mode
 	w.SetPreviewMode(true)
