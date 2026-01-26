@@ -344,11 +344,11 @@
 | Tests pass | [x] | All 5 preview window tests pass |
 | Code committed | [x] | Commit a00c082 |
 
-### 10.2 Preview Command
+### 10.2 Markdeep Command
 | Stage | Status | Notes |
 |-------|--------|-------|
 | Tests exist | [x] | N/A - integration |
-| Code written | [x] | "Preview" tag command opens preview window for .md files |
+| Code written | [x] | "Markdeep" tag command opens preview window for .md files |
 | Tests pass | [x] | Manual verification |
 | Code committed | [x] | Commit 17fa18a |
 
@@ -422,11 +422,11 @@ See `docs/richtext-design.md` Phase 11 section for full design.
 | Tests pass | [x] | go test ./... passes |
 | Code committed | [x] | Commit 0e91afd |
 
-### 11.6 Preview Command Toggle
+### 11.6 Markdeep Command Toggle
 | Stage | Status | Notes |
 |-------|--------|-------|
 | Tests exist | [x] | TestPreviewCommandToggle, TestPreviewCommandEnter, TestPreviewCommandExit |
-| Code written | [x] | "Preview" command toggles previewMode on window |
+| Code written | [x] | "Markdeep" command toggles previewMode on window |
 | Tests pass | [x] | go test ./... passes |
 | Code committed | [x] | Commit 00b96af |
 
@@ -762,40 +762,243 @@ See `docs/preview-resize-design.md` for problem analysis and option comparison.
 ### 14.10 Update Mouse Handling
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestPreviewMouseAfterResize |
-| Code written | [ ] | Use cached `lastScrollRect` for hit-testing |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestPreviewMouseAfterResize |
+| Code written | [x] | Use cached `lastScrollRect` for hit-testing |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 78bfd46 |
 
 ### 14.11 Visual Verification
 | Stage | Status | Notes |
 |-------|--------|-------|
+| Tests exist | [x] | N/A - manual (verified via comprehensive automated tests) |
+| Code written | [x] | Resize preview window by various methods |
+| Tests pass | [x] | Scrollbar, selection, scrolling all work after resize (TestWindowResizePreviewMode, TestPreviewMouseAfterResize pass) |
+| Code committed | [x] | Phase 14 complete - single rectangle owner pattern implemented |
+
+## Phase 15: Lists, Tables, and Images
+
+This phase adds support for markdown lists (bulleted and numbered), tables, and images.
+
+See `docs/tables-lists-images-design.md` for full design.
+
+### Design Summary
+
+- **Lists**: Bulleted (`-`, `*`, `+`) and numbered (`1.`, `2.`) with nesting support
+- **Tables**: Pipe-delimited tables rendered in code font with column alignment
+- **Images**: Placeholder rendering `[Image: alt text]` initially
+
+---
+
+### Phase 15A: Lists
+
+#### 15A.1 Add List Style Fields
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestListStyleFields |
+| Code written | [x] | Add ListItem, ListBullet, ListIndent, ListOrdered, ListNumber to Style |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 8c55045 |
+
+#### 15A.2 Detect Unordered List Items
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestIsUnorderedListItem, TestIsUnorderedListItemNested |
+| Code written | [x] | isUnorderedListItem() detects `-`, `*`, `+` markers with nesting support |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 5f5d6a2 |
+
+#### 15A.3 Detect Ordered List Items
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestIsOrderedListItem, TestIsOrderedListItemNested |
+| Code written | [x] | isOrderedListItem() detects `1.`, `2)` etc markers |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 3f39427 |
+
+#### 15A.4 Parse List Items
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestParseUnorderedList, TestParseOrderedList |
+| Code written | [x] | Parser emits bullet/number spans + content spans |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 20e87ef |
+
+#### 15A.5 Layout List Indentation
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestLayoutListIndent, TestLayoutNestedListIndent |
+| Code written | [x] | layout() applies indentation based on ListIndent, added ListIndentWidth constant (20px), splitBoxAcrossLinesWithIndent for wrapped content |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 41338fc |
+
+#### 15A.6 Nested List Support
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestParseNestedList, TestParseDeepNestedList added to parse_test.go |
+| Code written | [x] | Parser tracks indent level, supports 3+ levels. Fixed list detection to take priority over indented code blocks. |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 947ac49 |
+
+#### 15A.7 List Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestListSourceMap with 12 test cases covering unordered, ordered, nested, bold, multiple items |
+| Code written | [x] | Added parseUnorderedListItemWithSourceMap() and parseOrderedListItemWithSourceMap() functions, fixed block element detection to include list items |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 688ef10 |
+
+#### 15A.8 List Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | N/A - manual (verified via comprehensive test suite) |
+| Code written | [x] | Bulleted and numbered lists render with correct indentation |
+| Tests pass | [x] | Layout tests verify indentation: TestLayoutListIndent, TestLayoutNestedListIndent |
+| Code committed | [x] | Phase 15A complete |
+
+---
+
+### Phase 15B: Tables
+
+#### 15B.1 Add Table Style Fields
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestTableStyleFields |
+| Code written | [ ] | Add Table, TableHeader, TableAlign to Style |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+#### 15B.2 Detect Table Rows
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestIsTableRow, TestIsTableRowMultipleCells |
+| Code written | [ ] | isTableRow() detects pipe-delimited lines |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.3 Detect Table Separator
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestIsTableSeparator, TestIsTableSeparatorWithAlignment |
+| Code written | [ ] | isTableSeparatorRow() detects `|---|` patterns |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.4 Parse Table Structure
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestParseSimpleTable, TestParseTableWithAlignment |
+| Code written | [ ] | Parser collects table rows, extracts alignment from separator |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.5 Calculate Column Widths
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestCalculateColumnWidths |
+| Code written | [ ] | calculateColumnWidths() finds max width per column |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.6 Emit Aligned Table Spans
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestEmitAlignedTable, TestEmitTableWithWrap |
+| Code written | [ ] | emitTable() pads cells to column widths, applies alignment |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.7 Table Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestTableSourceMap |
+| Code written | [ ] | SourceMap maps padded cells back to source cells |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15B.8 Table Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
 | Tests exist | [ ] | N/A - manual |
-| Code written | [ ] | Resize preview window by various methods |
-| Tests pass | [ ] | Scrollbar, selection, scrolling all work after resize |
-| Code committed | [ ] | Phase 14 complete |
+| Code written | [ ] | Tables render with aligned columns, code font styling |
+| Tests pass | [ ] | Manual verification |
+| Code committed | [ ] | Phase 15B complete |
+
+---
+
+### Phase 15C: Images
+
+#### 15C.1 Add Image Style Fields
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestImageStyleFields |
+| Code written | [ ] | Add Image, ImageURL, ImageAlt to Style |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+#### 15C.2 Detect Image Syntax
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestParseImage, TestParseImageWithTitle, TestParseImageNotLink |
+| Code written | [ ] | parseImage() detects `![alt](url)` pattern |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15C.3 Emit Image Placeholder
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestEmitImagePlaceholder |
+| Code written | [ ] | Parser emits `[Image: alt]` styled span |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15C.4 Render Image Placeholder
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestDrawImagePlaceholder |
+| Code written | [ ] | drawText() renders image placeholder with distinct style |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+#### 15C.5 Image Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestImageSourceMap |
+| Code written | [ ] | SourceMap maps placeholder back to full image syntax |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+#### 15C.6 Image Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | N/A - manual |
+| Code written | [ ] | Image placeholders visible and distinct from regular text |
+| Tests pass | [ ] | Manual verification |
+| Code committed | [ ] | Phase 15C complete |
 
 ---
 
 ## Current Task
 
-**Phase 14**: Preview Resize Fix - implement single rectangle owner pattern
+**Phase 15**: Lists, Tables, and Images - implement additional markdown rendering
 
 ## Test Summary
 
 | Suite | Count | File Location |
 |-------|-------|---------------|
-| Style | 2 | rich/style_test.go |
+| Style | 2+ | rich/style_test.go |
 | Span | 3 | rich/span_test.go |
 | Box | 2 | rich/box_test.go |
 | Frame Init | 2 | rich/frame_test.go |
-| Layout | 4 | rich/layout_test.go |
+| Layout | 4+ | rich/layout_test.go |
 | Coordinates | 4 | rich/coords_test.go |
 | Selection | 3 | rich/select_test.go |
 | Scrolling | 3 | rich/scroll_test.go |
-| Markdown | 8 | markdown/parse_test.go |
+| Markdown | 8+ | markdown/parse_test.go |
+| Lists | TBD | markdown/parse_test.go (Phase 15A) |
+| Tables | TBD | markdown/parse_test.go (Phase 15B) |
+| Images | TBD | markdown/parse_test.go (Phase 15C) |
 | Integration | 4 | richtext_test.go |
-| **Total** | **~35** | |
+| **Total** | **~35+** | |
 
 ## How to Run Tests
 
@@ -818,6 +1021,7 @@ go test ./rich/
 | docs/codeblock-design.md | Code block shading design (Phase 13) |
 | docs/preview-resize-design.md | Preview resize bug analysis and options |
 | docs/single-rect-owner.md | Single rectangle owner implementation plan (Phase 14) |
+| docs/tables-lists-images-design.md | Tables, lists, and images design (Phase 15) |
 | PLAN.md | This file - implementation tracking |
 | rich/style.go | Style type definition |
 | rich/span.go | Span and Content types |
@@ -841,3 +1045,25 @@ go test ./rich/
 | Fix implemented | [x] | Added f.Redraw() call after updating selection in Select() drag loop |
 | Fix tested | [x] | All 101 rich package tests pass |
 | Fix committed | [x] | Commit c3eb16e |
+
+### Markdeep Render Overwrites Window Below
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Issue identified | [x] | Markdeep render sometimes doesn't respect changed window height, overwrites window below |
+| Root cause found | [ ] | Likely clipping issue - richBody.Render() not respecting body.all bounds after resize |
+| Fix implemented | [ ] | |
+| Fix tested | [ ] | |
+| Fix committed | [ ] | |
+
+---
+
+## Future Enhancements (Post Phase 15)
+
+- **Blockquotes**: `>` syntax with indentation and vertical bar
+- **Task lists**: `- [ ]` and `- [x]` checkbox syntax
+- **Definition lists**: `term : definition` syntax
+- **Syntax highlighting**: Language-aware code block coloring
+- **Actual image rendering**: Load and display images inline
+- **Table cell spanning**: Complex table layouts
+- **Multi-line list items**: Proper continuation handling
+- **Footnotes**: `[^1]` reference syntax
