@@ -3274,3 +3274,481 @@ func TestTableNotTable(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Phase 15C: Image Tests
+// ============================================================================
+
+func TestParseImage(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text    string
+			isImage bool
+			alt     string
+			url     string
+		}
+	}{
+		{
+			name:  "simple image",
+			input: "![Logo](logo.png)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: Logo]", isImage: true, alt: "Logo", url: "logo.png"},
+			},
+		},
+		{
+			name:  "image with path",
+			input: "![Screenshot](images/screen.png)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: Screenshot]", isImage: true, alt: "Screenshot", url: "images/screen.png"},
+			},
+		},
+		{
+			name:  "image with url",
+			input: "![Remote](https://example.com/image.jpg)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: Remote]", isImage: true, alt: "Remote", url: "https://example.com/image.jpg"},
+			},
+		},
+		{
+			name:  "image with empty alt",
+			input: "![](image.png)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image]", isImage: true, alt: "", url: "image.png"},
+			},
+		},
+		{
+			name:  "image in text",
+			input: "See this image ![chart](chart.png) for details.",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "See this image ", isImage: false},
+				{text: "[Image: chart]", isImage: true, alt: "chart", url: "chart.png"},
+				{text: " for details.", isImage: false},
+			},
+		},
+		{
+			name:  "image at start of text",
+			input: "![icon](icon.png) Click here",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: icon]", isImage: true, alt: "icon", url: "icon.png"},
+				{text: " Click here", isImage: false},
+			},
+		},
+		{
+			name:  "image at end of text",
+			input: "Here is an example: ![example](ex.png)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "Here is an example: ", isImage: false},
+				{text: "[Image: example]", isImage: true, alt: "example", url: "ex.png"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Image != want.isImage {
+					t.Errorf("span[%d].Image = %v, want %v (style: %+v)", i, got[i].Style.Image, want.isImage, got[i].Style)
+				}
+				if want.isImage {
+					if got[i].Style.ImageAlt != want.alt {
+						t.Errorf("span[%d].ImageAlt = %q, want %q", i, got[i].Style.ImageAlt, want.alt)
+					}
+					if got[i].Style.ImageURL != want.url {
+						t.Errorf("span[%d].ImageURL = %q, want %q", i, got[i].Style.ImageURL, want.url)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestParseImageWithTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text    string
+			isImage bool
+			alt     string
+			url     string
+		}
+	}{
+		{
+			name:  "image with double-quoted title",
+			input: `![Logo](logo.png "Company Logo")`,
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: Logo]", isImage: true, alt: "Logo", url: "logo.png"},
+			},
+		},
+		{
+			name:  "image with single-quoted title",
+			input: `![Logo](logo.png 'Company Logo')`,
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				alt     string
+				url     string
+			}{
+				{text: "[Image: Logo]", isImage: true, alt: "Logo", url: "logo.png"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Image != want.isImage {
+					t.Errorf("span[%d].Image = %v, want %v", i, got[i].Style.Image, want.isImage)
+				}
+				if want.isImage {
+					if got[i].Style.ImageAlt != want.alt {
+						t.Errorf("span[%d].ImageAlt = %q, want %q", i, got[i].Style.ImageAlt, want.alt)
+					}
+					if got[i].Style.ImageURL != want.url {
+						t.Errorf("span[%d].ImageURL = %q, want %q", i, got[i].Style.ImageURL, want.url)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestParseImageInline(t *testing.T) {
+	// Test that images work inline with other formatting
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text    string
+			isImage bool
+			isBold  bool
+			isCode  bool
+		}
+	}{
+		{
+			name:  "image with bold text",
+			input: "**Bold** and ![img](a.png)",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				isBold  bool
+				isCode  bool
+			}{
+				{text: "Bold", isBold: true},
+				{text: " and ", isBold: false},
+				{text: "[Image: img]", isImage: true},
+			},
+		},
+		{
+			name:  "image between code spans",
+			input: "`code` ![img](a.png) `more code`",
+			wantSpan: []struct {
+				text    string
+				isImage bool
+				isBold  bool
+				isCode  bool
+			}{
+				{text: "code", isCode: true},
+				{text: " ", isCode: false},
+				{text: "[Image: img]", isImage: true},
+				{text: " ", isCode: false},
+				{text: "more code", isCode: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Image != want.isImage {
+					t.Errorf("span[%d].Image = %v, want %v", i, got[i].Style.Image, want.isImage)
+				}
+				if got[i].Style.Bold != want.isBold {
+					t.Errorf("span[%d].Bold = %v, want %v", i, got[i].Style.Bold, want.isBold)
+				}
+				if got[i].Style.Code != want.isCode {
+					t.Errorf("span[%d].Code = %v, want %v", i, got[i].Style.Code, want.isCode)
+				}
+			}
+		})
+	}
+}
+
+func TestParseImageNotLink(t *testing.T) {
+	// Test that images are distinguished from regular links
+	tests := []struct {
+		name    string
+		input   string
+		isImage bool
+		isLink  bool
+	}{
+		{
+			name:    "image syntax",
+			input:   "![alt](url)",
+			isImage: true,
+			isLink:  false,
+		},
+		{
+			name:    "link syntax",
+			input:   "[text](url)",
+			isImage: false,
+			isLink:  true,
+		},
+		{
+			name:    "exclamation not followed by bracket",
+			input:   "! [text](url)",
+			isImage: false,
+			isLink:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) == 0 {
+				t.Fatal("no spans returned")
+			}
+			// Find the span that should be image or link
+			found := false
+			for _, span := range got {
+				if span.Style.Image || span.Style.Link {
+					found = true
+					if span.Style.Image != tt.isImage {
+						t.Errorf("Image = %v, want %v", span.Style.Image, tt.isImage)
+					}
+					if span.Style.Link != tt.isLink {
+						t.Errorf("Link = %v, want %v", span.Style.Link, tt.isLink)
+					}
+					break
+				}
+			}
+			if !found && (tt.isImage || tt.isLink) {
+				t.Errorf("no image or link span found in %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestParseImageNotImage(t *testing.T) {
+	// Test that certain patterns are NOT parsed as images
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "unclosed alt bracket",
+			input: "![unclosed alt(image.png)",
+		},
+		{
+			name:  "no opening paren",
+			input: "![alt text]image.png)",
+		},
+		{
+			name:  "unclosed url paren",
+			input: "![alt](image.png",
+		},
+		{
+			name:  "exclamation with space before bracket",
+			input: "! [not an image](url)",
+		},
+		{
+			name:  "exclamation alone",
+			input: "!",
+		},
+		{
+			name:  "exclamation with text",
+			input: "!Hello world",
+		},
+		{
+			name:  "image syntax in code block",
+			input: "```\n![alt](url)\n```",
+		},
+		{
+			name:  "image syntax in inline code",
+			input: "`![alt](url)`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			for _, span := range got {
+				if span.Style.Image {
+					t.Errorf("unexpected image span found in %q: %+v", tt.input, span)
+				}
+			}
+		})
+	}
+}
+
+func TestParseMultipleImages(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		imageCount int
+		wantAlts   []string
+	}{
+		{
+			name:       "two images",
+			input:      "![one](1.png) and ![two](2.png)",
+			imageCount: 2,
+			wantAlts:   []string{"one", "two"},
+		},
+		{
+			name:       "three images in sequence",
+			input:      "![a](1)![b](2)![c](3)",
+			imageCount: 3,
+			wantAlts:   []string{"a", "b", "c"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			var images []rich.Span
+			for _, span := range got {
+				if span.Style.Image {
+					images = append(images, span)
+				}
+			}
+			if len(images) != tt.imageCount {
+				t.Errorf("got %d images, want %d", len(images), tt.imageCount)
+				return
+			}
+			for i, alt := range tt.wantAlts {
+				if images[i].Style.ImageAlt != alt {
+					t.Errorf("image[%d].ImageAlt = %q, want %q", i, images[i].Style.ImageAlt, alt)
+				}
+			}
+		})
+	}
+}
+
+func TestImagePlaceholderStyle(t *testing.T) {
+	// Test that image placeholders have appropriate styling
+	got := Parse("![Logo](logo.png)")
+
+	if len(got) != 1 {
+		t.Fatalf("got %d spans, want 1", len(got))
+	}
+
+	span := got[0]
+	if !span.Style.Image {
+		t.Fatal("span.Style.Image = false, want true")
+	}
+
+	// Image placeholders should have a distinctive appearance
+	// The exact color values can be adjusted, but they should exist
+	if span.Style.Fg == nil && span.Style.Bg == nil {
+		t.Log("Warning: image placeholder has no distinctive colors set")
+	}
+}
+
+func TestImageSourceMap(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "simple image source mapping",
+			input: "![alt](url)",
+		},
+		{
+			name:  "image in document",
+			input: "# Header\n\n![diagram](diagram.png)\n\nSome text after.",
+		},
+		{
+			name:  "multiple images",
+			input: "![one](1.png) and ![two](2.png)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, sourceMap, _ := ParseWithSourceMap(tt.input)
+
+			// Verify content was parsed
+			if len(content) == 0 {
+				t.Error("no content parsed")
+				return
+			}
+
+			// Verify source map exists and can map positions
+			totalLen := 0
+			for _, span := range content {
+				totalLen += len([]rune(span.Text))
+			}
+
+			if totalLen > 0 {
+				// Map from start of rendered to source
+				srcStart, srcEnd := sourceMap.ToSource(0, 1)
+				if srcStart < 0 || srcEnd < 0 {
+					t.Errorf("invalid source mapping: srcStart=%d, srcEnd=%d", srcStart, srcEnd)
+				}
+			}
+		})
+	}
+}

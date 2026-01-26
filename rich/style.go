@@ -31,6 +31,11 @@ type Style struct {
 	TableHeader bool      // This is a header cell
 	TableAlign  Alignment // Cell alignment (left, center, right)
 
+	// Image placeholder
+	Image    bool   // This span is an image placeholder
+	ImageURL string // URL/path of the image
+	ImageAlt string // Alt text
+
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
 	Scale float64

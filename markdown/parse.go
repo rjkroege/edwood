@@ -351,13 +351,77 @@ func parseLine(line string) []rich.Span {
 	return parseInlineFormatting(line, rich.DefaultStyle())
 }
 
-// parseInlineFormatting parses code spans, bold/italic markers, and links in text and returns styled spans.
+// parseInlineFormatting parses code spans, bold/italic markers, links, and images in text and returns styled spans.
 func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 	var spans []rich.Span
 	var currentText strings.Builder
 	i := 0
 
 	for i < len(text) {
+		// Check for ![ (potential image) - must be checked before link
+		if text[i] == '!' && i+1 < len(text) && text[i+1] == '[' {
+			// Try to parse as image: ![alt](url)
+			altEnd := strings.Index(text[i+2:], "]")
+			if altEnd != -1 {
+				closeBracket := i + 2 + altEnd
+				// Check if immediately followed by (
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					// Find closing ) - handle titles like ![alt](url "title") or ![alt](url 'title')
+					urlStart := closeBracket + 2
+					urlEnd := -1
+					for j := urlStart; j < len(text); j++ {
+						if text[j] == ')' {
+							urlEnd = j
+							break
+						}
+					}
+					if urlEnd != -1 {
+						// We have a valid image pattern
+						// Flush any accumulated plain text
+						if currentText.Len() > 0 {
+							spans = append(spans, rich.Span{
+								Text:  currentText.String(),
+								Style: baseStyle,
+							})
+							currentText.Reset()
+						}
+
+						// Extract alt text and URL
+						altText := text[i+2 : closeBracket]
+						urlPart := text[urlStart:urlEnd]
+						// Parse URL (may contain title)
+						url := parseURLPart(urlPart)
+
+						// Create image placeholder span
+						placeholderText := "[Image: " + altText + "]"
+						if altText == "" {
+							placeholderText = "[Image]"
+						}
+						imageStyle := rich.Style{
+							Fg:       rich.LinkBlue, // Use blue like links for now
+							Bg:       baseStyle.Bg,
+							Image:    true,
+							ImageURL: url,
+							ImageAlt: altText,
+							Scale:    baseStyle.Scale,
+						}
+						spans = append(spans, rich.Span{
+							Text:  placeholderText,
+							Style: imageStyle,
+						})
+
+						// Skip past the entire image syntax
+						i = urlEnd + 1
+						continue
+					}
+				}
+			}
+			// Not a valid image, treat ! as regular text
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
 		// Check for [ (potential link) - must be checked early
 		if text[i] == '[' {
 			// Try to parse as link: [text](url)
@@ -569,6 +633,61 @@ func parseInlineFormattingWithListStyle(text string, baseStyle rich.Style) []ric
 	i := 0
 
 	for i < len(text) {
+		// Check for ![ (potential image) - must be checked before link
+		if text[i] == '!' && i+1 < len(text) && text[i+1] == '[' {
+			altEnd := strings.Index(text[i+2:], "]")
+			if altEnd != -1 {
+				closeBracket := i + 2 + altEnd
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					urlStart := closeBracket + 2
+					urlEnd := -1
+					for j := urlStart; j < len(text); j++ {
+						if text[j] == ')' {
+							urlEnd = j
+							break
+						}
+					}
+					if urlEnd != -1 {
+						if currentText.Len() > 0 {
+							spans = append(spans, rich.Span{
+								Text:  currentText.String(),
+								Style: baseStyle,
+							})
+							currentText.Reset()
+						}
+						altText := text[i+2 : closeBracket]
+						urlPart := text[urlStart:urlEnd]
+						url := parseURLPart(urlPart)
+						placeholderText := "[Image: " + altText + "]"
+						if altText == "" {
+							placeholderText = "[Image]"
+						}
+						imageStyle := rich.Style{
+							Fg:          rich.LinkBlue,
+							Bg:          baseStyle.Bg,
+							Image:       true,
+							ImageURL:    url,
+							ImageAlt:    altText,
+							ListItem:    baseStyle.ListItem,
+							ListIndent:  baseStyle.ListIndent,
+							ListOrdered: baseStyle.ListOrdered,
+							ListNumber:  baseStyle.ListNumber,
+							Scale:       baseStyle.Scale,
+						}
+						spans = append(spans, rich.Span{
+							Text:  placeholderText,
+							Style: imageStyle,
+						})
+						i = urlEnd + 1
+						continue
+					}
+				}
+			}
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
 		// Check for [ (potential link) - must be checked early
 		if text[i] == '[' {
 			linkEnd := strings.Index(text[i+1:], "]")
@@ -1058,6 +1177,27 @@ func parseInlineFormattingNoLinks(text string, baseStyle rich.Style) []rich.Span
 	}
 
 	return spans
+}
+
+// parseURLPart extracts the URL from a URL part that may contain an optional title.
+// Handles formats like: "url", "url 'title'", or "url \"title\"".
+func parseURLPart(urlPart string) string {
+	urlPart = strings.TrimSpace(urlPart)
+	if urlPart == "" {
+		return ""
+	}
+
+	// Check for title with double quotes: url "title"
+	if idx := strings.Index(urlPart, " \""); idx != -1 {
+		return strings.TrimSpace(urlPart[:idx])
+	}
+
+	// Check for title with single quotes: url 'title'
+	if idx := strings.Index(urlPart, " '"); idx != -1 {
+		return strings.TrimSpace(urlPart[:idx])
+	}
+
+	return urlPart
 }
 
 // isHorizontalRule returns true if the line is a horizontal rule.
