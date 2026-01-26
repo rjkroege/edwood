@@ -27,6 +27,10 @@ func DefaultStyle() Style {
 // LinkBlue is the standard blue color for hyperlinks.
 var LinkBlue = color.RGBA{R: 0, G: 0, B: 238, A: 255}
 
+// InlineCodeBg is the light gray background for inline code spans.
+// Uses RGB values around 230 for a subtle but visible distinction.
+var InlineCodeBg = color.RGBA{R: 230, G: 230, B: 230, A: 255}
+
 // Common styles
 var (
 	StyleH1     = Style{Bold: true, Scale: 2.0}

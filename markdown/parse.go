@@ -169,7 +169,7 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 					Text: text[i+1 : i+1+end],
 					Style: rich.Style{
 						Fg:    baseStyle.Fg,
-						Bg:    baseStyle.Bg,
+						Bg:    rich.InlineCodeBg,
 						Code:  true,
 						Scale: baseStyle.Scale,
 					},
@@ -321,7 +321,7 @@ func parseInlineFormattingNoLinks(text string, baseStyle rich.Style) []rich.Span
 					Text: text[i+1 : i+1+end],
 					Style: rich.Style{
 						Fg:    baseStyle.Fg,
-						Bg:    baseStyle.Bg,
+						Bg:    rich.InlineCodeBg,
 						Code:  true,
 						Link:  baseStyle.Link,
 						Scale: baseStyle.Scale,

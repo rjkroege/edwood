@@ -901,3 +901,108 @@ func TestLinkHasBlueColor(t *testing.T) {
 		t.Errorf("link Fg blue component too low: %d, want >= 128", b8)
 	}
 }
+
+func TestInlineCodeBackground(t *testing.T) {
+	// Inline code spans should have a background color set
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "simple code span",
+			input: "`code`",
+		},
+		{
+			name:  "code span with content",
+			input: "`fmt.Println()`",
+		},
+		{
+			name:  "code span with special chars",
+			input: "`x := y + z`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+
+			if len(got) != 1 {
+				t.Fatalf("got %d spans, want 1 span\n  got: %+v", len(got), got)
+			}
+
+			span := got[0]
+			if !span.Style.Code {
+				t.Fatal("span.Style.Code = false, want true")
+			}
+
+			if span.Style.Bg == nil {
+				t.Fatal("span.Style.Bg is nil, want inline code background color")
+			}
+
+			// Check that background is a light gray (high RGB values, roughly equal)
+			r, g, b, _ := span.Style.Bg.RGBA()
+			// Convert from 16-bit to 8-bit for easier comparison
+			r8, g8, b8 := r>>8, g>>8, b>>8
+
+			// Should be light (all components >= 200)
+			if r8 < 200 || g8 < 200 || b8 < 200 {
+				t.Errorf("inline code Bg is not light enough: R=%d, G=%d, B=%d (want all >= 200)", r8, g8, b8)
+			}
+
+			// Should be grayish (components roughly equal, within 20 of each other)
+			if abs(int(r8)-int(g8)) > 20 || abs(int(g8)-int(b8)) > 20 || abs(int(r8)-int(b8)) > 20 {
+				t.Errorf("inline code Bg is not gray: R=%d, G=%d, B=%d (want components within 20)", r8, g8, b8)
+			}
+		})
+	}
+}
+
+func TestInlineCodeWithSurroundingText(t *testing.T) {
+	// When inline code is surrounded by text, only the code span should have a background
+	got := Parse("use the `fmt.Println` function")
+
+	if len(got) != 3 {
+		t.Fatalf("got %d spans, want 3 spans\n  got: %+v", len(got), got)
+	}
+
+	// First span: "use the " - should NOT have background
+	if got[0].Text != "use the " {
+		t.Errorf("span[0].Text = %q, want %q", got[0].Text, "use the ")
+	}
+	if got[0].Style.Code {
+		t.Error("span[0].Style.Code = true, want false")
+	}
+	if got[0].Style.Bg != nil {
+		t.Errorf("span[0].Style.Bg = %v, want nil (no background for plain text)", got[0].Style.Bg)
+	}
+
+	// Second span: "fmt.Println" - should have Code=true and Bg set
+	if got[1].Text != "fmt.Println" {
+		t.Errorf("span[1].Text = %q, want %q", got[1].Text, "fmt.Println")
+	}
+	if !got[1].Style.Code {
+		t.Error("span[1].Style.Code = false, want true")
+	}
+	if got[1].Style.Bg == nil {
+		t.Error("span[1].Style.Bg is nil, want inline code background color")
+	}
+
+	// Third span: " function" - should NOT have background
+	if got[2].Text != " function" {
+		t.Errorf("span[2].Text = %q, want %q", got[2].Text, " function")
+	}
+	if got[2].Style.Code {
+		t.Error("span[2].Style.Code = true, want false")
+	}
+	if got[2].Style.Bg != nil {
+		t.Errorf("span[2].Style.Bg = %v, want nil (no background for plain text)", got[2].Style.Bg)
+	}
+}
+
+// abs returns the absolute value of x.
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
