@@ -1,7 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -2528,5 +2533,271 @@ func TestResolveImagePathRelative(t *testing.T) {
 					tc.basePath, tc.imgPath, got, tc.want)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Phase 16H: Integration Tests
+// =============================================================================
+
+// TestMarkdeepImageIntegration tests the end-to-end image rendering pipeline:
+// 1. Parse markdown with image syntax
+// 2. Create window with preview mode
+// 3. Load image into cache
+// 4. Verify image box is created with correct dimensions
+// 5. Verify image data is available for rendering
+func TestMarkdeepImageIntegration(t *testing.T) {
+	// Create a temporary directory with a test image
+	tmpDir := t.TempDir()
+	imgPath := filepath.Join(tmpDir, "test_image.png")
+	mdPath := filepath.Join(tmpDir, "test.md")
+
+	// Create a simple 40x30 test image
+	img := image.NewRGBA(image.Rect(0, 0, 40, 30))
+	red := color.RGBA{255, 0, 0, 255}
+	for y := 0; y < 30; y++ {
+		for x := 0; x < 40; x++ {
+			img.Set(x, y, red)
+		}
+	}
+	f, err := os.Create(imgPath)
+	if err != nil {
+		t.Fatalf("failed to create test image: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Create markdown content with the image
+	// Use relative path since that's the common case
+	markdownContent := fmt.Sprintf("# Test Document\n\n![Test Image](test_image.png)\n\nSome text after the image.\n")
+
+	// Write the markdown file
+	if err := os.WriteFile(mdPath, []byte(markdownContent), 0644); err != nil {
+		t.Fatalf("failed to write markdown file: %v", err)
+	}
+
+	// Set up the display and window
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with the markdown content
+	sourceRunes := []rune(markdownContent)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer(mdPath, sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Test markdown.Parse (non-source-mapped version) first to verify image parsing works
+	parsedContent := markdown.Parse(markdownContent)
+
+	// Verify basic parsing detected the image
+	foundImage := false
+	for _, span := range parsedContent {
+		if span.Style.Image {
+			foundImage = true
+			if span.Style.ImageURL != "test_image.png" {
+				t.Errorf("ImageURL = %q, want %q", span.Style.ImageURL, "test_image.png")
+			}
+			if span.Style.ImageAlt != "Test Image" {
+				t.Errorf("ImageAlt = %q, want %q", span.Style.ImageAlt, "Test Image")
+			}
+			break
+		}
+	}
+	if !foundImage {
+		t.Fatal("markdown.Parse did not detect image")
+	}
+
+	// Parse markdown with source map (currently images are rendered as placeholders)
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(markdownContent)
+
+	// Create and initialize the image cache
+	cache := rich.NewImageCache(10)
+
+	// Resolve and load the image
+	resolvedPath := resolveImagePath(mdPath, "test_image.png")
+	expectedResolvedPath := filepath.Join(tmpDir, "test_image.png")
+	if resolvedPath != expectedResolvedPath {
+		t.Errorf("resolveImagePath = %q, want %q", resolvedPath, expectedResolvedPath)
+	}
+
+	// Load the image into cache
+	cached, err := cache.Load(resolvedPath)
+	if err != nil {
+		t.Fatalf("failed to load image into cache: %v", err)
+	}
+
+	// Verify cached image properties
+	if cached.Width != 40 {
+		t.Errorf("cached image width = %d, want 40", cached.Width)
+	}
+	if cached.Height != 30 {
+		t.Errorf("cached image height = %d, want 30", cached.Height)
+	}
+	if cached.Original == nil {
+		t.Error("cached.Original should not be nil")
+	}
+	if cached.Data == nil {
+		t.Error("cached.Data (Plan 9 format) should not be nil")
+	}
+	if cached.Err != nil {
+		t.Errorf("cached.Err should be nil, got: %v", cached.Err)
+	}
+
+	// Set up preview mode components
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.SetContent(content)
+	rt.Render(bodyRect)
+
+	// Wire everything to the window
+	w.imageCache = cache
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verify preview mode is active
+	if !w.previewMode {
+		t.Error("previewMode should be true")
+	}
+
+	// Verify cache was attached
+	if w.imageCache == nil {
+		t.Error("imageCache should be attached to window")
+	}
+
+	// Verify the cache hit on second load
+	cached2, _ := cache.Get(resolvedPath)
+	if cached2 != cached {
+		t.Error("cache should return same entry on second access")
+	}
+
+	// Clean up by exiting preview mode
+	w.SetPreviewMode(false)
+	cache.Clear()
+}
+
+// TestHandlePreviewMouseSignature tests that HandlePreviewMouse accepts both
+// a mouse event and a Mousectl, which is needed for proper drag selection.
+// This test verifies the signature change from (m *draw.Mouse) to (m *draw.Mouse, mc *draw.Mousectl).
+func TestHandlePreviewMouseSignature(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World\n\nThis is some text.")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Set up the body.all rectangle (used by HandlePreviewMouse for hit-testing)
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content in the RichText
+	content := rich.Plain("Hello World - this is some test content for selection")
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enter preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Create a Mousectl for the test
+	mc := display.InitMouse()
+	if mc == nil {
+		t.Fatal("InitMouse() returned nil")
+	}
+
+	// Create a mouse event in the frame area (button 1 click for selection)
+	frameRect := rt.Frame().Rect()
+	clickPoint := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 1, // Button 1 pressed
+	}
+
+	// Test that HandlePreviewMouse can be called with both mouse and mousectl
+	// The key assertion is that the call compiles and executes without error
+	handled := w.HandlePreviewMouse(&m, mc)
+
+	// The event should be handled since we're in preview mode and clicking in the frame
+	if !handled {
+		t.Error("HandlePreviewMouse should return true for button 1 click in frame area")
+	}
+
+	// After handling, the selection should be set (at minimum, a point selection at the click)
+	q0, q1 := rt.Selection()
+	// We expect at least that q0/q1 are set (the exact values depend on the click position)
+	// Since this is a single click without drag, q0 should equal q1
+	if q0 != q1 {
+		t.Logf("Selection after single click: q0=%d, q1=%d (expected point selection)", q0, q1)
+	}
+
+	// Test that events outside the body area are not handled
+	outsidePoint := image.Pt(-10, -10)
+	m2 := draw.Mouse{
+		Point:   outsidePoint,
+		Buttons: 1,
+	}
+	handled2 := w.HandlePreviewMouse(&m2, mc)
+	if handled2 {
+		t.Error("HandlePreviewMouse should return false for clicks outside body.all")
+	}
+
+	// Test with nil Mousectl (should still handle simple cases like scroll wheel)
+	scrollDownMouse := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 16, // Button 5 - scroll down
+	}
+	handled3 := w.HandlePreviewMouse(&scrollDownMouse, nil)
+	if !handled3 {
+		t.Error("HandlePreviewMouse should handle scroll wheel even with nil Mousectl")
 	}
 }

@@ -456,7 +456,7 @@ func MovedMouse(g *globals, m draw.Mouse) {
 	// In preview mode, the body area is fully controlled by the preview - don't fall through
 	if w != nil && t.what == Body && w.IsPreviewMode() {
 		w.Lock('M')
-		w.HandlePreviewMouse(&m)
+		w.HandlePreviewMouse(&m, global.mousectl)
 		w.Unlock()
 		return
 	}

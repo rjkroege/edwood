@@ -659,7 +659,7 @@ func (w *Window) Draw() {
 // HandlePreviewMouse handles mouse events when the window is in preview mode.
 // Returns true if the event was handled by the preview mode, false otherwise.
 // When false is returned, the caller should handle the event normally.
-func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
+func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	if !w.previewMode || w.richBody == nil {
 		return false
 	}
