@@ -657,6 +657,10 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 			if pb.Box.IsNewline() || pb.Box.IsTab() {
 				continue
 			}
+			// Skip images - they are handled in Phase 5
+			if pb.Box.IsImage() || (pb.Box.Style.Image && pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil) {
+				continue
+			}
 			if len(pb.Box.Text) == 0 {
 				continue
 			}
@@ -686,6 +690,45 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 
 			// Render the text
 			target.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
+		}
+	}
+
+	// Phase 5: Render images
+	// Images are rendered after text so they can overlay backgrounds properly.
+	// Images with load errors show a placeholder text instead.
+	for _, line := range lines {
+		// Skip lines that start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
+		for _, pb := range line.Boxes {
+			// Check if this is an image box
+			if !pb.Box.Style.Image {
+				continue
+			}
+
+			// Calculate position in target image
+			pt := image.Point{
+				X: offset.X + pb.X,
+				Y: offset.Y + line.Y,
+			}
+
+			// Check for error placeholder case
+			if pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil {
+				// Show error placeholder as text
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path)
+				continue
+			}
+
+			// Check if we have valid image data to render
+			if !pb.Box.IsImage() {
+				// No ImageData, show placeholder for unloaded image
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL)
+				continue
+			}
+
+			// Render the actual image
+			f.drawImageTo(target, pb, line, offset, frameWidth, frameHeight)
 		}
 	}
 }
@@ -1074,4 +1117,123 @@ func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
 		}
 	}
 	return f.font
+}
+
+// drawImageTo renders an image box to the target at the appropriate position.
+// The image is clipped to the frame boundaries using Intersect.
+func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line Line, offset image.Point, frameWidth, frameHeight int) {
+	if f.display == nil {
+		return
+	}
+
+	cached := pb.Box.ImageData
+	if cached == nil || cached.Data == nil || cached.Original == nil {
+		return
+	}
+
+	// Calculate the scaled dimensions for the image
+	scaledWidth, scaledHeight := imageBoxDimensions(&pb.Box, frameWidth)
+	if scaledWidth == 0 || scaledHeight == 0 {
+		return
+	}
+
+	// Calculate the destination rectangle
+	dstX := offset.X + pb.X
+	dstY := offset.Y + line.Y
+
+	// Create destination rectangle for the image
+	dstRect := image.Rect(dstX, dstY, dstX+scaledWidth, dstY+scaledHeight)
+
+	// Clip to frame bounds
+	clipRect := image.Rect(offset.X, offset.Y, offset.X+frameWidth, offset.Y+frameHeight)
+	clippedDst := dstRect.Intersect(clipRect)
+	if clippedDst.Empty() {
+		return
+	}
+
+	// Allocate an image to hold the pixel data
+	// Use RGBA32 format to match our ConvertToPlan9 output
+	srcRect := image.Rect(0, 0, cached.Width, cached.Height)
+	srcImg, err := f.display.AllocImage(srcRect, edwooddraw.RGBA32, false, 0)
+	if err != nil {
+		// Fall back to error placeholder
+		pt := image.Point{X: dstX, Y: dstY}
+		f.drawImageErrorPlaceholder(target, pt, cached.Path)
+		return
+	}
+	defer srcImg.Free()
+
+	// Load the pixel data into the source image
+	_, err = srcImg.Load(srcRect, cached.Data)
+	if err != nil {
+		// Fall back to error placeholder
+		pt := image.Point{X: dstX, Y: dstY}
+		f.drawImageErrorPlaceholder(target, pt, cached.Path)
+		return
+	}
+
+	// Calculate the source point for clipping
+	// If the destination was clipped, we need to adjust which part of the source we draw
+	srcPt := image.ZP
+	if dstRect.Min.X < clippedDst.Min.X {
+		// Left edge was clipped, adjust source X
+		srcPt.X = (clippedDst.Min.X - dstRect.Min.X) * cached.Width / scaledWidth
+	}
+	if dstRect.Min.Y < clippedDst.Min.Y {
+		// Top edge was clipped, adjust source Y
+		srcPt.Y = (clippedDst.Min.Y - dstRect.Min.Y) * cached.Height / scaledHeight
+	}
+
+	// Draw the image (using the display's draw operation for scaling)
+	// Note: Plan 9's draw doesn't do automatic scaling, so for scaled images
+	// we would need to either:
+	// 1. Pre-scale the image data before loading
+	// 2. Use a draw operation that supports scaling
+	// For now, we draw at the original size and clip
+	//
+	// When image is scaled down (scaledWidth < cached.Width), we draw the original
+	// and it will be clipped. For proper scaling, we'd need to scale the pixel data.
+	if scaledWidth == cached.Width && scaledHeight == cached.Height {
+		// No scaling needed, direct draw
+		target.Draw(clippedDst, srcImg, nil, srcPt)
+	} else {
+		// Image needs scaling - for now, draw at original size (clipped)
+		// A more sophisticated implementation would scale the pixel data first
+		// This produces correct results for images that fit; larger images are clipped
+		actualDst := image.Rect(dstX, dstY, dstX+cached.Width, dstY+cached.Height)
+		actualDst = actualDst.Intersect(clipRect)
+		if !actualDst.Empty() {
+			actualSrcPt := image.ZP
+			if dstX < actualDst.Min.X {
+				actualSrcPt.X = actualDst.Min.X - dstX
+			}
+			if dstY < actualDst.Min.Y {
+				actualSrcPt.Y = actualDst.Min.Y - dstY
+			}
+			target.Draw(actualDst, srcImg, nil, actualSrcPt)
+		}
+	}
+}
+
+// ImageErrorPlaceholderColor is the color used for image error placeholder text.
+var ImageErrorPlaceholderColor = color.RGBA{R: 200, G: 100, B: 100, A: 255}
+
+// drawImageErrorPlaceholder renders an error placeholder for failed image loads.
+// It displays "[Image: load failed]" at the specified position.
+func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string) {
+	if f.font == nil || f.textColor == nil {
+		return
+	}
+
+	// Create error placeholder text
+	placeholder := "[Image: load failed]"
+
+	// Use a reddish color for error placeholders
+	errorColor := f.allocColorImage(ImageErrorPlaceholderColor)
+	if errorColor == nil {
+		errorColor = f.textColor // Fall back to default text color
+	}
+
+	// Render the placeholder text
+	target.Bytes(pt, errorColor, image.ZP, f.font, []byte(placeholder))
 }

@@ -155,6 +155,14 @@ type FontForStyleFunc func(style Style) draw.Font
 // This is approximately 2 characters wide.
 const ListIndentWidth = 20
 
+// CodeBlockIndentChars is the number of 'M' characters to indent code blocks.
+const CodeBlockIndentChars = 4
+
+// CodeBlockIndent is the default code block indentation in pixels.
+// This assumes a typical M-width of 10 pixels (CodeBlockIndentChars * 10 = 40).
+// The actual indentation may vary based on the code font at runtime.
+const CodeBlockIndent = 40
+
 // imageBoxDimensions calculates the width and height for an image box,
 // scaling down if the image is wider than maxWidth.
 // Returns (0, 0) if the box is not an image with ImageData.
@@ -202,6 +210,13 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			return fontForStyleFn(style)
 		}
 		return font
+	}
+
+	// Calculate code block indent based on code font's M-width
+	codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+	if fontForStyleFn != nil {
+		codeFont := fontForStyleFn(Style{Code: true, Scale: 1.0})
+		codeBlockIndent = CodeBlockIndentChars * codeFont.BytesWidth([]byte("M"))
 	}
 
 	var lines []Line
@@ -265,16 +280,19 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			pendingParaBreak = false
 		}
 
-		// Calculate list indentation for this box
-		listIndentPixels := 0
+		// Calculate indentation for this box
+		indentPixels := 0
 		if box.Style.ListBullet || box.Style.ListItem {
-			listIndentPixels = box.Style.ListIndent * ListIndentWidth
+			indentPixels = box.Style.ListIndent * ListIndentWidth
 			currentListIndent = box.Style.ListIndent // Track for wrapped lines
+		} else if box.Style.Block && box.Style.Code {
+			// Code blocks get indentation based on code font M-width
+			indentPixels = codeBlockIndent
 		}
 
-		// Apply list indentation at the start of a line
-		if xPos == 0 && listIndentPixels > 0 {
-			xPos = listIndentPixels
+		// Apply indentation at the start of a line
+		if xPos == 0 && indentPixels > 0 {
+			xPos = indentPixels
 		}
 
 		// Calculate width for this box using the style-specific font
@@ -288,11 +306,17 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
 
-		// Effective frame width accounts for list indentation
-		effectiveFrameWidth := frameWidth - listIndentPixels
+		// Effective frame width accounts for indentation
+		effectiveFrameWidth := frameWidth - indentPixels
+
+		// Determine the current indent for wrapped lines
+		currentIndent := currentListIndent * ListIndentWidth
+		if box.Style.Block && box.Style.Code {
+			currentIndent = codeBlockIndent
+		}
 
 		// Check if we need to wrap
-		if xPos+width > frameWidth && xPos > listIndentPixels {
+		if xPos+width > frameWidth && xPos > indentPixels {
 			// Need to wrap - but only if we're not at the start of the content area
 			// First, check if this box can fit on a new line
 			// If the box is wider than effectiveFrameWidth, we'll need to split it
@@ -304,8 +328,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 					Y:      currentLine.Y + currentLine.Height,
 					Height: defaultFontHeight,
 				}
-				// Maintain list indentation on wrapped lines
-				xPos = currentListIndent * ListIndentWidth
+				// Maintain indentation on wrapped lines
+				xPos = currentIndent
 
 				// Recalculate tab width at new position
 				if box.IsTab() {
@@ -313,12 +337,12 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				}
 			} else {
 				// Box is wider than frame, need to split it
-				lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, currentListIndent*ListIndentWidth)
+				lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, currentIndent)
 				continue
 			}
-		} else if xPos == listIndentPixels && width > effectiveFrameWidth {
+		} else if xPos == indentPixels && width > effectiveFrameWidth {
 			// Box is at start of content area but still too wide - split it
-			lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, listIndentPixels)
+			lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, indentPixels)
 			continue
 		}
 

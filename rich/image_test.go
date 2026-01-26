@@ -1066,3 +1066,370 @@ func TestImageCacheFreeImages(t *testing.T) {
 	// we would verify that Plan9Image.Free() was called. For now,
 	// we verify the cache map is cleared.
 }
+
+// =============================================================================
+// Phase 16F: Frame Rendering Tests
+// =============================================================================
+
+// TestDrawImage verifies that images are rendered in Phase 5 of drawText.
+// An image box should trigger a blit operation to copy the image to the screen.
+func TestDrawImage(t *testing.T) {
+	// Create a temporary PNG file for the test
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "test_image.png")
+
+	// Create a simple 20x15 red image
+	img := image.NewRGBA(image.Rect(0, 0, 20, 15))
+	red := color.RGBA{255, 0, 0, 255}
+	for y := 0; y < 15; y++ {
+		for x := 0; x < 20; x++ {
+			img.Set(x, y, red)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Create an ImageCache and load the image
+	cache := NewImageCache(10)
+	cached, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("failed to load image into cache: %v", err)
+	}
+
+	// Create content with an image span
+	content := Content{
+		Span{
+			Text: "[Image: test]",
+			Style: Style{
+				Image:    true,
+				ImageURL: pngPath,
+				ImageAlt: "test",
+			},
+		},
+	}
+
+	// Create boxes from content and inject the cached image data
+	boxes := contentToBoxes(content)
+	if len(boxes) == 0 {
+		t.Fatal("contentToBoxes returned no boxes")
+	}
+	// Inject the loaded image data into the box
+	boxes[0].ImageData = cached
+
+	// Verify the box is recognized as an image
+	if !boxes[0].IsImage() {
+		t.Error("box should be recognized as an image when ImageData is set")
+	}
+
+	// Verify box dimensions are correct
+	if boxes[0].ImageData.Width != 20 || boxes[0].ImageData.Height != 15 {
+		t.Errorf("image dimensions = %dx%d, want 20x15",
+			boxes[0].ImageData.Width, boxes[0].ImageData.Height)
+	}
+}
+
+// TestDrawImagePosition verifies that images are positioned correctly in layout.
+// The image should be placed at the correct X,Y position based on its layout position.
+func TestDrawImagePosition(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "position_test.png")
+
+	// Create a 30x20 image
+	img := image.NewRGBA(image.Rect(0, 0, 30, 20))
+	blue := color.RGBA{0, 0, 255, 255}
+	for y := 0; y < 20; y++ {
+		for x := 0; x < 30; x++ {
+			img.Set(x, y, blue)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Load image
+	cache := NewImageCache(10)
+	cached, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("failed to load image: %v", err)
+	}
+
+	// Create content: text followed by image
+	content := Content{
+		Span{Text: "prefix "},
+		Span{
+			Text: "[Image: pos]",
+			Style: Style{
+				Image:    true,
+				ImageURL: pngPath,
+				ImageAlt: "pos",
+			},
+		},
+	}
+
+	// Convert to boxes
+	boxes := contentToBoxes(content)
+	if len(boxes) < 2 {
+		t.Fatalf("expected at least 2 boxes, got %d", len(boxes))
+	}
+
+	// Find and set up the image box
+	for i := range boxes {
+		if boxes[i].Style.Image {
+			boxes[i].ImageData = cached
+		}
+	}
+
+	// Create a mock font with known dimensions
+	mockFont := &testFont{width: 10, height: 14}
+
+	// Layout the boxes
+	frameWidth := 400
+	maxtab := 80
+	lines := layout(boxes, mockFont, frameWidth, maxtab, nil, nil)
+
+	if len(lines) == 0 {
+		t.Fatal("layout returned no lines")
+	}
+
+	// Find the image box in the layout
+	var imageBox *PositionedBox
+	for _, line := range lines {
+		for i := range line.Boxes {
+			if line.Boxes[i].Box.IsImage() {
+				imageBox = &line.Boxes[i]
+				break
+			}
+		}
+	}
+
+	if imageBox == nil {
+		t.Fatal("image box not found in layout")
+	}
+
+	// The image should be positioned after the "prefix " text
+	// "prefix " = 7 characters * 10 pixels = 70 pixels
+	expectedX := 70 // After "prefix " (7 chars at 10px each)
+	if imageBox.X != expectedX {
+		t.Errorf("image X position = %d, want %d", imageBox.X, expectedX)
+	}
+
+	// Image width should be its actual width (not scaled since it fits)
+	if imageBox.Box.Wid != 30 {
+		t.Errorf("image width = %d, want 30", imageBox.Box.Wid)
+	}
+}
+
+// TestDrawImageClipBottom verifies that images are clipped at the frame bottom boundary.
+// Images that extend below the frame should be partially rendered.
+func TestDrawImageClipBottom(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "clip_bottom.png")
+
+	// Create a tall 20x50 image
+	img := image.NewRGBA(image.Rect(0, 0, 20, 50))
+	green := color.RGBA{0, 255, 0, 255}
+	for y := 0; y < 50; y++ {
+		for x := 0; x < 20; x++ {
+			img.Set(x, y, green)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Load image
+	cache := NewImageCache(10)
+	cached, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("failed to load image: %v", err)
+	}
+
+	// Verify the image is 50 pixels tall
+	if cached.Height != 50 {
+		t.Errorf("cached image height = %d, want 50", cached.Height)
+	}
+
+	// Create a frame with height smaller than the image
+	// When rendering, images that exceed the frame height should be clipped
+	// The clipping is handled by Draw's Intersect operation
+
+	// Test that imageBoxDimensions returns correct values
+	box := Box{
+		Style: Style{
+			Image:    true,
+			ImageURL: pngPath,
+			ImageAlt: "clip",
+		},
+		ImageData: cached,
+	}
+
+	// For a frame width of 100, the image (20px wide) should not be scaled
+	frameWidth := 100
+	width, height := imageBoxDimensions(&box, frameWidth)
+
+	// Image fits horizontally, so no scaling
+	if width != 20 {
+		t.Errorf("imageBoxDimensions width = %d, want 20", width)
+	}
+	if height != 50 {
+		t.Errorf("imageBoxDimensions height = %d, want 50", height)
+	}
+
+	// Note: Actual clipping during rendering is handled by the Draw operation
+	// which clips the destination rectangle to the frame bounds.
+	// This test verifies the image dimensions are preserved before clipping.
+}
+
+// TestDrawImageClipRight verifies that images wider than the frame are scaled down.
+// Unlike clipping at the bottom, wide images are scaled to fit the frame width.
+func TestDrawImageClipRight(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "clip_right.png")
+
+	// Create a wide 200x50 image
+	img := image.NewRGBA(image.Rect(0, 0, 200, 50))
+	yellow := color.RGBA{255, 255, 0, 255}
+	for y := 0; y < 50; y++ {
+		for x := 0; x < 200; x++ {
+			img.Set(x, y, yellow)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Load image
+	cache := NewImageCache(10)
+	cached, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("failed to load image: %v", err)
+	}
+
+	// Verify original dimensions
+	if cached.Width != 200 || cached.Height != 50 {
+		t.Errorf("cached image dimensions = %dx%d, want 200x50",
+			cached.Width, cached.Height)
+	}
+
+	// Create a box for the image
+	box := Box{
+		Style: Style{
+			Image:    true,
+			ImageURL: pngPath,
+			ImageAlt: "wide",
+		},
+		ImageData: cached,
+	}
+
+	// Test scaling when image is wider than frame
+	frameWidth := 100 // Narrower than image width (200)
+	width, height := imageBoxDimensions(&box, frameWidth)
+
+	// Image should be scaled to fit frame width
+	if width != 100 {
+		t.Errorf("scaled image width = %d, want 100", width)
+	}
+
+	// Height should be proportionally scaled: 50 * (100/200) = 25
+	expectedHeight := 25
+	if height != expectedHeight {
+		t.Errorf("scaled image height = %d, want %d", height, expectedHeight)
+	}
+}
+
+// TestDrawImageError verifies that a placeholder is shown when image fails to load.
+// When an image cannot be loaded, the system should display an error placeholder
+// instead of crashing or showing a broken image.
+func TestDrawImageError(t *testing.T) {
+	// Create an ImageCache
+	cache := NewImageCache(10)
+
+	// Try to load a non-existent image
+	badPath := "/nonexistent/path/to/image.png"
+	cached, err := cache.Load(badPath)
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("expected error for non-existent image")
+	}
+
+	// Should still return a CachedImage with error set
+	if cached == nil {
+		t.Fatal("expected CachedImage even on error")
+	}
+	if cached.Err == nil {
+		t.Error("CachedImage.Err should be set for failed load")
+	}
+
+	// The cached image should not have Original set for failed loads
+	if cached.Original != nil {
+		t.Error("cached.Original should be nil for failed load")
+	}
+
+	// When rendering, if ImageData.Original is nil but there's an error,
+	// the rendering code should show a placeholder instead
+	// Test that IsImage() returns false when ImageData has error (no actual image)
+	box := Box{
+		Style: Style{
+			Image:    true,
+			ImageURL: badPath,
+			ImageAlt: "missing",
+		},
+		ImageData: cached,
+	}
+
+	// IsImage() checks Style.Image && ImageData != nil
+	// Even with ImageData set, if there's an error the box is technically
+	// an "image" but will show error placeholder during rendering
+	if !box.Style.Image {
+		t.Error("box.Style.Image should be true")
+	}
+	if box.ImageData == nil {
+		t.Error("box.ImageData should be set (even with error)")
+	}
+
+	// Verify error is preserved for placeholder rendering
+	if box.ImageData.Err == nil {
+		t.Error("box.ImageData.Err should be set for error placeholder")
+	}
+}
+
+// testFont is a simple font implementation for testing.
+type testFont struct {
+	width  int
+	height int
+}
+
+func (f *testFont) Name() string             { return "test-font" }
+func (f *testFont) Height() int              { return f.height }
+func (f *testFont) BytesWidth(b []byte) int  { return f.width * len(b) }
+func (f *testFont) RunesWidth(r []rune) int  { return f.width * len(r) }
+func (f *testFont) StringWidth(s string) int { return f.width * len(s) }

@@ -630,6 +630,79 @@ func TestLayoutListIndent(t *testing.T) {
 	})
 }
 
+// TestLayoutCodeBlockIndent tests that fenced code blocks are indented.
+func TestLayoutCodeBlockIndent(t *testing.T) {
+	// Mock font with fixed character width of 10 pixels, height 14
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Expected indent is CodeBlockIndentChars * M-width
+	// With mock font width of 10, that's 4 * 10 = 40 pixels
+	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+
+	t.Run("code block is indented by 4 M-widths", func(t *testing.T) {
+		// A code block line: "print('hello')" with Block=true and Code=true
+		content := Content{
+			{Text: "print('hello')", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Code blocks should be indented by 4 * M-width
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("code block X = %d, want %d (4 * M-width)", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+
+	t.Run("code block wrapping maintains indentation", func(t *testing.T) {
+		// A long code block line that wraps
+		content := Content{
+			{Text: "this is a very long line of code that will wrap", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		// Frame width that forces wrapping: 200 pixels = 20 chars
+		// After 40px indent, only 160px = 16 chars fit per line
+		lines := layout(boxes, font, 200, maxtab, nil, nil)
+
+		if len(lines) < 2 {
+			t.Fatalf("expected multiple lines for wrapped code, got %d", len(lines))
+		}
+
+		// All lines should start at the calculated indent
+		for i, line := range lines {
+			if len(line.Boxes) == 0 {
+				continue
+			}
+			if line.Boxes[0].X != expectedIndent {
+				t.Errorf("line %d: code block X = %d, want %d (4 * M-width)", i, line.Boxes[0].X, expectedIndent)
+			}
+		}
+	})
+
+	t.Run("non-block code is not indented", func(t *testing.T) {
+		// Inline code (Code=true but Block=false) should not be indented
+		content := Content{
+			{Text: "inline", Style: Style{Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Inline code should start at X=0 (no indentation)
+		if lines[0].Boxes[0].X != 0 {
+			t.Errorf("inline code X = %d, want 0 (no indentation)", lines[0].Boxes[0].X)
+		}
+	})
+}
+
 // TestContentToBoxesImage tests that image spans are converted to image boxes.
 // Image spans have Style.Image=true and should create a special image box.
 func TestContentToBoxesImage(t *testing.T) {
