@@ -2035,3 +2035,293 @@ func TestIsOrderedListItemNested(t *testing.T) {
 		})
 	}
 }
+
+func TestParseUnorderedList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text       string
+			listBullet bool
+			listItem   bool
+			listIndent int
+		}
+	}{
+		{
+			name:  "simple unordered list item",
+			input: "- Item one",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item one", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "unordered list with asterisk marker",
+			input: "* Item with asterisk",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item with asterisk", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "unordered list with plus marker",
+			input: "+ Item with plus",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item with plus", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "multiple unordered list items",
+			input: "- First\n- Second\n- Third",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "First\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Second\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Third", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "unordered list with bold text",
+			input: "- **Bold** item",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Bold", listBullet: false, listItem: true, listIndent: 0},   // bold
+				{text: " item", listBullet: false, listItem: true, listIndent: 0}, // plain
+			},
+		},
+		{
+			name:  "unordered list with code span",
+			input: "- Use `code` here",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Use ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "code", listBullet: false, listItem: true, listIndent: 0}, // code span
+				{text: " here", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "empty unordered list item",
+			input: "- ",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.ListBullet != want.listBullet {
+					t.Errorf("span[%d].Style.ListBullet = %v, want %v", i, got[i].Style.ListBullet, want.listBullet)
+				}
+				if got[i].Style.ListItem != want.listItem {
+					t.Errorf("span[%d].Style.ListItem = %v, want %v", i, got[i].Style.ListItem, want.listItem)
+				}
+				if got[i].Style.ListIndent != want.listIndent {
+					t.Errorf("span[%d].Style.ListIndent = %d, want %d", i, got[i].Style.ListIndent, want.listIndent)
+				}
+			}
+		})
+	}
+}
+
+func TestParseOrderedList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text        string
+			listBullet  bool
+			listItem    bool
+			listOrdered bool
+			listNumber  int
+			listIndent  int
+		}
+	}{
+		{
+			name:  "simple ordered list item",
+			input: "1. First item",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: "First item", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+			},
+		},
+		{
+			name:  "ordered list item with paren",
+			input: "1) First item",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: "First item", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+			},
+		},
+		{
+			name:  "multiple ordered list items",
+			input: "1. First\n2. Second\n3. Third",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: "First\n", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: "2.", listBullet: true, listItem: false, listOrdered: true, listNumber: 2, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 2, listIndent: 0},
+				{text: "Second\n", listBullet: false, listItem: true, listOrdered: true, listNumber: 2, listIndent: 0},
+				{text: "3.", listBullet: true, listItem: false, listOrdered: true, listNumber: 3, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 3, listIndent: 0},
+				{text: "Third", listBullet: false, listItem: true, listOrdered: true, listNumber: 3, listIndent: 0},
+			},
+		},
+		{
+			name:  "ordered list with multi-digit number",
+			input: "10. Tenth item",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "10.", listBullet: true, listItem: false, listOrdered: true, listNumber: 10, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 10, listIndent: 0},
+				{text: "Tenth item", listBullet: false, listItem: true, listOrdered: true, listNumber: 10, listIndent: 0},
+			},
+		},
+		{
+			name:  "ordered list with bold text",
+			input: "1. **Bold** item",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: "Bold", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},   // bold
+				{text: " item", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0}, // plain
+			},
+		},
+		{
+			name:  "empty ordered list item",
+			input: "1. ",
+			wantSpan: []struct {
+				text        string
+				listBullet  bool
+				listItem    bool
+				listOrdered bool
+				listNumber  int
+				listIndent  int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.ListBullet != want.listBullet {
+					t.Errorf("span[%d].Style.ListBullet = %v, want %v", i, got[i].Style.ListBullet, want.listBullet)
+				}
+				if got[i].Style.ListItem != want.listItem {
+					t.Errorf("span[%d].Style.ListItem = %v, want %v", i, got[i].Style.ListItem, want.listItem)
+				}
+				if got[i].Style.ListOrdered != want.listOrdered {
+					t.Errorf("span[%d].Style.ListOrdered = %v, want %v", i, got[i].Style.ListOrdered, want.listOrdered)
+				}
+				if got[i].Style.ListNumber != want.listNumber {
+					t.Errorf("span[%d].Style.ListNumber = %d, want %d", i, got[i].Style.ListNumber, want.listNumber)
+				}
+				if got[i].Style.ListIndent != want.listIndent {
+					t.Errorf("span[%d].Style.ListIndent = %d, want %d", i, got[i].Style.ListIndent, want.listIndent)
+				}
+			}
+		})
+	}
+}

@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rjkroege/edwood/rich"
@@ -131,8 +132,11 @@ func Parse(text string) rich.Content {
 			continue
 		}
 
-		// Check if this is a block-level element (heading, hrule)
-		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line)
+		// Check if this is a block-level element (heading, hrule, list item)
+		isUL, _, _ := isUnorderedListItem(line)
+		isOL, _, _, _ := isOrderedListItem(line)
+		isListItem := isUL || isOL
+		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line) || isListItem
 
 		if isBlockElement {
 			// Block elements start fresh - end previous paragraph with newline
@@ -155,17 +159,20 @@ func Parse(text string) rich.Content {
 		}
 
 		// Normal line parsing - strip trailing newline for paragraph text
+		// But preserve newline for list items so they end with \n
 		lineToPass := line
 		if !isBlockElement {
 			lineToPass = strings.TrimSuffix(line, "\n")
+		} else if isListItem {
+			// List items keep their trailing newline (if present) in the content
+			// but parseLine will handle the line with the newline
 		}
 		spans := parseLine(lineToPass)
 
 		// Merge consecutive spans with the same style
-		// (but don't merge link spans - each link should remain distinct
-		// for proper LinkMap tracking)
+		// (but don't merge link spans or list item spans - each should remain distinct)
 		for _, span := range spans {
-			if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
+			if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link && !span.Style.ListItem && !span.Style.ListBullet {
 				// Merge with previous span
 				result[len(result)-1].Text += span.Text
 			} else {
@@ -304,6 +311,16 @@ func parseLine(line string) []rich.Span {
 				Scale: headingScales[level],
 			},
 		}}
+	}
+
+	// Check for unordered list item (-, *, +)
+	if isUL, indentLevel, contentStart := isUnorderedListItem(line); isUL {
+		return parseUnorderedListItem(line, indentLevel, contentStart)
+	}
+
+	// Check for ordered list item (1., 2), etc.)
+	if isOL, indentLevel, contentStart, itemNumber := isOrderedListItem(line); isOL {
+		return parseOrderedListItem(line, indentLevel, contentStart, itemNumber)
 	}
 
 	// Parse inline formatting (bold, italic)
@@ -510,6 +527,363 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 	}
 
 	// If no spans were created, return a single span with original text
+	if len(spans) == 0 {
+		return []rich.Span{{
+			Text:  text,
+			Style: baseStyle,
+		}}
+	}
+
+	return spans
+}
+
+// parseInlineFormattingWithListStyle parses inline formatting while preserving list style fields.
+// All output spans will have ListItem, ListIndent, ListOrdered, and ListNumber from baseStyle.
+func parseInlineFormattingWithListStyle(text string, baseStyle rich.Style) []rich.Span {
+	var spans []rich.Span
+	var currentText strings.Builder
+	i := 0
+
+	for i < len(text) {
+		// Check for [ (potential link) - must be checked early
+		if text[i] == '[' {
+			linkEnd := strings.Index(text[i+1:], "]")
+			if linkEnd != -1 {
+				closeBracket := i + 1 + linkEnd
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					urlEnd := strings.Index(text[closeBracket+2:], ")")
+					if urlEnd != -1 {
+						if currentText.Len() > 0 {
+							spans = append(spans, rich.Span{
+								Text:  currentText.String(),
+								Style: baseStyle,
+							})
+							currentText.Reset()
+						}
+						linkText := text[i+1 : closeBracket]
+						linkStyle := rich.Style{
+							Fg:          rich.LinkBlue,
+							Bg:          baseStyle.Bg,
+							Link:        true,
+							ListItem:    baseStyle.ListItem,
+							ListIndent:  baseStyle.ListIndent,
+							ListOrdered: baseStyle.ListOrdered,
+							ListNumber:  baseStyle.ListNumber,
+							Scale:       baseStyle.Scale,
+						}
+						if linkText == "" {
+							spans = append(spans, rich.Span{
+								Text:  "",
+								Style: linkStyle,
+							})
+						} else {
+							linkSpans := parseInlineFormattingWithListStyleNoLinks(linkText, linkStyle)
+							spans = append(spans, linkSpans...)
+						}
+						i = closeBracket + 2 + urlEnd + 1
+						continue
+					}
+				}
+			}
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
+		// Check for ` (code span)
+		if text[i] == '`' {
+			end := strings.Index(text[i+1:], "`")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          rich.InlineCodeBg,
+						Code:        true,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
+		// Check for *** (bold+italic)
+		if i+2 < len(text) && text[i:i+3] == "***" {
+			end := strings.Index(text[i+3:], "***")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+3 : i+3+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        true,
+						Italic:      true,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 3 + end + 3
+				continue
+			}
+		}
+
+		// Check for ** (bold)
+		if i+1 < len(text) && text[i:i+2] == "**" {
+			end := strings.Index(text[i+2:], "**")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+2 : i+2+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        true,
+						Italic:      baseStyle.Italic,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 2 + end + 2
+				continue
+			}
+			currentText.WriteString("**")
+			i += 2
+			continue
+		}
+
+		// Check for * (italic)
+		if text[i] == '*' {
+			end := strings.Index(text[i+1:], "*")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        baseStyle.Bold,
+						Italic:      true,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		currentText.WriteByte(text[i])
+		i++
+	}
+
+	if currentText.Len() > 0 {
+		spans = append(spans, rich.Span{
+			Text:  currentText.String(),
+			Style: baseStyle,
+		})
+	}
+
+	if len(spans) == 0 {
+		return []rich.Span{{
+			Text:  text,
+			Style: baseStyle,
+		}}
+	}
+
+	return spans
+}
+
+// parseInlineFormattingWithListStyleNoLinks parses inline formatting while preserving list style fields,
+// but does not parse links (to avoid infinite recursion when parsing link text).
+func parseInlineFormattingWithListStyleNoLinks(text string, baseStyle rich.Style) []rich.Span {
+	var spans []rich.Span
+	var currentText strings.Builder
+	i := 0
+
+	for i < len(text) {
+		// Check for ` (code span)
+		if text[i] == '`' {
+			end := strings.Index(text[i+1:], "`")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          rich.InlineCodeBg,
+						Code:        true,
+						Link:        baseStyle.Link,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
+		// Check for *** (bold+italic)
+		if i+2 < len(text) && text[i:i+3] == "***" {
+			end := strings.Index(text[i+3:], "***")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+3 : i+3+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        true,
+						Italic:      true,
+						Link:        baseStyle.Link,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 3 + end + 3
+				continue
+			}
+		}
+
+		// Check for ** (bold)
+		if i+1 < len(text) && text[i:i+2] == "**" {
+			end := strings.Index(text[i+2:], "**")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+2 : i+2+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        true,
+						Italic:      baseStyle.Italic,
+						Link:        baseStyle.Link,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 2 + end + 2
+				continue
+			}
+			currentText.WriteString("**")
+			i += 2
+			continue
+		}
+
+		// Check for * (italic)
+		if text[i] == '*' {
+			end := strings.Index(text[i+1:], "*")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:          baseStyle.Fg,
+						Bg:          baseStyle.Bg,
+						Bold:        baseStyle.Bold,
+						Italic:      true,
+						Link:        baseStyle.Link,
+						ListItem:    baseStyle.ListItem,
+						ListIndent:  baseStyle.ListIndent,
+						ListOrdered: baseStyle.ListOrdered,
+						ListNumber:  baseStyle.ListNumber,
+						Scale:       baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		currentText.WriteByte(text[i])
+		i++
+	}
+
+	if currentText.Len() > 0 {
+		spans = append(spans, rich.Span{
+			Text:  currentText.String(),
+			Style: baseStyle,
+		})
+	}
+
 	if len(spans) == 0 {
 		return []rich.Span{{
 			Text:  text,
@@ -803,6 +1177,101 @@ func isOrderedListItem(line string) (bool, int, int, int) {
 	contentStart := i + 1
 
 	return true, indentLevel, contentStart, itemNumber
+}
+
+// parseUnorderedListItem parses an unordered list line and returns styled spans.
+// It emits: bullet span + space span + content spans (with inline formatting).
+func parseUnorderedListItem(line string, indentLevel int, contentStart int) []rich.Span {
+	var spans []rich.Span
+
+	// Emit the bullet marker (•)
+	bulletStyle := rich.Style{
+		ListBullet: true,
+		ListIndent: indentLevel,
+		Scale:      1.0,
+	}
+	spans = append(spans, rich.Span{
+		Text:  "•",
+		Style: bulletStyle,
+	})
+
+	// Emit the space after bullet
+	itemStyle := rich.Style{
+		ListItem:   true,
+		ListIndent: indentLevel,
+		Scale:      1.0,
+	}
+	spans = append(spans, rich.Span{
+		Text:  " ",
+		Style: itemStyle,
+	})
+
+	// Get the content after the marker
+	content := ""
+	if contentStart < len(line) {
+		content = line[contentStart:]
+	}
+
+	// If content is empty, we're done
+	if content == "" {
+		return spans
+	}
+
+	// Parse inline formatting in the content, using itemStyle as the base
+	contentSpans := parseInlineFormattingWithListStyle(content, itemStyle)
+	spans = append(spans, contentSpans...)
+
+	return spans
+}
+
+// parseOrderedListItem parses an ordered list line and returns styled spans.
+// It emits: number span + space span + content spans (with inline formatting).
+func parseOrderedListItem(line string, indentLevel int, contentStart int, itemNumber int) []rich.Span {
+	var spans []rich.Span
+
+	// Emit the number marker (e.g., "1.")
+	// Always normalize to "N." format regardless of original delimiter
+	bulletStyle := rich.Style{
+		ListBullet:  true,
+		ListOrdered: true,
+		ListNumber:  itemNumber,
+		ListIndent:  indentLevel,
+		Scale:       1.0,
+	}
+	spans = append(spans, rich.Span{
+		Text:  fmt.Sprintf("%d.", itemNumber),
+		Style: bulletStyle,
+	})
+
+	// Emit the space after number
+	itemStyle := rich.Style{
+		ListItem:    true,
+		ListOrdered: true,
+		ListNumber:  itemNumber,
+		ListIndent:  indentLevel,
+		Scale:       1.0,
+	}
+	spans = append(spans, rich.Span{
+		Text:  " ",
+		Style: itemStyle,
+	})
+
+	// Get the content after the marker
+	content := ""
+	if contentStart < len(line) {
+		content = line[contentStart:]
+	}
+
+	// If content is empty, we're done
+	if content == "" {
+		return spans
+	}
+
+	// Parse inline formatting in the content, using itemStyle as the base
+	contentSpans := parseInlineFormattingWithListStyle(content, itemStyle)
+	spans = append(spans, contentSpans...)
+
+	return spans
 }
 
 // isUnorderedListItem returns true if line starts with an unordered list marker.
