@@ -381,6 +381,11 @@ func (f *frameImpl) Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int) {
 		// Redraw to show updated selection during drag
 		f.Redraw()
 
+		// Flush the display to make selection visible immediately
+		if f.display != nil {
+			f.display.Flush()
+		}
+
 		// Check if button was released
 		if me.Buttons == 0 {
 			break
