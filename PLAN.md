@@ -599,7 +599,7 @@ See `docs/codeblock-design.md` for full design.
 | Tests exist | [x] | Existing fenced block tests + manual verification |
 | Code written | [x] | Detect lines starting with 4 spaces or 1 tab, merge consecutive lines into code block with `Block: true` |
 | Tests pass | [x] | go test ./markdown/... passes |
-| Code committed | [ ] | Pending |
+| Code committed | [x] | Commit 7a474f5 (markdown preview enhancements) |
 
 ### 13.5 Fenced Code Block Source Mapping
 | Stage | Status | Notes |
