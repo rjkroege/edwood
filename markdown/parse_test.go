@@ -611,3 +611,260 @@ func TestParseInlineCode(t *testing.T) {
 		})
 	}
 }
+
+func TestParseLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isLink bool
+		}
+	}{
+		{
+			name:  "simple link",
+			input: "[click here](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "click here", isLink: true},
+			},
+		},
+		{
+			name:  "link in middle of text",
+			input: "See [this link](https://example.com) for details.",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "See ", isLink: false},
+				{text: "this link", isLink: true},
+				{text: " for details.", isLink: false},
+			},
+		},
+		{
+			name:  "link at end of text",
+			input: "Visit [our site](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "Visit ", isLink: false},
+				{text: "our site", isLink: true},
+			},
+		},
+		{
+			name:  "link at start of text",
+			input: "[Home](/) is here",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "Home", isLink: true},
+				{text: " is here", isLink: false},
+			},
+		},
+		{
+			name:  "unclosed bracket treated as plain",
+			input: "[unclosed link",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "[unclosed link", isLink: false},
+			},
+		},
+		{
+			name:  "bracket without url parens treated as plain",
+			input: "[no url]",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "[no url]", isLink: false},
+			},
+		},
+		{
+			name:  "bracket with unclosed parens treated as plain",
+			input: "[text](unclosed",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "[text](unclosed", isLink: false},
+			},
+		},
+		{
+			name:  "empty link text",
+			input: "[](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "", isLink: true},
+			},
+		},
+		{
+			name:  "link with special characters in url",
+			input: "[docs](https://example.com/path?q=1&r=2#section)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "docs", isLink: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Link != want.isLink {
+					t.Errorf("span[%d].Link = %v, want %v (style: %+v)", i, got[i].Style.Link, want.isLink, got[i].Style)
+				}
+			}
+		})
+	}
+}
+
+func TestParseLinkWithBold(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isLink bool
+			isBold bool
+		}
+	}{
+		{
+			name:  "bold text in link",
+			input: "[**bold link**](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+				isBold bool
+			}{
+				{text: "bold link", isLink: true, isBold: true},
+			},
+		},
+		{
+			name:  "italic text in link",
+			input: "[*italic link*](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+				isBold bool
+			}{
+				{text: "italic link", isLink: true, isBold: false},
+			},
+		},
+		{
+			name:  "mixed bold and regular in link",
+			input: "[click **here**](https://example.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+				isBold bool
+			}{
+				{text: "click ", isLink: true, isBold: false},
+				{text: "here", isLink: true, isBold: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Link != want.isLink {
+					t.Errorf("span[%d].Link = %v, want %v", i, got[i].Style.Link, want.isLink)
+				}
+				if got[i].Style.Bold != want.isBold {
+					t.Errorf("span[%d].Bold = %v, want %v", i, got[i].Style.Bold, want.isBold)
+				}
+			}
+		})
+	}
+}
+
+func TestParseMultipleLinks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isLink bool
+		}
+	}{
+		{
+			name:  "two links",
+			input: "[one](https://one.com) and [two](https://two.com)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "one", isLink: true},
+				{text: " and ", isLink: false},
+				{text: "two", isLink: true},
+			},
+		},
+		{
+			name:  "three links in sequence",
+			input: "[a](1)[b](2)[c](3)",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "a", isLink: true},
+				{text: "b", isLink: true},
+				{text: "c", isLink: true},
+			},
+		},
+		{
+			name:  "links with other formatting",
+			input: "**bold** [link](url) *italic*",
+			wantSpan: []struct {
+				text   string
+				isLink bool
+			}{
+				{text: "bold", isLink: false},
+				{text: " ", isLink: false},
+				{text: "link", isLink: true},
+				{text: " ", isLink: false},
+				{text: "italic", isLink: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Link != want.isLink {
+					t.Errorf("span[%d].Link = %v, want %v (style: %+v)", i, got[i].Style.Link, want.isLink, got[i].Style)
+				}
+			}
+		})
+	}
+}

@@ -29,8 +29,10 @@ func Parse(text string) rich.Content {
 	for _, line := range lines {
 		spans := parseLine(line)
 		// Merge consecutive spans with the same style
+		// (but don't merge link spans - each link should remain distinct
+		// for proper LinkMap tracking)
 		for _, span := range spans {
-			if len(result) > 0 && result[len(result)-1].Style == span.Style {
+			if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
 				// Merge with previous span
 				result[len(result)-1].Text += span.Text
 			} else {
@@ -86,13 +88,67 @@ func parseLine(line string) []rich.Span {
 	return parseInlineFormatting(line, rich.DefaultStyle())
 }
 
-// parseInlineFormatting parses code spans, bold/italic markers in text and returns styled spans.
+// parseInlineFormatting parses code spans, bold/italic markers, and links in text and returns styled spans.
 func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 	var spans []rich.Span
 	var currentText strings.Builder
 	i := 0
 
 	for i < len(text) {
+		// Check for [ (potential link) - must be checked early
+		if text[i] == '[' {
+			// Try to parse as link: [text](url)
+			linkEnd := strings.Index(text[i+1:], "]")
+			if linkEnd != -1 {
+				closeBracket := i + 1 + linkEnd
+				// Check if immediately followed by (
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					// Find closing )
+					urlEnd := strings.Index(text[closeBracket+2:], ")")
+					if urlEnd != -1 {
+						// We have a valid link pattern
+						// Flush any accumulated plain text
+						if currentText.Len() > 0 {
+							spans = append(spans, rich.Span{
+								Text:  currentText.String(),
+								Style: baseStyle,
+							})
+							currentText.Reset()
+						}
+
+						// Extract link text and parse it for inline formatting
+						linkText := text[i+1 : closeBracket]
+						// Parse link text with Link style as base
+						linkStyle := rich.Style{
+							Fg:    baseStyle.Fg,
+							Bg:    baseStyle.Bg,
+							Link:  true,
+							Scale: baseStyle.Scale,
+						}
+						if linkText == "" {
+							// Empty link text
+							spans = append(spans, rich.Span{
+								Text:  "",
+								Style: linkStyle,
+							})
+						} else {
+							// Parse link text for bold/italic
+							linkSpans := parseInlineFormattingNoLinks(linkText, linkStyle)
+							spans = append(spans, linkSpans...)
+						}
+
+						// Skip past the entire link
+						i = closeBracket + 2 + urlEnd + 1
+						continue
+					}
+				}
+			}
+			// Not a valid link, treat [ as regular text
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
 		// Check for ` (code span) - must be checked before bold/italic
 		// so that asterisks inside code spans are preserved literally
 		if text[i] == '`' {
@@ -231,6 +287,148 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 	}
 
 	// If no spans were created, return a single span with original text
+	if len(spans) == 0 {
+		return []rich.Span{{
+			Text:  text,
+			Style: baseStyle,
+		}}
+	}
+
+	return spans
+}
+
+// parseInlineFormattingNoLinks parses code spans, bold/italic markers but NOT links.
+// Used for parsing text inside link labels to avoid infinite recursion.
+func parseInlineFormattingNoLinks(text string, baseStyle rich.Style) []rich.Span {
+	var spans []rich.Span
+	var currentText strings.Builder
+	i := 0
+
+	for i < len(text) {
+		// Check for ` (code span) - must be checked before bold/italic
+		if text[i] == '`' {
+			end := strings.Index(text[i+1:], "`")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:    baseStyle.Fg,
+						Bg:    baseStyle.Bg,
+						Code:  true,
+						Link:  baseStyle.Link,
+						Scale: baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+			currentText.WriteByte(text[i])
+			i++
+			continue
+		}
+
+		// Check for *** (bold+italic)
+		if i+2 < len(text) && text[i:i+3] == "***" {
+			end := strings.Index(text[i+3:], "***")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+3 : i+3+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: true,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 3 + end + 3
+				continue
+			}
+		}
+
+		// Check for ** (bold)
+		if i+1 < len(text) && text[i:i+2] == "**" {
+			end := strings.Index(text[i+2:], "**")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+2 : i+2+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: baseStyle.Italic,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 2 + end + 2
+				continue
+			}
+			currentText.WriteString("**")
+			i += 2
+			continue
+		}
+
+		// Check for * (italic)
+		if text[i] == '*' {
+			end := strings.Index(text[i+1:], "*")
+			if end != -1 {
+				if currentText.Len() > 0 {
+					spans = append(spans, rich.Span{
+						Text:  currentText.String(),
+						Style: baseStyle,
+					})
+					currentText.Reset()
+				}
+				spans = append(spans, rich.Span{
+					Text: text[i+1 : i+1+end],
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   baseStyle.Bold,
+						Italic: true,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		currentText.WriteByte(text[i])
+		i++
+	}
+
+	if currentText.Len() > 0 {
+		spans = append(spans, rich.Span{
+			Text:  currentText.String(),
+			Style: baseStyle,
+		})
+	}
+
 	if len(spans) == 0 {
 		return []rich.Span{{
 			Text:  text,
