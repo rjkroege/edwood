@@ -1232,6 +1232,10 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	w.imageCache = rich.NewImageCache(0) // 0 means use default size
 	rtOpts = append(rtOpts, WithRichTextImageCache(w.imageCache))
 
+	// Set the base path for resolving relative image paths
+	// The name variable contains the file path from the window tag
+	rtOpts = append(rtOpts, WithRichTextBasePath(name))
+
 	rt.Init(display, font, rtOpts...)
 
 	// Parse the markdown content with source mapping and link tracking

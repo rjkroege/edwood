@@ -75,6 +75,9 @@ type frameImpl struct {
 
 	// Image cache for loading images during layout
 	imageCache *ImageCache
+
+	// Base path for resolving relative image paths (e.g., the markdown file path)
+	basePath string
 }
 
 // NewFrame creates a new Frame.
@@ -1125,11 +1128,11 @@ func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
 }
 
 // layoutBoxes runs the layout algorithm on the given boxes.
-// If an imageCache is set on the frame, it uses layoutWithCache to load
+// If an imageCache is set on the frame, it uses layoutWithCacheAndBasePath to load
 // images and populate their ImageData. Otherwise, it uses the regular layout.
 func (f *frameImpl) layoutBoxes(boxes []Box, frameWidth, maxtab int) []Line {
 	if f.imageCache != nil {
-		return layoutWithCache(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle, f.imageCache)
+		return layoutWithCacheAndBasePath(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle, f.imageCache, f.basePath)
 	}
 	return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 }

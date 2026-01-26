@@ -41,6 +41,9 @@ type RichText struct {
 
 	// Image cache for loading images in markdown
 	imageCache *rich.ImageCache
+
+	// Base path for resolving relative image paths (e.g., the markdown file path)
+	basePath string
 }
 
 // NewRichText creates a new RichText component.
@@ -90,6 +93,9 @@ func (rt *RichText) Init(display draw.Display, font draw.Font, opts ...RichTextO
 	}
 	if rt.imageCache != nil {
 		frameOpts = append(frameOpts, rich.WithImageCache(rt.imageCache))
+	}
+	if rt.basePath != "" {
+		frameOpts = append(frameOpts, rich.WithBasePath(rt.basePath))
 	}
 
 	// Initialize frame with empty rectangle - will be set on first Render() call
@@ -547,6 +553,15 @@ func WithRichTextScaledFont(scale float64, f draw.Font) RichTextOption {
 func WithRichTextImageCache(cache *rich.ImageCache) RichTextOption {
 	return func(rt *RichText) {
 		rt.imageCache = cache
+	}
+}
+
+// WithRichTextBasePath sets the base path for resolving relative image paths.
+// This should be the path to the source file (e.g., markdown file) containing image references.
+// When combined with WithRichTextImageCache, relative paths will be resolved relative to this path.
+func WithRichTextBasePath(path string) RichTextOption {
+	return func(rt *RichText) {
+		rt.basePath = path
 	}
 }
 

@@ -87,3 +87,13 @@ func WithImageCache(cache *ImageCache) Option {
 		fi.imageCache = cache
 	}
 }
+
+// WithBasePath is an Option that sets the base path for resolving relative image paths.
+// This should be the path to the source file (e.g., markdown file) containing image references.
+// When combined with WithImageCache, relative image paths like "images/photo.png" will be
+// resolved relative to this base path's directory.
+func WithBasePath(path string) Option {
+	return func(fi *frameImpl) {
+		fi.basePath = path
+	}
+}

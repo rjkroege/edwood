@@ -1,6 +1,7 @@
 package rich
 
 import (
+	"path/filepath"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/draw"
@@ -495,4 +496,62 @@ func layoutWithCache(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHe
 
 	// Now run layout with populated ImageData
 	return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
+}
+
+// layoutWithCacheAndBasePath is like layoutWithCache but also accepts a basePath
+// for resolving relative image paths. The basePath should be the path to the
+// markdown file containing the image references.
+//
+// For example, if basePath is "/home/user/docs/readme.md" and an image has
+// ImageURL "images/photo.png", the path will be resolved to
+// "/home/user/docs/images/photo.png" before loading from the cache.
+//
+// Absolute paths (starting with /) are used as-is.
+// If basePath is empty, relative paths are used as-is (likely failing to load).
+func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc, fontForStyleFn FontForStyleFunc, cache *ImageCache, basePath string) []Line {
+	// If no cache, fall back to regular layout
+	if cache == nil {
+		return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
+	}
+
+	// Load images into cache and populate ImageData for image boxes
+	for i := range boxes {
+		box := &boxes[i]
+		if box.Style.Image && box.Style.ImageURL != "" {
+			// Resolve relative paths using basePath
+			imgPath := resolveImagePath(basePath, box.Style.ImageURL)
+
+			// Load image from cache (this will cache it for future use)
+			cached, _ := cache.Load(imgPath)
+			if cached != nil {
+				box.ImageData = cached
+			}
+		}
+	}
+
+	// Now run layout with populated ImageData
+	return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
+}
+
+// resolveImagePath resolves an image path relative to the base path's directory.
+// If imgPath is absolute (starts with /), it is returned unchanged.
+// If basePath is empty, imgPath is returned unchanged.
+// Otherwise, imgPath is resolved relative to the directory containing basePath.
+func resolveImagePath(basePath, imgPath string) string {
+	// Absolute paths are returned as-is
+	if filepath.IsAbs(imgPath) {
+		return imgPath
+	}
+
+	// If no basePath, can't resolve relative path
+	if basePath == "" {
+		return imgPath
+	}
+
+	// Get the directory containing the base file (e.g., markdown file)
+	baseDir := filepath.Dir(basePath)
+
+	// Join and clean the path
+	resolved := filepath.Join(baseDir, imgPath)
+	return filepath.Clean(resolved)
 }
