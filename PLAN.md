@@ -722,42 +722,42 @@ See `docs/preview-resize-design.md` for problem analysis and option comparison.
 ### 14.5 Update Scrollbar Methods
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | Existing scrollbar tests updated |
-| Code written | [ ] | `scrDrawAt(scrollRect)`, `scrThumbRectAt(scrollRect)`, `scrollClickAt(...)` |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | Existing scrollbar tests updated |
+| Code written | [x] | `scrDrawAt(scrollRect)`, `scrThumbRectAt(scrollRect)`, `scrollClickAt(...)` |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 9515443 |
 
 ### 14.6 Update RichText Init Signature
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | Update test initialization patterns |
-| Code written | [ ] | `Init(display, font, opts...)` without rectangle parameter |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | Update test initialization patterns |
+| Code written | [x] | `Init(display, font, opts...)` without rectangle parameter |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit d6c173f |
 
 ### 14.7 Update Window.Resize()
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestWindowResizePreviewMode |
-| Code written | [ ] | Always resize body, call `richBody.Render(body.all)` when in preview |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestWindowResizePreviewMode |
+| Code written | [x] | Always resize body, call `richBody.Render(body.all)` when in preview |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 84e3866 |
 
 ### 14.8 Update Window Draw Methods
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestWindowDrawPreviewModeAfterResize |
-| Code written | [ ] | All preview draws use `richBody.Render(body.all)` |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestWindowDrawPreviewModeAfterResize |
+| Code written | [x] | All preview draws use `richBody.Render(body.all)` |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit e696bcd |
 
 ### 14.9 Update Preview Command
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | Existing preview toggle tests |
-| Code written | [ ] | Update preview initialization to use new Init/Render pattern |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestPreviewCommandToggle, TestPreviewCommandEnter, TestPreviewCommandExit all use Init/Render pattern |
+| Code written | [x] | previewcmd() in exec.go uses NewRichText(), Init(display, font, opts...), then Render(bodyRect) |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Already committed in d6c173f (part of 14.6) |
 
 ### 14.10 Update Mouse Handling
 | Stage | Status | Notes |
