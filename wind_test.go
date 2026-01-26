@@ -3237,6 +3237,115 @@ func TestPreviewSelectionNearScrollbar(t *testing.T) {
 	})
 }
 
+// TestPreviewSnarfAfterSelection tests that Snarf (copy) works correctly after
+// making a drag selection in preview mode. This verifies the integration between
+// Frame.Select() drag selection and PreviewSnarf() source mapping.
+//
+// The test performs a drag selection and then calls PreviewSnarf() to verify
+// that the correct source markdown is returned (not the rendered text).
+func TestPreviewSnarfAfterSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with bold text
+	// Source:   "Hello **World** test" (20 chars)
+	// Rendered: "Hello World test" (16 chars)
+	sourceMarkdown := "Hello **World** test"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", sourceRunes),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content with source map
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and enable preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+	w.previewSourceMap = sourceMap
+
+	frameRect := rt.Frame().Rect()
+
+	// Simulate drag selection to select "World" in rendered text
+	// Rendered: "Hello World test"
+	//           0123456789012345
+	// "World" is at positions 6-11 in rendered text
+	// At 10px per char: position 6 = 60px, position 11 = 110px
+
+	// Mouse down at position 6 (start of "World")
+	downEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+60, frameRect.Min.Y+5),
+		Buttons: 1,
+	}
+	// Drag to position 11 (end of "World")
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+110, frameRect.Min.Y+5),
+		Buttons: 1,
+	}
+	// Mouse up
+	upEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+110, frameRect.Min.Y+5),
+		Buttons: 0,
+	}
+
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+	handled := w.HandlePreviewMouse(&downEvent, mc)
+
+	if !handled {
+		t.Error("HandlePreviewMouse should handle button 1 drag in frame area")
+	}
+
+	// Verify selection was set
+	q0, q1 := rt.Selection()
+	if q0 == q1 {
+		t.Errorf("Selection should be a range after drag, got point selection at %d", q0)
+	}
+
+	// Now test that PreviewSnarf returns the source markdown
+	snarfBytes := w.PreviewSnarf()
+	if snarfBytes == nil {
+		t.Fatal("PreviewSnarf should return bytes for selected text")
+	}
+
+	snarfText := string(snarfBytes)
+
+	// The selection should map to "**World**" in source (including the bold markers)
+	// Source:   "Hello **World** test"
+	//           01234567890123456789
+	// "**World**" is at positions 6-15 in source
+	if snarfText != "**World**" {
+		t.Errorf("PreviewSnarf should return source markdown '**World**', got %q", snarfText)
+	}
+}
+
 // =============================================================================
 // Phase 16I: Image Pipeline Integration Tests
 // =============================================================================
