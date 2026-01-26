@@ -326,11 +326,19 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y
 		}
-		y = w.body.Resize(r1, keepextra, false /* noredraw */)
+		// Always resize body Text to maintain canonical rectangle
+		// Pass noredraw=true if in preview mode (we'll render ourselves)
+		y = w.body.Resize(r1, keepextra, w.previewMode /* noredraw */)
 		w.r = r
 		w.r.Max.Y = y
-		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 		w.body.all.Min.Y = oy
+
+		// Render the appropriate view
+		if w.previewMode && w.richBody != nil {
+			w.richBody.Render(w.body.all)
+		} else {
+			w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
+		}
 	}
 	w.maxlines = util.Min(w.body.fr.GetFrameFillStatus().Nlines, util.Max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
 	// TODO(rjk): this value doesn't make sense when we've collapsed
