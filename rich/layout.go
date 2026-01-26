@@ -134,6 +134,10 @@ type FontHeightFunc func(style Style) int
 // FontForStyleFunc returns the font for a given style.
 type FontForStyleFunc func(style Style) draw.Font
 
+// ListIndentWidth is the number of pixels per indent level for list items.
+// This is approximately 2 characters wide.
+const ListIndentWidth = 20
+
 // layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
 // It computes the Wid field for each box and assigns X/Y positions.
 // The returned Lines contain positioned boxes ready for rendering.
@@ -168,6 +172,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 	currentLine.Height = defaultFontHeight
 	xPos := 0
 	pendingParaBreak := false // Track if we just had a paragraph break
+	currentListIndent := 0    // Track current list indentation level for wrapped lines
 
 	for i := range boxes {
 		box := &boxes[i]
@@ -196,6 +201,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				Height: defaultFontHeight,
 			}
 			xPos = 0
+			currentListIndent = 0 // Reset list indent on explicit newline
 
 			// Mark that we have a pending paragraph break if this newline is a para break
 			if box.Style.ParaBreak {
@@ -212,6 +218,18 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			pendingParaBreak = false
 		}
 
+		// Calculate list indentation for this box
+		listIndentPixels := 0
+		if box.Style.ListBullet || box.Style.ListItem {
+			listIndentPixels = box.Style.ListIndent * ListIndentWidth
+			currentListIndent = box.Style.ListIndent // Track for wrapped lines
+		}
+
+		// Apply list indentation at the start of a line
+		if xPos == 0 && listIndentPixels > 0 {
+			xPos = listIndentPixels
+		}
+
 		// Calculate width for this box using the style-specific font
 		var width int
 		if box.IsTab() {
@@ -220,20 +238,24 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
 
-		// Check if we need to wrap
-		if xPos+width > frameWidth && xPos > 0 {
-			// Need to wrap - but only if we're not at the start of a line
-			// First, check if this box can fit on a new line
-			// If the box is wider than frameWidth, we'll need to split it
+		// Effective frame width accounts for list indentation
+		effectiveFrameWidth := frameWidth - listIndentPixels
 
-			if width <= frameWidth {
+		// Check if we need to wrap
+		if xPos+width > frameWidth && xPos > listIndentPixels {
+			// Need to wrap - but only if we're not at the start of the content area
+			// First, check if this box can fit on a new line
+			// If the box is wider than effectiveFrameWidth, we'll need to split it
+
+			if width <= effectiveFrameWidth {
 				// Box fits on new line, start new line
 				lines = append(lines, currentLine)
 				currentLine = Line{
 					Y:      currentLine.Y + currentLine.Height,
 					Height: defaultFontHeight,
 				}
-				xPos = 0
+				// Maintain list indentation on wrapped lines
+				xPos = currentListIndent * ListIndentWidth
 
 				// Recalculate tab width at new position
 				if box.IsTab() {
@@ -241,12 +263,12 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				}
 			} else {
 				// Box is wider than frame, need to split it
-				lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle)
+				lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, currentListIndent*ListIndentWidth)
 				continue
 			}
-		} else if xPos == 0 && width > frameWidth {
-			// Box is at start of line but still too wide - split it
-			lines, currentLine, xPos = splitBoxAcrossLines(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle)
+		} else if xPos == listIndentPixels && width > effectiveFrameWidth {
+			// Box is at start of content area but still too wide - split it
+			lines, currentLine, xPos = splitBoxAcrossLinesWithIndent(lines, currentLine, box, font, frameWidth, currentLine.Height, getFontHeight, getFontForStyle, listIndentPixels)
 			continue
 		}
 
@@ -276,19 +298,25 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 // splitBoxAcrossLines splits a text box that's too wide to fit on a single line.
 // It creates multiple boxes, each fitting within frameWidth.
 func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, defaultFont draw.Font, frameWidth, defaultFontHeight int, fontHeightFn func(Style) int, fontForStyleFn func(Style) draw.Font) ([]Line, Line, int) {
+	return splitBoxAcrossLinesWithIndent(lines, currentLine, box, defaultFont, frameWidth, defaultFontHeight, fontHeightFn, fontForStyleFn, 0)
+}
+
+// splitBoxAcrossLinesWithIndent splits a text box that's too wide to fit on a single line,
+// maintaining the specified indentation on wrapped lines.
+func splitBoxAcrossLinesWithIndent(lines []Line, currentLine Line, box *Box, defaultFont draw.Font, frameWidth, defaultFontHeight int, fontHeightFn func(Style) int, fontForStyleFn func(Style) draw.Font, indent int) ([]Line, Line, int) {
 	// Tabs and newlines should never need splitting
 	if box.IsTab() || box.IsNewline() {
 		box.Wid = 0
 		currentLine.Boxes = append(currentLine.Boxes, PositionedBox{
 			Box: *box,
-			X:   0,
+			X:   indent,
 		})
-		return lines, currentLine, 0
+		return lines, currentLine, indent
 	}
 
 	text := box.Text
 	style := box.Style
-	xPos := 0
+	xPos := indent
 
 	// Get the correct font for this box's style
 	font := defaultFont
@@ -305,12 +333,15 @@ func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, defaultFont d
 		currentLine.Height = boxHeight
 	}
 
+	// Effective width available for content (after indentation)
+	effectiveWidth := frameWidth - indent
+
 	for len(text) > 0 {
 		// Find how many bytes fit on this line
-		bytesOnLine, widthOnLine := fitBytes(text, font, frameWidth)
+		bytesOnLine, widthOnLine := fitBytes(text, font, effectiveWidth)
 
 		if bytesOnLine == 0 {
-			// At least one rune must fit (even if it exceeds frameWidth)
+			// At least one rune must fit (even if it exceeds effectiveWidth)
 			_, runeLen := utf8.DecodeRune(text)
 			bytesOnLine = runeLen
 			widthOnLine = font.BytesWidth(text[:runeLen])
@@ -329,7 +360,7 @@ func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, defaultFont d
 			Box: portionBox,
 			X:   xPos,
 		})
-		xPos = widthOnLine
+		xPos = indent + widthOnLine
 
 		text = text[bytesOnLine:]
 
@@ -340,7 +371,7 @@ func splitBoxAcrossLines(lines []Line, currentLine Line, box *Box, defaultFont d
 				Y:      currentLine.Y + currentLine.Height,
 				Height: boxHeight, // New line continues with same style
 			}
-			xPos = 0
+			xPos = indent // Maintain indentation on wrapped lines
 		}
 	}
 

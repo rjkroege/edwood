@@ -559,3 +559,191 @@ func boxToString(b Box) string {
 	}
 	return string(b.Text)
 }
+
+// TestLayoutListIndent tests that list items are indented based on ListIndent.
+func TestLayoutListIndent(t *testing.T) {
+	// Mock font with fixed character width of 10 pixels, height 14
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// A simple list item: "• Item" where bullet is at indent 0
+	// Expected: bullet at X=0, content "Item" after the bullet
+	t.Run("single level list item at indent 0", func(t *testing.T) {
+		content := Content{
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 0, Scale: 1.0}},
+			{Text: " ", Style: Style{ListItem: true, ListIndent: 0, Scale: 1.0}},
+			{Text: "Item", Style: Style{ListItem: true, ListIndent: 0, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// At indent level 0, bullet should be at X=0
+		if lines[0].Boxes[0].X != 0 {
+			t.Errorf("bullet X = %d, want 0 (no indentation for level 0)", lines[0].Boxes[0].X)
+		}
+	})
+
+	t.Run("list item at indent 1 is indented", func(t *testing.T) {
+		content := Content{
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 1, Scale: 1.0}},
+			{Text: " ", Style: Style{ListItem: true, ListIndent: 1, Scale: 1.0}},
+			{Text: "Nested", Style: Style{ListItem: true, ListIndent: 1, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// At indent level 1, bullet should be indented (e.g., 20 pixels per level)
+		// ListIndentWidth should be 2 characters * 10 pixels = 20 pixels per level
+		expectedIndent := 20 // 1 level * 20 pixels
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("bullet X = %d, want %d (indented for level 1)", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+
+	t.Run("list item at indent 2 is further indented", func(t *testing.T) {
+		content := Content{
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 2, Scale: 1.0}},
+			{Text: " ", Style: Style{ListItem: true, ListIndent: 2, Scale: 1.0}},
+			{Text: "Deep", Style: Style{ListItem: true, ListIndent: 2, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// At indent level 2, bullet should be at 40 pixels (2 * 20)
+		expectedIndent := 40 // 2 levels * 20 pixels
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("bullet X = %d, want %d (indented for level 2)", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+}
+
+// TestLayoutNestedListIndent tests nested lists with multiple levels.
+func TestLayoutNestedListIndent(t *testing.T) {
+	// Mock font with fixed character width of 10 pixels, height 14
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	t.Run("multiple list items at different indent levels", func(t *testing.T) {
+		// Simulates:
+		// - Item 1
+		//   - Nested item
+		//     - Deep nested
+		content := Content{
+			// Line 1: "• Item 1" at indent 0
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 0, Scale: 1.0}},
+			{Text: " Item 1", Style: Style{ListItem: true, ListIndent: 0, Scale: 1.0}},
+			{Text: "\n", Style: Style{Scale: 1.0}},
+			// Line 2: "• Nested item" at indent 1
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 1, Scale: 1.0}},
+			{Text: " Nested item", Style: Style{ListItem: true, ListIndent: 1, Scale: 1.0}},
+			{Text: "\n", Style: Style{Scale: 1.0}},
+			// Line 3: "• Deep nested" at indent 2
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 2, Scale: 1.0}},
+			{Text: " Deep nested", Style: Style{ListItem: true, ListIndent: 2, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 3 {
+			t.Fatalf("expected 3 lines, got %d", len(lines))
+		}
+
+		// Line 1: bullet at indent 0 (X=0)
+		if len(lines[0].Boxes) < 1 {
+			t.Fatalf("line 0 has no boxes")
+		}
+		if lines[0].Boxes[0].X != 0 {
+			t.Errorf("line 0 bullet X = %d, want 0", lines[0].Boxes[0].X)
+		}
+
+		// Line 2: bullet at indent 1 (X=20)
+		if len(lines[1].Boxes) < 1 {
+			t.Fatalf("line 1 has no boxes")
+		}
+		if lines[1].Boxes[0].X != 20 {
+			t.Errorf("line 1 bullet X = %d, want 20", lines[1].Boxes[0].X)
+		}
+
+		// Line 3: bullet at indent 2 (X=40)
+		if len(lines[2].Boxes) < 1 {
+			t.Fatalf("line 2 has no boxes")
+		}
+		if lines[2].Boxes[0].X != 40 {
+			t.Errorf("line 2 bullet X = %d, want 40", lines[2].Boxes[0].X)
+		}
+	})
+
+	t.Run("ordered list numbers are indented", func(t *testing.T) {
+		content := Content{
+			// "1." at indent 0
+			{Text: "1.", Style: Style{ListBullet: true, ListOrdered: true, ListNumber: 1, ListIndent: 0, Scale: 1.0}},
+			{Text: " First", Style: Style{ListItem: true, ListIndent: 0, Scale: 1.0}},
+			{Text: "\n", Style: Style{Scale: 1.0}},
+			// "a." at indent 1 (sub-list)
+			{Text: "a.", Style: Style{ListBullet: true, ListOrdered: true, ListNumber: 1, ListIndent: 1, Scale: 1.0}},
+			{Text: " Sub-item", Style: Style{ListItem: true, ListIndent: 1, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 lines, got %d", len(lines))
+		}
+
+		// Line 1: "1." at X=0
+		if lines[0].Boxes[0].X != 0 {
+			t.Errorf("line 0 number X = %d, want 0", lines[0].Boxes[0].X)
+		}
+
+		// Line 2: "a." at X=20
+		if lines[1].Boxes[0].X != 20 {
+			t.Errorf("line 1 number X = %d, want 20", lines[1].Boxes[0].X)
+		}
+	})
+
+	t.Run("list content wraps with correct indentation", func(t *testing.T) {
+		// A list item with long content that wraps
+		// The wrapped portion should maintain the same indentation
+		content := Content{
+			{Text: "•", Style: Style{ListBullet: true, ListIndent: 1, Scale: 1.0}},
+			{Text: " This is a very long item that will need to wrap to the next line because it exceeds the frame width", Style: Style{ListItem: true, ListIndent: 1, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, 100, maxtab, nil, nil) // narrow frame to force wrapping
+
+		if len(lines) < 2 {
+			t.Fatalf("expected at least 2 lines for wrapped content, got %d", len(lines))
+		}
+
+		// First line should have bullet at indent 1 (X=20)
+		if lines[0].Boxes[0].X != 20 {
+			t.Errorf("line 0 bullet X = %d, want 20", lines[0].Boxes[0].X)
+		}
+
+		// Wrapped lines should also be indented to align with the text after the bullet
+		// The continuation should be at the same indentation level as the text start
+		// (bullet width + space = about 20 pixels more, so continuation at ~40)
+		for i := 1; i < len(lines); i++ {
+			if len(lines[i].Boxes) > 0 {
+				// Wrapped content should be indented (at least at the list indent level)
+				if lines[i].Boxes[0].X < 20 {
+					t.Errorf("wrapped line %d X = %d, want >= 20 (should maintain list indentation)", i, lines[i].Boxes[0].X)
+				}
+			}
+		}
+	})
+}
