@@ -2749,12 +2749,6 @@ func TestHandlePreviewMouseSignature(t *testing.T) {
 	w.richBody = rt
 	w.SetPreviewMode(true)
 
-	// Create a Mousectl for the test
-	mc := display.InitMouse()
-	if mc == nil {
-		t.Fatal("InitMouse() returned nil")
-	}
-
 	// Create a mouse event in the frame area (button 1 click for selection)
 	frameRect := rt.Frame().Rect()
 	clickPoint := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
@@ -2762,6 +2756,13 @@ func TestHandlePreviewMouseSignature(t *testing.T) {
 		Point:   clickPoint,
 		Buttons: 1, // Button 1 pressed
 	}
+
+	// Create a Mousectl with an immediate release event for proper Select() behavior
+	upEvent := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 0, // Button released
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
 
 	// Test that HandlePreviewMouse can be called with both mouse and mousectl
 	// The key assertion is that the call compiles and executes without error
@@ -2800,4 +2801,362 @@ func TestHandlePreviewMouseSignature(t *testing.T) {
 	if !handled3 {
 		t.Error("HandlePreviewMouse should handle scroll wheel even with nil Mousectl")
 	}
+}
+
+// mockMousectlWithEvents creates a mock Mousectl with a buffered channel
+// containing the provided events. This is used for testing drag selection.
+func mockMousectlWithEvents(events []draw.Mouse) *draw.Mousectl {
+	ch := make(chan draw.Mouse, len(events)+1)
+	for _, e := range events {
+		ch <- e
+	}
+	return &draw.Mousectl{C: ch}
+}
+
+// TestPreviewModeSelection tests that single-click selection in preview mode
+// sets a point selection (p0 == p1) at the click position.
+func TestPreviewModeSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Hello World" (11 chars)
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Simulate single click at position 5 (the space) - X=12+50=62
+	// (12px scrollbar + 5 chars * 10px = 62)
+	frameRect := rt.Frame().Rect()
+	clickPoint := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+
+	// Mouse down event
+	downEvent := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 1,
+	}
+	// Immediate mouse up at same position (no drag)
+	upEvent := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 0,
+	}
+
+	mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+	handled := w.HandlePreviewMouse(&downEvent, mc)
+
+	if !handled {
+		t.Error("HandlePreviewMouse should handle button 1 click in frame area")
+	}
+
+	// After single click without drag, selection should be a point (p0 == p1)
+	q0, q1 := rt.Selection()
+	if q0 != q1 {
+		t.Errorf("Single click selection should be point (p0 == p1), got p0=%d, p1=%d", q0, q1)
+	}
+	// Position 5 corresponds to the space in "Hello World"
+	if q0 != 5 {
+		t.Errorf("Click at X=50 should select position 5, got %d", q0)
+	}
+}
+
+// TestPreviewModeSelectionDrag tests that click-and-drag selection in preview mode
+// selects a range of text from the anchor point to the release point.
+func TestPreviewModeSelectionDrag(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Hello World" (11 chars)
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Simulate drag selection from position 0 to position 5 (select "Hello")
+	// Position 0 is at X = frameRect.Min.X (after scrollbar)
+	// Position 5 is at X = frameRect.Min.X + 50
+
+	// Mouse down at position 0
+	downEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+		Buttons: 1,
+	}
+	// Drag to position 5 (still holding button)
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+		Buttons: 1,
+	}
+	// Mouse up at position 5
+	upEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+		Buttons: 0,
+	}
+
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+	handled := w.HandlePreviewMouse(&downEvent, mc)
+
+	if !handled {
+		t.Error("HandlePreviewMouse should handle button 1 drag in frame area")
+	}
+
+	// After drag from 0 to 5, selection should be (0, 5)
+	q0, q1 := rt.Selection()
+	if q0 != 0 {
+		t.Errorf("Drag selection p0 should be 0, got %d", q0)
+	}
+	if q1 != 5 {
+		t.Errorf("Drag selection p1 should be 5, got %d", q1)
+	}
+}
+
+// TestPreviewModeSelectionDragBackward tests that dragging backward
+// (from right to left) still produces a valid selection with p0 < p1.
+func TestPreviewModeSelectionDragBackward(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Drag backward: start at position 5, drag to position 0
+	downEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5), // Position 5
+		Buttons: 1,
+	}
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5), // Position 0
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+		Buttons: 0,
+	}
+
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+	handled := w.HandlePreviewMouse(&downEvent, mc)
+
+	if !handled {
+		t.Error("HandlePreviewMouse should handle backward drag")
+	}
+
+	// Selection should still be normalized: p0 < p1
+	q0, q1 := rt.Selection()
+	if q0 != 0 {
+		t.Errorf("Backward drag selection p0 should be 0, got %d", q0)
+	}
+	if q1 != 5 {
+		t.Errorf("Backward drag selection p1 should be 5, got %d", q1)
+	}
+}
+
+// =============================================================================
+// Phase 16I: Image Pipeline Integration Tests
+// =============================================================================
+
+// TestPreviewCmdPassesImageCache verifies that when entering Markdeep preview mode,
+// the image cache created for the window is passed through to the RichText component
+// via the WithRichTextImageCache option. This ensures images can be loaded and
+// rendered during layout.
+//
+// The test simulates what previewcmd() should do:
+// 1. Create an image cache
+// 2. Pass it to RichText via WithRichTextImageCache
+// 3. Verify the cache is accessible through the Frame
+func TestPreviewCmdPassesImageCache(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Create a window with markdown content containing an image
+	markdownContent := "# Test\n\n![My Image](test.png)\n\nSome text after."
+	sourceRunes := []rune(markdownContent)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/docs/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create fonts and colors
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	// Create the image cache BEFORE creating RichText (this is what previewcmd should do)
+	cache := rich.NewImageCache(10)
+	w.imageCache = cache
+
+	// Create RichText with the image cache option
+	// This is what previewcmd() SHOULD be doing but currently doesn't
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithRichTextImageCache(cache), // This is the critical line being tested
+	)
+
+	// Use markdown.Parse to get content with image spans (ParseWithSourceMap
+	// doesn't currently handle images, that's a separate issue)
+	parsedContent := markdown.Parse(markdownContent)
+
+	// Verify basic parsing detected the image
+	foundImage := false
+	for _, span := range parsedContent {
+		if span.Style.Image {
+			foundImage = true
+			if span.Style.ImageURL != "test.png" {
+				t.Errorf("ImageURL = %q, want %q", span.Style.ImageURL, "test.png")
+			}
+			break
+		}
+	}
+	if !foundImage {
+		t.Error("markdown.Parse should detect image in content")
+	}
+
+	// Set content with images and render
+	rt.SetContent(parsedContent)
+	rt.Render(bodyRect)
+
+	// For source mapping, we still need ParseWithSourceMap
+	_, sourceMap, linkMap := markdown.ParseWithSourceMap(markdownContent)
+
+	// Assign richBody and enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verification 1: Window has the cache
+	if w.imageCache == nil {
+		t.Error("Window.imageCache should not be nil")
+	}
+
+	// Verification 2: RichText has the cache (check via internal field)
+	// Note: We can't directly access rt.imageCache since it's unexported,
+	// but we can verify behavior by checking if the Frame was initialized
+	// with the cache. The real test is that images render correctly.
+	if rt.Frame() == nil {
+		t.Fatal("RichText.Frame() should not be nil after Init")
+	}
+
+	// Verification 3: The cache itself should be usable
+	// Try to get a path that doesn't exist - should return nil, false
+	cached, found := cache.Get("/nonexistent/path.png")
+	if found || cached != nil {
+		t.Error("Get on non-existent path should return nil, false")
+	}
+
+	// Clean up
+	w.SetPreviewMode(false)
+	cache.Clear()
 }

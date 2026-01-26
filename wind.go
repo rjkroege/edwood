@@ -721,9 +721,16 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	// Handle button 1 in frame area for text selection
 	frameRect := rt.Frame().Rect()
 	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
-		// Get character position at click point
-		charPos := rt.Frame().Charofpt(m.Point)
-		rt.SetSelection(charPos, charPos)
+		if mc != nil {
+			// Use Frame.Select() for proper drag selection
+			// This reads subsequent mouse events from mc.C until button release
+			p0, p1 := rt.Frame().Select(mc, m)
+			rt.SetSelection(p0, p1)
+		} else {
+			// Fallback: just set point selection if no Mousectl available
+			charPos := rt.Frame().Charofpt(m.Point)
+			rt.SetSelection(charPos, charPos)
+		}
 		w.Draw()
 		if w.display != nil {
 			w.display.Flush()
