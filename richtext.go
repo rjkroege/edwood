@@ -220,8 +220,13 @@ func (rt *RichText) Render(r image.Rectangle) {
 	}
 }
 
-// scrDraw renders the scrollbar background and thumb.
+// scrDraw renders the scrollbar background and thumb using cached rectangles.
 func (rt *RichText) scrDraw() {
+	rt.scrDrawAt(rt.lastScrollRect)
+}
+
+// scrDrawAt renders the scrollbar at the given rectangle.
+func (rt *RichText) scrDrawAt(scrollRect image.Rectangle) {
 	if rt.display == nil {
 		return
 	}
@@ -230,17 +235,17 @@ func (rt *RichText) scrDraw() {
 
 	// Draw scrollbar background
 	if rt.scrollBg != nil {
-		screen.Draw(rt.lastScrollRect, rt.scrollBg, rt.scrollBg, image.ZP)
+		screen.Draw(scrollRect, rt.scrollBg, rt.scrollBg, image.ZP)
 	}
 
 	// Draw scrollbar thumb
 	if rt.scrollThumb != nil {
-		thumbRect := rt.scrThumbRect()
+		thumbRect := rt.scrThumbRectAt(scrollRect)
 		screen.Draw(thumbRect, rt.scrollThumb, rt.scrollThumb, image.ZP)
 	}
 }
 
-// ScrollClick handles a click on the scrollbar.
+// ScrollClick handles a click on the scrollbar using cached rectangles.
 // It takes the button number (1, 2, or 3) and the click point,
 // calculates the new origin based on the button behavior, and returns it.
 // Button 1 (left): scroll up (backward in content)
@@ -248,6 +253,11 @@ func (rt *RichText) scrDraw() {
 // Button 3 (right): scroll down (forward in content)
 // The origin is also updated in the RichText component.
 func (rt *RichText) ScrollClick(button int, pt image.Point) int {
+	return rt.scrollClickAt(button, pt, rt.lastScrollRect)
+}
+
+// scrollClickAt handles a click on the scrollbar using a given scroll rectangle.
+func (rt *RichText) scrollClickAt(button int, pt image.Point, scrollRect image.Rectangle) int {
 	// If no content or frame, return 0
 	if rt.content == nil || rt.frame == nil {
 		return 0
@@ -269,12 +279,12 @@ func (rt *RichText) ScrollClick(button int, pt image.Point) int {
 	}
 
 	// Calculate click position as a proportion of the scrollbar height
-	scrollHeight := rt.lastScrollRect.Dy()
+	scrollHeight := scrollRect.Dy()
 	if scrollHeight <= 0 {
 		return rt.Origin()
 	}
 
-	clickY := pt.Y - rt.lastScrollRect.Min.Y
+	clickY := pt.Y - scrollRect.Min.Y
 	if clickY < 0 {
 		clickY = 0
 	}
@@ -369,19 +379,24 @@ func (rt *RichText) ScrollClick(button int, pt image.Point) int {
 	return newOrigin
 }
 
-// scrThumbRect returns the rectangle for the scrollbar thumb.
+// scrThumbRect returns the rectangle for the scrollbar thumb using cached rectangles.
+func (rt *RichText) scrThumbRect() image.Rectangle {
+	return rt.scrThumbRectAt(rt.lastScrollRect)
+}
+
+// scrThumbRectAt computes thumb position for a given scrollbar rectangle.
 // The thumb position and size reflect the current scroll position and
 // the proportion of visible content to total content.
-func (rt *RichText) scrThumbRect() image.Rectangle {
+func (rt *RichText) scrThumbRectAt(scrollRect image.Rectangle) image.Rectangle {
 	// If no content or frame, fill the whole scrollbar
 	if rt.content == nil || rt.frame == nil {
-		return rt.lastScrollRect
+		return scrollRect
 	}
 
 	totalRunes := rt.content.Len()
 	if totalRunes == 0 {
 		// No content - thumb fills the whole scrollbar
-		return rt.lastScrollRect
+		return scrollRect
 	}
 
 	// Get scroll metrics from the frame using visual line counts
@@ -390,11 +405,11 @@ func (rt *RichText) scrThumbRect() image.Rectangle {
 	lineCount := rt.frame.TotalLines()
 	lineStarts := rt.frame.LineStartRunes()
 
-	scrollHeight := rt.lastScrollRect.Dy()
+	scrollHeight := scrollRect.Dy()
 
 	// If all content fits, fill the scrollbar
 	if lineCount <= maxLines {
-		return rt.lastScrollRect
+		return scrollRect
 	}
 
 	// Calculate thumb height based on visible vs total lines
@@ -451,12 +466,12 @@ func (rt *RichText) scrThumbRect() image.Rectangle {
 	availableSpace := scrollHeight - thumbHeight
 
 	// Thumb top position
-	thumbTop := rt.lastScrollRect.Min.Y + int(float64(availableSpace)*posProportion)
+	thumbTop := scrollRect.Min.Y + int(float64(availableSpace)*posProportion)
 
 	return image.Rect(
-		rt.lastScrollRect.Min.X,
+		scrollRect.Min.X,
 		thumbTop,
-		rt.lastScrollRect.Max.X,
+		scrollRect.Max.X,
 		thumbTop+thumbHeight,
 	)
 }
