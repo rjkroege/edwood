@@ -86,23 +86,28 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	return srcStart, srcEnd
 }
 
-// ParseWithSourceMap parses markdown and returns both the styled content
-// and a source map for mapping rendered positions back to source positions.
-func ParseWithSourceMap(text string) (rich.Content, *SourceMap) {
+// ParseWithSourceMap parses markdown and returns the styled content,
+// a source map for mapping rendered positions back to source positions,
+// and a link map for tracking which rendered positions contain links.
+func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	if text == "" {
-		return rich.Content{}, &SourceMap{}
+		return rich.Content{}, &SourceMap{}, NewLinkMap()
 	}
 
 	var result rich.Content
 	sm := &SourceMap{}
+	lm := NewLinkMap()
 	lines := splitLines(text)
 
-	sourcePos := 0  // Current position in source
+	sourcePos := 0   // Current position in source
 	renderedPos := 0 // Current position in rendered content
 
 	for _, line := range lines {
-		spans, entries := parseLineWithSourceMap(line, sourcePos, renderedPos)
+		spans, entries, linkEntries := parseLineWithSourceMap(line, sourcePos, renderedPos)
 		sm.entries = append(sm.entries, entries...)
+		for _, le := range linkEntries {
+			lm.Add(le.Start, le.End, le.URL)
+		}
 
 		// Update rendered position based on spans
 		for _, span := range spans {
@@ -122,11 +127,11 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap) {
 		}
 	}
 
-	return result, sm
+	return result, sm, lm
 }
 
-// parseLineWithSourceMap parses a single line and returns spans plus source map entries.
-func parseLineWithSourceMap(line string, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry) {
+// parseLineWithSourceMap parses a single line and returns spans, source map entries, and link entries.
+func parseLineWithSourceMap(line string, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
 	// Check for heading (# at start of line)
 	level := headingLevel(line)
 	if level > 0 {
@@ -154,17 +159,18 @@ func parseLineWithSourceMap(line string, sourceOffset, renderedOffset int) ([]ri
 				Scale: headingScales[level],
 			},
 		}
-		return []rich.Span{span}, []SourceMapEntry{entry}
+		return []rich.Span{span}, []SourceMapEntry{entry}, nil
 	}
 
 	// Parse inline formatting
 	return parseInlineWithSourceMap(line, rich.DefaultStyle(), sourceOffset, renderedOffset)
 }
 
-// parseInlineWithSourceMap parses inline formatting and builds source map entries.
-func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry) {
+// parseInlineWithSourceMap parses inline formatting and builds source map and link map entries.
+func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
 	var spans []rich.Span
 	var entries []SourceMapEntry
+	var linkEntries []LinkEntry
 	var currentText strings.Builder
 	i := 0
 	srcPos := sourceOffset
@@ -182,6 +188,79 @@ func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, r
 	}
 
 	for i < len(text) {
+		// Check for [ (potential link) - must be checked early
+		if text[i] == '[' {
+			// Try to parse as link: [text](url)
+			linkEnd := strings.Index(text[i+1:], "]")
+			if linkEnd != -1 {
+				closeBracket := i + 1 + linkEnd
+				// Check if immediately followed by (
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					// Find closing )
+					urlEnd := strings.Index(text[closeBracket+2:], ")")
+					if urlEnd != -1 {
+						// We have a valid link pattern
+						flushPlain()
+
+						linkText := text[i+1 : closeBracket]
+						url := text[closeBracket+2 : closeBracket+2+urlEnd]
+						sourceLen := 1 + linkEnd + 1 + 1 + urlEnd + 1 // [text](url)
+
+						// Parse link text with Link style as base
+						linkStyle := rich.Style{
+							Fg:    baseStyle.Fg,
+							Bg:    baseStyle.Bg,
+							Link:  true,
+							Scale: baseStyle.Scale,
+						}
+
+						// Track the start of the link in rendered content
+						linkRenderedStart := rendPos
+
+						if linkText == "" {
+							// Empty link text - nothing to render
+						} else {
+							// Parse link text for bold/italic (recursively, but without link detection)
+							linkSpans, linkSourceEntries, _ := parseInlineWithSourceMapNoLinks(linkText, linkStyle, srcPos+1, rendPos)
+							spans = append(spans, linkSpans...)
+							entries = append(entries, linkSourceEntries...)
+							for _, span := range linkSpans {
+								rendPos += len([]rune(span.Text))
+							}
+						}
+
+						// Track the end of the link in rendered content
+						linkRenderedEnd := rendPos
+
+						// Add link entry if there's actual content
+						if linkRenderedEnd > linkRenderedStart {
+							linkEntries = append(linkEntries, LinkEntry{
+								Start: linkRenderedStart,
+								End:   linkRenderedEnd,
+								URL:   url,
+							})
+						}
+
+						srcPos += sourceLen
+						i = closeBracket + 2 + urlEnd + 1
+						continue
+					}
+				}
+			}
+			// Not a valid link, treat [ as regular text
+			currentText.WriteByte(text[i])
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + 1,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + 1,
+			})
+			rendPos++
+			srcPos++
+			i++
+			continue
+		}
+
 		// Check for ` (code span)
 		if text[i] == '`' {
 			end := strings.Index(text[i+1:], "`")
@@ -362,5 +441,214 @@ func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, r
 		}}
 	}
 
-	return spans, entries
+	return spans, entries, linkEntries
+}
+
+// parseInlineWithSourceMapNoLinks parses inline formatting but NOT links.
+// Used for parsing text inside link labels to avoid infinite recursion.
+func parseInlineWithSourceMapNoLinks(text string, baseStyle rich.Style, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
+	var spans []rich.Span
+	var entries []SourceMapEntry
+	var currentText strings.Builder
+	i := 0
+	srcPos := sourceOffset
+	rendPos := renderedOffset
+
+	flushPlain := func() {
+		if currentText.Len() > 0 {
+			t := currentText.String()
+			spans = append(spans, rich.Span{
+				Text:  t,
+				Style: baseStyle,
+			})
+			currentText.Reset()
+		}
+	}
+
+	for i < len(text) {
+		// Check for ` (code span)
+		if text[i] == '`' {
+			end := strings.Index(text[i+1:], "`")
+			if end != -1 {
+				flushPlain()
+				codeText := text[i+1 : i+1+end]
+				codeLen := len([]rune(codeText))
+				sourceLen := 1 + end + 1 // `code`
+
+				spans = append(spans, rich.Span{
+					Text: codeText,
+					Style: rich.Style{
+						Fg:    baseStyle.Fg,
+						Bg:    baseStyle.Bg,
+						Code:  true,
+						Link:  baseStyle.Link,
+						Scale: baseStyle.Scale,
+					},
+				})
+				entries = append(entries, SourceMapEntry{
+					RenderedStart: rendPos,
+					RenderedEnd:   rendPos + codeLen,
+					SourceStart:   srcPos,
+					SourceEnd:     srcPos + sourceLen,
+				})
+				rendPos += codeLen
+				srcPos += sourceLen
+				i = i + 1 + end + 1
+				continue
+			}
+			currentText.WriteByte(text[i])
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + 1,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + 1,
+			})
+			rendPos++
+			srcPos++
+			i++
+			continue
+		}
+
+		// Check for *** (bold+italic)
+		if i+2 < len(text) && text[i:i+3] == "***" {
+			end := strings.Index(text[i+3:], "***")
+			if end != -1 {
+				flushPlain()
+				innerText := text[i+3 : i+3+end]
+				innerLen := len([]rune(innerText))
+				sourceLen := 3 + end + 3 // ***text***
+
+				spans = append(spans, rich.Span{
+					Text: innerText,
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: true,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				entries = append(entries, SourceMapEntry{
+					RenderedStart: rendPos,
+					RenderedEnd:   rendPos + innerLen,
+					SourceStart:   srcPos,
+					SourceEnd:     srcPos + sourceLen,
+				})
+				rendPos += innerLen
+				srcPos += sourceLen
+				i = i + 3 + end + 3
+				continue
+			}
+		}
+
+		// Check for ** (bold)
+		if i+1 < len(text) && text[i:i+2] == "**" {
+			end := strings.Index(text[i+2:], "**")
+			if end != -1 {
+				flushPlain()
+				innerText := text[i+2 : i+2+end]
+				innerLen := len([]rune(innerText))
+				sourceLen := 2 + end + 2 // **text**
+
+				spans = append(spans, rich.Span{
+					Text: innerText,
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   true,
+						Italic: baseStyle.Italic,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				entries = append(entries, SourceMapEntry{
+					RenderedStart: rendPos,
+					RenderedEnd:   rendPos + innerLen,
+					SourceStart:   srcPos,
+					SourceEnd:     srcPos + sourceLen,
+				})
+				rendPos += innerLen
+				srcPos += sourceLen
+				i = i + 2 + end + 2
+				continue
+			}
+			// No closing ** found
+			currentText.WriteString("**")
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + 2,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + 2,
+			})
+			rendPos += 2
+			srcPos += 2
+			i += 2
+			continue
+		}
+
+		// Check for * (italic)
+		if text[i] == '*' {
+			end := strings.Index(text[i+1:], "*")
+			if end != -1 {
+				flushPlain()
+				innerText := text[i+1 : i+1+end]
+				innerLen := len([]rune(innerText))
+				sourceLen := 1 + end + 1 // *text*
+
+				spans = append(spans, rich.Span{
+					Text: innerText,
+					Style: rich.Style{
+						Fg:     baseStyle.Fg,
+						Bg:     baseStyle.Bg,
+						Bold:   baseStyle.Bold,
+						Italic: true,
+						Link:   baseStyle.Link,
+						Scale:  baseStyle.Scale,
+					},
+				})
+				entries = append(entries, SourceMapEntry{
+					RenderedStart: rendPos,
+					RenderedEnd:   rendPos + innerLen,
+					SourceStart:   srcPos,
+					SourceEnd:     srcPos + sourceLen,
+				})
+				rendPos += innerLen
+				srcPos += sourceLen
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		// Regular character
+		currentText.WriteByte(text[i])
+		entries = append(entries, SourceMapEntry{
+			RenderedStart: rendPos,
+			RenderedEnd:   rendPos + 1,
+			SourceStart:   srcPos,
+			SourceEnd:     srcPos + 1,
+		})
+		rendPos++
+		srcPos++
+		i++
+	}
+
+	// Flush any remaining text
+	flushPlain()
+
+	// If no spans were created, return a single span with original text
+	if len(spans) == 0 && text != "" {
+		spans = []rich.Span{{
+			Text:  text,
+			Style: baseStyle,
+		}}
+		entries = []SourceMapEntry{{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + len([]rune(text)),
+			SourceStart:   sourceOffset,
+			SourceEnd:     sourceOffset + len(text),
+		}}
+	}
+
+	return spans, entries, nil
 }

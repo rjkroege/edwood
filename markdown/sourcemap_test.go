@@ -7,7 +7,7 @@ import (
 // TestSourceMapSimple tests source mapping for plain text (1:1 mapping).
 func TestSourceMapSimple(t *testing.T) {
 	input := "Hello, World!"
-	_, sm := ParseWithSourceMap(input)
+	_, sm, _ := ParseWithSourceMap(input)
 
 	// Plain text should have 1:1 mapping
 	// Rendered position 0 should map to source position 0
@@ -92,7 +92,7 @@ func TestSourceMapBold(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, sm := ParseWithSourceMap(tt.input)
+			_, sm, _ := ParseWithSourceMap(tt.input)
 			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
 			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
 				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
@@ -166,7 +166,7 @@ func TestSourceMapHeading(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, sm := ParseWithSourceMap(tt.input)
+			_, sm, _ := ParseWithSourceMap(tt.input)
 			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
 			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
 				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
@@ -180,7 +180,7 @@ func TestSourceMapHeading(t *testing.T) {
 // TestSourceMapItalic tests source mapping for italic text (*text*).
 func TestSourceMapItalic(t *testing.T) {
 	input := "*italic*"
-	_, sm := ParseWithSourceMap(input)
+	_, sm, _ := ParseWithSourceMap(input)
 
 	// Rendered "italic" (6 chars) maps to source "*italic*" (8 chars)
 	srcStart, srcEnd := sm.ToSource(0, 6)
@@ -194,7 +194,7 @@ func TestSourceMapMixed(t *testing.T) {
 	// "# Title\nSome **bold** text\n"
 	// Rendered: "Title\nSome bold text\n"
 	input := "# Title\nSome **bold** text\n"
-	_, sm := ParseWithSourceMap(input)
+	_, sm, _ := ParseWithSourceMap(input)
 
 	// "Title" rendered at 0-5, source "# Title" at 0-7
 	srcStart, srcEnd := sm.ToSource(0, 5)
@@ -212,7 +212,7 @@ func TestSourceMapMixed(t *testing.T) {
 // TestSourceMapCode tests source mapping for inline code (`code`).
 func TestSourceMapCode(t *testing.T) {
 	input := "`code`"
-	_, sm := ParseWithSourceMap(input)
+	_, sm, _ := ParseWithSourceMap(input)
 
 	// Rendered "code" (4 chars) maps to source "`code`" (6 chars)
 	srcStart, srcEnd := sm.ToSource(0, 4)
@@ -224,11 +224,133 @@ func TestSourceMapCode(t *testing.T) {
 // TestSourceMapEmpty tests source mapping for empty input.
 func TestSourceMapEmpty(t *testing.T) {
 	input := ""
-	_, sm := ParseWithSourceMap(input)
+	_, sm, _ := ParseWithSourceMap(input)
 
 	// Empty input should return empty range
 	srcStart, srcEnd := sm.ToSource(0, 0)
 	if srcStart != 0 || srcEnd != 0 {
 		t.Errorf("ToSource(0, 0) = (%d, %d), want (0, 0)", srcStart, srcEnd)
+	}
+}
+
+// TestParseWithSourceMapLinks tests that ParseWithSourceMap returns a LinkMap
+// that correctly tracks link positions in the rendered content.
+func TestParseWithSourceMapLinks(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantLinks []struct {
+			pos     int    // Position within the link to test
+			wantURL string // Expected URL at that position
+		}
+		noLinks []int // Positions that should NOT be in a link
+	}{
+		{
+			name:  "simple link",
+			input: "[click here](https://example.com)",
+			// Rendered: "click here" (10 chars, positions 0-9)
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{
+				{pos: 0, wantURL: "https://example.com"},
+				{pos: 5, wantURL: "https://example.com"},
+				{pos: 9, wantURL: "https://example.com"},
+			},
+			noLinks: []int{10, 15}, // Outside link
+		},
+		{
+			name:  "link in middle of text",
+			input: "See [this link](https://example.com) for details.",
+			// Rendered: "See this link for details." (27 chars)
+			// "See " = 0-3, "this link" = 4-12, " for details." = 13-26
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{
+				{pos: 4, wantURL: "https://example.com"},
+				{pos: 8, wantURL: "https://example.com"},
+				{pos: 12, wantURL: "https://example.com"},
+			},
+			noLinks: []int{0, 3, 13, 20},
+		},
+		{
+			name:  "multiple links",
+			input: "[one](https://one.com) and [two](https://two.com)",
+			// Rendered: "one and two" (11 chars)
+			// "one" = 0-2, " and " = 3-7, "two" = 8-10
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{
+				{pos: 0, wantURL: "https://one.com"},
+				{pos: 2, wantURL: "https://one.com"},
+				{pos: 8, wantURL: "https://two.com"},
+				{pos: 10, wantURL: "https://two.com"},
+			},
+			noLinks: []int{3, 5, 7, 11},
+		},
+		{
+			name:  "no links",
+			input: "Just plain text",
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{},
+			noLinks: []int{0, 5, 10},
+		},
+		{
+			name:  "link with bold text",
+			input: "[**bold link**](https://example.com)",
+			// Rendered: "bold link" (9 chars, positions 0-8)
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{
+				{pos: 0, wantURL: "https://example.com"},
+				{pos: 4, wantURL: "https://example.com"},
+				{pos: 8, wantURL: "https://example.com"},
+			},
+			noLinks: []int{9, 15},
+		},
+		{
+			name:  "adjacent links",
+			input: "[a](url1)[b](url2)",
+			// Rendered: "ab" (2 chars)
+			// "a" = 0, "b" = 1
+			wantLinks: []struct {
+				pos     int
+				wantURL string
+			}{
+				{pos: 0, wantURL: "url1"},
+				{pos: 1, wantURL: "url2"},
+			},
+			noLinks: []int{2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, lm := ParseWithSourceMap(tt.input)
+			if lm == nil {
+				t.Fatal("ParseWithSourceMap returned nil LinkMap")
+			}
+
+			// Check positions that should be in links
+			for _, want := range tt.wantLinks {
+				gotURL := lm.URLAt(want.pos)
+				if gotURL != want.wantURL {
+					t.Errorf("URLAt(%d) = %q, want %q", want.pos, gotURL, want.wantURL)
+				}
+			}
+
+			// Check positions that should NOT be in links
+			for _, pos := range tt.noLinks {
+				gotURL := lm.URLAt(pos)
+				if gotURL != "" {
+					t.Errorf("URLAt(%d) = %q, want empty string (not in link)", pos, gotURL)
+				}
+			}
+		})
 	}
 }
