@@ -473,7 +473,17 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 		}
 	}
 
-	// Phase 2: Render text on top of backgrounds
+	// Phase 3: Draw horizontal rules
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.HRule {
+				f.drawHorizontalRule(screen, line)
+				break // Only one rule per line
+			}
+		}
+	}
+
+	// Phase 4: Render text on top of backgrounds
 	for _, line := range lines {
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't render visible text
@@ -481,6 +491,10 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 				continue
 			}
 			if len(pb.Box.Text) == 0 {
+				continue
+			}
+			// Skip horizontal rules - they are drawn as lines, not text
+			if pb.Box.Style.HRule {
 				continue
 			}
 
@@ -559,6 +573,33 @@ func (f *frameImpl) drawBoxBackground(screen edwooddraw.Image, pb PositionedBox,
 	)
 
 	screen.Draw(bgRect, bgImg, bgImg, image.ZP)
+}
+
+// HRuleColor is the gray color used for horizontal rule lines.
+var HRuleColor = color.RGBA{R: 180, G: 180, B: 180, A: 255}
+
+// drawHorizontalRule draws a horizontal rule line across the full frame width.
+// The line is drawn vertically centered within the line height.
+func (f *frameImpl) drawHorizontalRule(screen edwooddraw.Image, line Line) {
+	// Use a gray color for the rule
+	ruleImg := f.allocColorImage(HRuleColor)
+	if ruleImg == nil {
+		return
+	}
+
+	// Draw a 1px line vertically centered in the line
+	// The line spans the full frame width
+	lineThickness := 1
+	centerY := f.rect.Min.Y + line.Y + line.Height/2
+
+	ruleRect := image.Rect(
+		f.rect.Min.X,
+		centerY,
+		f.rect.Max.X,
+		centerY+lineThickness,
+	)
+
+	screen.Draw(ruleRect, ruleImg, ruleImg, image.ZP)
 }
 
 // layoutFromOrigin returns the layout lines starting from the origin position.

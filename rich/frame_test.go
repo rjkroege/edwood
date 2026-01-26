@@ -1934,3 +1934,133 @@ func TestDrawBlockBackgroundMultiLine(t *testing.T) {
 		}
 	}
 }
+
+// TestDrawHorizontalRule tests that HRuleRune causes a horizontal line to be drawn instead of text.
+// When a box contains HRuleRune with StyleHRule, the renderer should draw a line
+// instead of rendering the rune as text.
+func TestDrawHorizontalRule(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300) // Frame is 400px wide
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 14px line height
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with a horizontal rule marker followed by text
+	// The HRuleRune should be rendered as a line, not as text
+	content := Content{
+		{Text: "above\n", Style: DefaultStyle()},
+		{Text: string(HRuleRune) + "\n", Style: StyleHRule},
+		{Text: "below", Style: DefaultStyle()},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify "above" and "below" are rendered as text
+	foundAbove := false
+	foundBelow := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "above"`) {
+			foundAbove = true
+		}
+		if strings.Contains(op, `string "below"`) {
+			foundBelow = true
+		}
+	}
+
+	if !foundAbove {
+		t.Errorf("Redraw() did not render 'above' text\ngot ops: %v", ops)
+	}
+	if !foundBelow {
+		t.Errorf("Redraw() did not render 'below' text\ngot ops: %v", ops)
+	}
+
+	// Verify that HRuleRune is NOT rendered as text (it should be drawn as a line instead)
+	hruleAsText := false
+	for _, op := range ops {
+		// The HRuleRune character should NOT appear in any string rendering operation
+		if strings.Contains(op, `string "`) && strings.Contains(op, string(HRuleRune)) {
+			hruleAsText = true
+			break
+		}
+	}
+
+	if hruleAsText {
+		t.Errorf("HRuleRune should not be rendered as text (should be drawn as a line)\ngot ops: %v", ops)
+	}
+
+	// Verify that a horizontal line (fill operation) was drawn for the hrule
+	// The line should span the full width of the frame and be thin (1px or similar)
+	frameBackgroundRect := "(0,0)-(400,300)"
+	foundHRuleLine := false
+	for _, op := range ops {
+		if strings.HasPrefix(op, "fill ") {
+			if strings.Contains(op, frameBackgroundRect) {
+				continue // Skip the frame background fill
+			}
+			// Look for a thin fill that spans full width (x from 0 to 400)
+			// The horizontal rule line should be on line 2 (Y around 14-28 area)
+			// and be 1-2px tall
+			if strings.Contains(op, "(0,") && strings.Contains(op, "-(400,") {
+				foundHRuleLine = true
+			}
+		}
+	}
+
+	if !foundHRuleLine {
+		t.Errorf("Redraw() did not render horizontal rule line\nExpected a full-width fill for the hrule, got ops: %v", ops)
+	}
+}
+
+// TestHorizontalRuleFullWidth tests that the horizontal rule line spans the full frame width.
+func TestHorizontalRuleFullWidth(t *testing.T) {
+	rect := image.Rect(0, 0, 500, 300) // Frame is 500px wide
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 14px line height
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with just a horizontal rule
+	content := Content{
+		{Text: string(HRuleRune) + "\n", Style: StyleHRule},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// The horizontal rule should span from X=0 to X=500 (full frame width)
+	// It should be a thin line (1-2px tall)
+	frameBackgroundRect := "(0,0)-(500,300)"
+	foundFullWidthLine := false
+
+	for _, op := range ops {
+		if strings.HasPrefix(op, "fill ") {
+			if strings.Contains(op, frameBackgroundRect) {
+				continue // Skip the frame background fill
+			}
+			// Look for a fill from X=0 to X=500 (full width)
+			// The exact Y position depends on line height and vertical centering
+			if strings.Contains(op, "(0,") && strings.Contains(op, "-(500,") {
+				foundFullWidthLine = true
+			}
+		}
+	}
+
+	if !foundFullWidthLine {
+		t.Errorf("Horizontal rule line should span full frame width (500px)\ngot ops: %v", ops)
+	}
+}
