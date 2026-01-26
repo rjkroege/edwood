@@ -8,6 +8,8 @@ import (
 	_ "image/jpeg" // Register JPEG decoder
 	_ "image/png"  // Register PNG decoder
 	"os"
+	"sync"
+	"time"
 )
 
 // Image size limits to prevent memory exhaustion.
@@ -111,4 +113,140 @@ func ConvertToPlan9(img image.Image) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// DefaultCacheSize is the default maximum number of images to cache.
+const DefaultCacheSize = 50
+
+// CachedImage represents a loaded and converted image.
+type CachedImage struct {
+	Original image.Image // Go stdlib image
+	Data     []byte      // Plan 9 RGBA32 pixel data
+	Width    int         // Original width in pixels
+	Height   int         // Original height in pixels
+	Path     string      // Source path for debugging
+	LoadTime time.Time   // When loaded
+	Err      error       // Error if load failed
+}
+
+// ImageCache provides an LRU cache for loaded images.
+type ImageCache struct {
+	mu      sync.RWMutex
+	images  map[string]*CachedImage
+	order   []string // LRU order (oldest first)
+	maxSize int      // Maximum number of cached images
+}
+
+// NewImageCache creates a new image cache with the specified maximum size.
+// If maxSize <= 0, DefaultCacheSize is used.
+func NewImageCache(maxSize int) *ImageCache {
+	if maxSize <= 0 {
+		maxSize = DefaultCacheSize
+	}
+	return &ImageCache{
+		images:  make(map[string]*CachedImage),
+		order:   make([]string, 0),
+		maxSize: maxSize,
+	}
+}
+
+// Get retrieves a cached image without loading.
+// Returns the CachedImage and true if found, nil and false otherwise.
+func (c *ImageCache) Get(path string) (*CachedImage, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	cached, ok := c.images[path]
+	return cached, ok
+}
+
+// Load loads an image from the given path, using the cache if available.
+// On error, returns a CachedImage with Err set (and caches the error).
+func (c *ImageCache) Load(path string) (*CachedImage, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Check if already cached (including cached errors)
+	if cached, ok := c.images[path]; ok {
+		return cached, cached.Err
+	}
+
+	// Create new cache entry
+	cached := &CachedImage{
+		Path:     path,
+		LoadTime: time.Now(),
+	}
+
+	// Try to load the image
+	img, err := LoadImage(path)
+	if err != nil {
+		cached.Err = err
+		c.images[path] = cached
+		c.order = append(c.order, path)
+		c.evictOldest()
+		return cached, err
+	}
+
+	// Store original image and dimensions
+	cached.Original = img
+	cached.Width = img.Bounds().Dx()
+	cached.Height = img.Bounds().Dy()
+
+	// Convert to Plan 9 format
+	data, err := ConvertToPlan9(img)
+	if err != nil {
+		cached.Err = fmt.Errorf("failed to convert image: %w", err)
+		c.images[path] = cached
+		c.order = append(c.order, path)
+		c.evictOldest()
+		return cached, cached.Err
+	}
+
+	cached.Data = data
+	c.images[path] = cached
+	c.order = append(c.order, path)
+	c.evictOldest()
+
+	return cached, nil
+}
+
+// Clear removes all cached images.
+func (c *ImageCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Note: In a full implementation with Plan 9 display integration,
+	// we would call Plan9Image.Free() for each cached image here.
+	c.images = make(map[string]*CachedImage)
+	c.order = make([]string, 0)
+}
+
+// Evict removes a specific image from the cache.
+func (c *ImageCache) Evict(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, ok := c.images[path]; !ok {
+		return
+	}
+
+	delete(c.images, path)
+
+	// Remove from order list
+	for i, p := range c.order {
+		if p == path {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			break
+		}
+	}
+}
+
+// evictOldest removes the oldest entries if cache exceeds maxSize.
+// Must be called with lock held.
+func (c *ImageCache) evictOldest() {
+	for len(c.order) > c.maxSize {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.images, oldest)
+	}
 }

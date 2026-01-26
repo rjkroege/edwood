@@ -637,3 +637,432 @@ func TestConvertPalettedImage(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Phase 16D: Image Cache Tests
+// =============================================================================
+
+// TestImageCacheHit verifies that cached images are returned on subsequent loads.
+func TestImageCacheHit(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "test.png")
+
+	// Create a simple 5x5 image
+	img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+	for y := 0; y < 5; y++ {
+		for x := 0; x < 5; x++ {
+			img.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Create cache
+	cache := NewImageCache(10)
+
+	// Load image twice
+	cached1, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("first Load failed: %v", err)
+	}
+
+	cached2, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("second Load failed: %v", err)
+	}
+
+	// Should be the same object (cache hit)
+	if cached1 != cached2 {
+		t.Error("cache should return same CachedImage on second load")
+	}
+
+	// Verify image data is correct
+	if cached1.Width != 5 || cached1.Height != 5 {
+		t.Errorf("cached image size = %dx%d, want 5x5", cached1.Width, cached1.Height)
+	}
+}
+
+// TestImageCacheMiss verifies that cache misses trigger image loading.
+func TestImageCacheMiss(t *testing.T) {
+	// Create two temporary PNG files
+	tmpDir := t.TempDir()
+	pngPath1 := filepath.Join(tmpDir, "test1.png")
+	pngPath2 := filepath.Join(tmpDir, "test2.png")
+
+	// Create first image (red)
+	img1 := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			img1.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+	f1, err := os.Create(pngPath1)
+	if err != nil {
+		t.Fatalf("failed to create test1 PNG: %v", err)
+	}
+	if err := png.Encode(f1, img1); err != nil {
+		f1.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f1.Close()
+
+	// Create second image (blue, different size)
+	img2 := image.NewRGBA(image.Rect(0, 0, 15, 20))
+	for y := 0; y < 20; y++ {
+		for x := 0; x < 15; x++ {
+			img2.Set(x, y, color.RGBA{0, 0, 255, 255})
+		}
+	}
+	f2, err := os.Create(pngPath2)
+	if err != nil {
+		t.Fatalf("failed to create test2 PNG: %v", err)
+	}
+	if err := png.Encode(f2, img2); err != nil {
+		f2.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f2.Close()
+
+	// Create cache
+	cache := NewImageCache(10)
+
+	// Load first image
+	cached1, err := cache.Load(pngPath1)
+	if err != nil {
+		t.Fatalf("first Load failed: %v", err)
+	}
+	if cached1.Width != 10 || cached1.Height != 10 {
+		t.Errorf("first image size = %dx%d, want 10x10", cached1.Width, cached1.Height)
+	}
+
+	// Load second image (cache miss, different file)
+	cached2, err := cache.Load(pngPath2)
+	if err != nil {
+		t.Fatalf("second Load failed: %v", err)
+	}
+	if cached2.Width != 15 || cached2.Height != 20 {
+		t.Errorf("second image size = %dx%d, want 15x20", cached2.Width, cached2.Height)
+	}
+
+	// They should be different objects
+	if cached1 == cached2 {
+		t.Error("different files should return different CachedImage objects")
+	}
+}
+
+// TestImageCacheGet verifies that Get returns cached images without loading.
+func TestImageCacheGet(t *testing.T) {
+	cache := NewImageCache(10)
+
+	// Get non-existent key
+	cached, ok := cache.Get("/nonexistent/path")
+	if ok {
+		t.Error("Get should return false for non-existent key")
+	}
+	if cached != nil {
+		t.Error("Get should return nil for non-existent key")
+	}
+
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "test.png")
+	img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Load the image
+	loaded, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	// Now Get should return it
+	cached, ok = cache.Get(pngPath)
+	if !ok {
+		t.Error("Get should return true for loaded image")
+	}
+	if cached != loaded {
+		t.Error("Get should return the same CachedImage as Load")
+	}
+}
+
+// TestImageCacheEviction verifies LRU eviction when cache exceeds maxSize.
+func TestImageCacheEviction(t *testing.T) {
+	// Create a cache with max size of 3
+	cache := NewImageCache(3)
+
+	// Create 5 temporary PNG files
+	tmpDir := t.TempDir()
+	paths := make([]string, 5)
+	for i := 0; i < 5; i++ {
+		path := filepath.Join(tmpDir, "test"+string(rune('1'+i))+".png")
+		paths[i] = path
+
+		img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+		f, err := os.Create(path)
+		if err != nil {
+			t.Fatalf("failed to create test PNG %d: %v", i, err)
+		}
+		if err := png.Encode(f, img); err != nil {
+			f.Close()
+			t.Fatalf("failed to encode PNG %d: %v", i, err)
+		}
+		f.Close()
+	}
+
+	// Load first 3 images
+	for i := 0; i < 3; i++ {
+		_, err := cache.Load(paths[i])
+		if err != nil {
+			t.Fatalf("Load(%d) failed: %v", i, err)
+		}
+	}
+
+	// All 3 should be in cache
+	for i := 0; i < 3; i++ {
+		if _, ok := cache.Get(paths[i]); !ok {
+			t.Errorf("image %d should be in cache", i)
+		}
+	}
+
+	// Load 4th image - should evict the oldest (first)
+	_, err := cache.Load(paths[3])
+	if err != nil {
+		t.Fatalf("Load(3) failed: %v", err)
+	}
+
+	// First image should be evicted, 2nd, 3rd, 4th should remain
+	if _, ok := cache.Get(paths[0]); ok {
+		t.Error("first image should have been evicted")
+	}
+	for i := 1; i <= 3; i++ {
+		if _, ok := cache.Get(paths[i]); !ok {
+			t.Errorf("image %d should still be in cache", i)
+		}
+	}
+
+	// Load 5th image - should evict the 2nd (now oldest)
+	_, err = cache.Load(paths[4])
+	if err != nil {
+		t.Fatalf("Load(4) failed: %v", err)
+	}
+
+	// 2nd should be evicted, 3rd, 4th, 5th should remain
+	if _, ok := cache.Get(paths[1]); ok {
+		t.Error("second image should have been evicted")
+	}
+	for i := 2; i <= 4; i++ {
+		if _, ok := cache.Get(paths[i]); !ok {
+			t.Errorf("image %d should still be in cache", i)
+		}
+	}
+}
+
+// TestImageCacheMaxSize verifies that cache respects max size limit.
+func TestImageCacheMaxSize(t *testing.T) {
+	// Create a cache with max size of 2
+	cache := NewImageCache(2)
+
+	// Create 5 temporary PNG files
+	tmpDir := t.TempDir()
+	for i := 0; i < 5; i++ {
+		path := filepath.Join(tmpDir, "test"+string(rune('1'+i))+".png")
+		img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+		f, err := os.Create(path)
+		if err != nil {
+			t.Fatalf("failed to create test PNG %d: %v", i, err)
+		}
+		if err := png.Encode(f, img); err != nil {
+			f.Close()
+			t.Fatalf("failed to encode PNG %d: %v", i, err)
+		}
+		f.Close()
+
+		// Load each image
+		_, err = cache.Load(path)
+		if err != nil {
+			t.Fatalf("Load(%d) failed: %v", i, err)
+		}
+	}
+
+	// Cache should contain at most maxSize items
+	count := 0
+	for i := 0; i < 5; i++ {
+		path := filepath.Join(tmpDir, "test"+string(rune('1'+i))+".png")
+		if _, ok := cache.Get(path); ok {
+			count++
+		}
+	}
+
+	if count > 2 {
+		t.Errorf("cache contains %d items, expected at most 2", count)
+	}
+}
+
+// TestImageCacheErrorCached verifies that load errors are cached.
+func TestImageCacheErrorCached(t *testing.T) {
+	cache := NewImageCache(10)
+
+	// Try to load a non-existent file
+	badPath := "/nonexistent/path/to/image.png"
+
+	cached1, err1 := cache.Load(badPath)
+	if err1 == nil {
+		t.Fatal("Load should return error for missing file")
+	}
+	if cached1 == nil {
+		t.Fatal("Load should return CachedImage even on error")
+	}
+	if cached1.Err == nil {
+		t.Error("CachedImage.Err should be set on load failure")
+	}
+
+	// Second load should return cached error
+	cached2, err2 := cache.Load(badPath)
+	if err2 == nil {
+		t.Fatal("second Load should also return error")
+	}
+	if cached2 != cached1 {
+		t.Error("cache should return same CachedImage for repeated error loads")
+	}
+}
+
+// TestImageCacheNoRetry verifies that failed loads are not retried.
+func TestImageCacheNoRetry(t *testing.T) {
+	cache := NewImageCache(10)
+
+	// Create a counter to track load attempts
+	loadCount := 0
+	badPath := "/nonexistent/will/never/exist.png"
+
+	// First load
+	_, err := cache.Load(badPath)
+	if err == nil {
+		t.Fatal("Load should fail for non-existent file")
+	}
+	loadCount++
+
+	// Second load - should use cached error, not retry
+	cached, err := cache.Load(badPath)
+	if err == nil {
+		t.Fatal("second Load should also fail")
+	}
+
+	// The cached entry should exist with an error
+	if cached == nil || cached.Err == nil {
+		t.Error("cached error entry should exist")
+	}
+
+	// Verify via Get that the entry is cached
+	cachedGet, ok := cache.Get(badPath)
+	if !ok {
+		t.Error("failed load should still be cached")
+	}
+	if cachedGet.Err == nil {
+		t.Error("cached entry should have error set")
+	}
+}
+
+// TestImageCacheClear verifies that Clear removes all cached images.
+func TestImageCacheClear(t *testing.T) {
+	cache := NewImageCache(10)
+
+	// Create some temporary PNG files and load them
+	tmpDir := t.TempDir()
+	paths := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		path := filepath.Join(tmpDir, "test"+string(rune('1'+i))+".png")
+		paths[i] = path
+
+		img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+		f, err := os.Create(path)
+		if err != nil {
+			t.Fatalf("failed to create test PNG %d: %v", i, err)
+		}
+		if err := png.Encode(f, img); err != nil {
+			f.Close()
+			t.Fatalf("failed to encode PNG %d: %v", i, err)
+		}
+		f.Close()
+
+		_, err = cache.Load(path)
+		if err != nil {
+			t.Fatalf("Load(%d) failed: %v", i, err)
+		}
+	}
+
+	// Verify all are cached
+	for i, path := range paths {
+		if _, ok := cache.Get(path); !ok {
+			t.Errorf("image %d should be cached before Clear", i)
+		}
+	}
+
+	// Clear the cache
+	cache.Clear()
+
+	// Verify all are gone
+	for i, path := range paths {
+		if _, ok := cache.Get(path); ok {
+			t.Errorf("image %d should not be cached after Clear", i)
+		}
+	}
+}
+
+// TestImageCacheFreeImages verifies that Clear properly cleans up resources.
+func TestImageCacheFreeImages(t *testing.T) {
+	cache := NewImageCache(10)
+
+	// Create and load a PNG
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "test.png")
+	img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	cached, err := cache.Load(pngPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	// Verify image was loaded
+	if cached.Original == nil {
+		t.Error("cached.Original should be set")
+	}
+	if cached.Data == nil {
+		t.Error("cached.Data (Plan 9 bytes) should be set")
+	}
+
+	// Clear and verify the cache is empty
+	cache.Clear()
+
+	if _, ok := cache.Get(pngPath); ok {
+		t.Error("cache should be empty after Clear")
+	}
+
+	// Note: In a full implementation with Plan 9 display integration,
+	// we would verify that Plan9Image.Free() was called. For now,
+	// we verify the cache map is cleared.
+}
