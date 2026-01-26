@@ -673,12 +673,113 @@ See `docs/codeblock-design.md` for full design.
 | Tests pass | [x] | Manual verification with test_codeblocks.md |
 | Code committed | [x] | Phase 13 complete - code blocks and horizontal rules |
 
+## Phase 14: Preview Resize Fix (Single Rectangle Owner)
+
+This phase fixes the bug where resizing a window in preview mode doesn't update the rich text preview. The solution makes `body Text` the single owner of geometry, with `RichText` becoming a renderer that draws into whatever rectangle it's given.
+
+See `docs/single-rect-owner.md` for full design and implementation plan.
+See `docs/preview-resize-design.md` for problem analysis and option comparison.
+
+### Design Summary
+
+- **Single source of truth**: `body.all` is the canonical rectangle
+- **Stateless rendering**: `RichText.Render(rect)` draws into passed rectangle
+- **No resize branching**: `Window.Resize()` always updates `body.all`
+- **Cached hit-testing**: `RichText` caches last rectangle for mouse handling
+
+### 14.1 Add SetRect() to rich.Frame
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestFrameSetRect, TestFrameSetRectRelayout |
+| Code written | [ ] | Add `SetRect(r image.Rectangle)` to Frame interface and frameImpl |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 14.2 Add Rect() Accessor to rich.Frame
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | Existing tests use Rect() |
+| Code written | [ ] | Add `Rect() image.Rectangle` to Frame interface if not present |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 14.3 RichText Render() Method
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestRichTextRender, TestRichTextRenderUpdatesLastRect |
+| Code written | [ ] | Add `Render(r image.Rectangle)` that computes scrollbar/frame rects and draws |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.4 RichText Remove Stored Rectangles
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestRichTextRenderDifferentRects |
+| Code written | [ ] | Remove `all` field, add `lastRect`/`lastScrollRect` for hit-testing cache |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.5 Update Scrollbar Methods
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | Existing scrollbar tests updated |
+| Code written | [ ] | `scrDrawAt(scrollRect)`, `scrThumbRectAt(scrollRect)`, `scrollClickAt(...)` |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.6 Update RichText Init Signature
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | Update test initialization patterns |
+| Code written | [ ] | `Init(display, font, opts...)` without rectangle parameter |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.7 Update Window.Resize()
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestWindowResizePreviewMode |
+| Code written | [ ] | Always resize body, call `richBody.Render(body.all)` when in preview |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.8 Update Window Draw Methods
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestWindowDrawPreviewModeAfterResize |
+| Code written | [ ] | All preview draws use `richBody.Render(body.all)` |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.9 Update Preview Command
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | Existing preview toggle tests |
+| Code written | [ ] | Update preview initialization to use new Init/Render pattern |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.10 Update Mouse Handling
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestPreviewMouseAfterResize |
+| Code written | [ ] | Use cached `lastScrollRect` for hit-testing |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 14.11 Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | N/A - manual |
+| Code written | [ ] | Resize preview window by various methods |
+| Tests pass | [ ] | Scrollbar, selection, scrolling all work after resize |
+| Code committed | [ ] | Phase 14 complete |
+
 ---
 
 ## Current Task
 
-**Phase 12**: Markdown Links - render links in blue and open URLs on Look click.
-**Phase 13**: Code Blocks and Horizontal Rules - (design complete, ready for implementation)
+**Phase 14**: Preview Resize Fix - implement single rectangle owner pattern
 
 ## Test Summary
 
@@ -715,6 +816,8 @@ go test ./rich/
 |------|---------|
 | docs/richtext-design.md | Design document and architecture |
 | docs/codeblock-design.md | Code block shading design (Phase 13) |
+| docs/preview-resize-design.md | Preview resize bug analysis and options |
+| docs/single-rect-owner.md | Single rectangle owner implementation plan (Phase 14) |
 | PLAN.md | This file - implementation tracking |
 | rich/style.go | Style type definition |
 | rich/span.go | Span and Content types |
