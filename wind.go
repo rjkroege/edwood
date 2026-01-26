@@ -629,7 +629,7 @@ func (w *Window) RichBody() *RichText {
 // otherwise, it uses the normal body rendering.
 func (w *Window) Draw() {
 	if w.previewMode && w.richBody != nil {
-		w.richBody.Redraw()
+		w.richBody.Render(w.body.all)
 	} else {
 		// Normal body rendering is handled by the existing Text.Redraw
 		// mechanism which is called through Text.Resize and other paths.
@@ -820,8 +820,8 @@ func (w *Window) UpdatePreview() {
 	}
 	w.richBody.SetOrigin(currentOrigin)
 
-	// Redraw the preview
-	w.richBody.Redraw()
+	// Render the preview using body.all as the canonical geometry
+	w.richBody.Render(w.body.all)
 	if w.display != nil {
 		w.display.Flush()
 	}

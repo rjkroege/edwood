@@ -2199,3 +2199,99 @@ func TestWindowResizePreviewMode(t *testing.T) {
 		t.Errorf("Larger frame rect.Max.X (%d) should be greater than smaller (%d)", frameRectLarger.Max.X, frameRect.Max.X)
 	}
 }
+
+// TestWindowDrawPreviewModeAfterResize tests that Window.Draw() correctly uses
+// body.all as the rectangle when in preview mode, ensuring that after a resize
+// the preview content is rendered into the correct (updated) area.
+func TestWindowDrawPreviewModeAfterResize(t *testing.T) {
+	// Create initial rectangle and display
+	initialRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(initialRect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+
+	// Setup body with mock frame and initial rectangle
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/draw.md", []rune("# Hello\n\nWorld")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = initialRect
+
+	// Create and initialize RichText for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Initial render into the body area
+	rt.Render(w.body.all)
+
+	// Set content
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	// Assign richBody and enable preview mode
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	// Verify initial lastRect matches body.all
+	if !rt.All().Eq(w.body.all) {
+		t.Errorf("Initial lastRect should match body.all: got %v, want %v", rt.All(), w.body.all)
+	}
+
+	// Now simulate a resize: body.all changes but richBody's cached rectangle is stale
+	newBodyRect := image.Rect(0, 20, 600, 400)
+	w.body.all = newBodyRect
+
+	// Call Draw() - this should use body.all (the current geometry) not the cached value
+	w.Draw()
+
+	// Verify that after Draw(), the richBody's lastRect has been updated to body.all
+	// This proves that Draw() used Render(body.all) instead of Redraw()
+	if !rt.All().Eq(newBodyRect) {
+		t.Errorf("After Draw(), lastRect should match updated body.all: got %v, want %v", rt.All(), newBodyRect)
+	}
+
+	// Verify frame rectangle was also updated to match the new area
+	frameRect := rt.Frame().Rect()
+	if frameRect.Max.X > newBodyRect.Max.X {
+		t.Errorf("Frame rect.Max.X (%d) should not exceed newBodyRect.Max.X (%d)", frameRect.Max.X, newBodyRect.Max.X)
+	}
+	if frameRect.Max.Y != newBodyRect.Max.Y {
+		t.Errorf("Frame rect.Max.Y (%d) should match newBodyRect.Max.Y (%d)", frameRect.Max.Y, newBodyRect.Max.Y)
+	}
+
+	// Verify scrollbar rectangle was also updated
+	scrollRect := rt.ScrollRect()
+	if scrollRect.Min.X != newBodyRect.Min.X {
+		t.Errorf("Scroll rect.Min.X (%d) should match newBodyRect.Min.X (%d)", scrollRect.Min.X, newBodyRect.Min.X)
+	}
+	if scrollRect.Max.Y != newBodyRect.Max.Y {
+		t.Errorf("Scroll rect.Max.Y (%d) should match newBodyRect.Max.Y (%d)", scrollRect.Max.Y, newBodyRect.Max.Y)
+	}
+
+	// Test that subsequent Draw() calls also maintain correct geometry
+	evenSmallerRect := image.Rect(0, 20, 400, 300)
+	w.body.all = evenSmallerRect
+	w.Draw()
+
+	if !rt.All().Eq(evenSmallerRect) {
+		t.Errorf("After second Draw(), lastRect should match: got %v, want %v", rt.All(), evenSmallerRect)
+	}
+}
