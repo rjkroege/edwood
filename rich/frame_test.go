@@ -2189,3 +2189,44 @@ func TestFrameSetRectRedraw(t *testing.T) {
 		t.Errorf("Redraw() should fill new rectangle %v\ngot ops: %v", newRect, ops)
 	}
 }
+
+// TestDrawTextClipsToFrame verifies that drawText doesn't draw lines beyond
+// the frame's rectangle boundary. This is a regression test for the bug where
+// Markdeep preview would overwrite the window below when content exceeded the frame.
+func TestDrawTextClipsToFrame(t *testing.T) {
+	// Create a small frame that can only fit 2 lines (28 pixels at 14px per line)
+	rect := image.Rect(0, 0, 200, 28)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with 5 lines - only 2 should fit in the frame
+	f.SetContent(Plain("line1\nline2\nline3\nline4\nline5"))
+
+	// Clear draw ops and redraw
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	// Check that no draw operations were made with Y coordinates at or below the frame bottom
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	frameBottom := rect.Max.Y
+
+	for _, op := range ops {
+		// Look for "bytes at" operations which indicate text rendering
+		// Format: "bytes at (X,Y) ..."
+		if strings.Contains(op, "bytes at") {
+			// Parse the Y coordinate from the operation
+			var x, y int
+			if n, err := fmt.Sscanf(op, "bytes at (%d,%d)", &x, &y); n == 2 && err == nil {
+				if y >= frameBottom {
+					t.Errorf("draw operation at Y=%d exceeds frame bottom %d: %s", y, frameBottom, op)
+				}
+			}
+		}
+	}
+}

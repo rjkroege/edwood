@@ -519,9 +519,16 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 		return
 	}
 
+	// frameHeight is used to clip drawing - don't draw lines that start at or below the bottom
+	frameHeight := f.rect.Dy()
+
 	// Phase 1: Draw block-level backgrounds (full line width for fenced code blocks)
 	// This must happen first so text appears on top
 	for _, line := range lines {
+		// Clip: skip lines that would start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
 		// Check if any box on this line has Block=true with a background
 		for _, pb := range line.Boxes {
 			if pb.Box.Style.Block && pb.Box.Style.Bg != nil {
@@ -534,6 +541,10 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 	// Phase 2: Draw box backgrounds (for inline code, etc.)
 	// This must happen before text rendering so backgrounds appear behind text
 	for _, line := range lines {
+		// Clip: skip lines that would start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't have backgrounds
 			if pb.Box.IsNewline() || pb.Box.IsTab() {
@@ -553,6 +564,10 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 
 	// Phase 3: Draw horizontal rules
 	for _, line := range lines {
+		// Clip: skip lines that would start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
 		for _, pb := range line.Boxes {
 			if pb.Box.Style.HRule {
 				f.drawHorizontalRule(screen, line)
@@ -563,6 +578,10 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 
 	// Phase 4: Render text on top of backgrounds
 	for _, line := range lines {
+		// Clip: skip lines that would start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't render visible text
 			if pb.Box.IsNewline() || pb.Box.IsTab() {
@@ -768,6 +787,7 @@ func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
 
 	// Calculate frame width and tab width for layout
 	frameWidth := f.rect.Dx()
+	frameHeight := f.rect.Dy()
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
@@ -784,6 +804,11 @@ func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
 	// Walk through lines and boxes, tracking rune position
 	runePos := 0
 	for _, line := range lines {
+		// Clip: skip lines that would start at or below the frame bottom
+		if line.Y >= frameHeight {
+			break
+		}
+
 		lineStartRune := runePos
 		lineEndRune := lineStartRune
 
