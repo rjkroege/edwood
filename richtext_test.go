@@ -1154,6 +1154,102 @@ func TestRichTextRenderUpdatesLastRect(t *testing.T) {
 	}
 }
 
+// TestRichTextRenderDifferentRects tests that the RichText component correctly
+// handles rendering into multiple different rectangles, computing the scrollbar
+// and frame areas dynamically each time.
+func TestRichTextRenderDifferentRects(t *testing.T) {
+	// Start with a display larger than any rect we'll use
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	// Initial init with a rectangle
+	initialRect := image.Rect(0, 0, 400, 300)
+	rt.Init(initialRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Set content with enough lines to test scrolling
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Define several different rectangles to render into
+	testCases := []struct {
+		name string
+		rect image.Rectangle
+	}{
+		{"small", image.Rect(0, 0, 200, 150)},
+		{"medium", image.Rect(50, 50, 400, 300)},
+		{"large", image.Rect(0, 0, 600, 500)},
+		{"offset", image.Rect(100, 100, 500, 400)},
+		{"narrow", image.Rect(0, 0, 150, 400)},
+		{"wide", image.Rect(0, 0, 700, 200)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			display.(edwoodtest.GettableDrawOps).Clear()
+
+			// Render into this rectangle
+			rt.Render(tc.rect)
+
+			// Verify All() returns the rendered rectangle
+			if got := rt.All(); got != tc.rect {
+				t.Errorf("All() = %v, want %v", got, tc.rect)
+			}
+
+			// Verify scrollbar rect is within the rendered area
+			scrollr := rt.ScrollRect()
+			if scrollr.Min.X != tc.rect.Min.X {
+				t.Errorf("ScrollRect().Min.X = %d, want %d", scrollr.Min.X, tc.rect.Min.X)
+			}
+			if scrollr.Min.Y != tc.rect.Min.Y || scrollr.Max.Y != tc.rect.Max.Y {
+				t.Errorf("ScrollRect() Y bounds = (%d, %d), want (%d, %d)",
+					scrollr.Min.Y, scrollr.Max.Y, tc.rect.Min.Y, tc.rect.Max.Y)
+			}
+
+			// Verify scrollbar has positive width
+			if scrollr.Dx() <= 0 {
+				t.Errorf("ScrollRect().Dx() = %d, want > 0", scrollr.Dx())
+			}
+
+			// Verify frame rect starts after scrollbar with gap
+			framer := rt.Frame().Rect()
+			if framer.Min.X <= scrollr.Max.X {
+				t.Errorf("Frame().Rect().Min.X = %d, should be > %d (scrollbar end)",
+					framer.Min.X, scrollr.Max.X)
+			}
+			if framer.Min.Y != tc.rect.Min.Y || framer.Max.Y != tc.rect.Max.Y {
+				t.Errorf("Frame().Rect() Y bounds = (%d, %d), want (%d, %d)",
+					framer.Min.Y, framer.Max.Y, tc.rect.Min.Y, tc.rect.Max.Y)
+			}
+			if framer.Max.X != tc.rect.Max.X {
+				t.Errorf("Frame().Rect().Max.X = %d, want %d", framer.Max.X, tc.rect.Max.X)
+			}
+
+			// Verify draw operations occurred
+			ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+			if len(ops) == 0 {
+				t.Error("Render() did not produce any draw operations")
+			}
+		})
+	}
+}
+
 // TestMouseWheelScrollMultipleScrolls tests that multiple scroll wheel events
 // accumulate correctly.
 func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
