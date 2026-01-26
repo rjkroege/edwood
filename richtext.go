@@ -7,11 +7,8 @@ import (
 	"github.com/rjkroege/edwood/rich"
 )
 
-// scrollbarWidth is the width of the scrollbar in pixels.
-const scrollbarWidth = 12
-
-// scrollbarGap is the gap between the scrollbar and the frame.
-const scrollbarGap = 4
+// Note: scrollbar dimensions use Scrollwid and Scrollgap from dat.go
+// with display.ScaleSize() for proper high-DPI support
 
 // RichText is a component that combines a rich.Frame with a scrollbar.
 // It manages the layout of the scrollbar area and the text frame area.
@@ -46,17 +43,20 @@ func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font
 		opt(rt)
 	}
 
-	// Calculate scrollbar rectangle (left side)
+	// Calculate scrollbar rectangle (left side) using same scaling as Text
+	scrollWid := display.ScaleSize(Scrollwid)
+	scrollGap := display.ScaleSize(Scrollgap)
+
 	rt.scrollRect = image.Rect(
 		r.Min.X,
 		r.Min.Y,
-		r.Min.X+scrollbarWidth,
+		r.Min.X+scrollWid,
 		r.Max.Y,
 	)
 
 	// Calculate frame rectangle (right of scrollbar with gap)
 	frameRect := image.Rect(
-		r.Min.X+scrollbarWidth+scrollbarGap,
+		r.Min.X+scrollWid+scrollGap,
 		r.Min.Y,
 		r.Max.X,
 		r.Max.Y,

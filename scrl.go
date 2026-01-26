@@ -73,6 +73,10 @@ func (t *Text) ScrDraw(nchars int) {
 	if t.w == nil || t != &t.w.body {
 		return
 	}
+	// In preview mode, the RichText handles its own scrollbar
+	if t.w.IsPreviewMode() {
+		return
+	}
 	if scrtmp == nil {
 		ScrlResize(t.display)
 	}

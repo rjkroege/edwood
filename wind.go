@@ -421,6 +421,14 @@ func (w *Window) SetName(name string) {
 }
 
 func (w *Window) Type(t *Text, r rune) {
+	// In preview mode, route body key events through HandlePreviewKey
+	if t.what == Body && w.IsPreviewMode() {
+		if w.HandlePreviewKey(r) {
+			return
+		}
+		// Key was not handled by preview mode (e.g., typing keys are ignored)
+		return
+	}
 	t.Type(r)
 }
 
@@ -583,13 +591,23 @@ func (w *Window) IsPreviewMode() bool {
 }
 
 // SetPreviewMode enables or disables preview mode.
+// When disabling preview mode, triggers a full redraw of the body.
 func (w *Window) SetPreviewMode(enabled bool) {
+	wasPreview := w.previewMode
 	w.previewMode = enabled
+
+	// When exiting preview mode, refresh the body to show source text
+	if wasPreview && !enabled && w.display != nil {
+		// Force a full redraw of the body by resizing it
+		w.body.Resize(w.body.all, true, false)
+		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
+		w.display.Flush()
+	}
 }
 
 // TogglePreviewMode toggles the preview mode state.
 func (w *Window) TogglePreviewMode() {
-	w.previewMode = !w.previewMode
+	w.SetPreviewMode(!w.previewMode)
 }
 
 // RichBody returns the rich text renderer for preview mode, or nil if not initialized.

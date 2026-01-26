@@ -1187,6 +1187,7 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	rt.Init(bodyRect, display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
+		WithScrollbarColors(global.textcolors[frame.ColBord], global.textcolors[frame.ColBack]),
 	)
 
 	// Parse the markdown content with source mapping
