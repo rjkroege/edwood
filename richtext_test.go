@@ -1545,3 +1545,128 @@ func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
 		t.Errorf("Origin should have decreased after scrolling up; down=%d, up=%d", afterDown, afterUp)
 	}
 }
+
+// TestRichTextWithImageCache verifies that RichText can be configured with an
+// ImageCache via the WithRichTextImageCache option, and that the cache is passed
+// to the underlying Frame.
+func TestRichTextWithImageCache(t *testing.T) {
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Create an image cache
+	cache := rich.NewImageCache(10)
+
+	// Create background and text color images
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithRichTextImageCache(cache),
+	)
+
+	// Verify the RichText was initialized successfully
+	if rt.Frame() == nil {
+		t.Fatal("Frame() returned nil after Init with ImageCache")
+	}
+
+	// Set some content and render
+	rt.SetContent(rich.Plain("hello world"))
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
+
+	// Verify frame is in a valid state (should not panic, has valid rect)
+	if rt.Frame().Rect().Empty() {
+		t.Error("Frame should have non-empty rectangle after Render")
+	}
+
+	// Verify All() returns the rendered rectangle
+	if got := rt.All(); got != rect {
+		t.Errorf("All() = %v, want %v", got, rect)
+	}
+}
+
+// TestRichTextWithImageCacheNil verifies that RichText works correctly when
+// WithRichTextImageCache is called with nil (no cache).
+func TestRichTextWithImageCacheNil(t *testing.T) {
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	rt := NewRichText()
+
+	// Should not panic with nil cache
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithRichTextImageCache(nil),
+	)
+
+	// RichText should still work
+	rt.SetContent(rich.Plain("hello world"))
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
+
+	if rt.Frame().Rect().Empty() {
+		t.Error("Frame should have non-empty rectangle after Render with nil cache")
+	}
+}
+
+// TestRichTextWithImageCachePassedToFrame verifies that the ImageCache
+// configured on RichText is passed through to the underlying Frame.
+func TestRichTextWithImageCachePassedToFrame(t *testing.T) {
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Create an image cache
+	cache := rich.NewImageCache(10)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithRichTextImageCache(cache),
+	)
+
+	// Create content with an image span pointing to a path that we'll verify
+	// gets looked up in the cache
+	testImagePath := "/nonexistent/test_image.png"
+	content := rich.Content{
+		rich.Span{
+			Text: "[Image: test]",
+			Style: rich.Style{
+				Image:    true,
+				ImageURL: testImagePath,
+				ImageAlt: "test",
+			},
+		},
+	}
+	rt.SetContent(content)
+
+	// Render to trigger layout
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
+
+	// The frame should have used the cache during layout.
+	// Even though the file doesn't exist, the cache should record the load attempt.
+	// Verify by checking the cache has an entry for this path (with an error).
+	cached, ok := cache.Get(testImagePath)
+	if !ok {
+		t.Error("ImageCache should have been used during layout - expected cache entry for image path")
+	}
+	if cached == nil {
+		t.Error("Cached entry should not be nil")
+	} else if cached.Err == nil {
+		t.Error("Expected error in cached entry for nonexistent file")
+	}
+}

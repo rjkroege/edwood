@@ -38,6 +38,9 @@ type RichText struct {
 	// Scrollbar colors
 	scrollBg    draw.Image // Scrollbar background color
 	scrollThumb draw.Image // Scrollbar thumb color
+
+	// Image cache for loading images in markdown
+	imageCache *rich.ImageCache
 }
 
 // NewRichText creates a new RichText component.
@@ -84,6 +87,9 @@ func (rt *RichText) Init(display draw.Display, font draw.Font, opts ...RichTextO
 	}
 	for scale, f := range rt.scaledFonts {
 		frameOpts = append(frameOpts, rich.WithScaledFont(scale, f))
+	}
+	if rt.imageCache != nil {
+		frameOpts = append(frameOpts, rich.WithImageCache(rt.imageCache))
 	}
 
 	// Initialize frame with empty rectangle - will be set on first Render() call
@@ -181,6 +187,14 @@ func (rt *RichText) Render(r image.Rectangle) {
 		r.Max.Y,
 	)
 
+	// Compute gap rectangle (between scrollbar and frame)
+	gapRect := image.Rect(
+		r.Min.X+scrollWid,
+		r.Min.Y,
+		r.Min.X+scrollWid+scrollGap,
+		r.Max.Y,
+	)
+
 	// Compute frame rectangle (right of scrollbar with gap)
 	frameRect := image.Rect(
 		r.Min.X+scrollWid+scrollGap,
@@ -196,6 +210,12 @@ func (rt *RichText) Render(r image.Rectangle) {
 
 	// Draw scrollbar
 	rt.scrDraw()
+
+	// Fill the gap with the frame background color
+	if rt.display != nil && rt.background != nil {
+		screen := rt.display.ScreenImage()
+		screen.Draw(gapRect, rt.background, rt.background, image.ZP)
+	}
 
 	// Draw frame content
 	if rt.frame != nil {
@@ -519,6 +539,14 @@ func WithRichTextScaledFont(scale float64, f draw.Font) RichTextOption {
 			rt.scaledFonts = make(map[float64]draw.Font)
 		}
 		rt.scaledFonts[scale] = f
+	}
+}
+
+// WithRichTextImageCache sets the image cache for loading images in markdown content.
+// The cache is passed through to the underlying Frame for use during layout.
+func WithRichTextImageCache(cache *rich.ImageCache) RichTextOption {
+	return func(rt *RichText) {
+		rt.imageCache = cache
 	}
 }
 
