@@ -1006,3 +1006,283 @@ func abs(x int) int {
 	}
 	return x
 }
+
+func TestParseFencedCodeBlock(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isCode bool
+		}
+	}{
+		{
+			name:  "simple fenced code block",
+			input: "```\ncode here\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "code here\n", isCode: true},
+			},
+		},
+		{
+			name:  "fenced code block with multiple lines",
+			input: "```\nline one\nline two\nline three\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "line one\nline two\nline three\n", isCode: true},
+			},
+		},
+		{
+			name:  "fenced code block between text",
+			input: "Before\n```\ncode\n```\nAfter",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "Before\n", isCode: false},
+				{text: "code\n", isCode: true},
+				{text: "After", isCode: false},
+			},
+		},
+		{
+			name:  "unclosed fenced code block",
+			input: "```\nunclosed code",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				// If code block is unclosed, treat remaining content as code
+				{text: "unclosed code", isCode: true},
+			},
+		},
+		{
+			name:  "empty fenced code block",
+			input: "```\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				// Empty code block should produce no output (fence lines are omitted)
+			},
+		},
+		{
+			name:  "fenced code block preserves asterisks",
+			input: "```\n**not bold**\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "**not bold**\n", isCode: true},
+			},
+		},
+		{
+			name:  "fenced code block preserves backticks",
+			input: "```\nuse `code` here\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "use `code` here\n", isCode: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Code != want.isCode {
+					t.Errorf("span[%d].Code = %v, want %v (style: %+v)", i, got[i].Style.Code, want.isCode, got[i].Style)
+				}
+			}
+		})
+	}
+}
+
+func TestParseFencedCodeBlockWithLanguage(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text   string
+			isCode bool
+		}
+	}{
+		{
+			name:  "go code block",
+			input: "```go\nfunc main() {\n}\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "func main() {\n}\n", isCode: true},
+			},
+		},
+		{
+			name:  "python code block",
+			input: "```python\ndef hello():\n    print('hi')\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "def hello():\n    print('hi')\n", isCode: true},
+			},
+		},
+		{
+			name:  "javascript code block",
+			input: "```js\nconst x = 1;\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "const x = 1;\n", isCode: true},
+			},
+		},
+		{
+			name:  "language with trailing space",
+			input: "```go \ncode\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				{text: "code\n", isCode: true},
+			},
+		},
+		{
+			name:  "language identifier is stripped",
+			input: "```rust\nfn main() {}\n```",
+			wantSpan: []struct {
+				text   string
+				isCode bool
+			}{
+				// The language "rust" should not appear in output
+				{text: "fn main() {}\n", isCode: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Code != want.isCode {
+					t.Errorf("span[%d].Code = %v, want %v (style: %+v)", i, got[i].Style.Code, want.isCode, got[i].Style)
+				}
+			}
+		})
+	}
+}
+
+func TestParseFencedCodeBlockPreservesWhitespace(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantText string
+	}{
+		{
+			name:     "preserves leading spaces",
+			input:    "```\n    indented\n```",
+			wantText: "    indented\n",
+		},
+		{
+			name:     "preserves tabs",
+			input:    "```\n\tindented with tab\n```",
+			wantText: "\tindented with tab\n",
+		},
+		{
+			name:     "preserves multiple indent levels",
+			input:    "```\nif x {\n    if y {\n        deep\n    }\n}\n```",
+			wantText: "if x {\n    if y {\n        deep\n    }\n}\n",
+		},
+		{
+			name:     "preserves blank lines",
+			input:    "```\nline one\n\nline three\n```",
+			wantText: "line one\n\nline three\n",
+		},
+		{
+			name:     "preserves trailing spaces",
+			input:    "```\nwith trailing   \n```",
+			wantText: "with trailing   \n",
+		},
+		{
+			name:     "preserves mixed whitespace",
+			input:    "```\n  \t  mixed\n```",
+			wantText: "  \t  mixed\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) == 0 {
+				t.Fatalf("Parse returned empty content for input %q", tt.input)
+			}
+
+			// The code block content should be in a code-styled span
+			var codeSpan *rich.Span
+			for i := range got {
+				if got[i].Style.Code {
+					codeSpan = &got[i]
+					break
+				}
+			}
+
+			if codeSpan == nil {
+				t.Fatalf("no code span found in output: %+v", got)
+			}
+
+			if codeSpan.Text != tt.wantText {
+				t.Errorf("code span text = %q, want %q", codeSpan.Text, tt.wantText)
+			}
+		})
+	}
+}
+
+func TestParseFencedCodeBlockHasBackground(t *testing.T) {
+	// Fenced code blocks should have a background color
+	got := Parse("```\ncode\n```")
+
+	if len(got) != 1 {
+		t.Fatalf("got %d spans, want 1 span\n  got: %+v", len(got), got)
+	}
+
+	span := got[0]
+	if !span.Style.Code {
+		t.Fatal("span.Style.Code = false, want true")
+	}
+
+	if span.Style.Bg == nil {
+		t.Fatal("span.Style.Bg is nil, want code block background color")
+	}
+
+	// Check that background is a light gray (high RGB values, roughly equal)
+	r, g, b, _ := span.Style.Bg.RGBA()
+	// Convert from 16-bit to 8-bit for easier comparison
+	r8, g8, b8 := r>>8, g>>8, b>>8
+
+	// Should be light (all components >= 200)
+	if r8 < 200 || g8 < 200 || b8 < 200 {
+		t.Errorf("code block Bg is not light enough: R=%d, G=%d, B=%d (want all >= 200)", r8, g8, b8)
+	}
+
+	// Should be grayish (components roughly equal, within 20 of each other)
+	if abs(int(r8)-int(g8)) > 20 || abs(int(g8)-int(b8)) > 20 || abs(int(r8)-int(b8)) > 20 {
+		t.Errorf("code block Bg is not gray: R=%d, G=%d, B=%d (want components within 20)", r8, g8, b8)
+	}
+}

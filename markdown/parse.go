@@ -26,7 +26,44 @@ func Parse(text string) rich.Content {
 	var result rich.Content
 	lines := splitLines(text)
 
+	// Track fenced code block state
+	inFencedBlock := false
+	var codeBlockContent strings.Builder
+
 	for _, line := range lines {
+		// Check for fenced code block delimiter
+		if isFenceDelimiter(line) {
+			if !inFencedBlock {
+				// Opening fence - start collecting code
+				inFencedBlock = true
+				codeBlockContent.Reset()
+				continue
+			} else {
+				// Closing fence - emit the code block
+				inFencedBlock = false
+				codeContent := codeBlockContent.String()
+				if codeContent != "" {
+					codeSpan := rich.Span{
+						Text: codeContent,
+						Style: rich.Style{
+							Bg:    rich.InlineCodeBg,
+							Code:  true,
+							Scale: 1.0,
+						},
+					}
+					result = append(result, codeSpan)
+				}
+				continue
+			}
+		}
+
+		if inFencedBlock {
+			// Inside fenced block - collect raw content without parsing
+			codeBlockContent.WriteString(line)
+			continue
+		}
+
+		// Normal line parsing
 		spans := parseLine(line)
 		// Merge consecutive spans with the same style
 		// (but don't merge link spans - each link should remain distinct
@@ -41,7 +78,46 @@ func Parse(text string) rich.Content {
 		}
 	}
 
+	// Handle unclosed fenced code block - treat remaining content as code
+	if inFencedBlock {
+		codeContent := codeBlockContent.String()
+		if codeContent != "" {
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:    rich.InlineCodeBg,
+					Code:  true,
+					Scale: 1.0,
+				},
+			}
+			result = append(result, codeSpan)
+		}
+	}
+
 	return result
+}
+
+// isFenceDelimiter returns true if the line is a fenced code block delimiter (```).
+// This handles lines like "```", "```go", "```python ", etc.
+func isFenceDelimiter(line string) bool {
+	// Strip trailing newline for comparison
+	trimmed := strings.TrimSuffix(line, "\n")
+	// Must start with at least 3 backticks
+	if len(trimmed) < 3 {
+		return false
+	}
+	if trimmed[0:3] != "```" {
+		return false
+	}
+	// Rest can be language identifier or empty
+	// Language identifier: letters, digits, spaces only (no more backticks)
+	rest := trimmed[3:]
+	for _, r := range rest {
+		if r == '`' {
+			return false // Additional backticks not allowed in fence opener
+		}
+	}
+	return true
 }
 
 // splitLines splits text into lines, preserving trailing newlines on each line.
