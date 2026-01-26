@@ -14,6 +14,7 @@ type Style struct {
 	Code   bool // Monospace font for code spans
 	Link   bool // Hyperlink (rendered in blue by default)
 	Block  bool // Block-level element (full-width background for fenced code blocks)
+	HRule  bool // Horizontal rule marker (draw line instead of text)
 
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
@@ -28,6 +29,10 @@ func DefaultStyle() Style {
 // LinkBlue is the standard blue color for hyperlinks.
 var LinkBlue = color.RGBA{R: 0, G: 0, B: 238, A: 255}
 
+// HRuleRune is the marker rune used to represent a horizontal rule.
+// When the renderer encounters this rune, it draws a horizontal line instead of text.
+const HRuleRune = '\u2500' // ─ (BOX DRAWINGS LIGHT HORIZONTAL)
+
 // InlineCodeBg is the light gray background for inline code spans.
 // Uses RGB values around 230 for a subtle but visible distinction.
 var InlineCodeBg = color.RGBA{R: 230, G: 230, B: 230, A: 255}
@@ -39,6 +44,7 @@ var (
 	StyleH3     = Style{Bold: true, Scale: 1.25}
 	StyleBold   = Style{Bold: true, Scale: 1.0}
 	StyleItalic = Style{Italic: true, Scale: 1.0}
-	StyleCode   = Style{Code: true, Scale: 1.0}            // Monospace font
+	StyleCode   = Style{Code: true, Scale: 1.0}               // Monospace font
 	StyleLink   = Style{Link: true, Fg: LinkBlue, Scale: 1.0} // Blue hyperlink
+	StyleHRule  = Style{HRule: true, Scale: 1.0}              // Horizontal rule
 )

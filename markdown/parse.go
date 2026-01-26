@@ -145,6 +145,19 @@ func splitLines(text string) []string {
 
 // parseLine parses a single line and returns the appropriate spans.
 func parseLine(line string) []rich.Span {
+	// Check for horizontal rule (---, ***, ___)
+	if isHorizontalRule(line) {
+		// Emit the HRuleRune marker plus newline if the original line had one
+		text := string(rich.HRuleRune)
+		if strings.HasSuffix(line, "\n") {
+			text += "\n"
+		}
+		return []rich.Span{{
+			Text:  text,
+			Style: rich.StyleHRule,
+		}}
+	}
+
 	// Check for heading (# at start of line)
 	level := headingLevel(line)
 	if level > 0 {
@@ -514,6 +527,38 @@ func parseInlineFormattingNoLinks(text string, baseStyle rich.Style) []rich.Span
 	}
 
 	return spans
+}
+
+// isHorizontalRule returns true if the line is a horizontal rule.
+// A horizontal rule is a line containing only 3+ of the same character
+// (hyphens, asterisks, or underscores), optionally with spaces between them.
+// Examples: "---", "***", "___", "- - -", "* * *", "_ _ _"
+func isHorizontalRule(line string) bool {
+	// Strip trailing newline for comparison
+	trimmed := strings.TrimSuffix(line, "\n")
+	if trimmed == "" {
+		return false
+	}
+
+	// Remove all spaces and check what's left
+	noSpaces := strings.ReplaceAll(trimmed, " ", "")
+	if len(noSpaces) < 3 {
+		return false
+	}
+
+	// Check if all remaining characters are the same and valid hrule char
+	first := noSpaces[0]
+	if first != '-' && first != '*' && first != '_' {
+		return false
+	}
+
+	for i := 1; i < len(noSpaces); i++ {
+		if noSpaces[i] != first {
+			return false
+		}
+	}
+
+	return true
 }
 
 // headingLevel returns the heading level (1-6) if line starts with # prefix,

@@ -1007,6 +1007,281 @@ func abs(x int) int {
 	return x
 }
 
+func TestParseHorizontalRuleHyphens(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantLen int
+	}{
+		{
+			name:    "three hyphens",
+			input:   "---",
+			wantLen: 1,
+		},
+		{
+			name:    "three hyphens with newline",
+			input:   "---\n",
+			wantLen: 1,
+		},
+		{
+			name:    "four hyphens",
+			input:   "----",
+			wantLen: 1,
+		},
+		{
+			name:    "many hyphens",
+			input:   "----------",
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != tt.wantLen {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), tt.wantLen, got)
+			}
+
+			// The span should contain HRuleRune
+			if len(got) > 0 {
+				span := got[0]
+				if span.Text != string(rich.HRuleRune)+"\n" && span.Text != string(rich.HRuleRune) {
+					t.Errorf("span.Text = %q, want HRuleRune marker", span.Text)
+				}
+			}
+		})
+	}
+}
+
+func TestParseHorizontalRuleAsterisks(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantLen int
+	}{
+		{
+			name:    "three asterisks",
+			input:   "***",
+			wantLen: 1,
+		},
+		{
+			name:    "three asterisks with newline",
+			input:   "***\n",
+			wantLen: 1,
+		},
+		{
+			name:    "four asterisks",
+			input:   "****",
+			wantLen: 1,
+		},
+		{
+			name:    "many asterisks",
+			input:   "**********",
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != tt.wantLen {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), tt.wantLen, got)
+			}
+
+			// The span should contain HRuleRune
+			if len(got) > 0 {
+				span := got[0]
+				if span.Text != string(rich.HRuleRune)+"\n" && span.Text != string(rich.HRuleRune) {
+					t.Errorf("span.Text = %q, want HRuleRune marker", span.Text)
+				}
+			}
+		})
+	}
+}
+
+func TestParseHorizontalRuleUnderscores(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantLen int
+	}{
+		{
+			name:    "three underscores",
+			input:   "___",
+			wantLen: 1,
+		},
+		{
+			name:    "three underscores with newline",
+			input:   "___\n",
+			wantLen: 1,
+		},
+		{
+			name:    "four underscores",
+			input:   "____",
+			wantLen: 1,
+		},
+		{
+			name:    "many underscores",
+			input:   "__________",
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != tt.wantLen {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), tt.wantLen, got)
+			}
+
+			// The span should contain HRuleRune
+			if len(got) > 0 {
+				span := got[0]
+				if span.Text != string(rich.HRuleRune)+"\n" && span.Text != string(rich.HRuleRune) {
+					t.Errorf("span.Text = %q, want HRuleRune marker", span.Text)
+				}
+			}
+		})
+	}
+}
+
+func TestParseHorizontalRuleWithSpaces(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantLen int
+	}{
+		{
+			name:    "hyphens with spaces",
+			input:   "- - -",
+			wantLen: 1,
+		},
+		{
+			name:    "hyphens with spaces and newline",
+			input:   "- - -\n",
+			wantLen: 1,
+		},
+		{
+			name:    "asterisks with spaces",
+			input:   "* * *",
+			wantLen: 1,
+		},
+		{
+			name:    "underscores with spaces",
+			input:   "_ _ _",
+			wantLen: 1,
+		},
+		{
+			name:    "hyphens with multiple spaces",
+			input:   "-  -  -",
+			wantLen: 1,
+		},
+		{
+			name:    "more than three with spaces",
+			input:   "- - - -",
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != tt.wantLen {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), tt.wantLen, got)
+			}
+
+			// The span should contain HRuleRune
+			if len(got) > 0 {
+				span := got[0]
+				if span.Text != string(rich.HRuleRune)+"\n" && span.Text != string(rich.HRuleRune) {
+					t.Errorf("span.Text = %q, want HRuleRune marker", span.Text)
+				}
+			}
+		})
+	}
+}
+
+func TestParseNotHorizontalRule(t *testing.T) {
+	// These patterns should NOT be parsed as horizontal rules
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "only two hyphens",
+			input: "--",
+		},
+		{
+			name:  "only two asterisks",
+			input: "**",
+		},
+		{
+			name:  "only two underscores",
+			input: "__",
+		},
+		{
+			name:  "mixed characters",
+			input: "-*-",
+		},
+		{
+			name:  "hyphens with text",
+			input: "---text",
+		},
+		{
+			name:  "text then hyphens",
+			input: "text---",
+		},
+		{
+			name:  "hyphens in middle of line",
+			input: "a --- b",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) == 0 {
+				t.Fatal("Parse returned empty content")
+			}
+
+			// None of the spans should contain HRuleRune
+			for i, span := range got {
+				for _, r := range span.Text {
+					if r == rich.HRuleRune {
+						t.Errorf("span[%d].Text contains HRuleRune, but should not for input %q", i, tt.input)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestParseHorizontalRuleBetweenText(t *testing.T) {
+	// Horizontal rule between text content
+	input := "Above\n---\nBelow"
+	got := Parse(input)
+
+	// Should have 3 spans: text before, hrule, text after
+	if len(got) < 3 {
+		t.Fatalf("got %d spans, want at least 3 spans\n  got: %+v", len(got), got)
+	}
+
+	// Find the hrule span
+	foundHRule := false
+	for _, span := range got {
+		for _, r := range span.Text {
+			if r == rich.HRuleRune {
+				foundHRule = true
+				break
+			}
+		}
+	}
+
+	if !foundHRule {
+		t.Error("did not find HRuleRune in parsed output")
+	}
+}
+
 func TestParseFencedCodeBlock(t *testing.T) {
 	tests := []struct {
 		name     string
