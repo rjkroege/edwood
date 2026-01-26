@@ -721,6 +721,90 @@ func headingLevel(line string) int {
 	return level
 }
 
+// isOrderedListItem returns true if line starts with an ordered list marker.
+// Returns: (isListItem bool, indentLevel int, contentStart int, itemNumber int)
+// - isListItem: true if the line is an ordered list item
+// - indentLevel: the nesting level (0 = top level, 1 = first nested level, etc.)
+// - contentStart: the byte index where the item content begins (after "1. ")
+// - itemNumber: the number from the list marker (e.g., 1 for "1.")
+//
+// Ordered list markers are: one or more digits followed by '.' or ')' and a space.
+// Indentation is counted as: 2 spaces or 1 tab = 1 indent level.
+func isOrderedListItem(line string) (bool, int, int, int) {
+	if len(line) == 0 {
+		return false, 0, 0, 0
+	}
+
+	// Count leading whitespace and calculate indent level
+	// 2 spaces = 1 indent level, 1 tab = 1 indent level
+	i := 0
+	spaceCount := 0
+	tabCount := 0
+	for i < len(line) {
+		if line[i] == ' ' {
+			spaceCount++
+			i++
+		} else if line[i] == '\t' {
+			tabCount++
+			i++
+		} else {
+			break
+		}
+	}
+
+	// Calculate indent level: each tab counts as 1 level, each 2 spaces counts as 1 level
+	indentLevel := tabCount + spaceCount/2
+
+	// After whitespace, check for digits
+	if i >= len(line) {
+		return false, 0, 0, 0
+	}
+
+	// Must start with a digit
+	if line[i] < '0' || line[i] > '9' {
+		return false, 0, 0, 0
+	}
+
+	// Parse the number
+	numStart := i
+	for i < len(line) && line[i] >= '0' && line[i] <= '9' {
+		i++
+	}
+	numEnd := i
+
+	// Must have at least one digit
+	if numEnd == numStart {
+		return false, 0, 0, 0
+	}
+
+	// Parse the number value
+	itemNumber := 0
+	for j := numStart; j < numEnd; j++ {
+		itemNumber = itemNumber*10 + int(line[j]-'0')
+	}
+
+	// Must be followed by '.' or ')'
+	if i >= len(line) {
+		return false, 0, 0, 0
+	}
+
+	delimiter := line[i]
+	if delimiter != '.' && delimiter != ')' {
+		return false, 0, 0, 0
+	}
+	i++
+
+	// Delimiter must be followed by a space
+	if i >= len(line) || line[i] != ' ' {
+		return false, 0, 0, 0
+	}
+
+	// Content starts after "N. " or "N) "
+	contentStart := i + 1
+
+	return true, indentLevel, contentStart, itemNumber
+}
+
 // isUnorderedListItem returns true if line starts with an unordered list marker.
 // Returns: (isListItem bool, indentLevel int, contentStart int)
 // - isListItem: true if the line is an unordered list item

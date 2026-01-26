@@ -1767,3 +1767,271 @@ func TestIsUnorderedListItemNested(t *testing.T) {
 		})
 	}
 }
+
+func TestIsOrderedListItem(t *testing.T) {
+	tests := []struct {
+		name             string
+		line             string
+		wantIsListItem   bool
+		wantIndentLevel  int
+		wantContentStart int
+		wantItemNumber   int
+	}{
+		{
+			name:             "simple number with period",
+			line:             "1. Item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "number 2 with period",
+			line:             "2. Second item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   2,
+		},
+		{
+			name:             "number 10 with period",
+			line:             "10. Tenth item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 4,
+			wantItemNumber:   10,
+		},
+		{
+			name:             "large number with period",
+			line:             "999. Large number",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 5,
+			wantItemNumber:   999,
+		},
+		{
+			name:             "number with paren",
+			line:             "1) Item with paren",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "number 5 with paren",
+			line:             "5) Fifth item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   5,
+		},
+		{
+			name:             "with trailing newline",
+			line:             "1. Item\n",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "just number period space",
+			line:             "1. ",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "no space after period",
+			line:             "1.Item",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "no space after paren",
+			line:             "1)Item",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "just number no delimiter",
+			line:             "1",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "empty line",
+			line:             "",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "plain text",
+			line:             "Hello world",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "number in middle of text",
+			line:             "some 1. text",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "zero as number",
+			line:             "0. Zero item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 3,
+			wantItemNumber:   0,
+		},
+		{
+			name:             "leading zero in number",
+			line:             "01. Padded number",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 4,
+			wantItemNumber:   1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isListItem, indentLevel, contentStart, itemNumber := isOrderedListItem(tt.line)
+			if isListItem != tt.wantIsListItem {
+				t.Errorf("isOrderedListItem(%q) isListItem = %v, want %v", tt.line, isListItem, tt.wantIsListItem)
+			}
+			if indentLevel != tt.wantIndentLevel {
+				t.Errorf("isOrderedListItem(%q) indentLevel = %d, want %d", tt.line, indentLevel, tt.wantIndentLevel)
+			}
+			if contentStart != tt.wantContentStart {
+				t.Errorf("isOrderedListItem(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContentStart)
+			}
+			if itemNumber != tt.wantItemNumber {
+				t.Errorf("isOrderedListItem(%q) itemNumber = %d, want %d", tt.line, itemNumber, tt.wantItemNumber)
+			}
+		})
+	}
+}
+
+func TestIsOrderedListItemNested(t *testing.T) {
+	tests := []struct {
+		name             string
+		line             string
+		wantIsListItem   bool
+		wantIndentLevel  int
+		wantContentStart int
+		wantItemNumber   int
+	}{
+		{
+			name:             "one level indent with 2 spaces",
+			line:             "  1. Nested item",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 5,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "two levels indent with 4 spaces",
+			line:             "    1. Deep nested",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 7,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "three levels indent with 6 spaces",
+			line:             "      1. Very deep",
+			wantIsListItem:   true,
+			wantIndentLevel:  3,
+			wantContentStart: 9,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "one level indent with tab",
+			line:             "\t1. Tab nested",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 4,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "two levels indent with tabs",
+			line:             "\t\t1. Double tab",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 5,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "mixed indent (tab + 2 spaces)",
+			line:             "\t  1. Mixed indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 6,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "nested with paren delimiter",
+			line:             "  1) Nested paren",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 5,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "nested with multi-digit number",
+			line:             "  10. Multi-digit nested",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 6,
+			wantItemNumber:   10,
+		},
+		{
+			name:             "odd number of spaces (1 space)",
+			line:             " 1. One space indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  0, // 1 space alone doesn't make a full indent level
+			wantContentStart: 4,
+			wantItemNumber:   1,
+		},
+		{
+			name:             "odd number of spaces (3 spaces)",
+			line:             "   1. Three space indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  1, // 3 spaces = 1 full indent level
+			wantContentStart: 6,
+			wantItemNumber:   1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isListItem, indentLevel, contentStart, itemNumber := isOrderedListItem(tt.line)
+			if isListItem != tt.wantIsListItem {
+				t.Errorf("isOrderedListItem(%q) isListItem = %v, want %v", tt.line, isListItem, tt.wantIsListItem)
+			}
+			if indentLevel != tt.wantIndentLevel {
+				t.Errorf("isOrderedListItem(%q) indentLevel = %d, want %d", tt.line, indentLevel, tt.wantIndentLevel)
+			}
+			if contentStart != tt.wantContentStart {
+				t.Errorf("isOrderedListItem(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContentStart)
+			}
+			if itemNumber != tt.wantItemNumber {
+				t.Errorf("isOrderedListItem(%q) itemNumber = %d, want %d", tt.line, itemNumber, tt.wantItemNumber)
+			}
+		})
+	}
+}
