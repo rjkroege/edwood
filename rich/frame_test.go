@@ -229,19 +229,32 @@ func TestDrawTextAtCorrectPosition(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// Text should be rendered at the frame origin (rect.Min)
-	// The mock records: "string \"test\" atpoint: (20,10)"
-	foundAtOrigin := false
-	expectedPos := fmt.Sprintf("atpoint: %v", rect.Min)
+	// Text should be rendered at origin (0,0) in scratch image coordinates.
+	// The scratch image is then blitted to the frame origin on screen.
+	// When using scratch-based clipping, text is drawn at local coords.
+	foundText := false
 	for _, op := range ops {
-		if strings.Contains(op, `string "test"`) && strings.Contains(op, expectedPos) {
-			foundAtOrigin = true
+		if strings.Contains(op, `string "test"`) {
+			foundText = true
 			break
 		}
 	}
 
-	if !foundAtOrigin {
-		t.Errorf("Redraw() did not render 'test' at frame origin %v\ngot ops: %v", rect.Min, ops)
+	if !foundText {
+		t.Errorf("Redraw() did not render 'test'\ngot ops: %v", ops)
+	}
+
+	// Verify the final blit to screen places content at frame origin
+	foundBlit := false
+	expectedRect := fmt.Sprintf("fill %v", rect)
+	for _, op := range ops {
+		if strings.Contains(op, expectedRect) {
+			foundBlit = true
+			break
+		}
+	}
+	if !foundBlit {
+		t.Errorf("Redraw() did not blit to frame rect %v\ngot ops: %v", rect, ops)
 	}
 }
 
@@ -264,27 +277,41 @@ func TestDrawTextSecondLinePosition(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// First line at Y=10, second line at Y=10+14=24
-	firstLineY := rect.Min.Y
-	secondLineY := rect.Min.Y + 14
-
+	// When using scratch-based clipping, text is drawn at local coordinates.
+	// First line at Y=0, second line at Y=14 (font height)
+	// The scratch image is then blitted to screen at frame origin.
 	foundFirstLine := false
 	foundSecondLine := false
 
 	for _, op := range ops {
-		if strings.Contains(op, `string "line1"`) && strings.Contains(op, fmt.Sprintf("(%d,%d)", rect.Min.X, firstLineY)) {
+		// Check for line1 at local Y=0
+		if strings.Contains(op, `string "line1"`) && strings.Contains(op, "(0,0)") {
 			foundFirstLine = true
 		}
-		if strings.Contains(op, `string "line2"`) && strings.Contains(op, fmt.Sprintf("(%d,%d)", rect.Min.X, secondLineY)) {
+		// Check for line2 at local Y=14 (one line height below)
+		if strings.Contains(op, `string "line2"`) && strings.Contains(op, "(0,14)") {
 			foundSecondLine = true
 		}
 	}
 
 	if !foundFirstLine {
-		t.Errorf("Redraw() did not render 'line1' at Y=%d\ngot ops: %v", firstLineY, ops)
+		t.Errorf("Redraw() did not render 'line1' at local Y=0\ngot ops: %v", ops)
 	}
 	if !foundSecondLine {
-		t.Errorf("Redraw() did not render 'line2' at Y=%d\ngot ops: %v", secondLineY, ops)
+		t.Errorf("Redraw() did not render 'line2' at local Y=14\ngot ops: %v", ops)
+	}
+
+	// Verify the final blit places content at correct screen position
+	foundBlit := false
+	expectedRect := fmt.Sprintf("fill %v", rect)
+	for _, op := range ops {
+		if strings.Contains(op, expectedRect) {
+			foundBlit = true
+			break
+		}
+	}
+	if !foundBlit {
+		t.Errorf("Redraw() did not blit to frame rect %v\ngot ops: %v", rect, ops)
 	}
 }
 

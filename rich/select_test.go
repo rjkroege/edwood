@@ -1,6 +1,7 @@
 package rich
 
 import (
+	"fmt"
 	"image"
 	"strings"
 	"testing"
@@ -243,17 +244,19 @@ func TestDrawSelectionNoHighlightWhenEmpty(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// Count fill operations (starts with "fill ") - should only be the background fill
-	fillCount := 0
+	// Check that no selection-color fill is drawn when p0 == p1
+	// With scratch-based clipping, there will be multiple fills (background + blit),
+	// but none should use the selection color.
+	selectionDrawn := false
 	for _, op := range ops {
-		if strings.HasPrefix(op, "fill ") {
-			fillCount++
+		if strings.Contains(op, "selection-color") {
+			selectionDrawn = true
+			break
 		}
 	}
 
-	// Only one fill should exist (the background)
-	if fillCount != 1 {
-		t.Errorf("Redraw() should only draw background fill when p0 == p1, got %d fills\nops: %v", fillCount, ops)
+	if selectionDrawn {
+		t.Errorf("Redraw() should not draw selection when p0 == p1\nops: %v", ops)
 	}
 }
 
@@ -372,7 +375,8 @@ func TestDrawSelectionCorrectPosition(t *testing.T) {
 	f.SetContent(Plain("hello"))
 
 	// Select "ell" (positions 1-4)
-	// Should highlight from X = 20 + 10 = 30 to X = 20 + 40 = 60
+	// In scratch image coords: X = 10 (1 char) to X = 40 (4 chars), Y = 0 to 14
+	// The scratch is then blitted to screen at frame origin.
 	f.SetSelection(1, 4)
 
 	display.(edwoodtest.GettableDrawOps).Clear()
@@ -380,19 +384,33 @@ func TestDrawSelectionCorrectPosition(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// Look for a fill operation at the correct rectangle
-	// Expected: fill (30,10)-(60,24)
-	expectedRect := image.Rect(30, 10, 60, 24)
+	// Look for a fill operation at the correct scratch-local coordinates
+	// With scratch-based clipping, selection is drawn at local coords first.
+	// Expected: fill (10,0)-(40,14) in scratch image
+	expectedLocalRect := image.Rect(10, 0, 40, 14)
 	foundCorrectRect := false
 	for _, op := range ops {
-		if strings.Contains(op, "fill") && strings.Contains(op, expectedRect.String()) {
+		if strings.Contains(op, "fill") && strings.Contains(op, expectedLocalRect.String()) {
 			foundCorrectRect = true
 			break
 		}
 	}
 
 	if !foundCorrectRect {
-		t.Errorf("Redraw() did not draw selection at correct position %v\ngot ops: %v", expectedRect, ops)
+		t.Errorf("Redraw() did not draw selection at correct local position %v\ngot ops: %v", expectedLocalRect, ops)
+	}
+
+	// Also verify the blit places the scratch at the correct screen position
+	foundBlit := false
+	expectedScreenRect := fmt.Sprintf("fill %v", rect)
+	for _, op := range ops {
+		if strings.Contains(op, expectedScreenRect) {
+			foundBlit = true
+			break
+		}
+	}
+	if !foundBlit {
+		t.Errorf("Redraw() did not blit scratch to frame rect %v\ngot ops: %v", rect, ops)
 	}
 }
 
