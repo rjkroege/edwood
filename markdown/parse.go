@@ -56,7 +56,8 @@ func Parse(text string) rich.Content {
 	// Track if we're in a paragraph (consecutive non-block lines)
 	inParagraph := false
 
-	for _, line := range lines {
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
 			// If we were in an indented block, emit it first
@@ -136,6 +137,22 @@ func Parse(text string) rich.Content {
 				})
 				inParagraph = false
 			}
+			continue
+		}
+
+		// Check for table (must have header row followed by separator row)
+		isRow, _ := isTableRow(line)
+		if isRow && i+1 < len(lines) && isTableSeparatorRow(lines[i+1]) {
+			// End paragraph before table
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+			}
+			inParagraph = false
+
+			// Parse the table - collect all consecutive table rows
+			tableSpans, consumed := parseTableBlock(lines, i)
+			result = append(result, tableSpans...)
+			i += consumed - 1 // -1 because loop will increment
 			continue
 		}
 
@@ -1338,4 +1355,243 @@ func isUnorderedListItem(line string) (bool, int, int) {
 	contentStart := i + 2
 
 	return true, indentLevel, contentStart
+}
+
+// =============================================================================
+// Table Detection Functions (Phase 15B)
+// =============================================================================
+
+// isTableRow returns true if line is a table row (starts with |).
+// Also returns the cell contents (trimmed) if it is a table row.
+func isTableRow(line string) (bool, []string) {
+	// Strip trailing newline for comparison
+	trimmed := strings.TrimSuffix(line, "\n")
+	if trimmed == "" {
+		return false, nil
+	}
+
+	// Must start with |
+	if trimmed[0] != '|' {
+		return false, nil
+	}
+
+	// Split by | and extract cells
+	cells := splitTableCells(trimmed)
+	if len(cells) == 0 {
+		return false, nil
+	}
+
+	return true, cells
+}
+
+// splitTableCells splits a table row into cells, trimming whitespace from each.
+func splitTableCells(line string) []string {
+	// Remove leading and trailing |
+	trimmed := strings.TrimPrefix(line, "|")
+	trimmed = strings.TrimSuffix(trimmed, "|")
+
+	// Split by |
+	parts := strings.Split(trimmed, "|")
+
+	// Trim whitespace from each cell
+	cells := make([]string, len(parts))
+	for i, p := range parts {
+		cells[i] = strings.TrimSpace(p)
+	}
+
+	return cells
+}
+
+// isTableSeparatorRow returns true if the line is a table separator row.
+// A separator row contains cells with only dashes (and optional alignment colons).
+func isTableSeparatorRow(line string) bool {
+	isSep, _ := parseTableSeparator(line)
+	return isSep
+}
+
+// parseTableSeparator parses a table separator row and returns the alignment for each column.
+func parseTableSeparator(line string) (bool, []rich.Alignment) {
+	// Strip trailing newline for comparison
+	trimmed := strings.TrimSuffix(line, "\n")
+	if trimmed == "" {
+		return false, nil
+	}
+
+	// Must start with |
+	if trimmed[0] != '|' {
+		return false, nil
+	}
+
+	cells := splitTableCells(trimmed)
+	if len(cells) == 0 {
+		return false, nil
+	}
+
+	aligns := make([]rich.Alignment, len(cells))
+	for i, cell := range cells {
+		cell = strings.TrimSpace(cell)
+		align, ok := parseSeparatorCell(cell)
+		if !ok {
+			return false, nil
+		}
+		aligns[i] = align
+	}
+
+	return true, aligns
+}
+
+// parseSeparatorCell checks if a cell is a valid separator cell (dashes with optional alignment colons).
+// Returns the alignment and whether it's valid.
+func parseSeparatorCell(cell string) (rich.Alignment, bool) {
+	// Minimum valid separator cell is "---" (3 chars) or ":--" / "--:" (also 3 chars)
+	if len(cell) < 3 {
+		return rich.AlignLeft, false
+	}
+
+	// Check for alignment markers
+	hasLeftColon := strings.HasPrefix(cell, ":")
+	hasRightColon := strings.HasSuffix(cell, ":")
+
+	// Remove colons for dash check
+	inner := cell
+	if hasLeftColon {
+		inner = inner[1:]
+	}
+	if hasRightColon && len(inner) > 0 {
+		inner = inner[:len(inner)-1]
+	}
+
+	// Must have at least 1 dash (after removing colons)
+	// CommonMark requires at least 1 dash; we require 1 for compatibility
+	if len(inner) < 1 {
+		return rich.AlignLeft, false
+	}
+
+	// Rest must be all dashes
+	for _, c := range inner {
+		if c != '-' {
+			return rich.AlignLeft, false
+		}
+	}
+
+	// Determine alignment
+	if hasLeftColon && hasRightColon {
+		return rich.AlignCenter, true
+	}
+	if hasRightColon {
+		return rich.AlignRight, true
+	}
+	// Default is left (including explicit left with just leading colon)
+	return rich.AlignLeft, true
+}
+
+// calculateColumnWidths calculates the maximum width for each column.
+func calculateColumnWidths(rows [][]string) []int {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	// Find the number of columns from the first row
+	numCols := len(rows[0])
+	widths := make([]int, numCols)
+
+	for _, row := range rows {
+		for i, cell := range row {
+			if i < numCols {
+				w := len(cell)
+				if w > widths[i] {
+					widths[i] = w
+				}
+			}
+		}
+	}
+
+	return widths
+}
+
+// parseTableBlock parses a table starting at the given line index.
+// Returns the spans for the table and the number of lines consumed.
+func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
+	if startIdx >= len(lines) {
+		return nil, 0
+	}
+
+	// First line should be header row
+	isRow, _ := isTableRow(lines[startIdx])
+	if !isRow {
+		return nil, 0
+	}
+
+	// Second line should be separator row
+	if startIdx+1 >= len(lines) || !isTableSeparatorRow(lines[startIdx+1]) {
+		return nil, 0
+	}
+
+	// Collect all table lines (header, separator, and data rows)
+	var tableLines []string
+	consumed := 0
+
+	for i := startIdx; i < len(lines); i++ {
+		line := lines[i]
+		isTableLine, _ := isTableRow(line)
+		isSep := isTableSeparatorRow(line)
+
+		// A line is part of the table if it's a table row or separator
+		if isTableLine || isSep {
+			tableLines = append(tableLines, line)
+			consumed++
+		} else {
+			// Non-table line ends the table
+			break
+		}
+	}
+
+	if consumed < 2 {
+		// Need at least header + separator
+		return nil, 0
+	}
+
+	// Build spans for each table row
+	var spans []rich.Span
+
+	for i, line := range tableLines {
+		// Normalize line ending
+		lineText := strings.TrimSuffix(line, "\n")
+
+		// Determine if this is header row, separator row, or data row
+		isHeader := i == 0
+		isSeparator := i == 1 && isTableSeparatorRow(line)
+
+		// Add newline unless it's the last line
+		if i < len(tableLines)-1 {
+			lineText += "\n"
+		}
+
+		style := rich.Style{
+			Table:       true,
+			TableHeader: isHeader,
+			Code:        true, // Tables use code/monospace font
+			Block:       true, // Tables are block-level elements
+			Bg:          rich.InlineCodeBg,
+			Scale:       1.0,
+		}
+
+		// Headers are also bold
+		if isHeader {
+			style.Bold = true
+		}
+
+		// Separator rows are styled same as data rows (not header, not bold)
+		if isSeparator {
+			style.TableHeader = false
+			style.Bold = false
+		}
+
+		spans = append(spans, rich.Span{
+			Text:  lineText,
+			Style: style,
+		})
+	}
+
+	return spans, consumed
 }

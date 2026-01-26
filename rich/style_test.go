@@ -104,6 +104,13 @@ func stylesEqual(a, b Style) bool {
 	if a.ListNumber != b.ListNumber {
 		return false
 	}
+	// Compare table style fields
+	if a.Table != b.Table || a.TableHeader != b.TableHeader {
+		return false
+	}
+	if a.TableAlign != b.TableAlign {
+		return false
+	}
 	return true
 }
 
@@ -198,6 +205,88 @@ func TestListStyleFields(t *testing.T) {
 		}
 		if stylesEqual(s1, s3) {
 			t.Error("different indent levels should not be equal")
+		}
+	})
+}
+
+func TestTableStyleFields(t *testing.T) {
+	// Test that table style fields exist and have expected default values
+	t.Run("default style has no table fields set", func(t *testing.T) {
+		s := DefaultStyle()
+		if s.Table {
+			t.Error("DefaultStyle().Table = true, want false")
+		}
+		if s.TableHeader {
+			t.Error("DefaultStyle().TableHeader = true, want false")
+		}
+		if s.TableAlign != AlignLeft {
+			t.Errorf("DefaultStyle().TableAlign = %d, want AlignLeft (0)", s.TableAlign)
+		}
+	})
+
+	t.Run("can set table cell style", func(t *testing.T) {
+		s := Style{
+			Table: true,
+			Code:  true, // Tables render in code font
+			Block: true, // Tables are block elements
+			Scale: 1.0,
+		}
+		if !s.Table {
+			t.Error("Table not set")
+		}
+		if !s.Code {
+			t.Error("Code not set")
+		}
+		if !s.Block {
+			t.Error("Block not set")
+		}
+	})
+
+	t.Run("can set table header style", func(t *testing.T) {
+		s := Style{
+			Table:       true,
+			TableHeader: true,
+			Bold:        true, // Headers are typically bold
+			Code:        true,
+			Block:       true,
+			Scale:       1.0,
+		}
+		if !s.TableHeader {
+			t.Error("TableHeader not set")
+		}
+		if !s.Bold {
+			t.Error("Bold not set for header")
+		}
+	})
+
+	t.Run("table alignment values", func(t *testing.T) {
+		// Test each alignment value
+		tests := []struct {
+			name  string
+			align Alignment
+		}{
+			{"left", AlignLeft},
+			{"center", AlignCenter},
+			{"right", AlignRight},
+		}
+		for _, tt := range tests {
+			s := Style{Table: true, TableAlign: tt.align, Scale: 1.0}
+			if s.TableAlign != tt.align {
+				t.Errorf("%s: TableAlign = %d, want %d", tt.name, s.TableAlign, tt.align)
+			}
+		}
+	})
+
+	t.Run("table styles are comparable", func(t *testing.T) {
+		s1 := Style{Table: true, TableAlign: AlignCenter, Scale: 1.0}
+		s2 := Style{Table: true, TableAlign: AlignCenter, Scale: 1.0}
+		s3 := Style{Table: true, TableAlign: AlignRight, Scale: 1.0}
+
+		if !stylesEqual(s1, s2) {
+			t.Error("identical table styles should be equal")
+		}
+		if stylesEqual(s1, s3) {
+			t.Error("different alignments should not be equal")
 		}
 	})
 }

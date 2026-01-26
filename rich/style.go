@@ -26,6 +26,11 @@ type Style struct {
 	ListOrdered bool // true for ordered lists, false for unordered
 	ListNumber  int  // For ordered lists, the item number
 
+	// Table formatting
+	Table       bool      // This span is part of a table
+	TableHeader bool      // This is a header cell
+	TableAlign  Alignment // Cell alignment (left, center, right)
+
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
 	Scale float64
@@ -38,6 +43,15 @@ func DefaultStyle() Style {
 
 // LinkBlue is the standard blue color for hyperlinks.
 var LinkBlue = color.RGBA{R: 0, G: 0, B: 238, A: 255}
+
+// Alignment represents text alignment within a table cell.
+type Alignment int
+
+const (
+	AlignLeft   Alignment = iota // Default left alignment
+	AlignCenter                  // Center alignment
+	AlignRight                   // Right alignment
+)
 
 // HRuleRune is the marker rune used to represent a horizontal rule.
 // When the renderer encounters this rune, it draws a horizontal line instead of text.

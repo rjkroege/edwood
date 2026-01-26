@@ -152,7 +152,8 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		inIndentedBlock = false
 	}
 
-	for _, line := range lines {
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
 			// If we were in an indented block, emit it first
@@ -266,6 +267,32 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			}
 			inParagraph = false
 			sourcePos += len(line)
+			continue
+		}
+
+		// Check for table (must have header row followed by separator row)
+		isRow, _ := isTableRow(line)
+		if isRow && i+1 < len(lines) && isTableSeparatorRow(lines[i+1]) {
+			// End paragraph before table
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+				renderedPos++
+			}
+			inParagraph = false
+
+			// Parse the table - collect all consecutive table rows
+			tableSpans, tableEntries, consumed := parseTableBlockWithSourceMap(lines, i, sourcePos, renderedPos)
+			result = append(result, tableSpans...)
+			sm.entries = append(sm.entries, tableEntries...)
+
+			// Update positions based on consumed lines
+			for j := 0; j < consumed; j++ {
+				sourcePos += len(lines[i+j])
+			}
+			for _, span := range tableSpans {
+				renderedPos += len([]rune(span.Text))
+			}
+			i += consumed - 1 // -1 because loop will increment
 			continue
 		}
 
@@ -1081,4 +1108,105 @@ func parseInlineWithSourceMapNoLinks(text string, baseStyle rich.Style, sourceOf
 	}
 
 	return spans, entries, nil
+}
+
+// parseTableBlockWithSourceMap parses a table starting at the given line index.
+// Returns the spans for the table, source map entries, and the number of lines consumed.
+func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, int) {
+	if startIdx >= len(lines) {
+		return nil, nil, 0
+	}
+
+	// First line should be header row
+	isRow, _ := isTableRow(lines[startIdx])
+	if !isRow {
+		return nil, nil, 0
+	}
+
+	// Second line should be separator row
+	if startIdx+1 >= len(lines) || !isTableSeparatorRow(lines[startIdx+1]) {
+		return nil, nil, 0
+	}
+
+	// Collect all table lines (header, separator, and data rows)
+	var tableLines []string
+	consumed := 0
+
+	for i := startIdx; i < len(lines); i++ {
+		line := lines[i]
+		isTableLine, _ := isTableRow(line)
+		isSep := isTableSeparatorRow(line)
+
+		// A line is part of the table if it's a table row or separator
+		if isTableLine || isSep {
+			tableLines = append(tableLines, line)
+			consumed++
+		} else {
+			// Non-table line ends the table
+			break
+		}
+	}
+
+	if consumed < 2 {
+		// Need at least header + separator
+		return nil, nil, 0
+	}
+
+	// Build spans and source map entries for each table row
+	var spans []rich.Span
+	var entries []SourceMapEntry
+	srcPos := sourceOffset
+	rendPos := renderedOffset
+
+	for i, line := range tableLines {
+		// Normalize line ending
+		lineText := strings.TrimSuffix(line, "\n")
+
+		// Determine if this is header row, separator row, or data row
+		isHeader := i == 0
+		isSeparator := i == 1 && isTableSeparatorRow(line)
+
+		// Add newline unless it's the last line
+		if i < len(tableLines)-1 {
+			lineText += "\n"
+		}
+
+		style := rich.Style{
+			Table:       true,
+			TableHeader: isHeader,
+			Code:        true, // Tables use code/monospace font
+			Block:       true, // Tables are block-level elements
+			Bg:          rich.InlineCodeBg,
+			Scale:       1.0,
+		}
+
+		// Headers are also bold
+		if isHeader {
+			style.Bold = true
+		}
+
+		// Separator rows are styled same as data rows (not header, not bold)
+		if isSeparator {
+			style.TableHeader = false
+			style.Bold = false
+		}
+
+		spans = append(spans, rich.Span{
+			Text:  lineText,
+			Style: style,
+		})
+
+		// Create source map entry for this line
+		renderedLen := len([]rune(lineText))
+		entries = append(entries, SourceMapEntry{
+			RenderedStart: rendPos,
+			RenderedEnd:   rendPos + renderedLen,
+			SourceStart:   srcPos,
+			SourceEnd:     srcPos + len(line),
+		})
+		rendPos += renderedLen
+		srcPos += len(line)
+	}
+
+	return spans, entries, consumed
 }
