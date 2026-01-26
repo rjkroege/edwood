@@ -615,7 +615,7 @@ See `docs/codeblock-design.md` for full design.
 | Tests exist | [x] | Manual verification with README.md |
 | Code written | [x] | ParseWithSourceMap tracks indented block source positions |
 | Tests pass | [x] | go test ./markdown/... passes |
-| Code committed | [ ] | Pending |
+| Code committed | [x] | Commit 7a474f5 (markdown preview enhancements) |
 
 ### 13.6 Block-Level Background Rendering
 | Stage | Status | Notes |
@@ -690,34 +690,34 @@ See `docs/preview-resize-design.md` for problem analysis and option comparison.
 ### 14.1 Add SetRect() to rich.Frame
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestFrameSetRect, TestFrameSetRectRelayout |
-| Code written | [ ] | Add `SetRect(r image.Rectangle)` to Frame interface and frameImpl |
-| Tests pass | [ ] | go test ./rich/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestFrameSetRect, TestFrameSetRectNoChange, TestFrameSetRectRelayout, TestFrameSetRectRedraw |
+| Code written | [x] | Add `SetRect(r image.Rectangle)` to Frame interface and frameImpl |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit b8928a3 |
 
 ### 14.2 Add Rect() Accessor to rich.Frame
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | Existing tests use Rect() |
-| Code written | [ ] | Add `Rect() image.Rectangle` to Frame interface if not present |
-| Tests pass | [ ] | go test ./rich/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | Existing tests use Rect() |
+| Code written | [x] | `Rect() image.Rectangle` already present in Frame interface (frame.go:25) and implemented (frame.go:98-101) |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Already present in codebase (pre-existing) |
 
 ### 14.3 RichText Render() Method
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestRichTextRender, TestRichTextRenderUpdatesLastRect |
-| Code written | [ ] | Add `Render(r image.Rectangle)` that computes scrollbar/frame rects and draws |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestRichTextRender, TestRichTextRenderUpdatesLastRect |
+| Code written | [x] | `Render(r image.Rectangle)` implemented in richtext.go:184-218 |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit da8115a |
 
 ### 14.4 RichText Remove Stored Rectangles
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestRichTextRenderDifferentRects |
-| Code written | [ ] | Remove `all` field, add `lastRect`/`lastScrollRect` for hit-testing cache |
-| Tests pass | [ ] | go test ./... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestRichTextRenderDifferentRects |
+| Code written | [x] | Renamed `all` to `lastRect`, `scrollRect` to `lastScrollRect` for hit-testing cache |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit e05cb3d |
 
 ### 14.5 Update Scrollbar Methods
 | Stage | Status | Notes |
