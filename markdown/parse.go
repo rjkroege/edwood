@@ -720,3 +720,62 @@ func headingLevel(line string) int {
 
 	return level
 }
+
+// isUnorderedListItem returns true if line starts with an unordered list marker.
+// Returns: (isListItem bool, indentLevel int, contentStart int)
+// - isListItem: true if the line is an unordered list item
+// - indentLevel: the nesting level (0 = top level, 1 = first nested level, etc.)
+// - contentStart: the byte index where the item content begins (after "- ")
+//
+// Unordered list markers are: -, *, + followed by a space.
+// Indentation is counted as: 2 spaces or 1 tab = 1 indent level.
+func isUnorderedListItem(line string) (bool, int, int) {
+	if len(line) == 0 {
+		return false, 0, 0
+	}
+
+	// Count leading whitespace and calculate indent level
+	// 2 spaces = 1 indent level, 1 tab = 1 indent level
+	i := 0
+	spaceCount := 0
+	tabCount := 0
+	for i < len(line) {
+		if line[i] == ' ' {
+			spaceCount++
+			i++
+		} else if line[i] == '\t' {
+			tabCount++
+			i++
+		} else {
+			break
+		}
+	}
+
+	// Calculate indent level: each tab counts as 1 level, each 2 spaces counts as 1 level
+	indentLevel := tabCount + spaceCount/2
+
+	// After whitespace, check for list marker (-, *, +)
+	if i >= len(line) {
+		return false, 0, 0
+	}
+
+	marker := line[i]
+	if marker != '-' && marker != '*' && marker != '+' {
+		return false, 0, 0
+	}
+
+	// Marker must be followed by a space
+	if i+1 >= len(line) || line[i+1] != ' ' {
+		return false, 0, 0
+	}
+
+	// Check for double markers like "--" which are not list items
+	if i+1 < len(line) && line[i+1] == marker {
+		return false, 0, 0
+	}
+
+	// Content starts after "marker "
+	contentStart := i + 2
+
+	return true, indentLevel, contentStart
+}

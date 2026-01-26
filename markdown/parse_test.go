@@ -1566,3 +1566,204 @@ func TestParseFencedCodeBlockHasBackground(t *testing.T) {
 		t.Errorf("code block Bg is not gray: R=%d, G=%d, B=%d (want components within 20)", r8, g8, b8)
 	}
 }
+
+// Tests for Phase 15A: Lists
+
+func TestIsUnorderedListItem(t *testing.T) {
+	tests := []struct {
+		name             string
+		line             string
+		wantIsListItem   bool
+		wantIndentLevel  int
+		wantContentStart int
+	}{
+		{
+			name:             "hyphen marker",
+			line:             "- Item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 2,
+		},
+		{
+			name:             "asterisk marker",
+			line:             "* Item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 2,
+		},
+		{
+			name:             "plus marker",
+			line:             "+ Item",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 2,
+		},
+		{
+			name:             "hyphen with trailing newline",
+			line:             "- Item\n",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 2,
+		},
+		{
+			name:             "just marker and space",
+			line:             "- ",
+			wantIsListItem:   true,
+			wantIndentLevel:  0,
+			wantContentStart: 2,
+		},
+		{
+			name:             "no space after marker",
+			line:             "-Item",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+		{
+			name:             "just marker no space",
+			line:             "-",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+		{
+			name:             "empty line",
+			line:             "",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+		{
+			name:             "plain text",
+			line:             "Hello world",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+		{
+			name:             "hyphen in middle of text",
+			line:             "some - text",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+		{
+			name:             "double hyphen (not list)",
+			line:             "-- Not a list",
+			wantIsListItem:   false,
+			wantIndentLevel:  0,
+			wantContentStart: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isListItem, indentLevel, contentStart := isUnorderedListItem(tt.line)
+			if isListItem != tt.wantIsListItem {
+				t.Errorf("isUnorderedListItem(%q) isListItem = %v, want %v", tt.line, isListItem, tt.wantIsListItem)
+			}
+			if indentLevel != tt.wantIndentLevel {
+				t.Errorf("isUnorderedListItem(%q) indentLevel = %d, want %d", tt.line, indentLevel, tt.wantIndentLevel)
+			}
+			if contentStart != tt.wantContentStart {
+				t.Errorf("isUnorderedListItem(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContentStart)
+			}
+		})
+	}
+}
+
+func TestIsUnorderedListItemNested(t *testing.T) {
+	tests := []struct {
+		name             string
+		line             string
+		wantIsListItem   bool
+		wantIndentLevel  int
+		wantContentStart int
+	}{
+		{
+			name:             "one level indent with 2 spaces",
+			line:             "  - Nested item",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 4,
+		},
+		{
+			name:             "two levels indent with 4 spaces",
+			line:             "    - Deep nested",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 6,
+		},
+		{
+			name:             "three levels indent with 6 spaces",
+			line:             "      - Very deep",
+			wantIsListItem:   true,
+			wantIndentLevel:  3,
+			wantContentStart: 8,
+		},
+		{
+			name:             "one level indent with tab",
+			line:             "\t- Tab nested",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 3,
+		},
+		{
+			name:             "two levels indent with tabs",
+			line:             "\t\t- Double tab",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 4,
+		},
+		{
+			name:             "mixed indent (tab + 2 spaces)",
+			line:             "\t  - Mixed indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  2,
+			wantContentStart: 5,
+		},
+		{
+			name:             "nested asterisk",
+			line:             "  * Nested asterisk",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 4,
+		},
+		{
+			name:             "nested plus",
+			line:             "  + Nested plus",
+			wantIsListItem:   true,
+			wantIndentLevel:  1,
+			wantContentStart: 4,
+		},
+		{
+			name:             "odd number of spaces (1 space)",
+			line:             " - One space indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  0, // 1 space alone doesn't make a full indent level
+			wantContentStart: 3,
+		},
+		{
+			name:             "odd number of spaces (3 spaces)",
+			line:             "   - Three space indent",
+			wantIsListItem:   true,
+			wantIndentLevel:  1, // 3 spaces = 1 full indent level
+			wantContentStart: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isListItem, indentLevel, contentStart := isUnorderedListItem(tt.line)
+			if isListItem != tt.wantIsListItem {
+				t.Errorf("isUnorderedListItem(%q) isListItem = %v, want %v", tt.line, isListItem, tt.wantIsListItem)
+			}
+			if indentLevel != tt.wantIndentLevel {
+				t.Errorf("isUnorderedListItem(%q) indentLevel = %d, want %d", tt.line, indentLevel, tt.wantIndentLevel)
+			}
+			if contentStart != tt.wantContentStart {
+				t.Errorf("isUnorderedListItem(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContentStart)
+			}
+		})
+	}
+}
