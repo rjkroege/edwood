@@ -1221,7 +1221,7 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		rtOpts = append(rtOpts, WithRichTextScaledFont(1.25, h3Font))
 	}
 
-	rt.Init(bodyRect, display, font, rtOpts...)
+	rt.Init(display, font, rtOpts...)
 
 	// Parse the markdown content with source mapping and link tracking
 	mdContent := t.file.String()
@@ -1237,7 +1237,8 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Enter preview mode
 	w.SetPreviewMode(true)
 
-	// Redraw the preview
+	// Redraw the preview - Render() with body rectangle
+	rt.Render(bodyRect)
 	w.Draw()
 	if display != nil {
 		display.Flush()

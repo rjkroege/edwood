@@ -234,10 +234,11 @@ func TestWindowDrawPreviewMode(t *testing.T) {
 	rt := NewRichText()
 	// Body area is below tag (approximately)
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Set some content in the RichText
 	content := rich.Plain("Hello World")
@@ -326,10 +327,11 @@ func TestWindowMousePreviewSelection(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Set content in the RichText
 	content := rich.Plain("Hello World")
@@ -416,10 +418,11 @@ func TestPreviewSnarf(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -495,10 +498,11 @@ func TestPreviewSnarfBold(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -581,10 +585,11 @@ func TestPreviewSnarfHeading(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -662,11 +667,12 @@ func TestWindowMousePreviewScroll(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
 	)
+	rt.Render(bodyRect)
 
 	// Create content with many lines to enable scrolling
 	var content rich.Content
@@ -818,10 +824,11 @@ func TestPreviewCommandEnter(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(markdownContent)
@@ -911,10 +918,11 @@ func TestPreviewCommandExit(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	content, sourceMap, _ := markdown.ParseWithSourceMap(markdownContent)
 	rt.SetContent(content)
@@ -1007,10 +1015,11 @@ func TestPreviewLiveUpdate(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse initial markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
@@ -1099,10 +1108,11 @@ func TestPreviewLiveUpdatePreservesScroll(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse initial markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
@@ -1175,10 +1185,11 @@ func TestPreviewLiveUpdateMultipleTimes(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse initial markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(initialMarkdown)
@@ -1255,10 +1266,11 @@ func TestPreviewLook(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1368,10 +1380,11 @@ func TestPreviewExec(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1484,10 +1497,11 @@ func TestPreviewLookExpand(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1552,10 +1566,11 @@ func TestPreviewKeyScroll(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1672,10 +1687,11 @@ func TestPreviewKeyIgnoresTyping(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown and set content with source map
 	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1771,10 +1787,11 @@ func TestWindowPreviewLinkMap(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown with source map and link map
 	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1898,10 +1915,11 @@ func TestPreviewLookLink(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown with source map and link map
 	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
@@ -1979,10 +1997,11 @@ func TestPreviewLookNonLink(t *testing.T) {
 
 	rt := NewRichText()
 	bodyRect := image.Rect(0, 20, 800, 600)
-	rt.Init(bodyRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
+	rt.Render(bodyRect)
 
 	// Parse markdown with source map and link map
 	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)

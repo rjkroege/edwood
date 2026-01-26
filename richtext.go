@@ -45,9 +45,10 @@ func NewRichText() *RichText {
 	return &RichText{}
 }
 
-// Init initializes the RichText component with the given rectangle, display, font, and options.
-func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font, opts ...RichTextOption) {
-	rt.lastRect = r
+// Init initializes the RichText component with the given display, font, and options.
+// The rectangle is not provided at init time - use Render(rect) to draw into a specific area.
+// This allows the rectangle to be provided dynamically (e.g., from body.all).
+func (rt *RichText) Init(display draw.Display, font draw.Font, opts ...RichTextOption) {
 	rt.display = display
 
 	// Apply options
@@ -55,26 +56,7 @@ func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font
 		opt(rt)
 	}
 
-	// Calculate scrollbar rectangle (left side) using same scaling as Text
-	scrollWid := display.ScaleSize(Scrollwid)
-	scrollGap := display.ScaleSize(Scrollgap)
-
-	rt.lastScrollRect = image.Rect(
-		r.Min.X,
-		r.Min.Y,
-		r.Min.X+scrollWid,
-		r.Max.Y,
-	)
-
-	// Calculate frame rectangle (right of scrollbar with gap)
-	frameRect := image.Rect(
-		r.Min.X+scrollWid+scrollGap,
-		r.Min.Y,
-		r.Max.X,
-		r.Max.Y,
-	)
-
-	// Create and initialize the frame
+	// Create the frame (but don't init with a rectangle yet)
 	rt.frame = rich.NewFrame()
 
 	// Build frame options
@@ -104,7 +86,8 @@ func (rt *RichText) Init(r image.Rectangle, display draw.Display, font draw.Font
 		frameOpts = append(frameOpts, rich.WithScaledFont(scale, f))
 	}
 
-	rt.frame.Init(frameRect, frameOpts...)
+	// Initialize frame with empty rectangle - will be set on first Render() call
+	rt.frame.Init(image.Rectangle{}, frameOpts...)
 }
 
 // All returns the full rectangle area of the RichText component.

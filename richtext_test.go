@@ -10,9 +10,10 @@ import (
 )
 
 // TestRichTextInit verifies that RichText can be initialized correctly.
+// Init no longer takes a rectangle - rectangles are provided at Render() time.
 func TestRichTextInit(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
@@ -20,12 +21,7 @@ func TestRichTextInit(t *testing.T) {
 		t.Fatal("NewRichText() returned nil")
 	}
 
-	rt.Init(rect, display, font)
-
-	// Verify the full area is stored
-	if got := rt.All(); got != rect {
-		t.Errorf("All() = %v, want %v", got, rect)
-	}
+	rt.Init(display, font)
 
 	// Verify the frame was created and initialized
 	if rt.Frame() == nil {
@@ -36,16 +32,77 @@ func TestRichTextInit(t *testing.T) {
 	if rt.Display() != display {
 		t.Error("Display() does not match the initialized display")
 	}
+
+	// Before Render(), All() returns zero rect
+	if got := rt.All(); !got.Empty() {
+		t.Errorf("All() before Render() = %v, want empty rectangle", got)
+	}
+
+	// After Render(), All() returns the rendered rect
+	renderRect := image.Rect(0, 0, 400, 300)
+	rt.Render(renderRect)
+
+	if got := rt.All(); got != renderRect {
+		t.Errorf("All() after Render() = %v, want %v", got, renderRect)
+	}
+}
+
+// TestRichTextInitThenRender verifies the new Init/Render pattern works correctly.
+func TestRichTextInitThenRender(t *testing.T) {
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Set content before rendering
+	rt.SetContent(rich.Plain("hello world"))
+
+	// Clear any ops from init
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Now render into a specific rectangle
+	renderRect := image.Rect(50, 50, 350, 250)
+	rt.Render(renderRect)
+
+	// Verify draw operations occurred
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Error("Render() did not produce any draw operations")
+	}
+
+	// Verify rectangles are correct
+	if got := rt.All(); got != renderRect {
+		t.Errorf("All() = %v, want %v", got, renderRect)
+	}
+
+	scrollr := rt.ScrollRect()
+	if scrollr.Min.X != renderRect.Min.X {
+		t.Errorf("ScrollRect().Min.X = %d, want %d", scrollr.Min.X, renderRect.Min.X)
+	}
 }
 
 // TestRichTextScrollRect verifies that the scrollbar rectangle is calculated correctly.
 func TestRichTextScrollRect(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font)
+	rt.Init(display, font)
+
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Scrollbar should be on the left side of the full area
 	scrollr := rt.ScrollRect()
@@ -69,12 +126,15 @@ func TestRichTextScrollRect(t *testing.T) {
 
 // TestRichTextFrameRect verifies that the frame rectangle excludes the scrollbar.
 func TestRichTextFrameRect(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font)
+	rt.Init(display, font)
+
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	scrollr := rt.ScrollRect()
 	framer := rt.Frame().Rect()
@@ -94,14 +154,14 @@ func TestRichTextFrameRect(t *testing.T) {
 
 // TestRichTextSetContent verifies that content can be set and retrieved.
 func TestRichTextSetContent(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font)
+	rt.Init(display, font)
 
-	// Set content
+	// Set content (can be done before Render)
 	content := rich.Plain("hello world")
 	rt.SetContent(content)
 
@@ -114,12 +174,12 @@ func TestRichTextSetContent(t *testing.T) {
 
 // TestRichTextSelection verifies selection state management.
 func TestRichTextSelection(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font)
+	rt.Init(display, font)
 
 	rt.SetContent(rich.Plain("hello world"))
 
@@ -139,12 +199,12 @@ func TestRichTextSelection(t *testing.T) {
 
 // TestRichTextOrigin verifies origin (scroll position) management.
 func TestRichTextOrigin(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font)
+	rt.Init(display, font)
 
 	// Initial origin should be 0
 	if got := rt.Origin(); got != 0 {
@@ -160,8 +220,8 @@ func TestRichTextOrigin(t *testing.T) {
 
 // TestRichTextRedraw verifies that Redraw calls through to the frame.
 func TestRichTextRedraw(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	// Create background and text color images
@@ -177,14 +237,18 @@ func TestRichTextRedraw(t *testing.T) {
 	}
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 	)
 
 	rt.SetContent(rich.Plain("hello"))
 
-	// Clear any draw ops from init
+	// Render into a rectangle first
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
+
+	// Clear any draw ops from render
 	display.(edwoodtest.GettableDrawOps).Clear()
 
 	// Call Redraw
@@ -200,8 +264,8 @@ func TestRichTextRedraw(t *testing.T) {
 // TestScrollbarPosition tests that the scrollbar thumb is rendered at the correct position.
 func TestScrollbarPosition(t *testing.T) {
 	// Frame is 300 pixels tall, scrollbar is on the left
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	// Create colors for rendering
@@ -211,7 +275,7 @@ func TestScrollbarPosition(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -229,6 +293,10 @@ func TestScrollbarPosition(t *testing.T) {
 		content = append(content, rich.Plain("\n"+lines[i])...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Clear ops and redraw
 	display.(edwoodtest.GettableDrawOps).Clear()
@@ -255,8 +323,8 @@ func TestScrollbarPosition(t *testing.T) {
 
 // TestScrollbarThumbAtTop tests that the scrollbar thumb is at the top when origin is 0.
 func TestScrollbarThumbAtTop(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -265,7 +333,7 @@ func TestScrollbarThumbAtTop(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -280,6 +348,10 @@ func TestScrollbarThumbAtTop(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Origin at 0 (top)
 	rt.SetOrigin(0)
@@ -313,8 +385,8 @@ func TestScrollbarThumbAtTop(t *testing.T) {
 
 // TestScrollbarThumbAtBottom tests that the scrollbar thumb is at the bottom when scrolled to end.
 func TestScrollbarThumbAtBottom(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -323,7 +395,7 @@ func TestScrollbarThumbAtBottom(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -338,6 +410,10 @@ func TestScrollbarThumbAtBottom(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Set origin near the end (line 25 starts at rune position 5*25 = 125)
 	// Actually let's calculate: "line\n" repeated = 5 chars each
@@ -374,8 +450,8 @@ func TestScrollbarThumbAtBottom(t *testing.T) {
 
 // TestScrollbarThumbMiddle tests that the scrollbar thumb is in the middle when scrolled halfway.
 func TestScrollbarThumbMiddle(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -384,7 +460,7 @@ func TestScrollbarThumbMiddle(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -399,6 +475,10 @@ func TestScrollbarThumbMiddle(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Set origin to roughly halfway (line 15 = rune 75)
 	rt.SetOrigin(75)
@@ -438,8 +518,8 @@ func TestScrollbarThumbMiddle(t *testing.T) {
 
 // TestScrollbarNoContent tests that the scrollbar thumb fills the whole area when there's no content.
 func TestScrollbarNoContent(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -448,13 +528,17 @@ func TestScrollbarNoContent(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
 	)
 
 	// No content set
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	display.(edwoodtest.GettableDrawOps).Clear()
 	rt.Redraw()
@@ -471,8 +555,8 @@ func TestScrollbarNoContent(t *testing.T) {
 
 // TestScrollbarContentFits tests that the thumb fills the area when all content fits.
 func TestScrollbarContentFits(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -481,7 +565,7 @@ func TestScrollbarContentFits(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -489,6 +573,10 @@ func TestScrollbarContentFits(t *testing.T) {
 
 	// Content with just 3 lines - should fit (frame can show ~21 lines)
 	rt.SetContent(rich.Plain("line1\nline2\nline3"))
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	display.(edwoodtest.GettableDrawOps).Clear()
 	rt.Redraw()
@@ -513,8 +601,8 @@ func containsRect(op string, r image.Rectangle) bool {
 // TestScrollbarClickButton2 tests that middle-clicking on the scrollbar sets the origin
 // to an absolute position based on where the click occurred.
 func TestScrollbarClickButton2(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -523,7 +611,7 @@ func TestScrollbarClickButton2(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -538,6 +626,10 @@ func TestScrollbarClickButton2(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Initially at origin 0
 	rt.SetOrigin(0)
@@ -562,8 +654,8 @@ func TestScrollbarClickButton2(t *testing.T) {
 // TestScrollbarClickButton1 tests that left-clicking on the scrollbar scrolls up
 // (backs up content based on click position).
 func TestScrollbarClickButton1(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -572,7 +664,7 @@ func TestScrollbarClickButton1(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -587,6 +679,10 @@ func TestScrollbarClickButton1(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at line 15 (rune 75)
 	rt.SetOrigin(75)
@@ -608,8 +704,8 @@ func TestScrollbarClickButton1(t *testing.T) {
 // TestScrollbarClickButton3 tests that right-clicking on the scrollbar scrolls down
 // (advances content based on click position).
 func TestScrollbarClickButton3(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -618,7 +714,7 @@ func TestScrollbarClickButton3(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -633,6 +729,10 @@ func TestScrollbarClickButton3(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at origin 0
 	rt.SetOrigin(0)
@@ -654,8 +754,8 @@ func TestScrollbarClickButton3(t *testing.T) {
 // TestScrollbarClickAtTop tests that clicking at the very top of the scrollbar
 // with button 1 scrolls up minimally (or doesn't scroll if already at top).
 func TestScrollbarClickAtTop(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -664,7 +764,7 @@ func TestScrollbarClickAtTop(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -679,6 +779,10 @@ func TestScrollbarClickAtTop(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Already at origin 0
 	rt.SetOrigin(0)
@@ -697,8 +801,8 @@ func TestScrollbarClickAtTop(t *testing.T) {
 // TestScrollbarClickAtBottom tests that clicking at the bottom of the scrollbar
 // with button 3 advances to near the end of the content.
 func TestScrollbarClickAtBottom(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -707,7 +811,7 @@ func TestScrollbarClickAtBottom(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -722,6 +826,10 @@ func TestScrollbarClickAtBottom(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at origin 0
 	rt.SetOrigin(0)
@@ -742,8 +850,8 @@ func TestScrollbarClickAtBottom(t *testing.T) {
 // TestScrollbarClickNoContent tests that clicking the scrollbar with no content
 // returns origin 0.
 func TestScrollbarClickNoContent(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -752,13 +860,17 @@ func TestScrollbarClickNoContent(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
 	)
 
 	// No content set
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	scrollRect := rt.ScrollRect()
 	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
@@ -773,8 +885,8 @@ func TestScrollbarClickNoContent(t *testing.T) {
 // TestScrollbarClickContentFits tests that clicking the scrollbar when content fits
 // keeps origin at 0.
 func TestScrollbarClickContentFits(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -783,7 +895,7 @@ func TestScrollbarClickContentFits(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -791,6 +903,10 @@ func TestScrollbarClickContentFits(t *testing.T) {
 
 	// Content that fits (just 3 lines, frame can show ~21 lines)
 	rt.SetContent(rich.Plain("line1\nline2\nline3"))
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	scrollRect := rt.ScrollRect()
 	middleY := (scrollRect.Min.Y + scrollRect.Max.Y) / 2
@@ -804,8 +920,8 @@ func TestScrollbarClickContentFits(t *testing.T) {
 
 // TestMouseWheelScrollDown tests that scrolling down (button 5) increases the origin.
 func TestMouseWheelScrollDown(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -814,7 +930,7 @@ func TestMouseWheelScrollDown(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -829,6 +945,10 @@ func TestMouseWheelScrollDown(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at origin 0
 	rt.SetOrigin(0)
@@ -845,8 +965,8 @@ func TestMouseWheelScrollDown(t *testing.T) {
 
 // TestMouseWheelScrollUp tests that scrolling up (button 4) decreases the origin.
 func TestMouseWheelScrollUp(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -855,7 +975,7 @@ func TestMouseWheelScrollUp(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -870,6 +990,10 @@ func TestMouseWheelScrollUp(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at line 15 (rune 75)
 	rt.SetOrigin(75)
@@ -887,8 +1011,8 @@ func TestMouseWheelScrollUp(t *testing.T) {
 // TestMouseWheelScrollUpAtTop tests that scrolling up when already at origin 0
 // stays at origin 0.
 func TestMouseWheelScrollUpAtTop(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -897,7 +1021,7 @@ func TestMouseWheelScrollUpAtTop(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -912,6 +1036,10 @@ func TestMouseWheelScrollUpAtTop(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Already at origin 0
 	rt.SetOrigin(0)
@@ -928,8 +1056,8 @@ func TestMouseWheelScrollUpAtTop(t *testing.T) {
 // TestMouseWheelScrollDownAtBottom tests that scrolling down when already at the
 // end of content doesn't go past the last line.
 func TestMouseWheelScrollDownAtBottom(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -938,7 +1066,7 @@ func TestMouseWheelScrollDownAtBottom(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -954,6 +1082,10 @@ func TestMouseWheelScrollDownAtBottom(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Set origin to last line (line 29 starts at 5*29 = 145)
 	rt.SetOrigin(145)
@@ -976,8 +1108,8 @@ func TestMouseWheelScrollDownAtBottom(t *testing.T) {
 // TestMouseWheelScrollNoContent tests that scrolling with no content
 // returns origin 0.
 func TestMouseWheelScrollNoContent(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -986,13 +1118,17 @@ func TestMouseWheelScrollNoContent(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
 	)
 
 	// No content set
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Scroll down
 	newOrigin := rt.ScrollWheel(false)
@@ -1010,8 +1146,8 @@ func TestMouseWheelScrollNoContent(t *testing.T) {
 // TestMouseWheelScrollContentFits tests that scrolling when content fits in the view
 // keeps origin at 0.
 func TestMouseWheelScrollContentFits(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -1020,7 +1156,7 @@ func TestMouseWheelScrollContentFits(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -1028,6 +1164,10 @@ func TestMouseWheelScrollContentFits(t *testing.T) {
 
 	// Content with just 3 lines - should fit (frame can show ~21 lines)
 	rt.SetContent(rich.Plain("line1\nline2\nline3"))
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Scroll down - should stay at 0 because content fits
 	newOrigin := rt.ScrollWheel(false)
@@ -1045,8 +1185,8 @@ func TestMouseWheelScrollContentFits(t *testing.T) {
 // TestRichTextRender tests that the Render() method computes scrollbar/frame rects
 // from the passed rectangle and draws the content.
 func TestRichTextRender(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	// Create colors for rendering
@@ -1056,7 +1196,7 @@ func TestRichTextRender(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -1068,7 +1208,7 @@ func TestRichTextRender(t *testing.T) {
 	// Clear any draw ops from init
 	display.(edwoodtest.GettableDrawOps).Clear()
 
-	// Render into a different rectangle
+	// Render into a rectangle
 	newRect := image.Rect(50, 50, 350, 250)
 	rt.Render(newRect)
 
@@ -1108,8 +1248,8 @@ func TestRichTextRender(t *testing.T) {
 // TestRichTextRenderUpdatesLastRect tests that Render() updates the cached
 // rectangle used for hit-testing.
 func TestRichTextRenderUpdatesLastRect(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -1118,7 +1258,7 @@ func TestRichTextRenderUpdatesLastRect(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -1169,9 +1309,7 @@ func TestRichTextRenderDifferentRects(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	// Initial init with a rectangle
-	initialRect := image.Rect(0, 0, 400, 300)
-	rt.Init(initialRect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -1253,8 +1391,8 @@ func TestRichTextRenderDifferentRects(t *testing.T) {
 // TestMouseWheelScrollMultipleScrolls tests that multiple scroll wheel events
 // accumulate correctly.
 func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
-	rect := image.Rect(0, 0, 400, 300)
-	display := edwoodtest.NewDisplay(rect)
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
 	font := edwoodtest.NewFont(10, 14)
 
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
@@ -1263,7 +1401,7 @@ func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	rt := NewRichText()
-	rt.Init(rect, display, font,
+	rt.Init(display, font,
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
 		WithScrollbarColors(scrBg, scrThumb),
@@ -1278,6 +1416,10 @@ func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
 		content = append(content, rich.Plain("line")...)
 	}
 	rt.SetContent(content)
+
+	// Render into a specific rectangle
+	rect := image.Rect(0, 0, 400, 300)
+	rt.Render(rect)
 
 	// Start at origin 0
 	rt.SetOrigin(0)
