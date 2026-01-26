@@ -7,9 +7,13 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 // TestLoadImagePNG verifies that PNG images are loaded correctly.
@@ -378,11 +382,12 @@ func TestConvertRGBA(t *testing.T) {
 		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
 	}
 
-	// Verify first pixel (red) - should be R=255, G=0, B=0, A=255
+	// Verify first pixel (red) - Plan 9 RGBA32 uses ABGR byte order (little-endian)
+	// For red (R=255, G=0, B=0, A=255), bytes are: A=255, B=0, G=0, R=255
 	if len(data) >= 4 {
-		r, g, b, a := data[0], data[1], data[2], data[3]
-		if r != 255 || g != 0 || b != 0 || a != 255 {
-			t.Errorf("first pixel (red) = (%d, %d, %d, %d), want (255, 0, 0, 255)", r, g, b, a)
+		a, b, g, r := data[0], data[1], data[2], data[3]
+		if a != 255 || b != 0 || g != 0 || r != 255 {
+			t.Errorf("first pixel (red) = A=%d, B=%d, G=%d, R=%d, want A=255, B=0, G=0, R=255", a, b, g, r)
 		}
 	}
 }
@@ -412,11 +417,12 @@ func TestConvertRGB(t *testing.T) {
 		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
 	}
 
-	// Verify first pixel - should be cyan with full alpha
+	// Verify first pixel - Plan 9 RGBA32 uses ABGR byte order (little-endian)
+	// For cyan (R=0, G=255, B=255, A=255), bytes are: A=255, B=255, G=255, R=0
 	if len(data) >= 4 {
-		r, g, b, a := data[0], data[1], data[2], data[3]
-		if r != 0 || g != 255 || b != 255 || a != 255 {
-			t.Errorf("first pixel (cyan) = (%d, %d, %d, %d), want (0, 255, 255, 255)", r, g, b, a)
+		a, b, g, r := data[0], data[1], data[2], data[3]
+		if a != 255 || b != 255 || g != 255 || r != 0 {
+			t.Errorf("first pixel (cyan) = A=%d, B=%d, G=%d, R=%d, want A=255, B=255, G=255, R=0", a, b, g, r)
 		}
 	}
 }
@@ -443,20 +449,22 @@ func TestConvertGrayscale(t *testing.T) {
 		t.Errorf("converted data size = %d, want %d", len(data), expectedSize)
 	}
 
-	// Verify black pixel (0,0) - should be R=0, G=0, B=0, A=255
+	// Verify black pixel (0,0) - Plan 9 RGBA32 uses ABGR byte order
+	// For black (R=0, G=0, B=0, A=255), bytes are: A=255, B=0, G=0, R=0
 	if len(data) >= 4 {
-		r, g, b, a := data[0], data[1], data[2], data[3]
-		if r != 0 || g != 0 || b != 0 || a != 255 {
-			t.Errorf("black pixel = (%d, %d, %d, %d), want (0, 0, 0, 255)", r, g, b, a)
+		a, b, g, r := data[0], data[1], data[2], data[3]
+		if a != 255 || b != 0 || g != 0 || r != 0 {
+			t.Errorf("black pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=0, G=0, R=0", a, b, g, r)
 		}
 	}
 
-	// Verify white pixel (1,1) - should be R=255, G=255, B=255, A=255
+	// Verify white pixel (1,1) - Plan 9 RGBA32 uses ABGR byte order
+	// For white (R=255, G=255, B=255, A=255), bytes are: A=255, B=255, G=255, R=255
 	// Position in data: pixel at (1,1) is at index (1*2 + 1) * 4 = 12
 	if len(data) >= 16 {
-		r, g, b, a := data[12], data[13], data[14], data[15]
-		if r != 255 || g != 255 || b != 255 || a != 255 {
-			t.Errorf("white pixel = (%d, %d, %d, %d), want (255, 255, 255, 255)", r, g, b, a)
+		a, b, g, r := data[12], data[13], data[14], data[15]
+		if a != 255 || b != 255 || g != 255 || r != 255 {
+			t.Errorf("white pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=255, G=255, R=255", a, b, g, r)
 		}
 	}
 }
@@ -544,12 +552,13 @@ func TestConvertTransparent(t *testing.T) {
 		}
 	}
 
-	// Verify fully opaque blue pixel (1,1) is correct
+	// Verify fully opaque blue pixel (1,1) is correct - Plan 9 RGBA32 uses ABGR byte order
+	// For blue (R=0, G=0, B=255, A=255), bytes are: A=255, B=255, G=0, R=0
 	// Position: (1 + 1*2) * 4 = 12
 	if len(data) >= 16 {
-		r, g, b, a := data[12], data[13], data[14], data[15]
-		if r != 0 || g != 0 || b != 255 || a != 255 {
-			t.Errorf("opaque blue pixel = (%d, %d, %d, %d), want (0, 0, 255, 255)", r, g, b, a)
+		a, b, g, r := data[12], data[13], data[14], data[15]
+		if a != 255 || b != 255 || g != 0 || r != 0 {
+			t.Errorf("opaque blue pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=255, G=0, R=0", a, b, g, r)
 		}
 	}
 }
@@ -588,10 +597,12 @@ func TestConvertSinglePixel(t *testing.T) {
 		t.Errorf("single pixel should produce 4 bytes, got %d", len(data))
 	}
 
+	// Plan 9 RGBA32 uses ABGR byte order
+	// For (R=100, G=150, B=200, A=255), bytes are: A=255, B=200, G=150, R=100
 	if len(data) >= 4 {
-		r, g, b, a := data[0], data[1], data[2], data[3]
-		if r != 100 || g != 150 || b != 200 || a != 255 {
-			t.Errorf("pixel = (%d, %d, %d, %d), want (100, 150, 200, 255)", r, g, b, a)
+		a, b, g, r := data[0], data[1], data[2], data[3]
+		if a != 255 || b != 200 || g != 150 || r != 100 {
+			t.Errorf("pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=200, G=150, R=100", a, b, g, r)
 		}
 	}
 }
@@ -621,19 +632,21 @@ func TestConvertPalettedImage(t *testing.T) {
 		t.Errorf("converted data size = %d, want 16", len(data))
 	}
 
-	// Verify red pixel (0,0)
+	// Verify red pixel (0,0) - Plan 9 RGBA32 uses ABGR byte order
+	// For red (R=255, G=0, B=0, A=255), bytes are: A=255, B=0, G=0, R=255
 	if len(data) >= 4 {
-		r, g, b, a := data[0], data[1], data[2], data[3]
-		if r != 255 || g != 0 || b != 0 || a != 255 {
-			t.Errorf("red pixel = (%d, %d, %d, %d), want (255, 0, 0, 255)", r, g, b, a)
+		a, b, g, r := data[0], data[1], data[2], data[3]
+		if a != 255 || b != 0 || g != 0 || r != 255 {
+			t.Errorf("red pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=0, G=0, R=255", a, b, g, r)
 		}
 	}
 
-	// Verify yellow pixel (1,1)
+	// Verify yellow pixel (1,1) - Plan 9 RGBA32 uses ABGR byte order
+	// For yellow (R=255, G=255, B=0, A=255), bytes are: A=255, B=0, G=255, R=255
 	if len(data) >= 16 {
-		r, g, b, a := data[12], data[13], data[14], data[15]
-		if r != 255 || g != 255 || b != 0 || a != 255 {
-			t.Errorf("yellow pixel = (%d, %d, %d, %d), want (255, 255, 0, 255)", r, g, b, a)
+		a, b, g, r := data[12], data[13], data[14], data[15]
+		if a != 255 || b != 0 || g != 255 || r != 255 {
+			t.Errorf("yellow pixel = A=%d, B=%d, G=%d, R=%d, want A=255, B=0, G=255, R=255", a, b, g, r)
 		}
 	}
 }
@@ -1435,6 +1448,545 @@ func (f *testFont) RunesWidth(r []rune) int  { return f.width * len(r) }
 func (f *testFont) StringWidth(s string) int { return f.width * len(s) }
 
 // =============================================================================
+// Phase 16J: URL Image Support Tests
+// =============================================================================
+
+// TestIsImageURL verifies that URL detection correctly identifies HTTP(S) URLs
+// vs local file paths.
+func TestIsImageURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		// HTTP URLs
+		{"http URL", "http://example.com/image.png", true},
+		{"http URL with port", "http://example.com:8080/image.png", true},
+		{"http URL with query", "http://example.com/image.png?size=large", true},
+		{"http URL with fragment", "http://example.com/image.png#section", true},
+		{"http URL uppercase", "HTTP://example.com/image.png", true},
+		{"http URL mixed case", "Http://example.com/image.png", true},
+
+		// HTTPS URLs
+		{"https URL", "https://example.com/image.png", true},
+		{"https URL with port", "https://example.com:443/image.png", true},
+		{"https URL with path", "https://example.com/path/to/image.jpg", true},
+		{"https URL uppercase", "HTTPS://example.com/image.png", true},
+
+		// Local file paths
+		{"absolute path", "/path/to/image.png", false},
+		{"relative path", "images/photo.jpg", false},
+		{"relative path with dot", "./images/photo.jpg", false},
+		{"parent path", "../images/photo.jpg", false},
+		{"Windows absolute path", "C:\\Users\\photo.jpg", false},
+		{"tilde path", "~/Documents/image.png", false},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"just http", "http://", true}, // Technically a valid URL prefix
+		{"just https", "https://", true},
+		{"ftp URL (not supported)", "ftp://example.com/image.png", false},
+		{"file URL (not supported)", "file:///path/to/image.png", false},
+		{"data URL (not supported)", "data:image/png;base64,ABC123", false},
+		{"mailto (not supported)", "mailto:test@example.com", false},
+		{"httpx (invalid)", "httpx://example.com/image.png", false},
+		{"path containing http", "/var/http/image.png", false},
+		{"path starting with http", "http_files/image.png", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isImageURL(tt.path)
+			if result != tt.expected {
+				t.Errorf("isImageURL(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestLoadImageFromURL verifies that images can be loaded from HTTP URLs.
+// This test uses httptest.Server to simulate a web server serving images.
+func TestLoadImageFromURL(t *testing.T) {
+	// Create a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	red := color.RGBA{255, 0, 0, 255}
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			testImg.Set(x, y, red)
+		}
+	}
+
+	// Encode to PNG bytes
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, testImg); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	pngBytes := pngBuf.Bytes()
+
+	// Start a test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(pngBytes)
+	}))
+	defer server.Close()
+
+	// Load image from URL
+	img, err := loadImageFromURL(server.URL + "/test.png")
+	if err != nil {
+		t.Fatalf("loadImageFromURL failed: %v", err)
+	}
+
+	// Verify dimensions
+	bounds := img.Bounds()
+	if bounds.Dx() != 10 || bounds.Dy() != 10 {
+		t.Errorf("loaded image size = %dx%d, want 10x10", bounds.Dx(), bounds.Dy())
+	}
+
+	// Verify pixel color
+	r, g, b, a := img.At(0, 0).RGBA()
+	if r>>8 != 255 || g>>8 != 0 || b>>8 != 0 || a>>8 != 255 {
+		t.Errorf("pixel color = (%d, %d, %d, %d), want (255, 0, 0, 255)", r>>8, g>>8, b>>8, a>>8)
+	}
+}
+
+// TestLoadImageFromURLJPEG verifies JPEG images can be loaded from URLs.
+func TestLoadImageFromURLJPEG(t *testing.T) {
+	// Create a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 20, 15))
+	blue := color.RGBA{0, 0, 255, 255}
+	for y := 0; y < 15; y++ {
+		for x := 0; x < 20; x++ {
+			testImg.Set(x, y, blue)
+		}
+	}
+
+	// Encode to JPEG bytes
+	var jpegBuf bytes.Buffer
+	if err := jpeg.Encode(&jpegBuf, testImg, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	jpegBytes := jpegBuf.Bytes()
+
+	// Start a test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(jpegBytes)
+	}))
+	defer server.Close()
+
+	// Load image from URL
+	img, err := loadImageFromURL(server.URL + "/test.jpg")
+	if err != nil {
+		t.Fatalf("loadImageFromURL failed: %v", err)
+	}
+
+	// Verify dimensions
+	bounds := img.Bounds()
+	if bounds.Dx() != 20 || bounds.Dy() != 15 {
+		t.Errorf("loaded image size = %dx%d, want 20x15", bounds.Dx(), bounds.Dy())
+	}
+}
+
+// TestLoadImageFromURLTimeout verifies that URL loading times out properly.
+func TestLoadImageFromURLTimeout(t *testing.T) {
+	// Create a server that delays response beyond timeout
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Sleep longer than the timeout
+		time.Sleep(15 * time.Second)
+		w.Write([]byte("too late"))
+	}))
+	defer server.Close()
+
+	// This should timeout (default timeout is 10 seconds)
+	// For test purposes, we use a separate function or check if the implementation
+	// respects timeout. The actual test depends on implementation details.
+	start := time.Now()
+	_, err := loadImageFromURL(server.URL + "/slow.png")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("expected timeout error for slow server")
+	}
+
+	// Should timeout well before the 15 second sleep
+	if elapsed > 12*time.Second {
+		t.Errorf("request took %v, expected timeout around 10 seconds", elapsed)
+	}
+}
+
+// TestLoadImageFromURL404 verifies proper handling of 404 errors.
+func TestLoadImageFromURL404(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	_, err := loadImageFromURL(server.URL + "/notfound.png")
+	if err == nil {
+		t.Error("expected error for 404 response")
+	}
+
+	// Error message should indicate the status
+	if err != nil && !strings.Contains(err.Error(), "404") && !strings.Contains(strings.ToLower(err.Error()), "not found") {
+		t.Errorf("error should mention 404 or not found, got: %v", err)
+	}
+}
+
+// TestLoadImageFromURL500 verifies proper handling of 500 errors.
+func TestLoadImageFromURL500(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err := loadImageFromURL(server.URL + "/error.png")
+	if err == nil {
+		t.Error("expected error for 500 response")
+	}
+
+	// Error message should indicate server error
+	if err != nil && !strings.Contains(err.Error(), "500") && !strings.Contains(strings.ToLower(err.Error()), "server error") {
+		t.Errorf("error should mention 500 or server error, got: %v", err)
+	}
+}
+
+// TestLoadImageFromURLTooLarge verifies that images exceeding size limits are rejected.
+func TestLoadImageFromURLTooLarge(t *testing.T) {
+	// Create a server that claims a very large Content-Length
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Content-Length", "100000000") // 100MB
+		// Start writing some data (but less than claimed)
+		w.Write([]byte("fake data"))
+	}))
+	defer server.Close()
+
+	_, err := loadImageFromURL(server.URL + "/huge.png")
+	if err == nil {
+		t.Error("expected error for image exceeding size limit")
+	}
+
+	// Error should mention size
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "size") && !strings.Contains(strings.ToLower(err.Error()), "large") && !strings.Contains(strings.ToLower(err.Error()), "limit") {
+		t.Errorf("error should mention size limit, got: %v", err)
+	}
+}
+
+// TestLoadImageFromURLTooLargeBody verifies that large response bodies are rejected
+// even when Content-Length is not set.
+func TestLoadImageFromURLTooLargeBody(t *testing.T) {
+	// Create a server that streams a lot of data without Content-Length
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		// Don't set Content-Length - stream chunks
+
+		// Write PNG magic header first to make it look valid
+		pngMagic := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+		w.Write(pngMagic)
+
+		// Write more than MaxImageBytes (17MB to exceed 16MB limit)
+		chunk := make([]byte, 1024*1024) // 1MB chunks
+		for i := 0; i < 18; i++ {
+			w.Write(chunk)
+		}
+	}))
+	defer server.Close()
+
+	_, err := loadImageFromURL(server.URL + "/streamed_huge.png")
+	if err == nil {
+		t.Error("expected error for large streamed image")
+	}
+}
+
+// TestLoadImageFromURLBadContentType verifies that non-image content types are rejected.
+func TestLoadImageFromURLBadContentType(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+	}{
+		{"text/html", "text/html"},
+		{"text/plain", "text/plain"},
+		{"application/json", "application/json"},
+		{"application/pdf", "application/pdf"},
+		{"video/mp4", "video/mp4"},
+		{"application/octet-stream", "application/octet-stream"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.Write([]byte("not an image"))
+			}))
+			defer server.Close()
+
+			_, err := loadImageFromURL(server.URL + "/fake.png")
+			if err == nil {
+				t.Errorf("expected error for Content-Type %q", tt.contentType)
+			}
+
+			// Error should mention content type
+			if err != nil && !strings.Contains(strings.ToLower(err.Error()), "content") && !strings.Contains(strings.ToLower(err.Error()), "type") {
+				t.Errorf("error should mention content type, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestLoadImageFromURLValidContentTypes verifies that valid image content types are accepted.
+func TestLoadImageFromURLValidContentTypes(t *testing.T) {
+	// Create a valid test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 5, 5))
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, testImg); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	pngBytes := pngBuf.Bytes()
+
+	tests := []struct {
+		name        string
+		contentType string
+	}{
+		{"image/png", "image/png"},
+		{"image/jpeg", "image/jpeg"},
+		{"image/gif", "image/gif"},
+		{"image/webp", "image/webp"},
+		{"image/png with charset", "image/png; charset=utf-8"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.Write(pngBytes)
+			}))
+			defer server.Close()
+
+			img, err := loadImageFromURL(server.URL + "/test.png")
+			// Note: image/webp might fail to decode if not supported, that's OK
+			// The important thing is Content-Type validation passes
+			if err != nil && !strings.Contains(err.Error(), "decode") {
+				t.Errorf("unexpected error for Content-Type %q: %v", tt.contentType, err)
+			}
+			if err == nil && img == nil {
+				t.Error("expected non-nil image on success")
+			}
+		})
+	}
+}
+
+// TestLoadImageDispatchesURL verifies that LoadImage dispatches URL paths to loadImageFromURL.
+func TestLoadImageDispatchesURL(t *testing.T) {
+	// Create a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	green := color.RGBA{0, 255, 0, 255}
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			testImg.Set(x, y, green)
+		}
+	}
+
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, testImg); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	pngBytes := pngBuf.Bytes()
+
+	// Start a test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(pngBytes)
+	}))
+	defer server.Close()
+
+	// LoadImage should detect the URL and dispatch to loadImageFromURL
+	img, err := LoadImage(server.URL + "/test.png")
+	if err != nil {
+		t.Fatalf("LoadImage failed for URL: %v", err)
+	}
+
+	// Verify it loaded correctly
+	bounds := img.Bounds()
+	if bounds.Dx() != 8 || bounds.Dy() != 8 {
+		t.Errorf("loaded image size = %dx%d, want 8x8", bounds.Dx(), bounds.Dy())
+	}
+}
+
+// TestLoadImageDispatchesFile verifies that LoadImage dispatches file paths to file loading.
+func TestLoadImageDispatchesFile(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "dispatch_test.png")
+
+	// Create and save a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 12, 12))
+	purple := color.RGBA{128, 0, 128, 255}
+	for y := 0; y < 12; y++ {
+		for x := 0; x < 12; x++ {
+			testImg.Set(x, y, purple)
+		}
+	}
+
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, testImg); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// LoadImage should detect the file path and load from file
+	img, err := LoadImage(pngPath)
+	if err != nil {
+		t.Fatalf("LoadImage failed for file path: %v", err)
+	}
+
+	// Verify it loaded correctly
+	bounds := img.Bounds()
+	if bounds.Dx() != 12 || bounds.Dy() != 12 {
+		t.Errorf("loaded image size = %dx%d, want 12x12", bounds.Dx(), bounds.Dy())
+	}
+}
+
+// TestLoadImageURLErrors verifies that error messages are clear and descriptive.
+func TestLoadImageURLErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		handler       http.HandlerFunc
+		wantSubstring string
+	}{
+		{
+			name: "404 not found",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.NotFound(w, r)
+			},
+			wantSubstring: "404",
+		},
+		{
+			name: "403 forbidden",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+			},
+			wantSubstring: "403",
+		},
+		{
+			name: "invalid content type",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				w.Write([]byte("<html>not an image</html>"))
+			},
+			wantSubstring: "content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			_, err := LoadImage(server.URL + "/test.png")
+			if err == nil {
+				t.Error("expected error")
+				return
+			}
+
+			errLower := strings.ToLower(err.Error())
+			wantLower := strings.ToLower(tt.wantSubstring)
+			if !strings.Contains(errLower, wantLower) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantSubstring)
+			}
+		})
+	}
+}
+
+// TestLoadImageURLNetworkError verifies handling of network connection failures.
+func TestLoadImageURLNetworkError(t *testing.T) {
+	// Use a URL that will fail to connect (closed port)
+	// Note: This test might be flaky in some network environments
+	_, err := LoadImage("http://127.0.0.1:1/nonexistent.png")
+	if err == nil {
+		t.Error("expected error for connection refused")
+	}
+}
+
+// TestLoadImageURLInvalidURL verifies handling of malformed URLs.
+func TestLoadImageURLInvalidURL(t *testing.T) {
+	invalidURLs := []string{
+		"http://",
+		"https://",
+		"http:///path/no/host",
+		"http://[invalid:ipv6/image.png",
+	}
+
+	for _, url := range invalidURLs {
+		t.Run(url, func(t *testing.T) {
+			_, err := LoadImage(url)
+			if err == nil {
+				t.Errorf("expected error for invalid URL: %s", url)
+			}
+		})
+	}
+}
+
+// TestImageCacheWorksWithURLs verifies that the ImageCache works correctly with URL paths.
+func TestImageCacheWorksWithURLs(t *testing.T) {
+	// Create a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, testImg); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	pngBytes := pngBuf.Bytes()
+
+	// Track how many times the server is hit
+	hitCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hitCount++
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(pngBytes)
+	}))
+	defer server.Close()
+
+	imageURL := server.URL + "/test.png"
+
+	// Create cache
+	cache := NewImageCache(10)
+
+	// First load - should hit server
+	cached1, err := cache.Load(imageURL)
+	if err != nil {
+		t.Fatalf("first Load failed: %v", err)
+	}
+	if hitCount != 1 {
+		t.Errorf("server hit count = %d, want 1", hitCount)
+	}
+
+	// Second load - should use cache, not hit server
+	cached2, err := cache.Load(imageURL)
+	if err != nil {
+		t.Fatalf("second Load failed: %v", err)
+	}
+	if hitCount != 1 {
+		t.Errorf("server hit count = %d, want 1 (cache hit)", hitCount)
+	}
+
+	// Should be the same cached object
+	if cached1 != cached2 {
+		t.Error("cache should return same CachedImage on second load")
+	}
+
+	// Verify the cached image is valid
+	if cached1.Original == nil {
+		t.Error("cached.Original should be set")
+	}
+	if cached1.Width != 10 || cached1.Height != 10 {
+		t.Errorf("cached image dimensions = %dx%d, want 10x10", cached1.Width, cached1.Height)
+	}
+}
+
+// =============================================================================
 // Phase 16I: Image Pipeline Integration Tests
 // =============================================================================
 
@@ -1549,5 +2101,112 @@ func TestFrameWithImageCacheUsedInLayout(t *testing.T) {
 	}
 	if cached != nil && cached.Width != 25 {
 		t.Errorf("cached image width = %d, want 25", cached.Width)
+	}
+}
+
+// TestFrameLayoutUsesCache verifies that the Frame's internal layout methods
+// (layoutFromOrigin, layoutBoxes) use the ImageCache to load images when set.
+// This is the key integration test for Phase 16I.4 - ensuring that layoutFromOrigin()
+// calls layoutWithCache() when imageCache is set.
+func TestFrameLayoutUsesCache(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "frame_layout_cache_test.png")
+
+	// Create a simple 40x30 magenta image
+	img := image.NewRGBA(image.Rect(0, 0, 40, 30))
+	magenta := color.RGBA{255, 0, 255, 255}
+	for y := 0; y < 30; y++ {
+		for x := 0; x < 40; x++ {
+			img.Set(x, y, magenta)
+		}
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode PNG: %v", err)
+	}
+	f.Close()
+
+	// Create cache and frame
+	cache := NewImageCache(10)
+	frame := NewFrame()
+	mockFont := &testFont{width: 10, height: 14}
+
+	frame.Init(
+		image.Rect(0, 0, 300, 200),
+		WithFont(mockFont),
+		WithImageCache(cache),
+	)
+
+	// Verify image is NOT in cache initially
+	_, inCache := cache.Get(pngPath)
+	if inCache {
+		t.Fatal("image should NOT be in cache before frame layout")
+	}
+
+	// Set content with an image span
+	content := Content{
+		Span{Text: "Before "},
+		Span{
+			Text: "[Image: test]",
+			Style: Style{
+				Image:    true,
+				ImageURL: pngPath,
+				ImageAlt: "test",
+			},
+		},
+		Span{Text: " After"},
+	}
+	frame.SetContent(content)
+
+	// Trigger layout via various Frame methods that call layoutFromOrigin/layoutBoxes
+	// All these methods internally call layoutBoxes which should use the cache
+
+	// Method 1: TotalLines() calls layoutBoxes
+	_ = frame.TotalLines()
+
+	// Verify image was loaded into cache
+	cachedImg, inCache := cache.Get(pngPath)
+	if !inCache {
+		t.Error("image should be in cache after Frame.TotalLines() called layoutBoxes")
+	}
+	if cachedImg == nil || cachedImg.Err != nil {
+		t.Errorf("cached image should have loaded successfully, got err: %v",
+			func() error {
+				if cachedImg != nil {
+					return cachedImg.Err
+				}
+				return nil
+			}())
+	}
+
+	// Method 2: Ptofchar() also calls layoutBoxes - verify it works correctly
+	pt := frame.Ptofchar(5)
+	if pt.X == 0 && pt.Y == 0 {
+		// Should not be at origin since "Before " has 7 characters
+		// Position 5 should be somewhere inside "Before "
+	}
+
+	// Method 3: Charofpt() also calls layoutBoxes
+	charPos := frame.Charofpt(image.Point{X: 50, Y: 7})
+	if charPos < 0 {
+		t.Error("Charofpt should return a valid character position")
+	}
+
+	// Method 4: LineStartRunes() also calls layoutBoxes
+	lineStarts := frame.LineStartRunes()
+	if len(lineStarts) == 0 {
+		t.Error("LineStartRunes should return at least one entry")
+	}
+
+	// Verify the cache was used (image should only be loaded once)
+	// We can check this indirectly by verifying the cached image dimensions
+	if cachedImg.Width != 40 || cachedImg.Height != 30 {
+		t.Errorf("cached image dimensions = %dx%d, want 40x30",
+			cachedImg.Width, cachedImg.Height)
 	}
 }

@@ -7,7 +7,10 @@ import (
 	_ "image/gif"  // Register GIF decoder
 	_ "image/jpeg" // Register JPEG decoder
 	_ "image/png"  // Register PNG decoder
+	"io"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,11 +22,97 @@ const (
 	MaxImageBytes  = 16 * 1024 * 1024  // 16MB uncompressed (RGBA at 4 bytes/pixel)
 )
 
-// LoadImage loads an image from a file path.
+// URLImageTimeout is the maximum time to wait for URL image downloads.
+const URLImageTimeout = 10 * time.Second
+
+// isImageURL returns true if path is an HTTP or HTTPS URL.
+// Only http:// and https:// schemes are supported for security reasons.
+func isImageURL(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
+// loadImageFromURL fetches an image from an HTTP(S) URL.
+// It enforces timeout, size limits, and content-type validation.
+func loadImageFromURL(url string) (image.Image, error) {
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: URLImageTimeout,
+	}
+
+	// Make the request
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned HTTP %d: %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
+	// Validate Content-Type
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" {
+		// Extract media type (ignore parameters like charset)
+		mediaType := strings.TrimSpace(strings.Split(contentType, ";")[0])
+		if !strings.HasPrefix(mediaType, "image/") {
+			return nil, fmt.Errorf("invalid content type: expected image/*, got %q", contentType)
+		}
+	}
+
+	// Check Content-Length if provided
+	if resp.ContentLength > int64(MaxImageBytes) {
+		return nil, fmt.Errorf("image too large: %d bytes exceeds limit of %d bytes", resp.ContentLength, MaxImageBytes)
+	}
+
+	// Use LimitReader to prevent reading more than MaxImageBytes
+	limitedReader := io.LimitReader(resp.Body, int64(MaxImageBytes)+1)
+
+	// Decode the image
+	img, _, err := image.Decode(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Validate image dimensions
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	if width > MaxImageWidth || height > MaxImageHeight {
+		return nil, fmt.Errorf("image too large: %dx%d (max %dx%d)",
+			width, height, MaxImageWidth, MaxImageHeight)
+	}
+
+	// Check uncompressed size
+	uncompressedSize := width * height * 4
+	if uncompressedSize > MaxImageBytes {
+		return nil, fmt.Errorf("image uncompressed size exceeds limit: %d bytes (max %d bytes)",
+			uncompressedSize, MaxImageBytes)
+	}
+
+	return img, nil
+}
+
+// LoadImage loads an image from a file path or URL.
 // Supports PNG, JPEG, and GIF (first frame only for GIF).
+// For URLs, only http:// and https:// schemes are supported.
 // Returns the decoded image or an error if the file cannot be read,
 // the format is not supported, or the image exceeds size limits.
 func LoadImage(path string) (image.Image, error) {
+	// Check if this is a URL
+	if isImageURL(path) {
+		return loadImageFromURL(path)
+	}
+
+	// Load from local file
+	return loadImageFromFile(path)
+}
+
+// loadImageFromFile loads an image from a local file path.
+func loadImageFromFile(path string) (image.Image, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open image file: %w", err)
@@ -58,7 +147,8 @@ func LoadImage(path string) (image.Image, error) {
 
 // ConvertToPlan9 converts a Go image.Image to Plan 9 RGBA32 pixel data.
 // The returned byte slice contains pixels in row-major order, with each
-// pixel being 4 bytes: R, G, B, A (pre-multiplied alpha).
+// pixel being 4 bytes in ABGR order (little-endian RGBA32):
+// byte[0]=A, byte[1]=B, byte[2]=G, byte[3]=R.
 //
 // Plan 9's draw model uses pre-multiplied alpha, meaning RGB values are
 // multiplied by the alpha value. For example, a 50% transparent red
@@ -100,13 +190,13 @@ func ConvertToPlan9(img image.Image) ([]byte, error) {
 				data[i+2] = 0
 				data[i+3] = 0
 			} else {
-				// Pre-multiply RGB by alpha
+				// Plan 9 RGBA32 uses little-endian byte order (ABGR in memory).
 				// Note: RGBA() already returns pre-multiplied values for most image types
-				// but we convert from 16-bit to 8-bit here
-				data[i] = uint8(r32 >> 8)
-				data[i+1] = uint8(g32 >> 8)
-				data[i+2] = uint8(b32 >> 8)
-				data[i+3] = a
+				// so we just convert from 16-bit to 8-bit here.
+				data[i] = a                  // byte 0: Alpha
+				data[i+1] = uint8(b32 >> 8)  // byte 1: Blue
+				data[i+2] = uint8(g32 >> 8)  // byte 2: Green
+				data[i+3] = uint8(r32 >> 8)  // byte 3: Red
 			}
 			i += 4
 		}
