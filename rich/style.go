@@ -19,6 +19,13 @@ type Style struct {
 	// Layout hints
 	ParaBreak bool // Paragraph break - adds extra vertical spacing
 
+	// List formatting
+	ListItem    bool // This span is a list item
+	ListBullet  bool // This span is a list bullet/number marker
+	ListIndent  int  // Indentation level (0 = top level)
+	ListOrdered bool // true for ordered lists, false for unordered
+	ListNumber  int  // For ordered lists, the item number
+
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
 	Scale float64
