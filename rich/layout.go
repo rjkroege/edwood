@@ -24,9 +24,21 @@ func contentToBoxes(c Content) []Box {
 
 // appendSpanBoxes appends boxes from a single span to the slice.
 // It splits the span text on newlines, tabs, and spaces to enable word wrapping.
+// Image spans are kept as a single box without splitting.
 func appendSpanBoxes(boxes []Box, span Span) []Box {
 	text := span.Text
 	style := span.Style
+
+	// Image spans should be kept as a single box without splitting
+	if style.Image {
+		boxes = append(boxes, Box{
+			Text:  []byte(text),
+			Nrune: utf8.RuneCountInString(text),
+			Bc:    0,
+			Style: style,
+		})
+		return boxes
+	}
 
 	for len(text) > 0 {
 		// Find the next break character (newline, tab, or space)
@@ -91,9 +103,14 @@ func appendSpanBoxes(boxes []Box, span Span) []Box {
 // boxWidth calculates the width of a box in pixels using font metrics.
 // For text boxes, it measures the text width using the font.
 // For newline and tab boxes, it returns 0 (tabs are handled separately by tabBoxWidth).
+// For image boxes with ImageData, returns the image width (not scaled).
 func boxWidth(box *Box, font draw.Font) int {
 	if box.IsNewline() || box.IsTab() {
 		return 0
+	}
+	// For image boxes with ImageData, return the image width
+	if box.IsImage() {
+		return box.ImageData.Width
 	}
 	if len(box.Text) == 0 {
 		return 0
@@ -138,6 +155,27 @@ type FontForStyleFunc func(style Style) draw.Font
 // This is approximately 2 characters wide.
 const ListIndentWidth = 20
 
+// imageBoxDimensions calculates the width and height for an image box,
+// scaling down if the image is wider than maxWidth.
+// Returns (0, 0) if the box is not an image with ImageData.
+func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
+	if !box.IsImage() {
+		return 0, 0
+	}
+
+	imgWidth := box.ImageData.Width
+	imgHeight := box.ImageData.Height
+
+	// If image fits within maxWidth, use original dimensions
+	if imgWidth <= maxWidth {
+		return imgWidth, imgHeight
+	}
+
+	// Scale down proportionally to fit within maxWidth
+	scale := float64(maxWidth) / float64(imgWidth)
+	return maxWidth, int(float64(imgHeight) * scale)
+}
+
 // layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
 // It computes the Wid field for each box and assigns X/Y positions.
 // The returned Lines contain positioned boxes ready for rendering.
@@ -179,6 +217,15 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 
 		// Update line height if this box uses a taller font
 		boxHeight := getFontHeight(box.Style)
+
+		// For image boxes with ImageData, use the image's scaled height
+		if box.IsImage() {
+			_, imgHeight := imageBoxDimensions(box, frameWidth)
+			if imgHeight > boxHeight {
+				boxHeight = imgHeight
+			}
+		}
+
 		if boxHeight > currentLine.Height {
 			currentLine.Height = boxHeight
 		}
@@ -234,6 +281,9 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		var width int
 		if box.IsTab() {
 			width = tabBoxWidth(box, xPos, 0, maxtab)
+		} else if box.IsImage() {
+			// For image boxes, use scaled dimensions
+			width, _ = imageBoxDimensions(box, frameWidth)
 		} else {
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
@@ -396,4 +446,13 @@ func fitBytes(text []byte, font draw.Font, maxWidth int) (bytesCount int, width 
 		i += runeLen
 	}
 	return bytesCount, totalWidth
+}
+
+// layoutWithCache is like layout but accepts an ImageCache for loading images.
+// This allows image boxes to be sized based on their actual image dimensions.
+// If cache is nil, images will use placeholder sizing based on text width.
+func layoutWithCache(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc, fontForStyleFn FontForStyleFunc, cache *ImageCache) []Line {
+	// TODO: Implement image loading from cache and sizing
+	// For now, delegate to layout without cache support
+	return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
 }

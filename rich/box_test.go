@@ -89,3 +89,69 @@ func TestBoxIsTab(t *testing.T) {
 		})
 	}
 }
+
+// TestBoxIsImage tests the IsImage method for detecting image boxes.
+// An image box has Style.Image=true and ImageData set.
+func TestBoxIsImage(t *testing.T) {
+	// Create a mock CachedImage for testing
+	mockCachedImage := &CachedImage{
+		Width:  100,
+		Height: 50,
+		Path:   "test.png",
+	}
+
+	tests := []struct {
+		name string
+		box  Box
+		want bool
+	}{
+		{
+			name: "image box with ImageData",
+			box: Box{
+				Style:     Style{Image: true, ImageURL: "test.png", ImageAlt: "test image", Scale: 1.0},
+				ImageData: mockCachedImage,
+			},
+			want: true,
+		},
+		{
+			name: "image style but no ImageData",
+			box: Box{
+				Style:     Style{Image: true, ImageURL: "test.png", ImageAlt: "test image", Scale: 1.0},
+				ImageData: nil,
+			},
+			want: false,
+		},
+		{
+			name: "ImageData but no Image style",
+			box: Box{
+				Style:     Style{Image: false, Scale: 1.0},
+				ImageData: mockCachedImage,
+			},
+			want: false,
+		},
+		{
+			name: "text box is not image",
+			box:  Box{Text: []byte("hello"), Nrune: 5, Bc: 0, Style: DefaultStyle()},
+			want: false,
+		},
+		{
+			name: "newline box is not image",
+			box:  Box{Nrune: -1, Bc: '\n', Style: DefaultStyle()},
+			want: false,
+		},
+		{
+			name: "tab box is not image",
+			box:  Box{Nrune: -1, Bc: '\t', Style: DefaultStyle()},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.box.IsImage()
+			if got != tt.want {
+				t.Errorf("Box.IsImage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

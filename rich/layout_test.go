@@ -630,6 +630,75 @@ func TestLayoutListIndent(t *testing.T) {
 	})
 }
 
+// TestContentToBoxesImage tests that image spans are converted to image boxes.
+// Image spans have Style.Image=true and should create a special image box.
+func TestContentToBoxesImage(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    Content
+		wantBoxes  int
+		checkImage bool // Whether to check for image box
+	}{
+		{
+			name: "single image span",
+			content: Content{
+				{Text: "[Image: alt]", Style: Style{Image: true, ImageURL: "test.png", ImageAlt: "alt", Scale: 1.0}},
+			},
+			wantBoxes:  1,
+			checkImage: true,
+		},
+		{
+			name: "image with surrounding text",
+			content: Content{
+				{Text: "Before ", Style: DefaultStyle()},
+				{Text: "[Image: photo]", Style: Style{Image: true, ImageURL: "photo.jpg", ImageAlt: "photo", Scale: 1.0}},
+				{Text: " After", Style: DefaultStyle()},
+			},
+			wantBoxes:  5, // "Before", " ", "[Image: photo]", " ", "After"
+			checkImage: true,
+		},
+		{
+			name: "multiple images",
+			content: Content{
+				{Text: "[Image: img1]", Style: Style{Image: true, ImageURL: "img1.png", ImageAlt: "img1", Scale: 1.0}},
+				{Text: "\n", Style: DefaultStyle()},
+				{Text: "[Image: img2]", Style: Style{Image: true, ImageURL: "img2.png", ImageAlt: "img2", Scale: 1.0}},
+			},
+			wantBoxes:  3, // image1, newline, image2
+			checkImage: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			boxes := contentToBoxes(tt.content)
+
+			if len(boxes) != tt.wantBoxes {
+				var boxDescs []string
+				for _, b := range boxes {
+					boxDescs = append(boxDescs, boxToString(b))
+				}
+				t.Errorf("contentToBoxes() returned %d boxes %v, want %d",
+					len(boxes), boxDescs, tt.wantBoxes)
+			}
+
+			if tt.checkImage {
+				// Verify at least one box has Image style
+				hasImageBox := false
+				for _, box := range boxes {
+					if box.Style.Image {
+						hasImageBox = true
+						break
+					}
+				}
+				if !hasImageBox {
+					t.Error("expected at least one box with Image style")
+				}
+			}
+		})
+	}
+}
+
 // TestLayoutNestedListIndent tests nested lists with multiple levels.
 func TestLayoutNestedListIndent(t *testing.T) {
 	// Mock font with fixed character width of 10 pixels, height 14
@@ -744,6 +813,326 @@ func TestLayoutNestedListIndent(t *testing.T) {
 					t.Errorf("wrapped line %d X = %d, want >= 20 (should maintain list indentation)", i, lines[i].Boxes[0].X)
 				}
 			}
+		}
+	})
+}
+
+// =============================================================================
+// Phase 16E: Image Layout Tests
+// =============================================================================
+
+// TestLayoutImageWidth tests that image boxes have correct width based on image dimensions.
+// When an image box has ImageData set, the layout should use the image's width.
+func TestLayoutImageWidth(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Create a mock cached image with known dimensions
+	mockImage := &CachedImage{
+		Width:  200,
+		Height: 100,
+		Path:   "test.png",
+	}
+
+	t.Run("image box uses image width", func(t *testing.T) {
+		// Create an image box with ImageData set
+		boxes := []Box{
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "test.png", ImageAlt: "test", Scale: 1.0},
+				ImageData: mockImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+		if len(lines[0].Boxes) != 1 {
+			t.Fatalf("expected 1 box, got %d", len(lines[0].Boxes))
+		}
+
+		// The image box should have width equal to the image width (200)
+		gotWidth := lines[0].Boxes[0].Box.Wid
+		if gotWidth != 200 {
+			t.Errorf("image box width = %d, want 200", gotWidth)
+		}
+	})
+
+	t.Run("image box without ImageData uses placeholder width", func(t *testing.T) {
+		// Create an image box without ImageData (loading failed or not yet loaded)
+		boxes := []Box{
+			{
+				Text:      []byte("[Image: test]"),
+				Nrune:     13,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "test.png", ImageAlt: "test", Scale: 1.0},
+				ImageData: nil,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+		if len(lines[0].Boxes) != 1 {
+			t.Fatalf("expected 1 box, got %d", len(lines[0].Boxes))
+		}
+
+		// Without ImageData, width should be based on placeholder text
+		gotWidth := lines[0].Boxes[0].Box.Wid
+		// "[Image: test]" = 13 chars * 10 pixels = 130
+		if gotWidth != 130 {
+			t.Errorf("placeholder box width = %d, want 130", gotWidth)
+		}
+	})
+}
+
+// TestLayoutImageScale tests that images wider than frame are scaled down.
+// Large images should be scaled to fit within the frame width.
+func TestLayoutImageScale(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 300 // Narrow frame
+	maxtab := 80
+
+	// Create a mock cached image that's wider than the frame
+	wideImage := &CachedImage{
+		Width:  600, // Twice the frame width
+		Height: 200,
+		Path:   "wide.png",
+	}
+
+	t.Run("wide image scaled to fit frame", func(t *testing.T) {
+		boxes := []Box{
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "wide.png", ImageAlt: "wide", Scale: 1.0},
+				ImageData: wideImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+		if len(lines[0].Boxes) != 1 {
+			t.Fatalf("expected 1 box, got %d", len(lines[0].Boxes))
+		}
+
+		// The image should be scaled to fit within frameWidth (300)
+		gotWidth := lines[0].Boxes[0].Box.Wid
+		if gotWidth > frameWidth {
+			t.Errorf("image box width = %d, should be <= frame width %d", gotWidth, frameWidth)
+		}
+		// After scaling 600 -> 300, the width should be exactly frameWidth
+		if gotWidth != frameWidth {
+			t.Errorf("image box width = %d, want %d (scaled to fit)", gotWidth, frameWidth)
+		}
+	})
+
+	t.Run("image smaller than frame not scaled up", func(t *testing.T) {
+		smallImage := &CachedImage{
+			Width:  100,
+			Height: 50,
+			Path:   "small.png",
+		}
+
+		boxes := []Box{
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "small.png", ImageAlt: "small", Scale: 1.0},
+				ImageData: smallImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Small images should keep their original width
+		gotWidth := lines[0].Boxes[0].Box.Wid
+		if gotWidth != 100 {
+			t.Errorf("small image box width = %d, want 100 (not scaled up)", gotWidth)
+		}
+	})
+}
+
+// TestLayoutImageLineHeight tests that lines containing images have appropriate height.
+// The line height should accommodate the image height (possibly scaled).
+func TestLayoutImageLineHeight(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	t.Run("line height includes image height", func(t *testing.T) {
+		tallImage := &CachedImage{
+			Width:  100,
+			Height: 200, // Much taller than font height (14)
+			Path:   "tall.png",
+		}
+
+		boxes := []Box{
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "tall.png", ImageAlt: "tall", Scale: 1.0},
+				ImageData: tallImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Line height should be at least the image height
+		gotHeight := lines[0].Height
+		if gotHeight < 200 {
+			t.Errorf("line height = %d, should be >= 200 (image height)", gotHeight)
+		}
+	})
+
+	t.Run("scaled image has proportional line height", func(t *testing.T) {
+		// Image that needs scaling: 1000x500 scaled to fit in 500 wide frame
+		// Scaled to 500x250
+		largeImage := &CachedImage{
+			Width:  1000,
+			Height: 500,
+			Path:   "large.png",
+		}
+
+		boxes := []Box{
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "large.png", ImageAlt: "large", Scale: 1.0},
+				ImageData: largeImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// After scaling 1000 -> 500 (50%), height should also scale: 500 -> 250
+		gotHeight := lines[0].Height
+		// The height should be the scaled height (250) not the original (500)
+		if gotHeight > 500 {
+			t.Errorf("line height = %d, should be proportionally scaled (expected ~250)", gotHeight)
+		}
+		if gotHeight < 200 {
+			t.Errorf("line height = %d, should be around 250 (scaled proportionally)", gotHeight)
+		}
+	})
+
+	t.Run("image on same line as text uses max height", func(t *testing.T) {
+		shortImage := &CachedImage{
+			Width:  50,
+			Height: 30, // Taller than font (14) but not huge
+			Path:   "short.png",
+		}
+
+		boxes := []Box{
+			{
+				Text:  []byte("Text"),
+				Nrune: 4,
+				Bc:    0,
+				Style: DefaultStyle(),
+			},
+			{
+				Text:  []byte(" "),
+				Nrune: 1,
+				Bc:    0,
+				Style: DefaultStyle(),
+			},
+			{
+				Text:      nil,
+				Nrune:     0,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "short.png", ImageAlt: "short", Scale: 1.0},
+				ImageData: shortImage,
+			},
+		}
+
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Line height should be the max of text height (14) and image height (30)
+		gotHeight := lines[0].Height
+		if gotHeight < 30 {
+			t.Errorf("line height = %d, should be >= 30 (image height)", gotHeight)
+		}
+	})
+}
+
+// TestLayoutWithCache tests that layout can use an ImageCache to load images.
+// When a cache is provided, layout should use it to retrieve image data for sizing.
+func TestLayoutWithCache(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Note: This test verifies the interface for passing ImageCache to layout.
+	// The actual loading behavior depends on implementation in 16E.4.
+
+	t.Run("layout accepts nil cache", func(t *testing.T) {
+		// Layout should work without a cache (backward compatibility)
+		boxes := []Box{
+			{
+				Text:  []byte("Hello"),
+				Nrune: 5,
+				Bc:    0,
+				Style: DefaultStyle(),
+			},
+		}
+
+		// Should not panic with nil cache
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+		if len(lines) != 1 {
+			t.Errorf("expected 1 line, got %d", len(lines))
+		}
+	})
+
+	t.Run("layout with image cache for image boxes", func(t *testing.T) {
+		// Create an image box that would need the cache
+		boxes := []Box{
+			{
+				Text:      []byte("[Image: test]"),
+				Nrune:     13,
+				Bc:        0,
+				Style:     Style{Image: true, ImageURL: "/path/to/test.png", ImageAlt: "test", Scale: 1.0},
+				ImageData: nil, // No image data yet
+			},
+		}
+
+		// Create a cache (even if we don't populate it for this test)
+		cache := NewImageCache(10)
+
+		// Layout should handle the case where image isn't in cache yet
+		// For now, just verify it doesn't panic
+		lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
+		if len(lines) != 1 {
+			t.Errorf("expected 1 line, got %d", len(lines))
 		}
 	})
 }
