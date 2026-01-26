@@ -119,8 +119,9 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 						// Extract link text and parse it for inline formatting
 						linkText := text[i+1 : closeBracket]
 						// Parse link text with Link style as base
+						// Use LinkBlue for the foreground color (standard blue for hyperlinks)
 						linkStyle := rich.Style{
-							Fg:    baseStyle.Fg,
+							Fg:    rich.LinkBlue,
 							Bg:    baseStyle.Bg,
 							Link:  true,
 							Scale: baseStyle.Scale,

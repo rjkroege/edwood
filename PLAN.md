@@ -470,11 +470,199 @@ See `docs/richtext-design.md` Phase 11 section for full design.
 | Tests pass | [x] | Preview toggles, selection, snarf, chords all work |
 | Code committed | [x] | Phase 11 complete - window integration for rich text preview |
 
+## Phase 12: Markdown Links
+
+This phase adds support for rendering and interacting with markdown links `[text](url)`.
+
+### Design Summary
+
+- **Parse links**: Detect `[link text](url)` syntax in markdown
+- **Render in blue**: Display link text in traditional blue link color
+- **LinkMap**: Track which rendered positions correspond to which URLs
+- **Look action**: B3 click on a link opens/plumbs the URL
+
+### Architecture Notes
+
+Links need a mapping from rendered text positions to URLs. This is similar to how `SourceMap` maps rendered positions to source positions. We'll create a `LinkMap` type that tracks:
+- Start and end positions of each link in the rendered text
+- The URL for each link
+
+When Look (B3) is clicked:
+1. Get the click position in rendered text
+2. Check if position falls within a link (using LinkMap)
+3. If yes, extract the URL and call `plumb` or `look3` with it
+
+### 12.1 LinkMap Type
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestLinkMapLookup, TestLinkMapEmpty, TestLinkMapMultipleLinks, TestLinkMapAdjacentLinks |
+| Code written | [x] | LinkMap type with Add() and URLAt(pos) methods in markdown/linkmap.go |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 0485e20 |
+
+### 12.2 Parse Links
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestParseLink, TestParseLinkWithBold, TestParseMultipleLinks |
+| Code written | [x] | Detect `[text](url)` pattern, emit styled span, populate LinkMap |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit ead1600 |
+
+### 12.3 Link Style (Blue Text)
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestLinkStyleColor |
+| Code written | [x] | Add StyleLink with blue foreground color to rich/style.go |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit e72de8d |
+
+### 12.4 ParseWithSourceMap Returns LinkMap
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestParseWithSourceMapLinks |
+| Code written | [x] | Update ParseWithSourceMap to return (Content, SourceMap, LinkMap) |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 5702a29 |
+
+### 12.5 Window Stores LinkMap
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestWindowPreviewLinkMap |
+| Code written | [x] | Add previewLinkMap field to Window, populate in previewcmd |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 65f16f2 |
+
+### 12.6 Look on Link Opens URL
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestPreviewLookLink, TestPreviewLookNonLink |
+| Code written | [x] | In preview Look handler, check LinkMap and plumb URL if found |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 4cfffad |
+
+### 12.7 Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | N/A - manual |
+| Code written | [x] | Fixed: links now render blue (set Fg to LinkBlue in parser). Added TestLinkHasBlueColor. Note: B3-click URL opening not yet fully integrated into mouse handler. |
+| Tests pass | [x] | All tests pass including new TestLinkHasBlueColor |
+| Code committed | [x] | Commit 96340b7 |
+
+## Phase 13: Code Blocks and Horizontal Rules
+
+This phase adds shaded background boxes for fenced code blocks, improves inline code rendering, and adds horizontal rule support.
+
+See `docs/codeblock-design.md` for full design.
+
+### Design Summary
+
+- **Fenced code blocks** (` ``` `): Full-width gray background, monospace font
+- **Inline code** (`` `code` ``): Text-width subtle background, monospace font
+- **Horizontal rules** (`---`, `***`, `___`): Full-width divider line
+- **Background rendering**: Add support for `Style.Bg` in `drawText()`
+
+### 13.1 Background Rendering Infrastructure
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestDrawBoxBackground, TestDrawBoxBackgroundMultiple |
+| Code written | [ ] | Enable `Style.Bg` rendering in `drawText()` for individual boxes |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 13.2 Code Font Selection
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestCodeFontSelection, TestCodeFontFallback |
+| Code written | [ ] | `fontForStyle()` checks `Style.Code`, add `WithCodeFont()` option |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 13.3 Inline Code Background
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestInlineCodeBackground, TestInlineCodeWithSurroundingText |
+| Code written | [ ] | Parser sets `Style.Bg` for inline code spans |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+### 13.4 Parse Fenced Code Blocks
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestParseFencedCodeBlock, TestParseFencedCodeBlockWithLanguage, TestParseFencedCodeBlockPreservesWhitespace |
+| Code written | [ ] | Detect ` ``` ` lines, emit code-styled spans, handle multi-line |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+### 13.5 Fenced Code Block Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestFencedCodeBlockSourceMap |
+| Code written | [ ] | SourceMap correctly maps rendered code to source (excluding fence lines) |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+### 13.6 Block-Level Background Rendering
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestDrawBlockBackground, TestDrawBlockBackgroundMultiLine |
+| Code written | [ ] | BlockRegion type, full-width background for fenced code blocks |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 13.7 Wire Code Font in Preview
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | N/A - integration |
+| Code written | [ ] | Load monospace font, pass via `WithCodeFont()` to preview frame |
+| Tests pass | [ ] | go test ./... passes |
+| Code committed | [ ] | |
+
+### 13.8 Code Block Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | N/A - manual |
+| Code written | [ ] | Fenced code blocks show gray background, inline code has subtle shading |
+| Tests pass | [ ] | Manual verification |
+| Code committed | [ ] | |
+
+### 13.9 Parse Horizontal Rules
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestParseHorizontalRuleHyphens, TestParseHorizontalRuleAsterisks, TestParseHorizontalRuleUnderscores, TestParseHorizontalRuleWithSpaces |
+| Code written | [ ] | Detect `---`, `***`, `___` patterns (3+ chars, optional spaces), emit HRuleRune marker |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+### 13.10 Render Horizontal Rules
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestDrawHorizontalRule, TestHorizontalRuleFullWidth |
+| Code written | [ ] | Detect HRuleRune in `drawText()`, draw 1px gray line full-width |
+| Tests pass | [ ] | go test ./rich/... passes |
+| Code committed | [ ] | |
+
+### 13.11 Horizontal Rule Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | TestHorizontalRuleSourceMap |
+| Code written | [ ] | SourceMap maps HRuleRune position to full source line |
+| Tests pass | [ ] | go test ./markdown/... passes |
+| Code committed | [ ] | |
+
+### 13.12 Horizontal Rule Visual Verification
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [ ] | N/A - manual |
+| Code written | [ ] | `---`, `***`, `___` render as gray horizontal lines |
+| Tests pass | [ ] | Manual verification |
+| Code committed | [ ] | |
+
 ---
 
 ## Current Task
 
-**Phase 11 complete**: Window Integration for rich text preview is fully implemented and tested.
+**Phase 12**: Markdown Links - render links in blue and open URLs on Look click.
+**Phase 13**: Code Blocks and Horizontal Rules - (design complete, ready for implementation)
 
 ## Test Summary
 
@@ -510,6 +698,7 @@ go test ./rich/
 | File | Purpose |
 |------|---------|
 | docs/richtext-design.md | Design document and architecture |
+| docs/codeblock-design.md | Code block shading design (Phase 13) |
 | PLAN.md | This file - implementation tracking |
 | rich/style.go | Style type definition |
 | rich/span.go | Span and Content types |

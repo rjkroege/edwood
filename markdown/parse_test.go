@@ -868,3 +868,36 @@ func TestParseMultipleLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestLinkHasBlueColor(t *testing.T) {
+	// Links should have blue foreground color (LinkBlue)
+	got := Parse("[click here](https://example.com)")
+
+	if len(got) != 1 {
+		t.Fatalf("got %d spans, want 1 span\n  got: %+v", len(got), got)
+	}
+
+	span := got[0]
+	if !span.Style.Link {
+		t.Fatal("span.Style.Link = false, want true")
+	}
+
+	if span.Style.Fg == nil {
+		t.Fatal("span.Style.Fg is nil, want LinkBlue color")
+	}
+
+	// Check that it's blue (high blue component, low red/green)
+	r, g, b, _ := span.Style.Fg.RGBA()
+	// Convert from 16-bit to 8-bit for easier comparison
+	r8, g8, b8 := r>>8, g>>8, b>>8
+
+	// Blue should be dominant
+	if b8 <= r8 || b8 <= g8 {
+		t.Errorf("link Fg is not blue enough: R=%d, G=%d, B=%d", r8, g8, b8)
+	}
+
+	// Blue component should be substantial (at least 128/255)
+	if b8 < 128 {
+		t.Errorf("link Fg blue component too low: %d, want >= 128", b8)
+	}
+}

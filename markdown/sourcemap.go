@@ -207,8 +207,9 @@ func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, r
 						sourceLen := 1 + linkEnd + 1 + 1 + urlEnd + 1 // [text](url)
 
 						// Parse link text with Link style as base
+						// Use LinkBlue for the foreground color (standard blue for hyperlinks)
 						linkStyle := rich.Style{
-							Fg:    baseStyle.Fg,
+							Fg:    rich.LinkBlue,
 							Bg:    baseStyle.Bg,
 							Link:  true,
 							Scale: baseStyle.Scale,
