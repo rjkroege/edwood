@@ -1042,6 +1042,118 @@ func TestMouseWheelScrollContentFits(t *testing.T) {
 	}
 }
 
+// TestRichTextRender tests that the Render() method computes scrollbar/frame rects
+// from the passed rectangle and draws the content.
+func TestRichTextRender(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	// Create colors for rendering
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Set some content
+	rt.SetContent(rich.Plain("hello world"))
+
+	// Clear any draw ops from init
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Render into a different rectangle
+	newRect := image.Rect(50, 50, 350, 250)
+	rt.Render(newRect)
+
+	// Verify that draw operations occurred
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Error("Render() did not produce any draw operations")
+	}
+
+	// Verify the last rect was updated
+	if got := rt.All(); got != newRect {
+		t.Errorf("All() after Render() = %v, want %v", got, newRect)
+	}
+
+	// Verify scrollbar rect is within the rendered area
+	scrollr := rt.ScrollRect()
+	if scrollr.Min.X != newRect.Min.X {
+		t.Errorf("ScrollRect().Min.X = %d, want %d", scrollr.Min.X, newRect.Min.X)
+	}
+	if scrollr.Min.Y != newRect.Min.Y || scrollr.Max.Y != newRect.Max.Y {
+		t.Errorf("ScrollRect() Y bounds = (%d, %d), want (%d, %d)",
+			scrollr.Min.Y, scrollr.Max.Y, newRect.Min.Y, newRect.Max.Y)
+	}
+
+	// Verify frame rect starts after scrollbar
+	framer := rt.Frame().Rect()
+	if framer.Min.X <= scrollr.Max.X {
+		t.Errorf("Frame().Rect().Min.X = %d, should be > %d (scrollbar end)",
+			framer.Min.X, scrollr.Max.X)
+	}
+	if framer.Min.Y != newRect.Min.Y || framer.Max.Y != newRect.Max.Y {
+		t.Errorf("Frame().Rect() Y bounds = (%d, %d), want (%d, %d)",
+			framer.Min.Y, framer.Max.Y, newRect.Min.Y, newRect.Max.Y)
+	}
+}
+
+// TestRichTextRenderUpdatesLastRect tests that Render() updates the cached
+// rectangle used for hit-testing.
+func TestRichTextRenderUpdatesLastRect(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(rect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	rt.SetContent(rich.Plain("hello world"))
+
+	// Render into first rectangle
+	rect1 := image.Rect(0, 0, 200, 150)
+	rt.Render(rect1)
+
+	if got := rt.All(); got != rect1 {
+		t.Errorf("After first Render(), All() = %v, want %v", got, rect1)
+	}
+
+	// Render into second rectangle
+	rect2 := image.Rect(100, 100, 500, 400)
+	rt.Render(rect2)
+
+	if got := rt.All(); got != rect2 {
+		t.Errorf("After second Render(), All() = %v, want %v", got, rect2)
+	}
+
+	// Verify scrollbar and frame rects match the second rectangle
+	scrollr := rt.ScrollRect()
+	if scrollr.Min.X != rect2.Min.X {
+		t.Errorf("ScrollRect().Min.X = %d, want %d after second Render()", scrollr.Min.X, rect2.Min.X)
+	}
+
+	framer := rt.Frame().Rect()
+	if framer.Max.X != rect2.Max.X {
+		t.Errorf("Frame().Rect().Max.X = %d, want %d after second Render()", framer.Max.X, rect2.Max.X)
+	}
+}
+
 // TestMouseWheelScrollMultipleScrolls tests that multiple scroll wheel events
 // accumulate correctly.
 func TestMouseWheelScrollMultipleScrolls(t *testing.T) {

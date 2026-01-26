@@ -167,12 +167,51 @@ func (rt *RichText) SetOrigin(org int) {
 	}
 }
 
-// Redraw redraws the RichText component.
+// Redraw redraws the RichText component using the last rendered rectangle.
 func (rt *RichText) Redraw() {
 	// Draw scrollbar first (behind frame)
 	rt.scrDraw()
 
 	// Draw the frame content
+	if rt.frame != nil {
+		rt.frame.Redraw()
+	}
+}
+
+// Render draws the rich text component into the given rectangle.
+// This computes scrollbar and frame areas from r at render time,
+// allowing the rectangle to be provided dynamically (e.g., from body.all).
+func (rt *RichText) Render(r image.Rectangle) {
+	rt.all = r
+
+	// Compute scrollbar rectangle (left side)
+	scrollWid := rt.display.ScaleSize(Scrollwid)
+	scrollGap := rt.display.ScaleSize(Scrollgap)
+
+	rt.scrollRect = image.Rect(
+		r.Min.X,
+		r.Min.Y,
+		r.Min.X+scrollWid,
+		r.Max.Y,
+	)
+
+	// Compute frame rectangle (right of scrollbar with gap)
+	frameRect := image.Rect(
+		r.Min.X+scrollWid+scrollGap,
+		r.Min.Y,
+		r.Max.X,
+		r.Max.Y,
+	)
+
+	// Update frame geometry if changed
+	if rt.frame != nil && rt.frame.Rect() != frameRect {
+		rt.frame.SetRect(frameRect)
+	}
+
+	// Draw scrollbar
+	rt.scrDraw()
+
+	// Draw frame content
 	if rt.frame != nil {
 		rt.frame.Redraw()
 	}
