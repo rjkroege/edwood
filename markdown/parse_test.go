@@ -2179,6 +2179,297 @@ func TestParseUnorderedList(t *testing.T) {
 	}
 }
 
+func TestParseNestedList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text       string
+			listBullet bool
+			listItem   bool
+			listIndent int
+		}
+	}{
+		{
+			name:  "simple nested unordered list",
+			input: "- Parent\n  - Child",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child", listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+		{
+			name:  "nested list with multiple children",
+			input: "- Parent\n  - Child 1\n  - Child 2",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child 1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child 2", listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+		{
+			name:  "nested list back to parent level",
+			input: "- Parent 1\n  - Child\n- Parent 2",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent 1\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent 2", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "nested ordered list",
+			input: "1. Parent\n   1. Child",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "1.", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child", listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+		{
+			name:  "mixed nested lists",
+			input: "- Unordered parent\n  1. Ordered child",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Unordered parent\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "1.", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Ordered child", listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+		{
+			name:  "nested list with tab indent",
+			input: "- Parent\n\t- Child",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Parent\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Child", listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.ListBullet != want.listBullet {
+					t.Errorf("span[%d].Style.ListBullet = %v, want %v", i, got[i].Style.ListBullet, want.listBullet)
+				}
+				if got[i].Style.ListItem != want.listItem {
+					t.Errorf("span[%d].Style.ListItem = %v, want %v", i, got[i].Style.ListItem, want.listItem)
+				}
+				if got[i].Style.ListIndent != want.listIndent {
+					t.Errorf("span[%d].Style.ListIndent = %d, want %d", i, got[i].Style.ListIndent, want.listIndent)
+				}
+			}
+		})
+	}
+}
+
+func TestParseDeepNestedList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text       string
+			listBullet bool
+			listItem   bool
+			listIndent int
+		}
+	}{
+		{
+			name:  "three level nested unordered list",
+			input: "- Level 0\n  - Level 1\n    - Level 2",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Level 0\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Level 1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 2},
+				{text: " ", listBullet: false, listItem: true, listIndent: 2},
+				{text: "Level 2", listBullet: false, listItem: true, listIndent: 2},
+			},
+		},
+		{
+			name:  "four level nested list",
+			input: "- L0\n  - L1\n    - L2\n      - L3",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "L0\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "L1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 2},
+				{text: " ", listBullet: false, listItem: true, listIndent: 2},
+				{text: "L2\n", listBullet: false, listItem: true, listIndent: 2},
+				{text: "•", listBullet: true, listItem: false, listIndent: 3},
+				{text: " ", listBullet: false, listItem: true, listIndent: 3},
+				{text: "L3", listBullet: false, listItem: true, listIndent: 3},
+			},
+		},
+		{
+			name:  "deep nested then return to shallow",
+			input: "- L0\n  - L1\n    - L2\n  - L1 again\n- L0 again",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "L0\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "L1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 2},
+				{text: " ", listBullet: false, listItem: true, listIndent: 2},
+				{text: "L2\n", listBullet: false, listItem: true, listIndent: 2},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "L1 again\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "L0 again", listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name:  "three level nested ordered list",
+			input: "1. Level 0\n  1. Level 1\n    1. Level 2", // Use 2-space indentation (consistent with unordered lists)
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Level 0\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "1.", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Level 1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "1.", listBullet: true, listItem: false, listIndent: 2},
+				{text: " ", listBullet: false, listItem: true, listIndent: 2},
+				{text: "Level 2", listBullet: false, listItem: true, listIndent: 2},
+			},
+		},
+		{
+			name:  "mixed deep nested lists",
+			input: "- Unordered L0\n  1. Ordered L1\n    - Unordered L2",
+			wantSpan: []struct {
+				text       string
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Unordered L0\n", listBullet: false, listItem: true, listIndent: 0},
+				{text: "1.", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Ordered L1\n", listBullet: false, listItem: true, listIndent: 1},
+				{text: "•", listBullet: true, listItem: false, listIndent: 2},
+				{text: " ", listBullet: false, listItem: true, listIndent: 2},
+				{text: "Unordered L2", listBullet: false, listItem: true, listIndent: 2},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.ListBullet != want.listBullet {
+					t.Errorf("span[%d].Style.ListBullet = %v, want %v", i, got[i].Style.ListBullet, want.listBullet)
+				}
+				if got[i].Style.ListItem != want.listItem {
+					t.Errorf("span[%d].Style.ListItem = %v, want %v", i, got[i].Style.ListItem, want.listItem)
+				}
+				if got[i].Style.ListIndent != want.listIndent {
+					t.Errorf("span[%d].Style.ListIndent = %d, want %d", i, got[i].Style.ListIndent, want.listIndent)
+				}
+			}
+		})
+	}
+}
+
 func TestParseOrderedList(t *testing.T) {
 	tests := []struct {
 		name     string

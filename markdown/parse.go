@@ -99,8 +99,15 @@ func Parse(text string) rich.Content {
 			continue
 		}
 
+		// Check for list items BEFORE checking for indented code blocks
+		// This ensures deeply nested list items (with 4+ spaces or tabs) are recognized
+		isULEarly, _, _ := isUnorderedListItem(line)
+		isOLEarly, _, _, _ := isOrderedListItem(line)
+		isListItemEarly := isULEarly || isOLEarly
+
 		// Check for indented code block (4 spaces or 1 tab)
-		if isIndentedCodeLine(line) {
+		// But NOT if it's a list item - list items take precedence
+		if isIndentedCodeLine(line) && !isListItemEarly {
 			// End paragraph with newline before code block
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
