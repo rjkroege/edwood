@@ -1861,3 +1861,182 @@ func TestWindowPreviewLinkMap(t *testing.T) {
 		t.Error("PreviewLinkMap should still be the same after re-entering preview mode")
 	}
 }
+
+// TestPreviewLookLink tests that B3 (Look) on a link in preview mode returns the link URL.
+// When the user B3-clicks on a link, the Look action should open/plumb the URL instead
+// of searching for the link text.
+func TestPreviewLookLink(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown with a link
+	sourceMarkdown := "Check out [Google](https://google.com) for more info."
+	// Rendered text: "Check out Google for more info."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/links.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown with source map and link map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and set maps, enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verify we're in preview mode
+	if !w.IsPreviewMode() {
+		t.Fatal("Window should be in preview mode")
+	}
+
+	// Find "Google" in the rendered text - this is the link text
+	plainText := content.Plain()
+	googleIdx := -1
+	for i := 0; i < len(plainText)-5; i++ {
+		if string(plainText[i:i+6]) == "Google" {
+			googleIdx = i
+			break
+		}
+	}
+	if googleIdx < 0 {
+		t.Fatalf("Could not find 'Google' in rendered text: %q", string(plainText))
+	}
+
+	// Test: PreviewLookLinkURL at the link position should return the URL
+	url := w.PreviewLookLinkURL(googleIdx)
+	if url != "https://google.com" {
+		t.Errorf("PreviewLookLinkURL(%d) = %q, want %q", googleIdx, url, "https://google.com")
+	}
+
+	// Also test at the end of the link text (still within the link)
+	url = w.PreviewLookLinkURL(googleIdx + 5) // last character of "Google"
+	if url != "https://google.com" {
+		t.Errorf("PreviewLookLinkURL(%d) = %q, want %q", googleIdx+5, url, "https://google.com")
+	}
+}
+
+// TestPreviewLookNonLink tests that B3 (Look) on non-link text in preview mode
+// returns empty string, indicating normal Look behavior should be used.
+func TestPreviewLookNonLink(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown with a link and regular text
+	sourceMarkdown := "Check out [Google](https://google.com) for more info."
+	// Rendered text: "Check out Google for more info."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/links.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(bodyRect, display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+
+	// Parse markdown with source map and link map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Assign the richBody to the window and set maps, enable preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verify we're in preview mode
+	if !w.IsPreviewMode() {
+		t.Fatal("Window should be in preview mode")
+	}
+
+	// Test: PreviewLookLinkURL at position 0 ("Check") should return empty string
+	// because it's not a link
+	url := w.PreviewLookLinkURL(0)
+	if url != "" {
+		t.Errorf("PreviewLookLinkURL(0) = %q, want empty string for non-link text", url)
+	}
+
+	// Find "more" in the rendered text - this is after the link
+	plainText := content.Plain()
+	moreIdx := -1
+	for i := 0; i < len(plainText)-3; i++ {
+		if string(plainText[i:i+4]) == "more" {
+			moreIdx = i
+			break
+		}
+	}
+	if moreIdx < 0 {
+		t.Fatalf("Could not find 'more' in rendered text: %q", string(plainText))
+	}
+
+	// Test: PreviewLookLinkURL at "more" position should return empty string
+	url = w.PreviewLookLinkURL(moreIdx)
+	if url != "" {
+		t.Errorf("PreviewLookLinkURL(%d) = %q, want empty string for non-link text", moreIdx, url)
+	}
+
+	// Test: PreviewLookLinkURL when not in preview mode should return empty string
+	w.SetPreviewMode(false)
+	url = w.PreviewLookLinkURL(10) // any position
+	if url != "" {
+		t.Errorf("PreviewLookLinkURL when not in preview mode = %q, want empty string", url)
+	}
+
+	// Test: PreviewLookLinkURL with no link map should return empty string
+	w.SetPreviewMode(true)
+	w.SetPreviewLinkMap(nil)
+	url = w.PreviewLookLinkURL(10)
+	if url != "" {
+		t.Errorf("PreviewLookLinkURL with nil link map = %q, want empty string", url)
+	}
+}

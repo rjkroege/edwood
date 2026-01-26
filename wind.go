@@ -735,6 +735,17 @@ func (w *Window) PreviewLinkMap() *markdown.LinkMap {
 	return w.previewLinkMap
 }
 
+// PreviewLookLinkURL returns the URL if the given position in the rendered preview
+// falls within a link. Returns empty string if the position is not within a link,
+// if not in preview mode, or if no link map is set.
+// This is used by the Look handler to determine if a B3 click should open a URL.
+func (w *Window) PreviewLookLinkURL(pos int) string {
+	if !w.previewMode || w.previewLinkMap == nil {
+		return ""
+	}
+	return w.previewLinkMap.URLAt(pos)
+}
+
 // UpdatePreview updates the preview content from the body buffer.
 // This should be called when the body buffer changes and the window is in preview mode.
 // It re-parses the markdown and updates the richBody, preserving the scroll position.
