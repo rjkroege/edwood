@@ -36,6 +36,8 @@ type Frame interface {
 	GetOrigin() int
 	MaxLines() int
 	VisibleLines() int
+	TotalLines() int       // Total number of layout lines in the content
+	LineStartRunes() []int // Rune offset at the start of each visual line
 
 	// Rendering
 	Redraw()
@@ -411,6 +413,73 @@ func (f *frameImpl) VisibleLines() int {
 	}
 	lines, _ := f.layoutFromOrigin()
 	return len(lines)
+}
+
+// TotalLines returns the total number of layout lines in the content.
+// This includes all lines after word wrapping, not just source newlines.
+func (f *frameImpl) TotalLines() int {
+	if f.font == nil || f.content == nil {
+		return 0
+	}
+
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return 0
+	}
+
+	// Calculate frame width for layout
+	frameWidth := f.rect.Dx()
+
+	// Default tab width (8 characters worth)
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout all boxes
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	return len(lines)
+}
+
+// LineStartRunes returns the rune offset at the start of each visual line.
+// This maps visual line indices to rune positions for scrolling.
+func (f *frameImpl) LineStartRunes() []int {
+	if f.font == nil || f.content == nil {
+		return []int{0}
+	}
+
+	// Convert content to boxes
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return []int{0}
+	}
+
+	// Calculate frame width for layout
+	frameWidth := f.rect.Dx()
+
+	// Default tab width (8 characters worth)
+	maxtab := 8 * f.font.StringWidth("0")
+
+	// Layout all boxes
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
+	if len(lines) == 0 {
+		return []int{0}
+	}
+
+	// Walk through lines and calculate rune offset at start of each line
+	lineStarts := make([]int, len(lines))
+	runeCount := 0
+	for i, line := range lines {
+		lineStarts[i] = runeCount
+		// Count runes in this line
+		for _, pb := range line.Boxes {
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				runeCount++
+			} else {
+				runeCount += pb.Box.Nrune
+			}
+		}
+	}
+
+	return lineStarts
 }
 
 // Redraw redraws the frame.

@@ -216,24 +216,9 @@ func (rt *RichText) ScrollClick(button int, pt image.Point) int {
 		return 0
 	}
 
-	// Count lines in content and build a map of line start positions
-	lineCount := 1
-	lineStarts := []int{0}
-	for i, span := range rt.content {
-		runeOffset := 0
-		if i > 0 {
-			for j := 0; j < i; j++ {
-				runeOffset += len([]rune(rt.content[j].Text))
-			}
-		}
-		for j, r := range span.Text {
-			if r == '\n' {
-				lineCount++
-				lineStarts = append(lineStarts, runeOffset+j+1)
-			}
-		}
-	}
-
+	// Get visual line information from the frame
+	lineCount := rt.frame.TotalLines()
+	lineStarts := rt.frame.LineStartRunes()
 	maxLines := rt.frame.MaxLines()
 
 	// If all content fits, no scrolling needed
@@ -357,30 +342,13 @@ func (rt *RichText) scrThumbRect() image.Rectangle {
 		return rt.scrollRect
 	}
 
-	// Get scroll metrics from the frame
+	// Get scroll metrics from the frame using visual line counts
 	origin := rt.frame.GetOrigin()
 	maxLines := rt.frame.MaxLines()
+	lineCount := rt.frame.TotalLines()
+	lineStarts := rt.frame.LineStartRunes()
 
 	scrollHeight := rt.scrollRect.Dy()
-
-	// Count lines in content and build a map of line start positions
-	lineCount := 1 // At least one line
-	lineStarts := []int{0}
-	for i, span := range rt.content {
-		runeOffset := 0
-		if i > 0 {
-			// Sum up runes from previous spans
-			for j := 0; j < i; j++ {
-				runeOffset += len([]rune(rt.content[j].Text))
-			}
-		}
-		for j, r := range span.Text {
-			if r == '\n' {
-				lineCount++
-				lineStarts = append(lineStarts, runeOffset+j+1)
-			}
-		}
-	}
 
 	// If all content fits, fill the scrollbar
 	if lineCount <= maxLines {
@@ -531,24 +499,9 @@ func (rt *RichText) ScrollWheel(up bool) int {
 		return 0
 	}
 
-	// Count lines in content and build a map of line start positions
-	lineCount := 1
-	lineStarts := []int{0}
-	for i, span := range rt.content {
-		runeOffset := 0
-		if i > 0 {
-			for j := 0; j < i; j++ {
-				runeOffset += len([]rune(rt.content[j].Text))
-			}
-		}
-		for j, r := range span.Text {
-			if r == '\n' {
-				lineCount++
-				lineStarts = append(lineStarts, runeOffset+j+1)
-			}
-		}
-	}
-
+	// Get visual line information from the frame
+	lineCount := rt.frame.TotalLines()
+	lineStarts := rt.frame.LineStartRunes()
 	maxLines := rt.frame.MaxLines()
 
 	// If all content fits, no scrolling needed

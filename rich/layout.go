@@ -167,6 +167,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 	currentLine.Y = 0
 	currentLine.Height = defaultFontHeight
 	xPos := 0
+	pendingParaBreak := false // Track if we just had a paragraph break
 
 	for i := range boxes {
 		box := &boxes[i]
@@ -186,12 +187,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			})
 			lines = append(lines, currentLine)
 
-			// Calculate Y offset - add extra spacing for paragraph breaks
+			// Calculate Y offset (just the line height for now)
 			yOffset := currentLine.Height
-			if box.Style.ParaBreak {
-				// Add half line height for paragraph spacing
-				yOffset += defaultFontHeight / 2
-			}
 
 			// Start new line
 			currentLine = Line{
@@ -199,7 +196,20 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				Height: defaultFontHeight,
 			}
 			xPos = 0
+
+			// Mark that we have a pending paragraph break if this newline is a para break
+			if box.Style.ParaBreak {
+				pendingParaBreak = true
+			}
 			continue
+		}
+
+		// If we have a pending paragraph break and this is the first content,
+		// add space before this paragraph based on the content's font height
+		if pendingParaBreak && !box.IsTab() {
+			// Add half the height of the upcoming text before this paragraph
+			currentLine.Y += boxHeight / 2
+			pendingParaBreak = false
 		}
 
 		// Calculate width for this box using the style-specific font
