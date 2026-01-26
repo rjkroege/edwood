@@ -3047,6 +3047,196 @@ func TestPreviewModeSelectionDragBackward(t *testing.T) {
 	}
 }
 
+// TestPreviewSelectionNearScrollbar tests that selection works correctly when
+// the drag starts in the frame area and ends near or past the scrollbar boundary.
+// The selection should clamp to the beginning of the line (position 0) when
+// dragging into the scrollbar area.
+func TestPreviewSelectionNearScrollbar(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/file.md", []rune("# Hello World")),
+	}
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.all = image.Rect(0, 20, 800, 600)
+
+	// Create a RichText component for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Hello World" (11 chars)
+	content := rich.Plain("Hello World")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+	scrollRect := rt.ScrollRect()
+
+	// Verify the geometry: scrollbar should be to the left of the frame
+	if scrollRect.Max.X > frameRect.Min.X {
+		t.Logf("scrollRect: %v, frameRect: %v", scrollRect, frameRect)
+	}
+
+	// Test 1: Start in frame, drag to scrollbar area (past left edge)
+	// Start at position 5 ("Hello" + one char), drag left into scrollbar
+	t.Run("DragIntoScrollbar", func(t *testing.T) {
+		// Mouse down at position 5 (50 pixels from frame left edge)
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Drag to scrollbar area (past left edge of frame, into scrollbar)
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(scrollRect.Min.X+2, frameRect.Min.Y+5), // Inside scrollbar
+			Buttons: 1,
+		}
+		// Mouse up in scrollbar area
+		upEvent := draw.Mouse{
+			Point:   image.Pt(scrollRect.Min.X+2, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle drag that ends in scrollbar area")
+		}
+
+		// Selection should be from 0 (clamped) to 5 (start position)
+		// When dragging left past the frame boundary, Charofpt clamps x to 0,
+		// which maps to position 0
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("Selection p0 should be 0 (clamped at left edge), got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("Selection p1 should be 5 (anchor point), got %d", q1)
+		}
+	})
+
+	// Test 2: Start at frame left edge, drag right (selection from beginning)
+	// This verifies that clicking exactly at the frame's left edge works correctly
+	t.Run("StartAtFrameEdge", func(t *testing.T) {
+		// Clear previous selection
+		rt.SetSelection(0, 0)
+
+		// Mouse down at frame left edge
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Get the anchor position
+		anchor := rt.Frame().Charofpt(downEvent.Point)
+
+		// Drag right by 30 pixels
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+30, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Mouse up
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+30, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle drag from frame edge")
+		}
+
+		// Selection should start at the anchor position
+		q0, q1 := rt.Selection()
+		if q0 != anchor {
+			t.Errorf("Selection p0 should be %d (anchor), got %d", anchor, q0)
+		}
+		// Selection end should be further right (higher position)
+		if q1 <= q0 {
+			t.Errorf("Selection p1 should be > p0, got p0=%d, p1=%d", q0, q1)
+		}
+	})
+
+	// Test 3: Drag that goes into scrollbar and back
+	// This verifies that dragging through the scrollbar area and back works correctly
+	t.Run("DragThroughScrollbarAndBack", func(t *testing.T) {
+		// Clear previous selection
+		rt.SetSelection(0, 0)
+
+		// Mouse down at position well inside the frame (50px from left)
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Get the anchor position
+		anchor := rt.Frame().Charofpt(downEvent.Point)
+
+		// Drag into scrollbar (intermediate position - will clamp to position 0)
+		dragEvent1 := draw.Mouse{
+			Point:   image.Pt(scrollRect.Min.X+2, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Drag back into frame (20px from left)
+		dragEvent2 := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+20, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		// Get the final position
+		finalPos := rt.Frame().Charofpt(dragEvent2.Point)
+
+		// Mouse up
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+20, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent1, dragEvent2, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle complex drag path")
+		}
+
+		// Selection should be from finalPos to anchor (normalized: smaller first)
+		q0, q1 := rt.Selection()
+		expectedP0 := finalPos
+		expectedP1 := anchor
+		if expectedP0 > expectedP1 {
+			expectedP0, expectedP1 = expectedP1, expectedP0
+		}
+		if q0 != expectedP0 {
+			t.Errorf("Selection p0 should be %d, got %d", expectedP0, q0)
+		}
+		if q1 != expectedP1 {
+			t.Errorf("Selection p1 should be %d, got %d", expectedP1, q1)
+		}
+	})
+}
+
 // =============================================================================
 // Phase 16I: Image Pipeline Integration Tests
 // =============================================================================
