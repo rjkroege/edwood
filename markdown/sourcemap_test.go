@@ -343,6 +343,126 @@ func TestFencedCodeBlockSourceMap(t *testing.T) {
 	}
 }
 
+// TestHorizontalRuleSourceMap tests source mapping for horizontal rules (---, ***, ___).
+// A horizontal rule like "---" (3 chars) renders as HRuleRune + "\n" (2 runes).
+// The source map should map the rendered HRuleRune position back to the full source line.
+func TestHorizontalRuleSourceMap(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		renderedPos  int
+		renderedEnd  int
+		wantSrcStart int
+		wantSrcEnd   int
+	}{
+		{
+			name: "simple hrule with hyphens",
+			// Source: "---\n" (4 bytes)
+			// Rendered: HRuleRune + "\n" (2 runes, positions 0-1)
+			input:        "---\n",
+			renderedPos:  0,
+			renderedEnd:  2, // HRuleRune + newline
+			wantSrcStart: 0,
+			wantSrcEnd:   4, // "---\n"
+		},
+		{
+			name: "hrule without trailing newline",
+			// Source: "---" (3 bytes)
+			// Rendered: HRuleRune (1 rune, position 0)
+			input:        "---",
+			renderedPos:  0,
+			renderedEnd:  1, // just HRuleRune
+			wantSrcStart: 0,
+			wantSrcEnd:   3, // "---"
+		},
+		{
+			name: "hrule with asterisks",
+			// Source: "***\n" (4 bytes)
+			// Rendered: HRuleRune + "\n" (2 runes)
+			input:        "***\n",
+			renderedPos:  0,
+			renderedEnd:  2,
+			wantSrcStart: 0,
+			wantSrcEnd:   4,
+		},
+		{
+			name: "hrule with underscores",
+			// Source: "___\n" (4 bytes)
+			// Rendered: HRuleRune + "\n" (2 runes)
+			input:        "___\n",
+			renderedPos:  0,
+			renderedEnd:  2,
+			wantSrcStart: 0,
+			wantSrcEnd:   4,
+		},
+		{
+			name: "longer hrule",
+			// Source: "----------\n" (11 bytes)
+			// Rendered: HRuleRune + "\n" (2 runes)
+			input:        "----------\n",
+			renderedPos:  0,
+			renderedEnd:  2,
+			wantSrcStart: 0,
+			wantSrcEnd:   11,
+		},
+		{
+			name: "hrule between text",
+			// Source: "Above\n---\nBelow" (15 bytes)
+			// Positions: 0-5 = "Above\n", 6-9 = "---\n", 10-14 = "Below"
+			// Rendered: "Above\n" + HRuleRune + "\n" + "Below" (14 runes)
+			// Positions: 0-5 = "Above\n", 6 = HRuleRune, 7 = "\n", 8-12 = "Below"
+			input:        "Above\n---\nBelow",
+			renderedPos:  6,
+			renderedEnd:  8, // HRuleRune + "\n"
+			wantSrcStart: 6,
+			wantSrcEnd:   10, // "---\n"
+		},
+		{
+			name: "text before hrule",
+			// Source: "Above\n---\nBelow"
+			// Rendered: "Above\n" + HRuleRune + "\n" + "Below"
+			input:        "Above\n---\nBelow",
+			renderedPos:  0,
+			renderedEnd:  6, // "Above\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   6, // "Above\n" maps 1:1
+		},
+		{
+			name: "text after hrule",
+			// Source: "Above\n---\nBelow"
+			// Rendered: "Above\n" + HRuleRune + "\n" + "Below"
+			input:        "Above\n---\nBelow",
+			renderedPos:  8,  // Start of "Below" in rendered
+			renderedEnd:  13, // End of "Below"
+			wantSrcStart: 10, // Start of "Below" in source
+			wantSrcEnd:   15, // End of "Below" in source
+		},
+		{
+			name: "select just hrule marker",
+			// Source: "---\n"
+			// Rendered: HRuleRune + "\n"
+			// Select just the HRuleRune (position 0)
+			input:        "---\n",
+			renderedPos:  0,
+			renderedEnd:  1, // just HRuleRune
+			wantSrcStart: 0,
+			wantSrcEnd:   3, // "---" (without newline since we didn't select it)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+					tt.wantSrcStart, tt.wantSrcEnd)
+			}
+		})
+	}
+}
+
 // TestParseWithSourceMapLinks tests that ParseWithSourceMap returns a LinkMap
 // that correctly tracks link positions in the rendered content.
 func TestParseWithSourceMapLinks(t *testing.T) {

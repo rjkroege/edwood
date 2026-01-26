@@ -222,6 +222,45 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 
 // parseLineWithSourceMap parses a single line and returns spans, source map entries, and link entries.
 func parseLineWithSourceMap(line string, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
+	// Check for horizontal rule (---, ***, ___)
+	if isHorizontalRule(line) {
+		// Emit the HRuleRune marker plus newline if the original line had one
+		text := string(rich.HRuleRune)
+		hasNewline := strings.HasSuffix(line, "\n")
+		if hasNewline {
+			text += "\n"
+		}
+
+		var entries []SourceMapEntry
+
+		// Source line without newline (e.g., "---" from "---\n")
+		sourceWithoutNewline := strings.TrimSuffix(line, "\n")
+
+		// Entry for HRuleRune maps to the hrule characters (without newline)
+		entries = append(entries, SourceMapEntry{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + 1, // Just HRuleRune
+			SourceStart:   sourceOffset,
+			SourceEnd:     sourceOffset + len(sourceWithoutNewline),
+		})
+
+		// If there's a newline, add a separate entry for it
+		if hasNewline {
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: renderedOffset + 1,
+				RenderedEnd:   renderedOffset + 2, // The newline
+				SourceStart:   sourceOffset + len(sourceWithoutNewline),
+				SourceEnd:     sourceOffset + len(line),
+			})
+		}
+
+		span := rich.Span{
+			Text:  text,
+			Style: rich.StyleHRule,
+		}
+		return []rich.Span{span}, entries, nil
+	}
+
 	// Check for heading (# at start of line)
 	level := headingLevel(line)
 	if level > 0 {
