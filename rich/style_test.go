@@ -109,3 +109,35 @@ func colorEqual(a, b color.Color) bool {
 	br, bg, bb, ba := b.RGBA()
 	return ar == br && ag == bg && ab == bb && aa == ba
 }
+
+func TestLinkStyleColor(t *testing.T) {
+	// StyleLink should have a blue foreground color for rendering links
+	if StyleLink.Fg == nil {
+		t.Fatal("StyleLink.Fg is nil, want blue color")
+	}
+
+	// Check that it's blue (high blue component, low red/green)
+	r, g, b, _ := StyleLink.Fg.RGBA()
+	// Convert from 16-bit to 8-bit for easier comparison
+	r8, g8, b8 := r>>8, g>>8, b>>8
+
+	// Blue should be dominant
+	if b8 <= r8 || b8 <= g8 {
+		t.Errorf("StyleLink.Fg is not blue enough: R=%d, G=%d, B=%d", r8, g8, b8)
+	}
+
+	// Blue component should be substantial (at least 128/255)
+	if b8 < 128 {
+		t.Errorf("StyleLink.Fg blue component too low: %d, want >= 128", b8)
+	}
+
+	// StyleLink should have Link=true
+	if !StyleLink.Link {
+		t.Error("StyleLink.Link = false, want true")
+	}
+
+	// StyleLink should have normal scale
+	if StyleLink.Scale != 1.0 {
+		t.Errorf("StyleLink.Scale = %v, want 1.0", StyleLink.Scale)
+	}
+}

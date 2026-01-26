@@ -24,6 +24,9 @@ func DefaultStyle() Style {
 	return Style{Scale: 1.0}
 }
 
+// LinkBlue is the standard blue color for hyperlinks.
+var LinkBlue = color.RGBA{R: 0, G: 0, B: 238, A: 255}
+
 // Common styles
 var (
 	StyleH1     = Style{Bold: true, Scale: 2.0}
@@ -31,5 +34,6 @@ var (
 	StyleH3     = Style{Bold: true, Scale: 1.25}
 	StyleBold   = Style{Bold: true, Scale: 1.0}
 	StyleItalic = Style{Italic: true, Scale: 1.0}
-	StyleCode   = Style{Code: true, Scale: 1.0} // Monospace font
+	StyleCode   = Style{Code: true, Scale: 1.0}            // Monospace font
+	StyleLink   = Style{Link: true, Fg: LinkBlue, Scale: 1.0} // Blue hyperlink
 )
