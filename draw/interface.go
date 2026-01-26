@@ -32,6 +32,7 @@ type Image interface {
 	Border(r image.Rectangle, n int, color Image, sp image.Point)
 	Bytes(pt image.Point, src Image, sp image.Point, f Font, b []byte) image.Point
 	Free() error
+	Load(r image.Rectangle, data []byte) (int, error)
 }
 
 type Font interface {
@@ -96,6 +97,10 @@ func (dst *imageImpl) Border(r image.Rectangle, n int, color Image, sp image.Poi
 
 func (dst *imageImpl) Bytes(pt image.Point, src Image, sp image.Point, f Font, b []byte) image.Point {
 	return dst.drawImage.Bytes(pt, toDrawImage(src), sp, f.(*fontImpl).drawFont, b)
+}
+
+func (dst *imageImpl) Load(r image.Rectangle, data []byte) (int, error) {
+	return dst.drawImage.Load(r, data)
 }
 
 func toDrawImage(i Image) *drawImage {

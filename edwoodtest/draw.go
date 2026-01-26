@@ -340,6 +340,12 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 
 func (i *mockImage) Free() error { return nil }
 
+func (i *mockImage) Load(r image.Rectangle, data []byte) (int, error) {
+	// Mock implementation: just return the number of bytes "loaded"
+	// In a real implementation, this would load pixel data into the image
+	return len(data), nil
+}
+
 // N returns a nicename for the image colour.
 func (i *mockImage) N() string {
 	name := i.n

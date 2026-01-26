@@ -36,6 +36,15 @@ const (
 	Yellowgreen   = draw.Yellowgreen
 )
 
+// Pix constants for pixel formats.
+// These are used when allocating images with specific pixel formats.
+var (
+	RGBA32 = draw.RGBA32
+	RGB24  = draw.RGB24
+	ARGB32 = draw.ARGB32
+	XRGB32 = draw.XRGB32
+)
+
 type (
 	Color       = draw.Color
 	Cursor      = draw.Cursor
