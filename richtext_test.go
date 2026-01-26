@@ -1388,6 +1388,104 @@ func TestRichTextRenderDifferentRects(t *testing.T) {
 	}
 }
 
+// TestPreviewMouseAfterResize tests that mouse handling (scrollbar clicks, scroll wheel)
+// works correctly after the RichText component has been resized via Render().
+// This verifies that the cached lastScrollRect is updated by Render() and used
+// for hit-testing in mouse handling methods.
+func TestPreviewMouseAfterResize(t *testing.T) {
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+	)
+
+	// Content with 30 lines (scrollable content)
+	var content rich.Content
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			content = append(content, rich.Plain("\n")...)
+		}
+		content = append(content, rich.Plain("line")...)
+	}
+	rt.SetContent(content)
+
+	// Initial render into a small rectangle
+	initialRect := image.Rect(0, 0, 200, 150)
+	rt.Render(initialRect)
+
+	// Verify initial scrollbar rect
+	initialScrollRect := rt.ScrollRect()
+	if initialScrollRect.Min.Y != initialRect.Min.Y || initialScrollRect.Max.Y != initialRect.Max.Y {
+		t.Errorf("Initial ScrollRect Y bounds = (%d, %d), want (%d, %d)",
+			initialScrollRect.Min.Y, initialScrollRect.Max.Y, initialRect.Min.Y, initialRect.Max.Y)
+	}
+
+	// Now resize to a different rectangle (simulate window resize)
+	resizedRect := image.Rect(50, 50, 400, 350)
+	rt.Render(resizedRect)
+
+	// Verify the scrollbar rect updated after resize
+	resizedScrollRect := rt.ScrollRect()
+	if resizedScrollRect.Min.Y != resizedRect.Min.Y || resizedScrollRect.Max.Y != resizedRect.Max.Y {
+		t.Errorf("Resized ScrollRect Y bounds = (%d, %d), want (%d, %d)",
+			resizedScrollRect.Min.Y, resizedScrollRect.Max.Y, resizedRect.Min.Y, resizedRect.Max.Y)
+	}
+
+	// Test 1: ScrollClick should use the new (resized) scrollbar rect for hit-testing
+	// Start at origin 0
+	rt.SetOrigin(0)
+
+	// Click in the middle of the NEW scrollbar rect (should scroll)
+	newScrollMiddleY := (resizedScrollRect.Min.Y + resizedScrollRect.Max.Y) / 2
+	clickPoint := image.Pt(resizedScrollRect.Min.X+5, newScrollMiddleY)
+
+	// Button 3 (right-click) should scroll down
+	newOrigin := rt.ScrollClick(3, clickPoint)
+	if newOrigin <= 0 {
+		t.Errorf("ScrollClick after resize: expected origin > 0, got %d", newOrigin)
+	}
+
+	// Test 2: ScrollWheel should work after resize
+	rt.SetOrigin(0)
+	wheelOrigin := rt.ScrollWheel(false) // scroll down
+	if wheelOrigin <= 0 {
+		t.Errorf("ScrollWheel after resize: expected origin > 0, got %d", wheelOrigin)
+	}
+
+	// Test 3: Clicking at old scrollbar location should NOT have effect
+	// The old scrollbar was at Y=0 to Y=150, new is at Y=50 to Y=350
+	// A click at Y=140 (which was valid before but is now above the scrollbar)
+	// should still work because the click is within the new scrollbar area.
+	// But let's verify clicks in the new area work correctly.
+	rt.SetOrigin(0)
+
+	// Click at the bottom of the NEW scrollbar area
+	bottomClickPoint := image.Pt(resizedScrollRect.Min.X+5, resizedScrollRect.Max.Y-10)
+	bottomOrigin := rt.ScrollClick(3, bottomClickPoint)
+	if bottomOrigin <= 0 {
+		t.Errorf("ScrollClick at bottom after resize: expected origin > 0, got %d", bottomOrigin)
+	}
+
+	// Test 4: Verify thumb position is calculated using the new rectangle
+	rt.SetOrigin(0)
+	thumbRect := rt.scrThumbRect()
+
+	// Thumb should be within the new scrollbar area
+	if thumbRect.Min.Y < resizedScrollRect.Min.Y || thumbRect.Max.Y > resizedScrollRect.Max.Y {
+		t.Errorf("Thumb rect %v should be within resized scrollbar %v", thumbRect, resizedScrollRect)
+	}
+}
+
 // TestMouseWheelScrollMultipleScrolls tests that multiple scroll wheel events
 // accumulate correctly.
 func TestMouseWheelScrollMultipleScrolls(t *testing.T) {
