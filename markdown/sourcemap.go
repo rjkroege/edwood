@@ -102,7 +102,69 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	sourcePos := 0   // Current position in source
 	renderedPos := 0 // Current position in rendered content
 
+	// Track fenced code block state
+	inFencedBlock := false
+	var codeBlockContent strings.Builder
+	codeBlockSourceStart := 0 // Source position where code content starts (after opening fence line)
+
 	for _, line := range lines {
+		// Check for fenced code block delimiter
+		if isFenceDelimiter(line) {
+			if !inFencedBlock {
+				// Opening fence - start collecting code
+				inFencedBlock = true
+				codeBlockContent.Reset()
+				// Skip past the fence line in source, remember where code content starts
+				sourcePos += len(line)
+				codeBlockSourceStart = sourcePos
+				continue
+			} else {
+				// Closing fence - emit the code block
+				inFencedBlock = false
+				codeContent := codeBlockContent.String()
+				if codeContent != "" {
+					codeSpan := rich.Span{
+						Text: codeContent,
+						Style: rich.Style{
+							Bg:    rich.InlineCodeBg,
+							Code:  true,
+							Scale: 1.0,
+						},
+					}
+
+					// Create source map entry for the code content
+					// Maps rendered code to source code (excluding fence lines)
+					codeLen := len([]rune(codeContent))
+					entry := SourceMapEntry{
+						RenderedStart: renderedPos,
+						RenderedEnd:   renderedPos + codeLen,
+						SourceStart:   codeBlockSourceStart,
+						SourceEnd:     sourcePos, // sourcePos is at start of closing fence
+					}
+					sm.entries = append(sm.entries, entry)
+					renderedPos += codeLen
+
+					// Merge or append the code span
+					if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
+						result[len(result)-1].Text += codeSpan.Text
+					} else {
+						result = append(result, codeSpan)
+					}
+				}
+				// Skip past the closing fence line in source
+				sourcePos += len(line)
+				continue
+			}
+		}
+
+		if inFencedBlock {
+			// Inside fenced block - collect raw content without parsing
+			codeBlockContent.WriteString(line)
+			sourcePos += len(line)
+			continue
+		}
+
+		// Normal line parsing
 		spans, entries, linkEntries := parseLineWithSourceMap(line, sourcePos, renderedPos)
 		sm.entries = append(sm.entries, entries...)
 		for _, le := range linkEntries {
@@ -124,6 +186,34 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			} else {
 				result = append(result, span)
 			}
+		}
+	}
+
+	// Handle unclosed fenced code block - treat remaining content as code
+	if inFencedBlock {
+		codeContent := codeBlockContent.String()
+		if codeContent != "" {
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:    rich.InlineCodeBg,
+					Code:  true,
+					Scale: 1.0,
+				},
+			}
+
+			// Create source map entry
+			codeLen := len([]rune(codeContent))
+			entry := SourceMapEntry{
+				RenderedStart: renderedPos,
+				RenderedEnd:   renderedPos + codeLen,
+				SourceStart:   codeBlockSourceStart,
+				SourceEnd:     sourcePos,
+			}
+			sm.entries = append(sm.entries, entry)
+			renderedPos += codeLen
+
+			result = append(result, codeSpan)
 		}
 	}
 

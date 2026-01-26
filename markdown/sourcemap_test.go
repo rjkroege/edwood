@@ -233,6 +233,116 @@ func TestSourceMapEmpty(t *testing.T) {
 	}
 }
 
+// TestFencedCodeBlockSourceMap tests source mapping for fenced code blocks.
+// The fence lines (``` and ```go etc.) are not rendered, so the source map
+// must correctly map the rendered code content to the source position within
+// the fences (excluding the fence lines themselves).
+func TestFencedCodeBlockSourceMap(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		renderedPos  int
+		renderedEnd  int
+		wantSrcStart int
+		wantSrcEnd   int
+	}{
+		{
+			name: "simple fenced code block",
+			// Source: "```\ncode\n```"
+			// Positions: 0-3 = "```", 3 = "\n", 4-7 = "code", 8 = "\n", 9-11 = "```"
+			// Rendered: "code\n"
+			input:        "```\ncode\n```",
+			renderedPos:  0,
+			renderedEnd:  5, // "code\n"
+			wantSrcStart: 4, // Start of "code" in source
+			wantSrcEnd:   9, // End of "code\n" in source (before closing ```)
+		},
+		{
+			name: "fenced code block with language",
+			// Source: "```go\nfunc main() {}\n```"
+			// Positions: 0-4 = "```go", 5 = "\n", 6-19 = "func main() {}", 20 = "\n", 21-23 = "```"
+			input:        "```go\nfunc main() {}\n```",
+			renderedPos:  0,
+			renderedEnd:  15, // "func main() {}\n"
+			wantSrcStart: 6,  // Start of "func" in source
+			wantSrcEnd:   21, // End of "}\n" in source (before closing ```)
+		},
+		{
+			name: "fenced code block partial selection",
+			// Source: "```\nhello world\n```"
+			// Rendered: "hello world\n"
+			input:        "```\nhello world\n```",
+			renderedPos:  0,
+			renderedEnd:  5, // "hello" only
+			wantSrcStart: 4, // Start of "hello" in source
+			wantSrcEnd:   9, // End of "hello" in source
+		},
+		{
+			name: "fenced code block in middle of text",
+			// Source: "Before\n```\ncode\n```\nAfter"
+			// Positions: 0-5 = "Before", 6 = "\n", 7-9 = "```", 10 = "\n", 11-14 = "code", 15 = "\n", 16-18 = "```", 19 = "\n", 20-24 = "After"
+			// Rendered: "Before\ncode\nAfter"
+			input:        "Before\n```\ncode\n```\nAfter",
+			renderedPos:  7,  // Start of "code" in rendered
+			renderedEnd:  12, // "code\n"
+			wantSrcStart: 11, // Start of "code" in source
+			wantSrcEnd:   16, // End of "code\n" in source
+		},
+		{
+			name: "text before fenced code block",
+			// Source: "Before\n```\ncode\n```\nAfter"
+			// Rendered: "Before\ncode\nAfter"
+			input:        "Before\n```\ncode\n```\nAfter",
+			renderedPos:  0,
+			renderedEnd:  7, // "Before\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   7, // "Before\n" maps 1:1
+		},
+		{
+			name: "text after fenced code block",
+			// Source: "Before\n```\ncode\n```\nAfter"
+			// Rendered: "Before\ncode\nAfter"
+			input:        "Before\n```\ncode\n```\nAfter",
+			renderedPos:  12, // Start of "After" in rendered
+			renderedEnd:  17, // End of "After"
+			wantSrcStart: 20, // Start of "After" in source
+			wantSrcEnd:   25, // End of "After" in source
+		},
+		{
+			name: "multiline fenced code block",
+			// Source: "```\nline1\nline2\n```"
+			// Rendered: "line1\nline2\n"
+			input:        "```\nline1\nline2\n```",
+			renderedPos:  0,
+			renderedEnd:  12, // "line1\nline2\n"
+			wantSrcStart: 4,  // Start of "line1" in source
+			wantSrcEnd:   16, // End of "line2\n" in source
+		},
+		{
+			name: "select second line of code block",
+			// Source: "```\nline1\nline2\n```"
+			// Rendered: "line1\nline2\n"
+			input:        "```\nline1\nline2\n```",
+			renderedPos:  6,  // Start of "line2" in rendered
+			renderedEnd:  12, // "line2\n"
+			wantSrcStart: 10, // Start of "line2" in source
+			wantSrcEnd:   16, // End of "line2\n" in source
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+					tt.wantSrcStart, tt.wantSrcEnd)
+			}
+		})
+	}
+}
+
 // TestParseWithSourceMapLinks tests that ParseWithSourceMap returns a LinkMap
 // that correctly tracks link positions in the rendered content.
 func TestParseWithSourceMapLinks(t *testing.T) {
