@@ -1805,3 +1805,132 @@ func TestCodeFontFallback(t *testing.T) {
 		t.Errorf("fontForStyle(Code:true) without codeFont should return regularFont, got %v", got)
 	}
 }
+
+// TestDrawBlockBackground tests that BlockRegions cause full-width background fills.
+// This is used for fenced code blocks where the background extends to the frame edge,
+// not just the width of the text.
+func TestDrawBlockBackground(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300) // Frame is 400px wide
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // "code" is 4 chars = 40px wide
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with block-level background (like fenced code)
+	// The Block flag indicates this should have full-width background
+	grayBg := color.RGBA{R: 240, G: 240, B: 240, A: 255}
+	codeBlockStyle := Style{Code: true, Bg: grayBg, Block: true, Scale: 1.0}
+	content := Content{
+		{Text: "code\n", Style: codeBlockStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// There should be a fill operation that spans the FULL width of the frame
+	// (400px), not just the text width (40px)
+	foundBlockFill := false
+	frameBackgroundRect := "(0,0)-(400,300)"
+
+	for _, op := range ops {
+		// Look for fill operations that are NOT the frame background
+		// but ARE full-width (x from 0 to 400)
+		if strings.HasPrefix(op, "fill ") {
+			if strings.Contains(op, frameBackgroundRect) {
+				continue // Skip the frame background
+			}
+			// Check if this fill extends to the full frame width
+			// The fill should be from X=0 to X=400 (full width)
+			// Format: "fill (0,0)-(400,14)" for first line
+			if strings.Contains(op, "(0,0)-(400,") {
+				foundBlockFill = true
+			}
+		}
+	}
+
+	if !foundBlockFill {
+		t.Errorf("Redraw() did not render full-width block background for code block\nExpected fill from x=0 to x=400, got ops: %v", ops)
+	}
+
+	// Also verify text was rendered
+	foundText := false
+	for _, op := range ops {
+		if strings.Contains(op, `string "code"`) {
+			foundText = true
+			break
+		}
+	}
+	if !foundText {
+		t.Errorf("Redraw() did not render 'code' text\ngot ops: %v", ops)
+	}
+}
+
+// TestDrawBlockBackgroundMultiLine tests full-width backgrounds spanning multiple lines.
+func TestDrawBlockBackgroundMultiLine(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300) // Frame is 400px wide
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 14px line height
+
+	bgImage := edwoodtest.NewImage(display, "frame-background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create multi-line content with block-level background
+	grayBg := color.RGBA{R: 240, G: 240, B: 240, A: 255}
+	codeBlockStyle := Style{Code: true, Bg: grayBg, Block: true, Scale: 1.0}
+	content := Content{
+		{Text: "line1\nline2\nline3\n", Style: codeBlockStyle},
+	}
+	f.SetContent(content)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	f.Redraw()
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	frameBackgroundRect := "(0,0)-(400,300)"
+
+	// Count full-width fill operations (excluding frame background)
+	// Each line should have its own full-width background fill
+	blockFillCount := 0
+	for _, op := range ops {
+		if strings.HasPrefix(op, "fill ") {
+			if strings.Contains(op, frameBackgroundRect) {
+				continue // Skip the frame background
+			}
+			// Check if this fill is full-width (x from 0 to 400)
+			if strings.Contains(op, "-(400,") && strings.Contains(op, "(0,") {
+				blockFillCount++
+			}
+		}
+	}
+
+	// Should have 3 full-width fills for 3 lines of code
+	// (newlines create separate lines, each with their own fill)
+	if blockFillCount < 3 {
+		t.Errorf("Expected at least 3 full-width block background fills for 3-line code block, got %d\ngot ops: %v", blockFillCount, ops)
+	}
+
+	// Verify all text lines were rendered
+	texts := []string{"line1", "line2", "line3"}
+	for _, text := range texts {
+		found := false
+		for _, op := range ops {
+			if strings.Contains(op, fmt.Sprintf(`string "%s"`, text)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Redraw() did not render '%s'\ngot ops: %v", text, ops)
+		}
+	}
+}

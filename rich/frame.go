@@ -441,7 +441,19 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 		return
 	}
 
-	// Phase 1: Draw box backgrounds (for inline code, etc.)
+	// Phase 1: Draw block-level backgrounds (full line width for fenced code blocks)
+	// This must happen first so text appears on top
+	for _, line := range lines {
+		// Check if any box on this line has Block=true with a background
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Block && pb.Box.Style.Bg != nil {
+				f.drawBlockBackground(screen, line)
+				break // Only draw once per line
+			}
+		}
+	}
+
+	// Phase 2: Draw box backgrounds (for inline code, etc.)
 	// This must happen before text rendering so backgrounds appear behind text
 	for _, line := range lines {
 		for _, pb := range line.Boxes {
@@ -453,8 +465,9 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 				continue
 			}
 
-			// Draw background if style has Bg color set
-			if pb.Box.Style.Bg != nil {
+			// Draw background if style has Bg color set, but NOT for block-level styles
+			// (those are handled in Phase 1 with full-width backgrounds)
+			if pb.Box.Style.Bg != nil && !pb.Box.Style.Block {
 				f.drawBoxBackground(screen, pb, line)
 			}
 		}
@@ -494,6 +507,37 @@ func (f *frameImpl) drawText(screen edwooddraw.Image) {
 			screen.Bytes(pt, textColorImg, image.ZP, boxFont, pb.Box.Text)
 		}
 	}
+}
+
+// drawBlockBackground draws a full-width background for a line.
+// This is used for fenced code blocks where the background extends to the frame edge.
+func (f *frameImpl) drawBlockBackground(screen edwooddraw.Image, line Line) {
+	// Find the background color from a block-styled box on this line
+	var bgColor color.Color
+	for _, pb := range line.Boxes {
+		if pb.Box.Style.Block && pb.Box.Style.Bg != nil {
+			bgColor = pb.Box.Style.Bg
+			break
+		}
+	}
+	if bgColor == nil {
+		return
+	}
+
+	bgImg := f.allocColorImage(bgColor)
+	if bgImg == nil {
+		return
+	}
+
+	// Full-width background: from frame left edge to frame right edge
+	bgRect := image.Rect(
+		f.rect.Min.X,
+		f.rect.Min.Y+line.Y,
+		f.rect.Max.X,
+		f.rect.Min.Y+line.Y+line.Height,
+	)
+
+	screen.Draw(bgRect, bgImg, bgImg, image.ZP)
 }
 
 // drawBoxBackground draws the background color for a positioned box.

@@ -13,6 +13,7 @@ type Style struct {
 	Italic bool
 	Code   bool // Monospace font for code spans
 	Link   bool // Hyperlink (rendered in blue by default)
+	Block  bool // Block-level element (full-width background for fenced code blocks)
 
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
