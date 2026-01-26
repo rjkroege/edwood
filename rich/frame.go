@@ -116,7 +116,7 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 	if len(lines) == 0 {
 		return f.rect.Min
 	}
@@ -173,7 +173,7 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 				// After a newline, position is at start of next line
 				return image.Point{
 					X: f.rect.Min.X,
-					Y: f.rect.Min.Y + lastLine.Y + f.font.Height(),
+					Y: f.rect.Min.Y + lastLine.Y + lastLine.Height,
 				}
 			}
 			endX = pb.X + pb.Box.Wid
@@ -202,7 +202,7 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 	if len(lines) == 0 {
 		return 0
 	}
@@ -621,11 +621,11 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 
 	// If origin is 0, just return the normal layout
 	if f.origin == 0 {
-		return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle), 0
+		return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle), 0
 	}
 
 	// Layout all boxes first
-	allLines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
+	allLines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 	if len(allLines) == 0 {
 		return nil, 0
 	}
@@ -666,10 +666,11 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 	visibleLines := make([]Line, 0, len(allLines)-startLineIdx)
 	for i := startLineIdx; i < len(allLines); i++ {
 		line := allLines[i]
-		// Adjust Y coordinate to start from 0
+		// Adjust Y coordinate to start from 0, preserving Height
 		adjustedLine := Line{
-			Y:     line.Y - originY,
-			Boxes: line.Boxes,
+			Y:      line.Y - originY,
+			Height: line.Height,
+			Boxes:  line.Boxes,
 		}
 		visibleLines = append(visibleLines, adjustedLine)
 	}
@@ -692,7 +693,7 @@ func (f *frameImpl) drawSelection(screen edwooddraw.Image) {
 	maxtab := 8 * f.font.StringWidth("0")
 
 	// Layout boxes into lines
-	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle)
+	lines := layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 	if len(lines) == 0 {
 		return
 	}

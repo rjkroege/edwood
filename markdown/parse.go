@@ -30,9 +30,43 @@ func Parse(text string) rich.Content {
 	inFencedBlock := false
 	var codeBlockContent strings.Builder
 
+	// Track indented code block state
+	inIndentedBlock := false
+	var indentedBlockContent strings.Builder
+
+	// Helper to emit indented code block
+	emitIndentedBlock := func() {
+		if indentedBlockContent.Len() > 0 {
+			codeSpan := rich.Span{
+				Text: indentedBlockContent.String(),
+				Style: rich.Style{
+					Bg:    rich.InlineCodeBg,
+					Code:  true,
+					Block: true,
+					Scale: 1.0,
+				},
+			}
+			result = append(result, codeSpan)
+			indentedBlockContent.Reset()
+		}
+		inIndentedBlock = false
+	}
+
+	// Track if we're in a paragraph (consecutive non-block lines)
+	inParagraph := false
+
 	for _, line := range lines {
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
+			// If we were in an indented block, emit it first
+			if inIndentedBlock {
+				emitIndentedBlock()
+			}
+			// End paragraph with newline before code block
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+			}
+			inParagraph = false
 			if !inFencedBlock {
 				// Opening fence - start collecting code
 				inFencedBlock = true
@@ -48,6 +82,7 @@ func Parse(text string) rich.Content {
 						Style: rich.Style{
 							Bg:    rich.InlineCodeBg,
 							Code:  true,
+							Block: true,
 							Scale: 1.0,
 						},
 					}
@@ -63,8 +98,69 @@ func Parse(text string) rich.Content {
 			continue
 		}
 
-		// Normal line parsing
-		spans := parseLine(line)
+		// Check for indented code block (4 spaces or 1 tab)
+		if isIndentedCodeLine(line) {
+			// End paragraph with newline before code block
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+			}
+			inParagraph = false
+			inIndentedBlock = true
+			// Remove the indent prefix and add to block
+			indentedBlockContent.WriteString(stripIndent(line))
+			continue
+		}
+
+		// Not an indented line - if we were in an indented block, emit it
+		if inIndentedBlock {
+			emitIndentedBlock()
+		}
+
+		// Check for blank line (paragraph break)
+		trimmedLine := strings.TrimRight(line, "\n")
+		if trimmedLine == "" {
+			// Blank line = paragraph break
+			if inParagraph {
+				// End the paragraph with a newline (with ParaBreak for extra spacing)
+				result = append(result, rich.Span{
+					Text:  "\n",
+					Style: rich.Style{ParaBreak: true, Scale: 1.0},
+				})
+				inParagraph = false
+			}
+			continue
+		}
+
+		// Check if this is a block-level element (heading, hrule)
+		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line)
+
+		if isBlockElement {
+			// Block elements start fresh - end previous paragraph with newline
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+			}
+			inParagraph = false
+		} else {
+			// Regular text line - join with previous paragraph text
+			if inParagraph && len(result) > 0 {
+				// Add space to end of last span for paragraph continuation
+				lastSpan := &result[len(result)-1]
+				if strings.HasSuffix(lastSpan.Text, "\n") {
+					lastSpan.Text = strings.TrimSuffix(lastSpan.Text, "\n") + " "
+				} else if !strings.HasSuffix(lastSpan.Text, " ") {
+					lastSpan.Text += " "
+				}
+			}
+			inParagraph = true
+		}
+
+		// Normal line parsing - strip trailing newline for paragraph text
+		lineToPass := line
+		if !isBlockElement {
+			lineToPass = strings.TrimSuffix(line, "\n")
+		}
+		spans := parseLine(lineToPass)
+
 		// Merge consecutive spans with the same style
 		// (but don't merge link spans - each link should remain distinct
 		// for proper LinkMap tracking)
@@ -87,6 +183,7 @@ func Parse(text string) rich.Content {
 				Style: rich.Style{
 					Bg:    rich.InlineCodeBg,
 					Code:  true,
+					Block: true,
 					Scale: 1.0,
 				},
 			}
@@ -94,7 +191,43 @@ func Parse(text string) rich.Content {
 		}
 	}
 
+	// Handle trailing indented code block
+	if inIndentedBlock {
+		emitIndentedBlock()
+	}
+
 	return result
+}
+
+// isIndentedCodeLine returns true if the line is an indented code line
+// (starts with 4 spaces or 1 tab).
+func isIndentedCodeLine(line string) bool {
+	if len(line) == 0 {
+		return false
+	}
+	// Check for tab indent
+	if line[0] == '\t' {
+		return true
+	}
+	// Check for 4-space indent
+	if len(line) >= 4 && line[0:4] == "    " {
+		return true
+	}
+	return false
+}
+
+// stripIndent removes the leading indent (4 spaces or 1 tab) from a line.
+func stripIndent(line string) string {
+	if len(line) == 0 {
+		return line
+	}
+	if line[0] == '\t' {
+		return line[1:]
+	}
+	if len(line) >= 4 && line[0:4] == "    " {
+		return line[4:]
+	}
+	return line
 }
 
 // isFenceDelimiter returns true if the line is a fenced code block delimiter (```).

@@ -16,6 +16,9 @@ type Style struct {
 	Block  bool // Block-level element (full-width background for fenced code blocks)
 	HRule  bool // Horizontal rule marker (draw line instead of text)
 
+	// Layout hints
+	ParaBreak bool // Paragraph break - adds extra vertical spacing
+
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
 	Scale float64

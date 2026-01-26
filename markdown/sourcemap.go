@@ -107,9 +107,63 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	var codeBlockContent strings.Builder
 	codeBlockSourceStart := 0 // Source position where code content starts (after opening fence line)
 
+	// Track indented code block state
+	inIndentedBlock := false
+	var indentedBlockContent strings.Builder
+	indentedBlockSourceStart := 0
+
+	// Track paragraph state for joining lines
+	inParagraph := false
+
+	// Helper to emit indented code block
+	emitIndentedBlock := func() {
+		if indentedBlockContent.Len() > 0 {
+			codeContent := indentedBlockContent.String()
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:    rich.InlineCodeBg,
+					Code:  true,
+					Block: true,
+					Scale: 1.0,
+				},
+			}
+
+			// Create source map entry
+			codeLen := len([]rune(codeContent))
+			entry := SourceMapEntry{
+				RenderedStart: renderedPos,
+				RenderedEnd:   renderedPos + codeLen,
+				SourceStart:   indentedBlockSourceStart,
+				SourceEnd:     sourcePos,
+			}
+			sm.entries = append(sm.entries, entry)
+			renderedPos += codeLen
+
+			// Merge or append
+			if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
+				result[len(result)-1].Text += codeSpan.Text
+			} else {
+				result = append(result, codeSpan)
+			}
+			indentedBlockContent.Reset()
+		}
+		inIndentedBlock = false
+	}
+
 	for _, line := range lines {
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
+			// If we were in an indented block, emit it first
+			if inIndentedBlock {
+				emitIndentedBlock()
+			}
+			// End paragraph with newline before code block
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+				renderedPos++
+			}
+			inParagraph = false
 			if !inFencedBlock {
 				// Opening fence - start collecting code
 				inFencedBlock = true
@@ -128,6 +182,7 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 						Style: rich.Style{
 							Bg:    rich.InlineCodeBg,
 							Code:  true,
+							Block: true,
 							Scale: 1.0,
 						},
 					}
@@ -164,8 +219,81 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			continue
 		}
 
+		// Check for indented code block (4 spaces or 1 tab)
+		if isIndentedCodeLine(line) {
+			// End paragraph with newline before code block
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+				renderedPos++
+			}
+			inParagraph = false
+			if !inIndentedBlock {
+				// Start of indented block
+				inIndentedBlock = true
+				indentedBlockSourceStart = sourcePos
+				indentedBlockContent.Reset()
+			}
+			// Add the line content (with indent stripped)
+			indentedBlockContent.WriteString(stripIndent(line))
+			sourcePos += len(line)
+			continue
+		}
+
+		// Not an indented line - if we were in an indented block, emit it
+		if inIndentedBlock {
+			emitIndentedBlock()
+		}
+
+		// Check for blank line (paragraph break)
+		trimmedLine := strings.TrimRight(line, "\n")
+		if trimmedLine == "" {
+			// Blank line = paragraph break
+			if inParagraph && len(result) > 0 {
+				// End the paragraph with a newline (with ParaBreak for extra spacing)
+				result = append(result, rich.Span{
+					Text:  "\n",
+					Style: rich.Style{ParaBreak: true, Scale: 1.0},
+				})
+				renderedPos++
+			}
+			inParagraph = false
+			sourcePos += len(line)
+			continue
+		}
+
+		// Check if this is a block-level element (heading, hrule)
+		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line)
+
+		if isBlockElement {
+			// Block elements start fresh - end previous paragraph with newline
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+				renderedPos++
+			}
+			inParagraph = false
+		} else {
+			// Regular text line - join with previous paragraph text
+			if inParagraph && len(result) > 0 {
+				// Add space to end of last span for paragraph continuation
+				lastSpan := &result[len(result)-1]
+				if strings.HasSuffix(lastSpan.Text, "\n") {
+					lastSpan.Text = strings.TrimSuffix(lastSpan.Text, "\n") + " "
+				} else if !strings.HasSuffix(lastSpan.Text, " ") {
+					lastSpan.Text += " "
+					renderedPos++
+				}
+			}
+			inParagraph = true
+		}
+
+		// For regular text, strip trailing newline (paragraph text is joined with spaces)
+		lineToPass := line
+		if !isBlockElement {
+			lineToPass = strings.TrimSuffix(line, "\n")
+		}
+
 		// Normal line parsing
-		spans, entries, linkEntries := parseLineWithSourceMap(line, sourcePos, renderedPos)
+		spans, entries, linkEntries := parseLineWithSourceMap(lineToPass, sourcePos, renderedPos)
 		sm.entries = append(sm.entries, entries...)
 		for _, le := range linkEntries {
 			lm.Add(le.Start, le.End, le.URL)
@@ -176,7 +304,7 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			renderedPos += len([]rune(span.Text))
 		}
 
-		// Update source position
+		// Update source position (use original line length, not stripped)
 		sourcePos += len(line)
 
 		// Merge consecutive spans with the same style
@@ -198,6 +326,7 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 				Style: rich.Style{
 					Bg:    rich.InlineCodeBg,
 					Code:  true,
+					Block: true,
 					Scale: 1.0,
 				},
 			}
@@ -215,6 +344,11 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 
 			result = append(result, codeSpan)
 		}
+	}
+
+	// Handle trailing indented code block
+	if inIndentedBlock {
+		emitIndentedBlock()
 	}
 
 	return result, sm, lm

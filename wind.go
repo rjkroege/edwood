@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
@@ -708,6 +709,41 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse) bool {
 			w.display.Flush()
 		}
 		return true
+	}
+
+	// Handle button 3 (B3/right-click) in frame area for Look action
+	if m.Point.In(frameRect) && m.Buttons&4 != 0 {
+		// Get character position at click point
+		charPos := rt.Frame().Charofpt(m.Point)
+
+		// Debug output: show position and link map status
+		warning(nil, "Preview B3 click: charPos=%d, linkMap=%v\n", charPos, w.previewLinkMap != nil)
+
+		// Check if this position is within a link
+		url := w.PreviewLookLinkURL(charPos)
+		warning(nil, "Preview B3 click: url=%q\n", url)
+
+		if url != "" {
+			// Plumb the URL using the same mechanism as look3
+			if plumbsendfid != nil {
+				pm := &plumb.Message{
+					Src:  "acme",
+					Dst:  "",
+					Dir:  w.body.AbsDirName(""),
+					Type: "text",
+					Data: []byte(url),
+				}
+				if err := pm.Send(plumbsendfid); err != nil {
+					warning(nil, "Preview B3: plumb failed: %v\n", err)
+				}
+			} else {
+				warning(nil, "Preview B3: plumber not running\n")
+			}
+			return true
+		}
+
+		// Not a link - fall through to normal Look behavior
+		return false
 	}
 
 	return false

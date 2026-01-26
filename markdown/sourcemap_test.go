@@ -584,3 +584,24 @@ func TestParseWithSourceMapLinks(t *testing.T) {
 		})
 	}
 }
+
+// TestFencedCodeBlockHasBlockFlag verifies that fenced code blocks from
+// ParseWithSourceMap have the Block flag set to true.
+func TestFencedCodeBlockHasBlockFlag(t *testing.T) {
+	content, _, _ := ParseWithSourceMap("```\ncode\n```")
+	
+	if len(content) != 1 {
+		t.Fatalf("got %d spans, want 1", len(content))
+	}
+	
+	span := content[0]
+	if !span.Style.Code {
+		t.Error("span.Style.Code = false, want true")
+	}
+	if !span.Style.Block {
+		t.Error("span.Style.Block = false, want true for fenced code blocks")
+	}
+	if span.Style.Bg == nil {
+		t.Error("span.Style.Bg is nil, want background color")
+	}
+}

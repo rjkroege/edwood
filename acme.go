@@ -311,8 +311,28 @@ func tryLoadCodeFont(display draw.Display, baseFont string) draw.Font {
 
 	// Map of proportional fonts to their monospace equivalents
 	monoMap := map[string]string{
-		"GoRegular": "GoMono",
-		"Go-Bold":   "GoMono-Bold",
+		// Go fonts
+		"GoRegular":    "GoMono",
+		"Go-Regular":   "GoMono",
+		"Go-Bold":      "GoMono-Bold",
+		"GoMedium":     "GoMono",
+		"Go-Medium":    "GoMono",
+		// DejaVu fonts
+		"DejaVuSans":   "DejaVuSansMono",
+		// Liberation fonts
+		"LiberationSans": "LiberationMono",
+		// Noto fonts
+		"NotoSans":     "NotoSansMono",
+		// Ubuntu fonts
+		"Ubuntu":       "UbuntuMono",
+		// Source fonts
+		"SourceSansPro": "SourceCodePro",
+		// Roboto
+		"Roboto":       "RobotoMono",
+		// IBM Plex
+		"IBMPlexSans":  "IBMPlexMono",
+		// Inter (fallback to common monospace)
+		"Inter":        "JetBrainsMono",
 	}
 
 	// Try to find and replace a known family name in the path

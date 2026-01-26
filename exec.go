@@ -1226,6 +1226,7 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	// Parse the markdown content with source mapping and link tracking
 	mdContent := t.file.String()
 	content, sourceMap, linkMap := markdown.ParseWithSourceMap(mdContent)
+
 	rt.SetContent(content)
 
 	// Set up the window's preview components

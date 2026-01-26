@@ -26,10 +26,11 @@ func TestParsePlainText(t *testing.T) {
 			wantText: "Hello, World!",
 		},
 		{
+			// In markdown, consecutive lines within a paragraph are joined with spaces
 			name:     "multiline text",
 			input:    "Line one\nLine two\nLine three",
 			wantLen:  1,
-			wantText: "Line one\nLine two\nLine three",
+			wantText: "Line one Line two Line three",
 		},
 		{
 			name:     "text with spaces",
@@ -1540,6 +1541,10 @@ func TestParseFencedCodeBlockHasBackground(t *testing.T) {
 	span := got[0]
 	if !span.Style.Code {
 		t.Fatal("span.Style.Code = false, want true")
+	}
+
+	if !span.Style.Block {
+		t.Fatal("span.Style.Block = false, want true for fenced code blocks")
 	}
 
 	if span.Style.Bg == nil {

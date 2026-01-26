@@ -109,7 +109,8 @@ func TestContentToBoxes(t *testing.T) {
 				{Text: "world", Style: StyleBold},
 			},
 			want: []Box{
-				{Text: []byte("hello "), Nrune: 6, Bc: 0, Style: DefaultStyle()},
+				{Text: []byte("hello"), Nrune: 5, Bc: 0, Style: DefaultStyle()},
+				{Text: []byte(" "), Nrune: 1, Bc: 0, Style: DefaultStyle()},
 				{Text: []byte("world"), Nrune: 5, Bc: 0, Style: StyleBold},
 			},
 		},
@@ -347,7 +348,7 @@ func TestLayoutSingleLine(t *testing.T) {
 			name:      "two words",
 			content:   Plain("hello world"),
 			wantLines: 1,
-			wantBoxes: []string{"hello world"},
+			wantBoxes: []string{"hello", " ", "world"},
 		},
 		{
 			name:      "text with newline creates two lines",
@@ -378,7 +379,7 @@ func TestLayoutSingleLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			boxes := contentToBoxes(tt.content)
-			lines := layout(boxes, font, frameWidth, maxtab, nil)
+			lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
 
 			if len(lines) != tt.wantLines {
 				t.Errorf("layout() returned %d lines, want %d", len(lines), tt.wantLines)
@@ -456,7 +457,7 @@ func TestLayoutWrapping(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			boxes := contentToBoxes(tt.content)
-			lines := layout(boxes, font, tt.frameWidth, maxtab, nil)
+			lines := layout(boxes, font, tt.frameWidth, maxtab, nil, nil)
 
 			if len(lines) != tt.wantLines {
 				var lineContents []string
@@ -484,7 +485,7 @@ func TestLayoutBoxPositions(t *testing.T) {
 	t.Run("sequential boxes have correct X positions", func(t *testing.T) {
 		content := Plain("ab\tcd")
 		boxes := contentToBoxes(content)
-		lines := layout(boxes, font, frameWidth, maxtab, nil)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
 
 		if len(lines) != 1 {
 			t.Fatalf("expected 1 line, got %d", len(lines))
@@ -515,7 +516,7 @@ func TestLayoutBoxPositions(t *testing.T) {
 	t.Run("wrapped lines have correct Y positions", func(t *testing.T) {
 		content := Plain("hello\nworld")
 		boxes := contentToBoxes(content)
-		lines := layout(boxes, font, frameWidth, maxtab, nil)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
 
 		if len(lines) != 2 {
 			t.Fatalf("expected 2 lines, got %d", len(lines))
@@ -535,7 +536,7 @@ func TestLayoutBoxPositions(t *testing.T) {
 	t.Run("box widths are computed", func(t *testing.T) {
 		content := Plain("hello")
 		boxes := contentToBoxes(content)
-		lines := layout(boxes, font, frameWidth, maxtab, nil)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
 
 		if len(lines) != 1 || len(lines[0].Boxes) != 1 {
 			t.Fatalf("expected 1 line with 1 box")

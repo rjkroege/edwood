@@ -194,6 +194,7 @@ func (w *Window) setTag1() {
 		Lput      = " Put"
 		Llook     = " Look"
 		Ledit     = " Edit"
+		Lpreview  = " Preview"
 		Lpipe     = " |"
 	)
 
@@ -234,6 +235,10 @@ func (w *Window) setTag1() {
 		sb.WriteString(Lpipe)
 		sb.WriteString(Llook)
 		sb.WriteString(Ledit)
+		// Add Preview command for markdown files
+		if strings.HasSuffix(strings.ToLower(w.body.file.Name()), ".md") {
+			sb.WriteString(Lpreview)
+		}
 		sb.WriteString(" ")
 	}
 

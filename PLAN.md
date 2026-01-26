@@ -593,6 +593,14 @@ See `docs/codeblock-design.md` for full design.
 | Tests pass | [x] | go test ./markdown/... passes |
 | Code committed | [x] | Commit 7add578 |
 
+### 13.4a Parse Indented Code Blocks
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | Existing fenced block tests + manual verification |
+| Code written | [x] | Detect lines starting with 4 spaces or 1 tab, merge consecutive lines into code block with `Block: true` |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [ ] | Pending |
+
 ### 13.5 Fenced Code Block Source Mapping
 | Stage | Status | Notes |
 |-------|--------|-------|
@@ -600,6 +608,14 @@ See `docs/codeblock-design.md` for full design.
 | Code written | [x] | SourceMap correctly maps rendered code to source (excluding fence lines) |
 | Tests pass | [x] | go test ./markdown/... passes |
 | Code committed | [x] | Commit c2fa25d |
+
+### 13.5a Indented Code Block Source Mapping
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | Manual verification with README.md |
+| Code written | [x] | ParseWithSourceMap tracks indented block source positions |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [ ] | Pending |
 
 ### 13.6 Block-Level Background Rendering
 | Stage | Status | Notes |
@@ -644,18 +660,18 @@ See `docs/codeblock-design.md` for full design.
 ### 13.11 Horizontal Rule Source Mapping
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | TestHorizontalRuleSourceMap |
-| Code written | [ ] | SourceMap maps HRuleRune position to full source line |
-| Tests pass | [ ] | go test ./markdown/... passes |
-| Code committed | [ ] | |
+| Tests exist | [x] | TestHorizontalRuleSourceMap |
+| Code written | [x] | SourceMap maps HRuleRune position to full source line |
+| Tests pass | [x] | go test ./markdown/... passes |
+| Code committed | [x] | Commit 3d1a49d |
 
 ### 13.12 Horizontal Rule Visual Verification
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Tests exist | [ ] | N/A - manual |
-| Code written | [ ] | `---`, `***`, `___` render as gray horizontal lines |
-| Tests pass | [ ] | Manual verification |
-| Code committed | [ ] | |
+| Tests exist | [x] | N/A - manual |
+| Code written | [x] | `---`, `***`, `___` render as gray horizontal lines |
+| Tests pass | [x] | Manual verification with test_codeblocks.md |
+| Code committed | [x] | Phase 13 complete - code blocks and horizontal rules |
 
 ---
 
