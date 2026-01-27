@@ -6806,6 +6806,235 @@ func TestPasteHeadingText(t *testing.T) {
 	})
 }
 
+func TestPasteIntoFormattedContext(t *testing.T) {
+	// Tests for format inheritance: when pasting into an already-formatted
+	// destination context, the transform should avoid double-wrapping.
+	// The key principle: if dest already provides formatting of the same type,
+	// strip source markers; otherwise apply normal transformation rules.
+
+	t.Run("BoldIntoBold", func(t *testing.T) {
+		// Pasting bold text into bold context — don't double-wrap with **.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("important"), sourceCtx, destCtx)
+		if string(result) != "important" {
+			t.Errorf("bold-into-bold: got %q, want %q", string(result), "important")
+		}
+	})
+
+	t.Run("ItalicIntoItalic", func(t *testing.T) {
+		// Pasting italic text into italic context — don't double-wrap with *.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentItalic,
+		}
+		result := transformForPaste([]byte("emphasis"), sourceCtx, destCtx)
+		if string(result) != "emphasis" {
+			t.Errorf("italic-into-italic: got %q, want %q", string(result), "emphasis")
+		}
+	})
+
+	t.Run("CodeIntoCode", func(t *testing.T) {
+		// Pasting code into code context — don't double-wrap with backticks.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentCode,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentCode,
+		}
+		result := transformForPaste([]byte("x := 1"), sourceCtx, destCtx)
+		if string(result) != "x := 1" {
+			t.Errorf("code-into-code: got %q, want %q", string(result), "x := 1")
+		}
+	})
+
+	t.Run("BoldItalicIntoBoldItalic", func(t *testing.T) {
+		// Pasting bold-italic into bold-italic context — same type, strip markers.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBoldItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBoldItalic,
+		}
+		result := transformForPaste([]byte("strong emphasis"), sourceCtx, destCtx)
+		if string(result) != "strong emphasis" {
+			t.Errorf("bolditalic-into-bolditalic: got %q, want %q", string(result), "strong emphasis")
+		}
+	})
+
+	t.Run("HeadingIntoHeading", func(t *testing.T) {
+		// Pasting heading text (no newline) into heading context — strip prefix.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		result := transformForPaste([]byte("## Section"), sourceCtx, destCtx)
+		if string(result) != "Section" {
+			t.Errorf("heading-into-heading: got %q, want %q", string(result), "Section")
+		}
+	})
+
+	t.Run("BoldIntoItalic", func(t *testing.T) {
+		// Pasting bold text into italic context — different formatting types.
+		// Bold source into non-plain dest: text passes through (not re-wrapped).
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentItalic,
+		}
+		result := transformForPaste([]byte("bold text"), sourceCtx, destCtx)
+		// Bold into non-plain, non-bold: text passes through (dest provides its own formatting).
+		if string(result) != "bold text" {
+			t.Errorf("bold-into-italic: got %q, want %q", string(result), "bold text")
+		}
+	})
+
+	t.Run("ItalicIntoBold", func(t *testing.T) {
+		// Pasting italic text into bold context — different formatting types.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("italic text"), sourceCtx, destCtx)
+		// Italic into non-plain, non-italic: text passes through.
+		if string(result) != "italic text" {
+			t.Errorf("italic-into-bold: got %q, want %q", string(result), "italic text")
+		}
+	})
+
+	t.Run("CodeIntoBold", func(t *testing.T) {
+		// Pasting code text into bold context — different formatting types.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentCode,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("var x"), sourceCtx, destCtx)
+		// Code into non-plain, non-code: text passes through.
+		if string(result) != "var x" {
+			t.Errorf("code-into-bold: got %q, want %q", string(result), "var x")
+		}
+	})
+
+	t.Run("BoldIntoCode", func(t *testing.T) {
+		// Pasting bold text into code context — different formatting types.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentCode,
+		}
+		result := transformForPaste([]byte("bold text"), sourceCtx, destCtx)
+		// Bold into non-plain, non-bold: text passes through.
+		if string(result) != "bold text" {
+			t.Errorf("bold-into-code: got %q, want %q", string(result), "bold text")
+		}
+	})
+
+	t.Run("PlainIntoBold", func(t *testing.T) {
+		// Pasting plain text into bold context — inherits bold formatting.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("hello world"), sourceCtx, destCtx)
+		if string(result) != "hello world" {
+			t.Errorf("plain-into-bold: got %q, want %q", string(result), "hello world")
+		}
+	})
+
+	t.Run("PlainIntoItalic", func(t *testing.T) {
+		// Pasting plain text into italic context — inherits italic formatting.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentItalic,
+		}
+		result := transformForPaste([]byte("hello world"), sourceCtx, destCtx)
+		if string(result) != "hello world" {
+			t.Errorf("plain-into-italic: got %q, want %q", string(result), "hello world")
+		}
+	})
+
+	t.Run("PlainIntoCode", func(t *testing.T) {
+		// Pasting plain text into code context — inherits code formatting.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentCode,
+		}
+		result := transformForPaste([]byte("x + y"), sourceCtx, destCtx)
+		if string(result) != "x + y" {
+			t.Errorf("plain-into-code: got %q, want %q", string(result), "x + y")
+		}
+	})
+
+	t.Run("PartialBoldIntoBold", func(t *testing.T) {
+		// Pasting partial bold (no markers in selection) into bold context.
+		// Same type — should still strip/pass through, not re-wrap.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  false,
+			IncludesCloseMarker: false,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("parti"), sourceCtx, destCtx)
+		if string(result) != "parti" {
+			t.Errorf("partial-bold-into-bold: got %q, want %q", string(result), "parti")
+		}
+	})
+
+	t.Run("BoldItalicIntoPlain", func(t *testing.T) {
+		// Pasting bold-italic into plain context — should wrap with ***.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBoldItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("strong emphasis"), sourceCtx, destCtx)
+		if string(result) != "***strong emphasis***" {
+			t.Errorf("bolditalic-into-plain: got %q, want %q", string(result), "***strong emphasis***")
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0
