@@ -13,6 +13,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/rich"
 )
@@ -7255,6 +7256,113 @@ func TestPreviewChordPasteUndo(t *testing.T) {
 	if string(buf) != originalText {
 		t.Errorf("after undo, body text should be %q, got %q", originalText, string(buf))
 	}
+}
+
+// TrackingMockFrame is a MockFrame that tracks DrawSel calls.
+type TrackingMockFrame struct {
+	MockFrame
+	DrawSelCalled bool
+	DrawSelCount  int
+	nchars        int
+	maxlines      int
+}
+
+func (mf *TrackingMockFrame) GetFrameFillStatus() frame.FrameFillStatus {
+	return frame.FrameFillStatus{
+		Nchars:         mf.nchars,
+		Nlines:         mf.maxlines,
+		Maxlines:       mf.maxlines,
+		MaxPixelHeight: mf.maxlines * 14,
+	}
+}
+
+func (mf *TrackingMockFrame) DrawSel(pt image.Point, p0, p1 int, ticked bool) {
+	mf.DrawSelCalled = true
+	mf.DrawSelCount++
+}
+
+func (mf *TrackingMockFrame) Ptofchar(int) image.Point { return image.Point{0, 0} }
+
+// TestPreviewShowSuppressesSourceDraw tests that when the window is in preview
+// mode, Text.Show() on the body updates q0/q1 but does NOT call DrawSel() on
+// the source body frame. This prevents the source frame from bleeding through
+// the preview rendering.
+func TestPreviewShowSuppressesSourceDraw(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	sourceText := "Hello world some text to search for here."
+	sourceRunes := []rune(sourceText)
+
+	// Helper to create a window with a tracking frame
+	makeWindow := func(previewMode bool) (*Window, *TrackingMockFrame) {
+		tf := &TrackingMockFrame{
+			nchars:   len(sourceRunes),
+			maxlines: 20,
+		}
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      tf,
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+		}
+		w.body.w = w
+		w.body.what = Body
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.tag = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("", nil),
+		}
+		w.col = &Column{safe: true}
+		w.r = rect
+		w.previewMode = previewMode
+		return w, tf
+	}
+
+	t.Run("preview_mode_suppresses_DrawSel", func(t *testing.T) {
+		w, tf := makeWindow(true)
+
+		if !w.IsPreviewMode() {
+			t.Fatal("Window should be in preview mode")
+		}
+
+		// Call Show() with a selection range - this simulates what search() does
+		// after finding a match in the source body
+		q0, q1 := 6, 11 // "world"
+		w.body.Show(q0, q1, true)
+
+		// Verify: q0/q1 should be updated (the logical selection)
+		if w.body.q0 != q0 || w.body.q1 != q1 {
+			t.Errorf("Show() should update q0/q1: want (%d,%d), got (%d,%d)",
+				q0, q1, w.body.q0, w.body.q1)
+		}
+
+		// Verify: DrawSel should NOT have been called (no source frame rendering)
+		if tf.DrawSelCalled {
+			t.Errorf("DrawSel should NOT be called on source body frame in preview mode, but was called %d times",
+				tf.DrawSelCount)
+		}
+	})
+
+	t.Run("normal_mode_calls_DrawSel", func(t *testing.T) {
+		w, tf := makeWindow(false)
+
+		if w.IsPreviewMode() {
+			t.Fatal("Window should NOT be in preview mode")
+		}
+
+		q0, q1 := 6, 11 // "world"
+		w.body.Show(q0, q1, true)
+
+		// Verify: DrawSel SHOULD be called in normal mode
+		if !tf.DrawSelCalled {
+			t.Error("DrawSel SHOULD be called on source body frame when NOT in preview mode")
+		}
+	})
 }
 
 // searchString returns the index of substr in s, or -1 if not found.
