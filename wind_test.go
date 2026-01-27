@@ -5624,6 +5624,260 @@ func TestSelectionContext(t *testing.T) {
 	})
 }
 
+// TestAnalyzeSelectionContent tests the analyzeSelectionContent method which
+// examines the spans in the rendered RichText content within the given
+// rendered-position range [rStart, rEnd) and determines the SelectionContentType.
+// This is used during selection context updates to classify what kind of
+// markdown content the user has selected (plain, bold, italic, code, heading, etc.).
+func TestAnalyzeSelectionContent(t *testing.T) {
+	// Helper to create a Window with richBody set to given content.
+	setupWindow := func(t *testing.T, content rich.Content) *Window {
+		t.Helper()
+		rect := image.Rect(0, 0, 800, 600)
+		display := edwoodtest.NewDisplay(rect)
+		global.configureGlobals(display)
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", nil),
+		}
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.col = &Column{safe: true}
+
+		font := edwoodtest.NewFont(10, 14)
+		bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+		textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+		rt := NewRichText()
+		bodyRect := image.Rect(12, 20, 800, 600)
+		rt.Init(display, font,
+			WithRichTextBackground(bgImage),
+			WithRichTextColor(textImage),
+		)
+		rt.Render(bodyRect)
+		rt.SetContent(content)
+		w.richBody = rt
+		w.SetPreviewMode(true)
+		return w
+	}
+
+	t.Run("PlainText", func(t *testing.T) {
+		// Content: "Hello world" — all plain text with default style.
+		content := rich.Plain("Hello world")
+		w := setupWindow(t, content)
+
+		// Selecting "Hello" (positions 0-5) should be plain.
+		got := w.analyzeSelectionContent(0, 5)
+		if got != ContentPlain {
+			t.Errorf("analyzeSelectionContent(0,5) = %v, want ContentPlain", got)
+		}
+	})
+
+	t.Run("AllBold", func(t *testing.T) {
+		// Content: "bold text" rendered with bold style.
+		content := rich.Content{
+			{Text: "bold text", Style: rich.StyleBold},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 9)
+		if got != ContentBold {
+			t.Errorf("analyzeSelectionContent(0,9) = %v, want ContentBold", got)
+		}
+	})
+
+	t.Run("PartialBold", func(t *testing.T) {
+		// Content: "bold text" rendered bold, selecting "old" (positions 1-4).
+		content := rich.Content{
+			{Text: "bold text", Style: rich.StyleBold},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(1, 4)
+		if got != ContentBold {
+			t.Errorf("analyzeSelectionContent(1,4) = %v, want ContentBold", got)
+		}
+	})
+
+	t.Run("AllItalic", func(t *testing.T) {
+		// Content: "italic" rendered with italic style.
+		content := rich.Content{
+			{Text: "italic", Style: rich.StyleItalic},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 6)
+		if got != ContentItalic {
+			t.Errorf("analyzeSelectionContent(0,6) = %v, want ContentItalic", got)
+		}
+	})
+
+	t.Run("BoldItalic", func(t *testing.T) {
+		// Content: "emphasis" rendered with both bold and italic.
+		content := rich.Content{
+			{Text: "emphasis", Style: rich.Style{Bold: true, Italic: true, Scale: 1.0}},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 8)
+		if got != ContentBoldItalic {
+			t.Errorf("analyzeSelectionContent(0,8) = %v, want ContentBoldItalic", got)
+		}
+	})
+
+	t.Run("InlineCode", func(t *testing.T) {
+		// Content: "code" rendered with code style (monospace).
+		content := rich.Content{
+			{Text: "code", Style: rich.StyleCode},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 4)
+		if got != ContentCode {
+			t.Errorf("analyzeSelectionContent(0,4) = %v, want ContentCode", got)
+		}
+	})
+
+	t.Run("CodeBlock", func(t *testing.T) {
+		// Content: "func main() {}" as a block-level code element.
+		content := rich.Content{
+			{Text: "func main() {}", Style: rich.Style{Code: true, Block: true, Scale: 1.0}},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 14)
+		if got != ContentCodeBlock {
+			t.Errorf("analyzeSelectionContent(0,14) = %v, want ContentCodeBlock", got)
+		}
+	})
+
+	t.Run("Heading", func(t *testing.T) {
+		// Content: "Heading" rendered with heading style (bold, Scale > 1).
+		content := rich.Content{
+			{Text: "Heading", Style: rich.StyleH1},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 7)
+		if got != ContentHeading {
+			t.Errorf("analyzeSelectionContent(0,7) = %v, want ContentHeading", got)
+		}
+	})
+
+	t.Run("HeadingH2", func(t *testing.T) {
+		// H2 heading also detected as heading.
+		content := rich.Content{
+			{Text: "Subheading", Style: rich.StyleH2},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 10)
+		if got != ContentHeading {
+			t.Errorf("analyzeSelectionContent(0,10) = %v, want ContentHeading", got)
+		}
+	})
+
+	t.Run("Link", func(t *testing.T) {
+		// Content: "click here" rendered as a link.
+		content := rich.Content{
+			{Text: "click here", Style: rich.StyleLink},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 10)
+		if got != ContentLink {
+			t.Errorf("analyzeSelectionContent(0,10) = %v, want ContentLink", got)
+		}
+	})
+
+	t.Run("Image", func(t *testing.T) {
+		// Content: image placeholder text.
+		content := rich.Content{
+			{Text: "[image]", Style: rich.Style{Image: true, ImageURL: "photo.png", Scale: 1.0}},
+		}
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(0, 7)
+		if got != ContentImage {
+			t.Errorf("analyzeSelectionContent(0,7) = %v, want ContentImage", got)
+		}
+	})
+
+	t.Run("MixedPlainAndBold", func(t *testing.T) {
+		// Content: "Hello " (plain) + "world" (bold)
+		// Selecting across both spans should return ContentMixed.
+		content := rich.Content{
+			{Text: "Hello ", Style: rich.DefaultStyle()},
+			{Text: "world", Style: rich.StyleBold},
+		}
+		w := setupWindow(t, content)
+
+		// Select "lo world" (positions 3-11), spanning plain and bold.
+		got := w.analyzeSelectionContent(3, 11)
+		if got != ContentMixed {
+			t.Errorf("analyzeSelectionContent(3,11) = %v, want ContentMixed", got)
+		}
+	})
+
+	t.Run("MixedBoldAndItalic", func(t *testing.T) {
+		// Content: "bold" (bold) + " and " (plain) + "italic" (italic)
+		content := rich.Content{
+			{Text: "bold", Style: rich.StyleBold},
+			{Text: " and ", Style: rich.DefaultStyle()},
+			{Text: "italic", Style: rich.StyleItalic},
+		}
+		w := setupWindow(t, content)
+
+		// Select everything (0-15 = "bold and italic").
+		got := w.analyzeSelectionContent(0, 15)
+		if got != ContentMixed {
+			t.Errorf("analyzeSelectionContent(0,15) = %v, want ContentMixed", got)
+		}
+	})
+
+	t.Run("SelectionWithinOneSpanOfMultiple", func(t *testing.T) {
+		// Content: "plain " (default) + "bold" (bold) + " more" (default)
+		// Selecting only within the bold span should return ContentBold.
+		content := rich.Content{
+			{Text: "plain ", Style: rich.DefaultStyle()},
+			{Text: "bold", Style: rich.StyleBold},
+			{Text: " more", Style: rich.DefaultStyle()},
+		}
+		w := setupWindow(t, content)
+
+		// "bold" starts at position 6, ends at 10.
+		got := w.analyzeSelectionContent(6, 10)
+		if got != ContentBold {
+			t.Errorf("analyzeSelectionContent(6,10) = %v, want ContentBold", got)
+		}
+	})
+
+	t.Run("EmptySelection", func(t *testing.T) {
+		// An empty selection (rStart == rEnd) should return ContentPlain.
+		content := rich.Plain("Some text")
+		w := setupWindow(t, content)
+
+		got := w.analyzeSelectionContent(5, 5)
+		if got != ContentPlain {
+			t.Errorf("analyzeSelectionContent(5,5) = %v, want ContentPlain", got)
+		}
+	})
+
+	t.Run("NilRichBody", func(t *testing.T) {
+		// If richBody is nil, should safely return ContentPlain.
+		w := NewWindow().initHeadless(nil)
+		w.richBody = nil
+
+		got := w.analyzeSelectionContent(0, 5)
+		if got != ContentPlain {
+			t.Errorf("analyzeSelectionContent(0,5) with nil richBody = %v, want ContentPlain", got)
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0

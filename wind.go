@@ -632,6 +632,75 @@ type SelectionContext struct {
 	IncludesCloseMarker bool // Selection includes the closing formatting marker
 }
 
+// classifyStyle maps a rich.Style to its SelectionContentType.
+func classifyStyle(s rich.Style) SelectionContentType {
+	switch {
+	case s.Image:
+		return ContentImage
+	case s.Link:
+		return ContentLink
+	case s.Code && s.Block:
+		return ContentCodeBlock
+	case s.Code:
+		return ContentCode
+	case s.Bold && s.Scale > 1.0:
+		return ContentHeading
+	case s.Bold && s.Italic:
+		return ContentBoldItalic
+	case s.Bold:
+		return ContentBold
+	case s.Italic:
+		return ContentItalic
+	default:
+		return ContentPlain
+	}
+}
+
+// analyzeSelectionContent examines the spans in the rendered RichText content
+// within the given rendered-position range [rStart, rEnd) and determines the
+// SelectionContentType. This is used during selection context updates to
+// classify what kind of markdown content the user has selected.
+func (w *Window) analyzeSelectionContent(rStart, rEnd int) SelectionContentType {
+	if w.richBody == nil || rStart >= rEnd {
+		return ContentPlain
+	}
+
+	content := w.richBody.Content()
+	if len(content) == 0 {
+		return ContentPlain
+	}
+
+	var foundType SelectionContentType
+	found := false
+	pos := 0
+
+	for _, span := range content {
+		runeLen := len([]rune(span.Text))
+		spanEnd := pos + runeLen
+
+		// Check if this span overlaps [rStart, rEnd)
+		if spanEnd > rStart && pos < rEnd {
+			ct := classifyStyle(span.Style)
+			if !found {
+				foundType = ct
+				found = true
+			} else if ct != foundType {
+				return ContentMixed
+			}
+		}
+
+		pos = spanEnd
+		if pos >= rEnd {
+			break
+		}
+	}
+
+	if !found {
+		return ContentPlain
+	}
+	return foundType
+}
+
 // IsPreviewMode returns true if the window is in preview mode (showing rendered markdown).
 func (w *Window) IsPreviewMode() bool {
 	return w.previewMode
