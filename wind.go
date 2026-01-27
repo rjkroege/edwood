@@ -981,10 +981,8 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		// Process chords
 		switch {
 		case chordButtons == 7: // B1+B2+B3: Snarf (copy, no delete)
-			if snarfed := w.PreviewSnarf(); len(snarfed) > 0 {
-				global.snarfbuf = snarfed
-				global.snarfContext = w.selectionContext
-			}
+			cut(&w.body, &w.body, nil, true, false, "")
+			global.snarfContext = w.selectionContext
 
 		case chordButtons&2 != 0: // B1+B2: Cut (copy + delete)
 			if snarfed := w.PreviewSnarf(); len(snarfed) > 0 {

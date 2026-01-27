@@ -5179,6 +5179,13 @@ func TestPreviewChordPaste(t *testing.T) {
 func TestPreviewChordSnarf(t *testing.T) {
 	w, rt, frameRect := setupPreviewChordTestWindow(t)
 
+	// Ensure body.w is set so cut() can operate on the text properly
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: w.display}
+	defer func() { global.row = Row{} }()
+
 	// Select "Hello" (chars 0-5) with B1, then chord B2+B3 to snarf
 	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
 	m := draw.Mouse{
@@ -5201,8 +5208,9 @@ func TestPreviewChordSnarf(t *testing.T) {
 	}
 	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
 
-	// Clear snarf buffer before test
+	// Clear snarf buffer and display snarf before test
 	global.snarfbuf = nil
+	w.display.WriteSnarf(nil)
 
 	handled := w.HandlePreviewMouse(&m, mc)
 	if !handled {
@@ -5212,6 +5220,20 @@ func TestPreviewChordSnarf(t *testing.T) {
 	// After B1+B2+B3 chord, the snarf buffer should contain the selected text
 	if len(global.snarfbuf) == 0 {
 		t.Error("snarf buffer should contain snarfed text after B1+B2+B3 chord")
+	}
+
+	// Verify the standard snarf path was used: acmeputsnarf() should have
+	// synced global.snarfbuf to the display's system clipboard via WriteSnarf().
+	clipBuf := make([]byte, 1024)
+	n, _, err := w.display.ReadSnarf(clipBuf)
+	if err != nil {
+		t.Fatalf("ReadSnarf failed: %v", err)
+	}
+	if n == 0 {
+		t.Error("system clipboard (display snarf) should be updated after chord snarf; acmeputsnarf() was not called")
+	}
+	if n > 0 && string(clipBuf[:n]) != string(global.snarfbuf) {
+		t.Errorf("system clipboard content should match global.snarfbuf: got %q, want %q", string(clipBuf[:n]), string(global.snarfbuf))
 	}
 
 	// Source body should NOT be modified (snarf copies but doesn't delete)
