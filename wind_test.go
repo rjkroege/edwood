@@ -4181,3 +4181,241 @@ func TestPreviewB2Execute(t *testing.T) {
 		}
 	})
 }
+
+// TestPreviewB2BuiltinCommands verifies that built-in commands (Del, Snarf, Cut,
+// Paste, Look, etc.) are correctly recognized and dispatched when B2-clicked in
+// preview mode. This tests the full flow from B2 click -> word expansion ->
+// previewExecute() -> built-in command dispatch.
+func TestPreviewB2BuiltinCommands(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: display}
+	defer func() { global.row = Row{} }()
+
+	// Markdown containing multiple built-in command words.
+	// Rendered text will be: "Del Snarf Cut Paste Look" (no markdown formatting)
+	sourceMarkdown := "Del Snarf Cut Paste Look"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/builtins.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	plainText := rt.Content().Plain()
+	frameRect := rt.Frame().Rect()
+
+	// Helper to find word position in rendered text
+	findWord := func(word string) int {
+		for i := 0; i <= len(plainText)-len(word); i++ {
+			if string(plainText[i:i+len(word)]) == word {
+				return i
+			}
+		}
+		return -1
+	}
+
+	// Helper to B2-click a word, returning the exec text.
+	// Note: HandlePreviewMouse calls previewExecute() which dispatches the
+	// built-in command. Only use this for commands safe in test context.
+	b2Click := func(t *testing.T, word string) string {
+		t.Helper()
+		idx := findWord(word)
+		if idx < 0 {
+			t.Fatalf("Could not find %q in rendered text: %q", word, string(plainText))
+		}
+
+		// Reset selection
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		clickX := frameRect.Min.X + idx*10 + (len(word)*10)/2 // middle of word
+		clickPoint := image.Pt(clickX, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Fatalf("HandlePreviewMouse should handle B2 click on %q", word)
+		}
+
+		return w.PreviewExecText()
+	}
+
+	// Test that each built-in command word is correctly extracted from preview
+	// and recognized by lookup in globalexectab. We verify the B2 click -> word
+	// expansion -> PreviewExecText() -> lookup pipeline for each command.
+	t.Run("AllBuiltinsRecognized", func(t *testing.T) {
+		builtins := []string{"Del", "Snarf", "Cut", "Paste", "Look"}
+		for _, cmd := range builtins {
+			t.Run(cmd, func(t *testing.T) {
+				idx := findWord(cmd)
+				if idx < 0 {
+					t.Fatalf("Could not find %q in rendered text", cmd)
+				}
+
+				// B2 click to select the word and extract exec text,
+				// but don't go through HandlePreviewMouse (which dispatches).
+				// Instead simulate just the selection + extraction steps.
+				rt.SetSelection(0, 0)
+				rt.Render(bodyRect)
+
+				// Simulate B2 null click word expansion
+				clickX := frameRect.Min.X + idx*10 + (len(cmd)*10)/2
+				clickPoint := image.Pt(clickX, frameRect.Min.Y+5)
+				charPos := rt.Frame().Charofpt(clickPoint)
+
+				// Expand to word boundaries (same logic as HandlePreviewMouse)
+				_, wordStart, wordEnd := w.PreviewExpandWord(charPos)
+				rt.SetSelection(wordStart, wordEnd)
+				w.syncSourceSelection()
+
+				execText := w.PreviewExecText()
+				if execText != cmd {
+					t.Errorf("PreviewExecText() returned %q, want %q", execText, cmd)
+					return
+				}
+
+				e := lookup(execText, globalexectab)
+				if e == nil {
+					t.Errorf("Command %q should be found in globalexectab", cmd)
+				} else if e.name != cmd {
+					t.Errorf("Looked up command should be %q, got %q", cmd, e.name)
+				}
+			})
+		}
+	})
+
+	// Test Snarf dispatch: previewExecute with "Snarf" should snarf the body
+	// selection text into global.snarfbuf. This verifies the full dispatch
+	// path from previewExecute -> lookup -> cut(dosnarf=true, docut=false).
+	t.Run("SnarfDispatch", func(t *testing.T) {
+		// Set body selection to "Del" (first 3 chars of source)
+		w.body.q0 = 0
+		w.body.q1 = 3
+
+		// Set global.seltext so cut() uses body selection
+		global.seltext = &w.body
+
+		// Clear snarfbuf
+		global.snarfbuf = nil
+
+		// Execute Snarf via previewExecute
+		previewExecute(&w.body, "Snarf")
+
+		// Verify snarfbuf was populated with the selected source text
+		if len(global.snarfbuf) == 0 {
+			t.Error("global.snarfbuf should be populated after Snarf, but is empty")
+		} else {
+			got := string(global.snarfbuf)
+			if got != "Del" {
+				t.Errorf("global.snarfbuf should contain 'Del', got %q", got)
+			}
+		}
+	})
+
+	// Test B2 click on "Snarf" through HandlePreviewMouse dispatches correctly.
+	// Snarf is safe to dispatch in test context since it only copies to snarfbuf.
+	t.Run("SnarfViaB2Click", func(t *testing.T) {
+		// Set body selection for snarf to copy
+		w.body.q0 = 4
+		w.body.q1 = 9 // "Snarf"
+		global.seltext = &w.body
+		global.snarfbuf = nil
+
+		execText := b2Click(t, "Snarf")
+		if execText != "Snarf" {
+			t.Errorf("PreviewExecText() for Snarf returned %q", execText)
+		}
+
+		// After HandlePreviewMouse dispatches Snarf, snarfbuf should be populated.
+		// The body selection is synced via syncSourceSelection(), and cut()
+		// reads from the body file at the synced positions.
+		if len(global.snarfbuf) == 0 {
+			t.Error("global.snarfbuf should be populated after B2-clicking Snarf")
+		}
+	})
+
+	// Test Cut command flags are correct for preview dispatch
+	t.Run("CutFlags", func(t *testing.T) {
+		e := lookup("Cut", globalexectab)
+		if e == nil {
+			t.Fatal("Cut should be in globalexectab")
+		}
+		// Cut has mark=true, flag1=true (dosnarf), flag2=true (docut)
+		if !e.mark {
+			t.Error("Cut should be marked as undoable")
+		}
+		if !e.flag1 {
+			t.Error("Cut should have flag1 (dosnarf) set")
+		}
+		if !e.flag2 {
+			t.Error("Cut should have flag2 (docut) set")
+		}
+	})
+
+	// Test Paste command flags
+	t.Run("PasteFlags", func(t *testing.T) {
+		e := lookup("Paste", globalexectab)
+		if e == nil {
+			t.Fatal("Paste should be in globalexectab")
+		}
+		if !e.mark {
+			t.Error("Paste should be marked as undoable")
+		}
+	})
+
+	// Test Look command is recognized
+	t.Run("LookRecognized", func(t *testing.T) {
+		e := lookup("Look", globalexectab)
+		if e == nil {
+			t.Fatal("Look should be in globalexectab")
+		}
+		if e.name != "Look" {
+			t.Errorf("Expected Look command, got %q", e.name)
+		}
+	})
+}

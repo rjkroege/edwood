@@ -43,6 +43,9 @@ type Frame interface {
 	// Rendering
 	Redraw()
 
+	// Content queries
+	ImageURLAt(pos int) string // Returns image URL at position, or "" if not an image
+
 	// Status
 	Full() bool // True if frame is at capacity
 }
@@ -354,6 +357,38 @@ func (f *frameImpl) runeAtX(text []byte, style Style, x int) int {
 	return runeIdx
 }
 
+// ImageURLAt returns the ImageURL if the given character position falls within
+// an image box. Returns empty string if not an image.
+func (f *frameImpl) ImageURLAt(pos int) string {
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return ""
+	}
+
+	// Walk through boxes counting runes until we find the one containing pos
+	runeCount := 0
+	for _, box := range boxes {
+		var boxRunes int
+		if box.IsNewline() || box.IsTab() {
+			boxRunes = 1
+		} else {
+			boxRunes = box.Nrune
+		}
+
+		// Check if pos falls within this box
+		if pos >= runeCount && pos < runeCount+boxRunes {
+			if box.Style.Image && box.Style.ImageURL != "" {
+				return box.Style.ImageURL
+			}
+			return ""
+		}
+
+		runeCount += boxRunes
+	}
+
+	return ""
+}
+
 // Select handles mouse selection.
 // It takes the Mousectl for reading subsequent mouse events and the
 // initial mouse-down event. It tracks the mouse drag and returns the
@@ -601,6 +636,7 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	frameHeight := f.rect.Dy()
 	frameWidth := f.rect.Dx()
 
+
 	// Phase 1: Draw block-level backgrounds (full line width for fenced code blocks)
 	// This must happen first so text appears on top
 	for _, line := range lines {
@@ -669,7 +705,7 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 				continue
 			}
 			// Skip images - they are handled in Phase 5
-			if pb.Box.IsImage() || (pb.Box.Style.Image && pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil) {
+			if pb.Box.Style.Image {
 				continue
 			}
 			if len(pb.Box.Text) == 0 {
@@ -705,8 +741,6 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	}
 
 	// Phase 5: Render images
-	// Images are rendered after text so they can overlay backgrounds properly.
-	// Images with load errors show a placeholder text instead.
 	for _, line := range lines {
 		// Skip lines that start at or below the frame bottom
 		if line.Y >= frameHeight {
@@ -726,15 +760,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 
 			// Check for error placeholder case
 			if pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil {
-				// Show error placeholder as text
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path)
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path, pb.Box.Style.ImageAlt)
 				continue
 			}
 
 			// Check if we have valid image data to render
 			if !pb.Box.IsImage() {
-				// No ImageData, show placeholder for unloaded image
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL)
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL, pb.Box.Style.ImageAlt)
 				continue
 			}
 
@@ -1181,7 +1213,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	if err != nil {
 		// Fall back to error placeholder
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path)
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
 		return
 	}
 	defer srcImg.Free()
@@ -1191,7 +1223,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	if err != nil {
 		// Fall back to error placeholder
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path)
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
 		return
 	}
 
@@ -1238,25 +1270,25 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	}
 }
 
-// ImageErrorPlaceholderColor is the color used for image error placeholder text.
-var ImageErrorPlaceholderColor = color.RGBA{R: 200, G: 100, B: 100, A: 255}
-
 // drawImageErrorPlaceholder renders an error placeholder for failed image loads.
-// It displays "[Image: load failed]" at the specified position.
-func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string) {
+// It displays "[Image: alt]" in blue (like a link) so it can be clicked to open the image path.
+func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string, alt string) {
 	if f.font == nil || f.textColor == nil {
 		return
 	}
 
-	// Create error placeholder text
-	placeholder := "[Image: load failed]"
+	// Create placeholder text with alt text
+	placeholder := "[Image: " + alt + "]"
+	if alt == "" {
+		placeholder = "[Image]"
+	}
 
-	// Use a reddish color for error placeholders
-	errorColor := f.allocColorImage(ImageErrorPlaceholderColor)
-	if errorColor == nil {
-		errorColor = f.textColor // Fall back to default text color
+	// Use blue (like links) so users know it's clickable
+	blueColor := f.allocColorImage(LinkBlue)
+	if blueColor == nil {
+		blueColor = f.textColor // Fall back to default text color
 	}
 
 	// Render the placeholder text
-	target.Bytes(pt, errorColor, image.ZP, f.font, []byte(placeholder))
+	target.Bytes(pt, blueColor, image.ZP, f.font, []byte(placeholder))
 }

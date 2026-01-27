@@ -23,8 +23,9 @@ type RichText struct {
 	content    rich.Content
 
 	// Options stored for frame initialization
-	background draw.Image
-	textColor  draw.Image
+	background     draw.Image
+	textColor      draw.Image
+	selectionColor draw.Image
 
 	// Font variants for styled text
 	boldFont       draw.Font
@@ -96,6 +97,9 @@ func (rt *RichText) Init(display draw.Display, font draw.Font, opts ...RichTextO
 	}
 	if rt.basePath != "" {
 		frameOpts = append(frameOpts, rich.WithBasePath(rt.basePath))
+	}
+	if rt.selectionColor != nil {
+		frameOpts = append(frameOpts, rich.WithSelectionColor(rt.selectionColor))
 	}
 
 	// Initialize frame with empty rectangle - will be set on first Render() call
@@ -562,6 +566,14 @@ func WithRichTextImageCache(cache *rich.ImageCache) RichTextOption {
 func WithRichTextBasePath(path string) RichTextOption {
 	return func(rt *RichText) {
 		rt.basePath = path
+	}
+}
+
+// WithRichTextSelectionColor sets the selection highlight color.
+// This color is used to highlight selected text in the rich text frame.
+func WithRichTextSelectionColor(c draw.Image) RichTextOption {
+	return func(rt *RichText) {
+		rt.selectionColor = c
 	}
 }
 

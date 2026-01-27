@@ -644,6 +644,70 @@ func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, r
 	}
 
 	for i < len(text) {
+		// Check for ! (potential image) - must be checked before links
+		if text[i] == '!' && i+1 < len(text) && text[i+1] == '[' {
+			// Try to parse as image: ![alt](url)
+			altEnd := strings.Index(text[i+2:], "]")
+			if altEnd != -1 {
+				closeBracket := i + 2 + altEnd
+				// Check if immediately followed by (
+				if closeBracket+1 < len(text) && text[closeBracket+1] == '(' {
+					// Find closing )
+					urlEnd := strings.Index(text[closeBracket+2:], ")")
+					if urlEnd != -1 {
+						// We have a valid image pattern
+						flushPlain()
+
+						altText := text[i+2 : closeBracket]
+						url := text[closeBracket+2 : closeBracket+2+urlEnd]
+						sourceLen := 1 + 1 + altEnd + 1 + 1 + urlEnd + 1 // ![alt](url)
+
+						// Create image placeholder text
+						placeholderText := "[Image: " + altText + "]"
+						if altText == "" {
+							placeholderText = "[Image]"
+						}
+						placeholderLen := len([]rune(placeholderText))
+
+						imageStyle := rich.Style{
+							Fg:       rich.LinkBlue,
+							Bg:       baseStyle.Bg,
+							Image:    true,
+							ImageURL: url,
+							ImageAlt: altText,
+							Scale:    baseStyle.Scale,
+						}
+						spans = append(spans, rich.Span{
+							Text:  placeholderText,
+							Style: imageStyle,
+						})
+						entries = append(entries, SourceMapEntry{
+							RenderedStart: rendPos,
+							RenderedEnd:   rendPos + placeholderLen,
+							SourceStart:   srcPos,
+							SourceEnd:     srcPos + sourceLen,
+						})
+						rendPos += placeholderLen
+						srcPos += sourceLen
+						i = closeBracket + 2 + urlEnd + 1
+						continue
+					}
+				}
+			}
+			// Not a valid image, treat ! as regular text
+			currentText.WriteByte(text[i])
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + 1,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + 1,
+			})
+			rendPos++
+			srcPos++
+			i++
+			continue
+		}
+
 		// Check for [ (potential link) - must be checked early
 		if text[i] == '[' {
 			// Try to parse as link: [text](url)

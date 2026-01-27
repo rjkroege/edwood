@@ -444,6 +444,15 @@ func (t *Text) Inserted(oq0 file.OffsetTuple, b []byte, nr int) {
 	if q0 < t.q0 {
 		t.q0 += nr
 	}
+
+	// In Markdeep mode, don't update the text frame directly.
+	// Instead, schedule a debounced re-render of the Markdeep view.
+	if t.what == Body && t.w != nil && t.w.IsPreviewMode() {
+		t.logInsert(oq0, b, nr)
+		t.w.SchedulePreviewUpdate()
+		return
+	}
+
 	if q0 < t.org {
 		t.org += nr
 	} else {
@@ -587,6 +596,15 @@ func (t *Text) Deleted(oq0, oq1 file.OffsetTuple) {
 	if q0 < t.q1 {
 		t.q1 -= util.Min(n, t.q1-q0)
 	}
+
+	// In Markdeep mode, don't update the text frame directly.
+	// Instead, schedule a debounced re-render of the Markdeep view.
+	if t.what == Body && t.w != nil && t.w.IsPreviewMode() {
+		t.logInsertDelete(q0, q1)
+		t.w.SchedulePreviewUpdate()
+		return
+	}
+
 	if q1 <= t.org {
 		t.org -= n
 	} else if t.fr != nil && q0 < t.org+(t.fr.GetFrameFillStatus().Nchars) {

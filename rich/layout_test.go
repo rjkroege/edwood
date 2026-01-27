@@ -2,6 +2,11 @@ package rich
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1208,4 +1213,578 @@ func TestLayoutWithCache(t *testing.T) {
 			t.Errorf("expected 1 line, got %d", len(lines))
 		}
 	})
+}
+
+// =============================================================================
+// Phase 16I.3: layoutWithCache Integration Tests
+// =============================================================================
+
+// TestLayoutWithCacheLoadsImages verifies that layoutWithCache automatically
+// loads images from the cache when processing image boxes. When a box has
+// Style.Image=true and ImageURL set, layoutWithCache should call cache.Load()
+// to load the image data.
+func TestLayoutWithCacheLoadsImages(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "cache_load_test.png")
+
+	// Create a simple 40x30 magenta image
+	img := createTestImage(40, 30, 255, 0, 255)
+	if err := saveTestPNG(pngPath, img); err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create an image box WITHOUT ImageData set initially
+	// layoutWithCache should load the image from the cache
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: test]"),
+			Nrune:     13,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: pngPath, ImageAlt: "test", Scale: 1.0},
+			ImageData: nil, // Not yet loaded
+		},
+	}
+
+	// Create a fresh cache
+	cache := NewImageCache(10)
+
+	// Verify image is NOT in cache before layout
+	if _, ok := cache.Get(pngPath); ok {
+		t.Error("image should NOT be in cache before layoutWithCache")
+	}
+
+	// Call layoutWithCache - this should trigger image loading
+	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCache returned no lines")
+	}
+
+	// Verify image IS now in cache after layout
+	cached, ok := cache.Get(pngPath)
+	if !ok {
+		t.Error("image should be in cache after layoutWithCache")
+	}
+	if cached == nil {
+		t.Fatal("cached image is nil")
+	}
+	if cached.Err != nil {
+		t.Errorf("cached image has error: %v", cached.Err)
+	}
+	if cached.Width != 40 || cached.Height != 30 {
+		t.Errorf("cached image dimensions = %dx%d, want 40x30", cached.Width, cached.Height)
+	}
+}
+
+// TestLayoutWithCachePopulatesImageData verifies that layoutWithCache populates
+// the ImageData field of image boxes after loading. This is essential for
+// rendering, as the renderer needs the image dimensions and pixel data.
+func TestLayoutWithCachePopulatesImageData(t *testing.T) {
+	// Create a temporary PNG file
+	tmpDir := t.TempDir()
+	pngPath := filepath.Join(tmpDir, "populate_test.png")
+
+	// Create a simple 50x40 cyan image
+	img := createTestImage(50, 40, 0, 255, 255)
+	if err := saveTestPNG(pngPath, img); err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create image boxes without ImageData
+	boxes := []Box{
+		{
+			Text:  []byte("Some text "),
+			Nrune: 10,
+			Bc:    0,
+			Style: DefaultStyle(),
+		},
+		{
+			Text:      []byte("[Image: photo]"),
+			Nrune:     14,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: pngPath, ImageAlt: "photo", Scale: 1.0},
+			ImageData: nil, // Should be populated by layoutWithCache
+		},
+		{
+			Text:  []byte(" more text"),
+			Nrune: 10,
+			Bc:    0,
+			Style: DefaultStyle(),
+		},
+	}
+
+	// Create cache
+	cache := NewImageCache(10)
+
+	// Call layoutWithCache
+	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCache returned no lines")
+	}
+
+	// Find the image box in the layout and verify ImageData is populated
+	var imageBoxFound bool
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				imageBoxFound = true
+				if pb.Box.ImageData == nil {
+					t.Error("image box ImageData should be populated after layoutWithCache")
+				} else {
+					// Verify the populated data is correct
+					if pb.Box.ImageData.Width != 50 || pb.Box.ImageData.Height != 40 {
+						t.Errorf("image box dimensions = %dx%d, want 50x40",
+							pb.Box.ImageData.Width, pb.Box.ImageData.Height)
+					}
+					if pb.Box.ImageData.Err != nil {
+						t.Errorf("image box has unexpected error: %v", pb.Box.ImageData.Err)
+					}
+					// Verify the box uses the image dimensions for layout
+					// (not the placeholder text dimensions)
+					if pb.Box.Wid != 50 {
+						t.Errorf("image box width = %d, want 50 (image width)", pb.Box.Wid)
+					}
+				}
+			}
+		}
+	}
+
+	if !imageBoxFound {
+		t.Error("image box not found in layout results")
+	}
+}
+
+// TestLayoutWithCacheHandlesLoadError verifies that layoutWithCache handles
+// image load errors gracefully. When an image fails to load, the CachedImage
+// is still stored in the box but with an error and zero dimensions.
+func TestLayoutWithCacheHandlesLoadError(t *testing.T) {
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create box with non-existent image path
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: missing]"),
+			Nrune:     16,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: "/nonexistent/path/to/image.png", ImageAlt: "missing", Scale: 1.0},
+			ImageData: nil,
+		},
+	}
+
+	cache := NewImageCache(10)
+
+	// Should not panic
+	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCache returned no lines")
+	}
+
+	// Verify the error was cached
+	cached, ok := cache.Get("/nonexistent/path/to/image.png")
+	if !ok {
+		t.Error("failed load should still be cached")
+	}
+	if cached != nil && cached.Err == nil {
+		t.Error("cached entry should have error set")
+	}
+
+	// Find the image box and verify it has ImageData set with the error
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				if pb.Box.ImageData == nil {
+					t.Error("ImageData should be set even for failed loads")
+				} else if pb.Box.ImageData.Err == nil {
+					t.Error("ImageData.Err should be set for failed loads")
+				}
+			}
+		}
+	}
+}
+
+// TestLayoutWithCacheMultipleImages verifies that layoutWithCache handles
+// multiple images in the content, loading each one.
+func TestLayoutWithCacheMultipleImages(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create two test images with different sizes
+	pngPath1 := filepath.Join(tmpDir, "img1.png")
+	pngPath2 := filepath.Join(tmpDir, "img2.png")
+
+	img1 := createTestImage(30, 25, 255, 0, 0) // red
+	img2 := createTestImage(45, 35, 0, 0, 255) // blue
+
+	if err := saveTestPNG(pngPath1, img1); err != nil {
+		t.Fatalf("failed to create test PNG 1: %v", err)
+	}
+	if err := saveTestPNG(pngPath2, img2); err != nil {
+		t.Fatalf("failed to create test PNG 2: %v", err)
+	}
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: img1]"),
+			Nrune:     13,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: pngPath1, ImageAlt: "img1", Scale: 1.0},
+			ImageData: nil,
+		},
+		{
+			Text: nil, Nrune: -1, Bc: '\n', Style: DefaultStyle(),
+		},
+		{
+			Text:      []byte("[Image: img2]"),
+			Nrune:     13,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: pngPath2, ImageAlt: "img2", Scale: 1.0},
+			ImageData: nil,
+		},
+	}
+
+	cache := NewImageCache(10)
+	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
+
+	// Should have loaded both images
+	cached1, ok1 := cache.Get(pngPath1)
+	cached2, ok2 := cache.Get(pngPath2)
+
+	if !ok1 {
+		t.Error("first image should be in cache")
+	}
+	if !ok2 {
+		t.Error("second image should be in cache")
+	}
+
+	if cached1 != nil && (cached1.Width != 30 || cached1.Height != 25) {
+		t.Errorf("first cached image dimensions = %dx%d, want 30x25", cached1.Width, cached1.Height)
+	}
+	if cached2 != nil && (cached2.Width != 45 || cached2.Height != 35) {
+		t.Errorf("second cached image dimensions = %dx%d, want 45x35", cached2.Width, cached2.Height)
+	}
+
+	// Verify layout produced correct number of lines
+	if len(lines) != 2 {
+		t.Errorf("expected 2 lines, got %d", len(lines))
+	}
+}
+
+// =============================================================================
+// Phase 16I.6: Relative Path Resolution Tests
+// =============================================================================
+
+// TestLayoutResolvesRelativePaths verifies that layoutWithCache resolves
+// relative image paths using the provided basePath. This is essential for
+// loading images specified with relative paths in markdown files.
+//
+// Example: If a markdown file at /home/user/docs/readme.md contains
+// ![alt](images/photo.png), the relative path "images/photo.png" should
+// be resolved to /home/user/docs/images/photo.png before loading.
+func TestLayoutResolvesRelativePaths(t *testing.T) {
+	// Create a temporary directory structure:
+	// tmpDir/
+	//   docs/
+	//     readme.md (simulated)
+	//     images/
+	//       photo.png
+	tmpDir := t.TempDir()
+	docsDir := filepath.Join(tmpDir, "docs")
+	imagesDir := filepath.Join(docsDir, "images")
+
+	if err := os.MkdirAll(imagesDir, 0755); err != nil {
+		t.Fatalf("failed to create images directory: %v", err)
+	}
+
+	// Create a test image at docs/images/photo.png
+	imgPath := filepath.Join(imagesDir, "photo.png")
+	img := createTestImage(60, 45, 0, 128, 255) // Blue image
+	if err := saveTestPNG(imgPath, img); err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+
+	// Simulate the markdown file path (for basePath)
+	mdPath := filepath.Join(docsDir, "readme.md")
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create an image box with a RELATIVE path (as would appear in markdown)
+	relativeImagePath := "images/photo.png"
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: photo]"),
+			Nrune:     14,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: relativeImagePath, ImageAlt: "photo", Scale: 1.0},
+			ImageData: nil, // Should be populated after layout
+		},
+	}
+
+	// Create a fresh cache
+	cache := NewImageCache(10)
+
+	// Call layoutWithCache WITH a basePath
+	// The basePath should be the markdown file's path
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCacheAndBasePath returned no lines")
+	}
+
+	// Verify the image was loaded using the resolved path
+	// The cache should contain the ABSOLUTE path (resolved from relative)
+	resolvedPath := filepath.Join(docsDir, relativeImagePath)
+	cached, ok := cache.Get(resolvedPath)
+	if !ok {
+		// Also check if it was cached with the relative path (wrong behavior)
+		if _, hasRelative := cache.Get(relativeImagePath); hasRelative {
+			t.Error("image was cached with relative path; should be cached with resolved absolute path")
+		} else {
+			t.Error("image should be in cache after layoutWithCacheAndBasePath")
+		}
+	}
+	if cached != nil && cached.Err != nil {
+		t.Errorf("cached image has error: %v", cached.Err)
+	}
+	if cached != nil && (cached.Width != 60 || cached.Height != 45) {
+		t.Errorf("cached image dimensions = %dx%d, want 60x45", cached.Width, cached.Height)
+	}
+
+	// Verify the box's ImageData was populated
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				if pb.Box.ImageData == nil {
+					t.Error("image box ImageData should be populated after layout with basePath")
+				} else if pb.Box.ImageData.Width != 60 || pb.Box.ImageData.Height != 45 {
+					t.Errorf("image box dimensions = %dx%d, want 60x45",
+						pb.Box.ImageData.Width, pb.Box.ImageData.Height)
+				}
+			}
+		}
+	}
+}
+
+// TestLayoutResolvesRelativePathsWithParentDir verifies that relative paths
+// with parent directory references (../) are resolved correctly.
+func TestLayoutResolvesRelativePathsWithParentDir(t *testing.T) {
+	// Create a temporary directory structure:
+	// tmpDir/
+	//   assets/
+	//     logo.png
+	//   docs/
+	//     guide/
+	//       intro.md (simulated)
+	tmpDir := t.TempDir()
+	assetsDir := filepath.Join(tmpDir, "assets")
+	guideDir := filepath.Join(tmpDir, "docs", "guide")
+
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("failed to create assets directory: %v", err)
+	}
+	if err := os.MkdirAll(guideDir, 0755); err != nil {
+		t.Fatalf("failed to create guide directory: %v", err)
+	}
+
+	// Create a test image at assets/logo.png
+	imgPath := filepath.Join(assetsDir, "logo.png")
+	img := createTestImage(80, 60, 255, 128, 0) // Orange image
+	if err := saveTestPNG(imgPath, img); err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+
+	// Simulate the markdown file path
+	mdPath := filepath.Join(guideDir, "intro.md")
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create an image box with a relative path that goes up two directories
+	relativeImagePath := "../../assets/logo.png"
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: logo]"),
+			Nrune:     13,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: relativeImagePath, ImageAlt: "logo", Scale: 1.0},
+			ImageData: nil,
+		},
+	}
+
+	cache := NewImageCache(10)
+
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCacheAndBasePath returned no lines")
+	}
+
+	// Verify the box's ImageData was populated with correct dimensions
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				if pb.Box.ImageData == nil {
+					t.Error("image box ImageData should be populated for relative path with ../")
+				} else if pb.Box.ImageData.Width != 80 || pb.Box.ImageData.Height != 60 {
+					t.Errorf("image box dimensions = %dx%d, want 80x60",
+						pb.Box.ImageData.Width, pb.Box.ImageData.Height)
+				}
+			}
+		}
+	}
+}
+
+// TestLayoutAbsolutePathIgnoresBasePath verifies that absolute image paths
+// are NOT modified by the basePath - they should load directly.
+func TestLayoutAbsolutePathIgnoresBasePath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create an image at an absolute path
+	imgPath := filepath.Join(tmpDir, "absolute_image.png")
+	img := createTestImage(50, 50, 255, 0, 0) // Red image
+	if err := saveTestPNG(imgPath, img); err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+
+	// Use a different directory as the "basePath" (should be ignored)
+	basePath := "/some/other/directory/readme.md"
+
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create an image box with an ABSOLUTE path
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: abs]"),
+			Nrune:     12,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: imgPath, ImageAlt: "abs", Scale: 1.0},
+			ImageData: nil,
+		},
+	}
+
+	cache := NewImageCache(10)
+
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, basePath)
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCacheAndBasePath returned no lines")
+	}
+
+	// Verify the image was loaded from the absolute path
+	cached, ok := cache.Get(imgPath)
+	if !ok {
+		t.Error("absolute path image should be cached with its original path")
+	}
+	if cached != nil && cached.Err != nil {
+		t.Errorf("cached image has error: %v", cached.Err)
+	}
+
+	// Verify dimensions
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				if pb.Box.ImageData == nil {
+					t.Error("image box ImageData should be populated for absolute path")
+				} else if pb.Box.ImageData.Width != 50 || pb.Box.ImageData.Height != 50 {
+					t.Errorf("image box dimensions = %dx%d, want 50x50",
+						pb.Box.ImageData.Width, pb.Box.ImageData.Height)
+				}
+			}
+		}
+	}
+}
+
+// TestLayoutEmptyBasePathFallsBack verifies that when basePath is empty,
+// relative paths are used as-is (likely failing to load, which is expected).
+func TestLayoutEmptyBasePathFallsBack(t *testing.T) {
+	font := &testLayoutFont{width: 10, height: 14}
+	frameWidth := 500
+	maxtab := 80
+
+	// Create an image box with a relative path but no basePath
+	boxes := []Box{
+		{
+			Text:      []byte("[Image: orphan]"),
+			Nrune:     15,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: "nonexistent/image.png", ImageAlt: "orphan", Scale: 1.0},
+			ImageData: nil,
+		},
+	}
+
+	cache := NewImageCache(10)
+
+	// Empty basePath - relative path should fail to load (expected)
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, "")
+
+	if len(lines) == 0 {
+		t.Fatal("layoutWithCacheAndBasePath returned no lines")
+	}
+
+	// The image should still have ImageData set (with an error)
+	for _, line := range lines {
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Image {
+				if pb.Box.ImageData == nil {
+					t.Error("image box ImageData should be set even on error")
+				} else if pb.Box.ImageData.Err == nil {
+					t.Error("expected error for non-existent relative path with empty basePath")
+				}
+			}
+		}
+	}
+}
+
+// Helper: testLayoutFont implements draw.Font for testing
+type testLayoutFont struct {
+	width  int
+	height int
+}
+
+func (f *testLayoutFont) Name() string             { return "test-layout-font" }
+func (f *testLayoutFont) Height() int              { return f.height }
+func (f *testLayoutFont) BytesWidth(b []byte) int  { return f.width * len(b) }
+func (f *testLayoutFont) RunesWidth(r []rune) int  { return f.width * len(r) }
+func (f *testLayoutFont) StringWidth(s string) int { return f.width * len(s) }
+
+// Helper: createTestImage creates a test image with given dimensions and color
+func createTestImage(w, h int, r, g, b uint8) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	c := color.RGBA{r, g, b, 255}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, c)
+		}
+	}
+	return img
+}
+
+// Helper: saveTestPNG saves an image as PNG
+func saveTestPNG(path string, img *image.RGBA) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, img)
 }
