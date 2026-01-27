@@ -993,15 +993,11 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			w.UpdatePreview()
 
 		case chordButtons&4 != 0: // B1+B3: Paste (replace selection with snarf)
-			if len(global.snarfbuf) > 0 {
-				// Delete current selection from source
-				if w.body.q0 < w.body.q1 {
-					w.body.file.DeleteAt(w.body.q0, w.body.q1)
-				}
-				// Insert snarf content at the selection start
-				w.body.file.InsertAt(w.body.q0, []rune(string(global.snarfbuf)))
-				w.UpdatePreview()
-			}
+			w.body.TypeCommit()
+			global.seq++
+			w.body.file.Mark(global.seq)
+			paste(&w.body, &w.body, nil, true, false, "")
+			w.UpdatePreview()
 		}
 
 		w.Draw()

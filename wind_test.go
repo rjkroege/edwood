@@ -5169,11 +5169,25 @@ func TestPreviewChordCut(t *testing.T) {
 // TestPreviewChordPaste tests that the B1+B3 chord in preview mode performs a Paste
 // operation: the snarf buffer content replaces the current selection in the source
 // body buffer. The preview should reflect the replacement.
+// It also verifies that the paste operation uses the standard paste() path,
+// which means undo works and proper sequence points are set.
 func TestPreviewChordPaste(t *testing.T) {
 	w, rt, frameRect := setupPreviewChordTestWindow(t)
 
-	// Pre-fill snarf buffer with replacement text
+	// Ensure body.w is set so paste() can operate on the text properly
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: w.display}
+	defer func() { global.row = Row{} }()
+
+	// Pre-fill snarf buffer with replacement text (both global and display snarf,
+	// since paste() calls acmegetsnarf() which reads from the display)
 	global.snarfbuf = []byte("Goodbye")
+	w.display.WriteSnarf([]byte("Goodbye"))
+
+	originalText := "Hello world test"
+	originalLen := len([]rune(originalText))
 
 	// Select "Hello" (chars 0-5) with B1, then chord B3 to paste
 	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
@@ -5211,6 +5225,14 @@ func TestPreviewChordPaste(t *testing.T) {
 	// "Hello" should be replaced with "Goodbye"
 	if !containsSubstring(bodyText, "Goodbye") {
 		t.Errorf("body should contain 'Goodbye' after paste, got %q", bodyText)
+	}
+
+	// Verify undo restores the original text: the paste should have set up
+	// proper undo sequence (TypeCommit + seq++ + Mark) so Undo works.
+	w.Undo(true)
+	afterUndoLen := w.body.file.Nr()
+	if afterUndoLen != originalLen {
+		t.Errorf("after undo, body length should be restored to %d, got %d", originalLen, afterUndoLen)
 	}
 
 	_ = rt
