@@ -731,6 +731,9 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			charPos := rt.Frame().Charofpt(m.Point)
 			rt.SetSelection(charPos, charPos)
 		}
+		// Sync the preview selection to the source body buffer
+		// This enables Snarf and other Acme commands to work correctly
+		w.syncSourceSelection()
 		w.Draw()
 		if w.display != nil {
 			w.display.Flush()
@@ -769,7 +772,28 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			return true
 		}
 
-		// Not a link - fall through to normal Look behavior
+		// Check if this position is within an image
+		imageURL := rt.Frame().ImageURLAt(charPos)
+		if imageURL != "" {
+			// Plumb the image path
+			if plumbsendfid != nil {
+				pm := &plumb.Message{
+					Src:  "acme",
+					Dst:  "",
+					Dir:  w.body.AbsDirName(""),
+					Type: "text",
+					Data: []byte(imageURL),
+				}
+				if err := pm.Send(plumbsendfid); err != nil {
+					warning(nil, "Markdeep B3 image: plumb failed: %v\n", err)
+				}
+			} else {
+				warning(nil, "Markdeep B3 image: plumber not running\n")
+			}
+			return true
+		}
+
+		// Not a link or image - fall through to normal Look behavior
 		return false
 	}
 
@@ -986,6 +1010,41 @@ func (w *Window) PreviewExpandWord(pos int) (word string, start, end int) {
 // isWordChar returns true if the rune is part of a word (alphanumeric or underscore).
 func isWordChar(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+}
+
+// syncSourceSelection maps the current preview selection to the corresponding
+// positions in the source body buffer. This keeps body.q0 and body.q1 in sync
+// with the rendered preview selection, enabling Snarf and other Acme operations
+// to work correctly in preview mode.
+func (w *Window) syncSourceSelection() {
+	if !w.previewMode || w.richBody == nil || w.previewSourceMap == nil {
+		return
+	}
+
+	// Get selection from the rich text frame
+	p0, p1 := w.richBody.Selection()
+
+	// Map rendered positions to source positions
+	srcStart, srcEnd := w.previewSourceMap.ToSource(p0, p1)
+
+	// Clamp to body buffer bounds
+	bodyLen := w.body.file.Nr()
+	if srcStart < 0 {
+		srcStart = 0
+	}
+	if srcEnd < 0 {
+		srcEnd = 0
+	}
+	if srcStart > bodyLen {
+		srcStart = bodyLen
+	}
+	if srcEnd > bodyLen {
+		srcEnd = bodyLen
+	}
+
+	// Update the body's selection to match
+	w.body.q0 = srcStart
+	w.body.q1 = srcEnd
 }
 
 // HandlePreviewKey handles keyboard input when the window is in preview mode.
