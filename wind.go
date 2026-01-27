@@ -741,6 +741,27 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		return true
 	}
 
+	// Handle button 2 (B2/middle-click) in frame area for Execute action
+	if m.Point.In(frameRect) && m.Buttons&2 != 0 {
+		if mc != nil {
+			// Use Frame.Select() for proper drag selection with B2
+			p0, p1 := rt.Frame().Select(mc, m)
+			rt.SetSelection(p0, p1)
+		} else {
+			// Fallback: just set point selection if no Mousectl available
+			charPos := rt.Frame().Charofpt(m.Point)
+			rt.SetSelection(charPos, charPos)
+		}
+		// Sync the preview selection to the source body buffer
+		w.syncSourceSelection()
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
+		}
+		// TODO(Phase 18.2): Expand word on null click and call execute()
+		return true
+	}
+
 	// Handle button 3 (B3/right-click) in frame area for Look action
 	if m.Point.In(frameRect) && m.Buttons&4 != 0 {
 		// Get character position at click point

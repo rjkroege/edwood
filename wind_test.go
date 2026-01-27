@@ -3459,3 +3459,111 @@ func TestPreviewCmdPassesImageCache(t *testing.T) {
 	w.SetPreviewMode(false)
 	cache.Clear()
 }
+
+// =============================================================================
+// Phase 18.2: Execute (B2) Tests
+// =============================================================================
+
+// TestPreviewB2Click tests that B2 (middle button/button 2) clicks in the preview
+// frame area are detected and handled by HandlePreviewMouse. In Acme, B2 is used
+// to execute commands. This test verifies:
+// 1. B2 click in frame area is detected (returns true)
+// 2. B2 click outside frame area is not handled (returns false)
+// 3. B2 click in scrollbar area goes to scrollbar, not command execution
+func TestPreviewB2Click(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown with command words
+	sourceMarkdown := "# Commands\n\nRun **Del** to close.\n\nTry `Echo hello` command."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content with source map
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	// Set up preview mode
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Get frame rect for positioning clicks
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B2 click in frame area should be handled
+	// Click at a position in the text area
+	clickPoint := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 2, // Button 2 (middle button)
+	}
+	// Immediate release for simple click
+	upEvent := draw.Mouse{
+		Point:   clickPoint,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Error("HandlePreviewMouse should handle B2 click in frame area")
+	}
+
+	// Test 2: B2 click outside body.all should not be handled
+	outsidePoint := image.Pt(-10, -10)
+	m2 := draw.Mouse{
+		Point:   outsidePoint,
+		Buttons: 2,
+	}
+	mc2 := mockMousectlWithEvents([]draw.Mouse{{Point: outsidePoint, Buttons: 0}})
+	handled2 := w.HandlePreviewMouse(&m2, mc2)
+	if handled2 {
+		t.Error("HandlePreviewMouse should NOT handle B2 click outside body.all")
+	}
+
+	// Test 3: B2 click in scrollbar should be handled as scrollbar scroll (not command execution)
+	// Scrollbar is to the left of the frame
+	scrollRect := rt.ScrollRect()
+	if !scrollRect.Empty() {
+		scrollPoint := image.Pt(scrollRect.Min.X+2, scrollRect.Min.Y+20)
+		m3 := draw.Mouse{
+			Point:   scrollPoint,
+			Buttons: 2,
+		}
+		// B2 in scrollbar triggers absolute scroll positioning
+		handled3 := w.HandlePreviewMouse(&m3, nil)
+		if !handled3 {
+			t.Error("HandlePreviewMouse should handle B2 click in scrollbar")
+		}
+	}
+}
