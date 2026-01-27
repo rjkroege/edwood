@@ -1136,6 +1136,7 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 					rendStart, rendEnd := w.previewSourceMap.ToRendered(w.body.q0, w.body.q1)
 					if rendStart >= 0 && rendEnd >= 0 {
 						rt.SetSelection(rendStart, rendEnd)
+						w.scrollPreviewToMatch(rt, rendStart)
 					}
 				}
 			}
@@ -1149,6 +1150,59 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	}
 
 	return false
+}
+
+// scrollPreviewToMatch scrolls the preview so that the match at rendStart
+// is visible, placing it roughly 1/3 from the top of the frame (matching
+// Acme's Show() scroll behavior). If the match is already visible, no
+// scrolling occurs.
+func (w *Window) scrollPreviewToMatch(rt *RichText, rendStart int) {
+	fr := rt.Frame()
+	if fr == nil {
+		return
+	}
+
+	// Get layout information
+	lineStarts := fr.LineStartRunes()
+	maxLines := fr.MaxLines()
+	if maxLines <= 0 || len(lineStarts) == 0 {
+		return
+	}
+
+	// Find which line contains rendStart
+	origin := rt.Origin()
+	matchLine := 0
+	for i, start := range lineStarts {
+		if rendStart >= start {
+			matchLine = i
+		} else {
+			break
+		}
+	}
+
+	// Find which line corresponds to the current origin
+	originLine := 0
+	for i, start := range lineStarts {
+		if origin >= start {
+			originLine = i
+		} else {
+			break
+		}
+	}
+
+	// Check if the match is already visible
+	if matchLine >= originLine && matchLine < originLine+maxLines {
+		return
+	}
+
+	// Scroll so the match is ~1/3 from the top
+	targetLine := matchLine - maxLines/3
+	if targetLine < 0 {
+		targetLine = 0
+	}
+	if targetLine < len(lineStarts) {
+		rt.SetOrigin(lineStarts[targetLine])
+	}
 }
 
 // SetPreviewSourceMap sets the source map used for mapping rendered positions

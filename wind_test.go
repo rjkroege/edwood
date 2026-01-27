@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rjkroege/edwood/draw"
@@ -7580,6 +7581,187 @@ func TestPreviewB3SearchNoBleed(t *testing.T) {
 	w.body.file.Read(w.body.q0, buf)
 	if string(buf) != "hello" {
 		t.Errorf("Search match should be \"hello\", got %q", string(buf))
+	}
+}
+
+// TestPreviewB3SearchScroll tests that when a B3 search in preview mode finds
+// a match outside the visible area, the preview scrolls so the match is visible.
+// Phase 20D: after setting the preview selection to the search result,
+// the origin should be adjusted if the match is not in the currently visible range.
+func TestPreviewB3SearchScroll(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Build source markdown with "target" appearing twice:
+	// - First occurrence near the top (visible when origin=0)
+	// - Second occurrence far down (not visible when origin=0)
+	// We use many lines between them to ensure the second is offscreen.
+	var sb strings.Builder
+	sb.WriteString("First target word here.\n\n")
+	// Add enough lines to push the second occurrence well beyond the visible area.
+	// With font height 14 and frame height ~580 (600-20), MaxLines ~ 41 lines.
+	// The mock font is 10px wide, so in an 800px frame each line wraps differently.
+	// We add 100 short lines to ensure the second "target" is well offscreen.
+	for i := 0; i < 100; i++ {
+		sb.WriteString(fmt.Sprintf("Line %d filler.\n", i))
+	}
+	sb.WriteString("Second target word here.\n")
+	sourceMarkdown := sb.String()
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &TrackingMockFrame{nchars: len(sourceRunes), maxlines: 20},
+		file:    file.MakeObservableEditableBuffer("/test/scroll.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview with a small frame so content exceeds visible area.
+	// Use a small frame height (160px) so only ~10 lines are visible (font height 14).
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 160)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content with source map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Start at the top
+	rt.SetOrigin(0)
+
+	// Find first "target" in rendered text and set selection there
+	plainText := content.Plain()
+	firstTargetRendered := -1
+	for i := 0; i < len(plainText)-5; i++ {
+		if string(plainText[i:i+6]) == "target" {
+			firstTargetRendered = i
+			break
+		}
+	}
+	if firstTargetRendered < 0 {
+		t.Fatalf("Could not find 'target' in rendered text: %q", string(plainText[:100]))
+	}
+
+	// Set preview selection to first "target" and sync to source
+	rt.SetSelection(firstTargetRendered, firstTargetRendered+6)
+	w.syncSourceSelection()
+
+	// Verify the origin is at the top before search
+	if rt.Origin() != 0 {
+		t.Fatalf("Origin should be 0 before search, got %d", rt.Origin())
+	}
+
+	// Perform the search - should find the SECOND "target" in source
+	found := search(&w.body, []rune("target"))
+	if !found {
+		t.Fatal("search() should find 'target' in source buffer")
+	}
+
+	// Map the search result back to rendered positions
+	rendStart, rendEnd := sourceMap.ToRendered(w.body.q0, w.body.q1)
+	if rendStart < 0 || rendEnd < 0 {
+		t.Fatalf("ToRendered(%d, %d) returned (-1,-1)", w.body.q0, w.body.q1)
+	}
+
+	// Verify the rendered match is the SECOND occurrence (not the first)
+	if rendStart == firstTargetRendered {
+		t.Fatal("Search should have found the second 'target', not the first")
+	}
+
+	// The second "target" should be far enough down to be outside the visible area.
+	// With origin=0 and MaxLines~41, the visible rune range is roughly 0..~2000.
+	// The second target should be well past that.
+	maxLines := rt.Frame().MaxLines()
+	if maxLines <= 0 {
+		maxLines = 41 // fallback estimate based on 580px / 14px font height
+	}
+
+	// Verify the match is NOT currently visible (origin=0 should not show it)
+	// The rendered match should be past the visible lines from origin 0.
+	// We verify by checking rendStart is beyond a reasonable visible rune count.
+	// Each filler line is ~45 chars + newline, so 60 lines ≈ 2760 runes.
+	// The first "target" line is ~24 chars, so second target starts around rune 2800+.
+	if rendStart < 100 {
+		t.Fatalf("Second 'target' should be far from origin 0, but rendStart=%d", rendStart)
+	}
+
+	// Set the preview selection and scroll to the match using Phase 20D code.
+	rt.SetSelection(rendStart, rendEnd)
+	w.scrollPreviewToMatch(rt, rendStart)
+
+	// Calculate what the origin SHOULD be after scrolling.
+	lineStarts := rt.Frame().LineStartRunes()
+	matchLine := 0
+	for i, start := range lineStarts {
+		if rendStart >= start {
+			matchLine = i
+		} else {
+			break
+		}
+	}
+
+	t.Logf("Match at rendered rune %d (line %d), maxLines=%d", rendStart, matchLine, maxLines)
+	t.Logf("lineStarts has %d entries", len(lineStarts))
+
+	// Verify match line is beyond visible area from origin 0
+	if matchLine < maxLines {
+		t.Fatalf("Match should be beyond visible area (line %d < maxLines %d)", matchLine, maxLines)
+	}
+
+	// After scrolling, the origin should NOT be 0 (match was offscreen)
+	newOrigin := rt.Origin()
+	if newOrigin == 0 {
+		t.Fatal("Origin should have changed from 0 after scrolling to offscreen match")
+	}
+
+	// Verify the match is now within the visible range from the new origin.
+	// Find which line the new origin corresponds to.
+	originLine := 0
+	for i, start := range lineStarts {
+		if newOrigin >= start {
+			originLine = i
+		} else {
+			break
+		}
+	}
+
+	if matchLine < originLine || matchLine >= originLine+maxLines {
+		t.Fatalf("Match (line %d) should be visible from origin line %d with maxLines %d",
+			matchLine, originLine, maxLines)
+	}
+
+	// Verify the match is roughly 1/3 from top
+	positionInFrame := matchLine - originLine
+	expectedPosition := maxLines / 3
+	// Allow some tolerance (within 2 lines)
+	if positionInFrame < expectedPosition-2 || positionInFrame > expectedPosition+2 {
+		t.Logf("Match is at position %d in frame (expected ~%d), within tolerance",
+			positionInFrame, expectedPosition)
 	}
 }
 
