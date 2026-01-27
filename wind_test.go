@@ -7132,6 +7132,131 @@ func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0
 }
 
+// TestPreviewChordCutUndo verifies that after a B1+B2 chord (Cut) in preview mode,
+// calling Undo restores the original text exactly. This confirms that the chord
+// handler sets up proper undo sequence points (TypeCommit + seq++ + Mark).
+func TestPreviewChordCutUndo(t *testing.T) {
+	w, _, frameRect := setupPreviewChordTestWindow(t)
+
+	originalText := "Hello world test"
+	originalRunes := []rune(originalText)
+
+	// Select "Hello" (chars 0-5) with B1, then chord B2 to cut
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 3, // B1 + B2
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	global.snarfbuf = nil
+	w.display.WriteSnarf(nil)
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle B1+B2 chord")
+	}
+
+	// Confirm the cut removed some text
+	afterCutLen := w.body.file.Nr()
+	if afterCutLen >= len(originalRunes) {
+		t.Fatalf("cut should have removed text: body length %d, original %d", afterCutLen, len(originalRunes))
+	}
+
+	// Undo the cut
+	w.Undo(true)
+
+	// Verify the full original text is restored
+	afterUndoLen := w.body.file.Nr()
+	if afterUndoLen != len(originalRunes) {
+		t.Errorf("after undo, body length should be %d, got %d", len(originalRunes), afterUndoLen)
+	}
+	buf := make([]rune, afterUndoLen)
+	w.body.file.Read(0, buf)
+	if string(buf) != originalText {
+		t.Errorf("after undo, body text should be %q, got %q", originalText, string(buf))
+	}
+}
+
+// TestPreviewChordPasteUndo verifies that after a B1+B3 chord (Paste) in preview mode,
+// calling Undo restores the original text exactly. This confirms that the chord
+// handler sets up proper undo sequence points (TypeCommit + seq++ + Mark).
+func TestPreviewChordPasteUndo(t *testing.T) {
+	w, _, frameRect := setupPreviewChordTestWindow(t)
+
+	originalText := "Hello world test"
+	originalRunes := []rune(originalText)
+
+	// Pre-fill snarf buffer with replacement text
+	global.snarfbuf = []byte("REPLACED")
+	w.display.WriteSnarf([]byte("REPLACED"))
+
+	// Select "Hello" (chars 0-5) with B1, then chord B3 to paste
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 5, // B1 (1) + B3 (4) = 5
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle B1+B3 chord")
+	}
+
+	// Confirm the paste changed the text
+	afterPasteLen := w.body.file.Nr()
+	afterPasteBuf := make([]rune, afterPasteLen)
+	w.body.file.Read(0, afterPasteBuf)
+	afterPasteText := string(afterPasteBuf)
+	if afterPasteText == originalText {
+		t.Fatal("paste should have changed the text")
+	}
+	if !containsSubstring(afterPasteText, "REPLACED") {
+		t.Fatalf("paste should have inserted 'REPLACED', got %q", afterPasteText)
+	}
+
+	// Undo the paste
+	w.Undo(true)
+
+	// Verify the full original text is restored
+	afterUndoLen := w.body.file.Nr()
+	if afterUndoLen != len(originalRunes) {
+		t.Errorf("after undo, body length should be %d, got %d", len(originalRunes), afterUndoLen)
+	}
+	buf := make([]rune, afterUndoLen)
+	w.body.file.Read(0, buf)
+	if string(buf) != originalText {
+		t.Errorf("after undo, body text should be %q, got %q", originalText, string(buf))
+	}
+}
+
 // searchString returns the index of substr in s, or -1 if not found.
 func searchString(s, substr string) int {
 	for i := 0; i <= len(s)-len(substr); i++ {
