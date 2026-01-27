@@ -9,6 +9,11 @@ import (
 	edwooddraw "github.com/rjkroege/edwood/draw"
 )
 
+const (
+	// frtickw is the tick (cursor) width in unscaled pixels, matching frame/frame.go.
+	frtickw = 3
+)
+
 // Option is a functional option for configuring a Frame.
 type Option func(*frameImpl)
 
@@ -92,6 +97,11 @@ type frameImpl struct {
 	// When non-nil, drawSelectionTo uses this instead of selectionColor.
 	// Cleared after each SelectWithColor/SelectWithChordAndColor call.
 	sweepColor edwooddraw.Image
+
+	// Tick (cursor bar) fields for drawing the insertion cursor
+	tickImage  edwooddraw.Image // pre-rendered tick mask (transparent + opaque pattern)
+	tickScale  int              // display.ScaleSize(1)
+	tickHeight int              // height of current tickImage (re-init when changed)
 }
 
 // NewFrame creates a new Frame.
@@ -1186,6 +1196,49 @@ func (f *frameImpl) DefaultFontHeight() int {
 		return f.font.Height()
 	}
 	return 0
+}
+
+// initTick creates or recreates the tick image when the required height changes.
+// The tick image is a transparent mask with an opaque vertical line and serif boxes,
+// matching the pattern from frame/tick.go:InitTick().
+func (f *frameImpl) initTick(height int) {
+	if f.display == nil {
+		return
+	}
+	if f.tickImage != nil && f.tickHeight == height {
+		return
+	}
+	if f.tickImage != nil {
+		f.tickImage.Free()
+		f.tickImage = nil
+	}
+
+	scale := f.display.ScaleSize(1)
+	f.tickScale = scale
+	w := frtickw * scale
+
+	b := f.display.ScreenImage()
+	img, err := f.display.AllocImage(
+		image.Rect(0, 0, w, height),
+		b.Pix(), false, edwooddraw.Transparent)
+	if err != nil {
+		return
+	}
+
+	// Fill transparent
+	img.Draw(img.R(), f.display.Transparent(), nil, image.ZP)
+	// Vertical line in center
+	img.Draw(image.Rect(scale*(frtickw/2), 0, scale*(frtickw/2+1), height),
+		f.display.Opaque(), nil, image.ZP)
+	// Top serif box
+	img.Draw(image.Rect(0, 0, w, w),
+		f.display.Opaque(), nil, image.ZP)
+	// Bottom serif box
+	img.Draw(image.Rect(0, height-w, w, height),
+		f.display.Opaque(), nil, image.ZP)
+
+	f.tickImage = img
+	f.tickHeight = height
 }
 
 // Full returns true if the frame is at capacity.

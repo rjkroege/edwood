@@ -2396,3 +2396,102 @@ func TestDrawTextClipsToFrame(t *testing.T) {
 		}
 	}
 }
+
+// TestInitTickCreatesImage verifies that initTick creates a tick image with
+// the correct dimensions: width = frtickw * ScaleSize(1), height = requested height.
+// The tick image should have a transparent background with an opaque vertical line
+// and serif boxes at top and bottom.
+func TestInitTickCreatesImage(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithFont(font))
+
+	// Before initTick, there should be no tick image
+	if fi.tickImage != nil {
+		t.Fatal("tickImage should be nil before initTick")
+	}
+
+	// Call initTick with a specific height
+	fi.initTick(20)
+
+	// tickImage should now be allocated
+	if fi.tickImage == nil {
+		t.Fatal("tickImage should not be nil after initTick")
+	}
+
+	// Verify tick dimensions: width = frtickw * scale, height = requested
+	// ScaleSize(1) returns 1 in mock display, so width = 3 * 1 = 3
+	tickRect := fi.tickImage.R()
+	expectedWidth := frtickw * display.ScaleSize(1) // 3 * 1 = 3
+	if tickRect.Dx() != expectedWidth {
+		t.Errorf("tick width = %d, want %d", tickRect.Dx(), expectedWidth)
+	}
+	if tickRect.Dy() != 20 {
+		t.Errorf("tick height = %d, want 20", tickRect.Dy())
+	}
+
+	// Verify tickHeight and tickScale fields are set
+	if fi.tickHeight != 20 {
+		t.Errorf("tickHeight = %d, want 20", fi.tickHeight)
+	}
+	if fi.tickScale != display.ScaleSize(1) {
+		t.Errorf("tickScale = %d, want %d", fi.tickScale, display.ScaleSize(1))
+	}
+
+	// Calling initTick with a different height should create a new image
+	fi.initTick(30)
+	if fi.tickImage == nil {
+		t.Fatal("tickImage should not be nil after initTick with new height")
+	}
+	tickRect = fi.tickImage.R()
+	if tickRect.Dy() != 30 {
+		t.Errorf("tick height after resize = %d, want 30", tickRect.Dy())
+	}
+	if fi.tickHeight != 30 {
+		t.Errorf("tickHeight after resize = %d, want 30", fi.tickHeight)
+	}
+}
+
+// TestInitTickReusesForSameHeight verifies that calling initTick with the same
+// height does not reallocate the image - it reuses the existing one.
+func TestInitTickReusesForSameHeight(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithFont(font))
+
+	// Create tick with height 20
+	fi.initTick(20)
+	if fi.tickImage == nil {
+		t.Fatal("tickImage should not be nil after initTick")
+	}
+
+	// Record the image pointer
+	firstImage := fi.tickImage
+
+	// Clear draw ops to track what happens next
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call initTick again with the same height
+	fi.initTick(20)
+
+	// The image should be reused (same pointer)
+	if fi.tickImage != firstImage {
+		t.Error("initTick should reuse existing image when height hasn't changed")
+	}
+
+	// No new AllocImage calls should have been made
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	for _, op := range ops {
+		if strings.Contains(op, "AllocImage") {
+			t.Errorf("unexpected AllocImage call when height unchanged: %s", op)
+		}
+	}
+}
