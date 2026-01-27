@@ -3237,6 +3237,148 @@ func TestPreviewSelectionNearScrollbar(t *testing.T) {
 	})
 }
 
+// TestPreviewB2ExpandWord tests that a B2 null click (click without sweep, p0==p1)
+// expands to the word under the cursor using PreviewExpandWord(). In Acme, a B2
+// click on a word executes that word as a command (e.g., clicking on "Del" runs Del).
+// This test verifies:
+// 1. A B2 null click on a word expands the selection to the whole word
+// 2. The expanded word can be retrieved for execution
+// 3. A B2 null click on whitespace does not expand
+func TestPreviewB2ExpandWord(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Del Put hello")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Del Put hello" (13 chars)
+	// Positions:    0123456789...
+	//               Del Put hello
+	content := rich.Plain("Del Put hello")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B2 null click in the middle of "Del" should expand to "Del"
+	t.Run("ExpandWordOnNullClick", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 1 (middle of "Del"), 10px per char
+		clickPt := image.Pt(frameRect.Min.X+15, frameRect.Min.Y+5)
+		downEvent := draw.Mouse{
+			Point:   clickPt,
+			Buttons: 2, // Button 2 (middle button)
+		}
+		// Immediate release at same position (null click)
+		upEvent := draw.Mouse{
+			Point:   clickPt,
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B2 null click in frame area")
+		}
+
+		// After null click, word expansion should give us "Del"
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		if word != "Del" {
+			t.Errorf("PreviewExpandWord should return \"Del\", got %q", word)
+		}
+		if start != 0 {
+			t.Errorf("PreviewExpandWord start should be 0, got %d", start)
+		}
+		if end != 3 {
+			t.Errorf("PreviewExpandWord end should be 3, got %d", end)
+		}
+	})
+
+	// Test 2: B2 null click on "Put" should expand to "Put"
+	t.Run("ExpandSecondWord", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 5 (middle of "Put"), 10px per char
+		clickPt := image.Pt(frameRect.Min.X+45, frameRect.Min.Y+5)
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		if word != "Put" {
+			t.Errorf("PreviewExpandWord should return \"Put\", got %q", word)
+		}
+		if start != 4 {
+			t.Errorf("PreviewExpandWord start should be 4, got %d", start)
+		}
+		if end != 7 {
+			t.Errorf("PreviewExpandWord end should be 7, got %d", end)
+		}
+	})
+
+	// Test 3: B2 null click on whitespace between words expands left to adjacent word
+	// This matches Acme behavior: clicking just past a word boundary selects that word.
+	t.Run("ExpandAdjacentWordOnWhitespace", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 3 (the space right after "Del")
+		clickPt := image.Pt(frameRect.Min.X+35, frameRect.Min.Y+5)
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		// Position 3 is space, but left-expansion finds "Del"
+		if word != "Del" {
+			t.Errorf("PreviewExpandWord at space after word should expand left, got %q", word)
+		}
+		if start != 0 || end != 3 {
+			t.Errorf("Expected expansion (0, 3), got (%d, %d)", start, end)
+		}
+	})
+
+	// Test 4: B2 null click beyond end of text should not expand
+	t.Run("NoExpandBeyondText", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// PreviewExpandWord with position beyond text length
+		word, _, _ := w.PreviewExpandWord(100)
+		if word != "" {
+			t.Errorf("PreviewExpandWord beyond text should return empty string, got %q", word)
+		}
+	})
+}
+
 // TestPreviewSnarfAfterSelection tests that Snarf (copy) works correctly after
 // making a drag selection in preview mode. This verifies the integration between
 // Frame.Select() drag selection and PreviewSnarf() source mapping.

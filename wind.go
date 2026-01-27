@@ -743,14 +743,24 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 	// Handle button 2 (B2/middle-click) in frame area for Execute action
 	if m.Point.In(frameRect) && m.Buttons&2 != 0 {
+		var p0, p1 int
 		if mc != nil {
 			// Use Frame.Select() for proper drag selection with B2
-			p0, p1 := rt.Frame().Select(mc, m)
+			p0, p1 = rt.Frame().Select(mc, m)
 			rt.SetSelection(p0, p1)
 		} else {
 			// Fallback: just set point selection if no Mousectl available
 			charPos := rt.Frame().Charofpt(m.Point)
+			p0, p1 = charPos, charPos
 			rt.SetSelection(charPos, charPos)
+		}
+		// If null click (no sweep), expand to word under cursor
+		if p0 == p1 {
+			_, wordStart, wordEnd := w.PreviewExpandWord(p0)
+			if wordStart != wordEnd {
+				rt.SetSelection(wordStart, wordEnd)
+				p0, p1 = wordStart, wordEnd
+			}
 		}
 		// Sync the preview selection to the source body buffer
 		w.syncSourceSelection()
@@ -758,7 +768,7 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		if w.display != nil {
 			w.display.Flush()
 		}
-		// TODO(Phase 18.2): Expand word on null click and call execute()
+		// TODO(Phase 18.2): Call execute() with selected text
 		return true
 	}
 
