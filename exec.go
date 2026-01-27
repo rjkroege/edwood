@@ -282,6 +282,46 @@ func execute(t *Text, aq0 int, aq1 int, external bool, argt *Text) {
 	run(t.w, string(b), dir, true, aa, a, false)
 }
 
+// previewExecute executes a command from the rendered preview text.
+// Unlike execute(), which reads command text from the source file buffer,
+// this uses the rendered text directly (without markdown formatting).
+// The body Text is used for context (window, directory, etc.).
+func previewExecute(t *Text, cmdText string) {
+	r := []rune(cmdText)
+	e := lookup(string(r), globalexectab)
+
+	// Send commands to external client if the target window's event file is in use.
+	if t.w != nil && t.w.nopen[QWevent] > 0 {
+		// For preview mode with external clients, use the source-mapped positions
+		delegateExecution(t, e, t.q0, t.q1, t.q0, t.q1, nil)
+		return
+	}
+
+	// Invoke an internal command if it exists.
+	if e != nil {
+		if (e.mark && global.seltext != nil) && global.seltext.what == Body {
+			global.seq++
+			global.seltext.w.body.file.Mark(global.seq)
+		}
+
+		s := strings.TrimLeft(string(r), " \t\n")
+		words := wsre.Split(s, 2)
+		arg := ""
+		if len(words) > 1 {
+			arg = strings.TrimLeft(words[1], " \t\n")
+		}
+
+		e.fn(t, global.seltext, nil, e.flag1, e.flag2, arg)
+		return
+	}
+
+	dir := t.DirName("")
+	if t.w != nil {
+		t.w.ref.Inc()
+	}
+	run(t.w, string(r), dir, true, "", "", false)
+}
+
 func edit(et *Text, _ *Text, argt *Text, _, _ bool, arg string) {
 	if et == nil {
 		return
@@ -1199,10 +1239,18 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		return
 	}
 
+	// Allocate selection highlight color (light blue, matching Acme's standard selection)
+	selImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x9EEEEEFF)
+	if err != nil {
+		warning(nil, "Markdeep: failed to allocate selection color: %v\n", err)
+		return
+	}
+
 	// Build RichText options
 	rtOpts := []RichTextOption{
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
+		WithRichTextSelectionColor(selImage),
 		WithScrollbarColors(global.textcolors[frame.ColBord], global.textcolors[frame.ColBack]),
 	}
 	if boldFont != nil {
@@ -1234,7 +1282,14 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 
 	// Set the base path for resolving relative image paths
 	// The name variable contains the file path from the window tag
-	rtOpts = append(rtOpts, WithRichTextBasePath(name))
+	// Convert to absolute path for proper image resolution regardless of working directory
+	basePath := name
+	if !filepath.IsAbs(basePath) {
+		if abs, err := filepath.Abs(basePath); err == nil {
+			basePath = abs
+		}
+	}
+	rtOpts = append(rtOpts, WithRichTextBasePath(basePath))
 
 	rt.Init(display, font, rtOpts...)
 

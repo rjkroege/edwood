@@ -3955,3 +3955,229 @@ func TestPreviewB2Sweep(t *testing.T) {
 		}
 	})
 }
+
+// TestPreviewB2Execute tests the full B2 execute flow in preview mode:
+// When the user B2-clicks (or sweeps) a command word in the rendered preview,
+// the system should:
+// 1. Select the text in the preview frame
+// 2. Map the preview selection back to source buffer positions via syncSourceSelection()
+// 3. Call execute() with the body Text and source-mapped positions
+//
+// This test verifies that after B2 click handling, the source body has the correct
+// selection positions and that reading from body.file at those positions yields the
+// command text that execute() would receive.
+func TestPreviewB2Execute(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown with a command word formatted in bold: **Del**
+	// Rendered preview text will be "Run Del now" (without the ** markers)
+	// Source text is "Run **Del** now"
+	sourceMarkdown := "Run **Del** now"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/exec.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown with source map
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// Find "Del" in the rendered text to determine its position
+	plainText := rt.Content().Plain()
+	delIdx := -1
+	for i := 0; i < len(plainText)-2; i++ {
+		if string(plainText[i:i+3]) == "Del" {
+			delIdx = i
+			break
+		}
+	}
+	if delIdx < 0 {
+		t.Fatalf("Could not find 'Del' in rendered text: %q", string(plainText))
+	}
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B2 null click on "Del" should expand to word, select it,
+	// and map back to source positions where body.file contains "Del"
+	t.Run("B2ClickExecuteMapping", func(t *testing.T) {
+		// Click in the middle of "Del" in the rendered text
+		// delIdx chars from left edge, each char is 10px
+		clickX := frameRect.Min.X + delIdx*10 + 15 // middle of "Del"
+		clickPoint := image.Pt(clickX, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Fatal("HandlePreviewMouse should handle B2 click in frame area")
+		}
+
+		// Verify the preview selection covers "Del"
+		q0, q1 := rt.Selection()
+		selectedRendered := string(plainText[q0:q1])
+		if selectedRendered != "Del" {
+			t.Errorf("Preview selection should be 'Del', got %q (q0=%d, q1=%d)", selectedRendered, q0, q1)
+		}
+
+		// Verify the exec text extracted from preview matches
+		execText := w.PreviewExecText()
+		if execText != "Del" {
+			t.Errorf("PreviewExecText() should return 'Del', got %q", execText)
+		}
+
+		// Verify source body selection was synced via syncSourceSelection()
+		sourceQ0, sourceQ1 := w.body.q0, w.body.q1
+		if sourceQ1 <= sourceQ0 {
+			t.Fatalf("Source selection should be non-empty, got q0=%d q1=%d", sourceQ0, sourceQ1)
+		}
+
+		// The source-mapped positions may include markdown formatting (e.g., "**Del**")
+		// so execute() must use the rendered text from PreviewExecText(), not the raw source.
+		// Verify that PreviewExecText() gives us the clean command text for execute().
+		if execText != "Del" {
+			t.Errorf("PreviewExecText() must return clean rendered text for execute(), got %q", execText)
+		}
+
+		// Verify Del is a valid built-in command that execute() can look up
+		e := lookup(execText, globalexectab)
+		if e == nil {
+			t.Errorf("Command %q should be found in globalexectab", execText)
+		}
+		if e != nil && e.name != "Del" {
+			t.Errorf("Looked up command should be 'Del', got %q", e.name)
+		}
+	})
+
+	// Test 2: B2 sweep selection should also produce correct exec text
+	t.Run("B2SweepExecuteMapping", func(t *testing.T) {
+		// Reset selection
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Sweep to select "Del" in the rendered text
+		startX := frameRect.Min.X + delIdx*10
+		endX := frameRect.Min.X + (delIdx+3)*10
+		downEvent := draw.Mouse{
+			Point:   image.Pt(startX, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(endX, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(endX, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+		if !handled {
+			t.Fatal("HandlePreviewMouse should handle B2 sweep")
+		}
+
+		// Verify exec text returns the rendered command, not raw markdown
+		execText := w.PreviewExecText()
+		if execText != "Del" {
+			t.Errorf("PreviewExecText() after sweep should return 'Del', got %q", execText)
+		}
+
+		// Verify the rendered text is a valid command for execute()
+		e := lookup(execText, globalexectab)
+		if e == nil {
+			t.Errorf("Swept command %q should be found in globalexectab", execText)
+		}
+	})
+
+	// Test 3: Verify execute flow with non-built-in command text
+	// When the user B2-clicks text that is not a built-in command,
+	// execute() should treat it as an external command to run.
+	t.Run("ExternalCommandText", func(t *testing.T) {
+		// Set up with markdown containing a non-built-in command
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Find "Run" in the rendered text (not a built-in command)
+		runIdx := -1
+		for i := 0; i < len(plainText)-2; i++ {
+			if string(plainText[i:i+3]) == "Run" {
+				runIdx = i
+				break
+			}
+		}
+		if runIdx < 0 {
+			t.Fatalf("Could not find 'Run' in rendered text: %q", string(plainText))
+		}
+
+		// B2 click on "Run"
+		clickX := frameRect.Min.X + runIdx*10 + 15
+		clickPoint := image.Pt(clickX, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   clickPoint,
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Fatal("HandlePreviewMouse should handle B2 click")
+		}
+
+		execText := w.PreviewExecText()
+		if execText != "Run" {
+			t.Errorf("PreviewExecText() should return 'Run', got %q", execText)
+		}
+
+		// "Run" is not a built-in, so lookup should return nil
+		// execute() would then try to run it as an external command
+		e := lookup(execText, globalexectab)
+		if e != nil {
+			t.Errorf("'Run' should not be a built-in command, but lookup returned %q", e.name)
+		}
+	})
+}

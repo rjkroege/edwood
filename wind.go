@@ -768,7 +768,11 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		if w.display != nil {
 			w.display.Flush()
 		}
-		// TODO(Phase 18.2): Call execute() with selected text
+		// Execute the rendered text as a command
+		cmdText := w.PreviewExecText()
+		if cmdText != "" {
+			previewExecute(&w.body, cmdText)
+		}
 		return true
 	}
 
