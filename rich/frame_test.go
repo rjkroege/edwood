@@ -1641,6 +1641,140 @@ func TestCoordinateRoundTripEmpty(t *testing.T) {
 	}
 }
 
+// TestCharofptWithOrigin tests that Charofpt returns the correct content-absolute
+// rune position after scrolling (non-zero origin). After SetOrigin(6) on
+// "hello\nworld\nfoo", clicking at the top of the frame should return position 6
+// (the 'w' of "world"), not position 0.
+func TestCharofptWithOrigin(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: "hello\nworld\nfoo" = "hello"(5) + \n(1) + "world"(5) + \n(1) + "foo"(3) = 15 runes
+	// Line 0: "hello\n" (runes 0-5)
+	// Line 1: "world\n" (runes 6-11)
+	// Line 2: "foo" (runes 12-14)
+	f.SetContent(Plain("hello\nworld\nfoo"))
+
+	// Scroll so "world\n" is the first visible line
+	f.SetOrigin(6)
+
+	// Click at the top-left of the frame should return rune 6 ('w' of "world")
+	pt := image.Point{X: rect.Min.X, Y: rect.Min.Y}
+	got := f.Charofpt(pt)
+	if got != 6 {
+		t.Errorf("Charofpt(%v) with origin=6: got %d, want 6", pt, got)
+	}
+
+	// Click at X offset for 3rd char on first visible line should return rune 8 ('r' of "world")
+	pt = image.Point{X: rect.Min.X + 20, Y: rect.Min.Y}
+	got = f.Charofpt(pt)
+	if got != 8 {
+		t.Errorf("Charofpt(%v) with origin=6: got %d, want 8", pt, got)
+	}
+
+	// Click on second visible line (Y offset = fontHeight) should return rune 12 ('f' of "foo")
+	pt = image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	got = f.Charofpt(pt)
+	if got != 12 {
+		t.Errorf("Charofpt(%v) with origin=6: got %d, want 12", pt, got)
+	}
+}
+
+// TestPtofcharWithOrigin tests that Ptofchar returns the correct screen point
+// for content-absolute rune positions after scrolling. After SetOrigin(6),
+// Ptofchar(6) should return the frame's top-left (since rune 6 is the first
+// visible character), not a position far down the frame.
+func TestPtofcharWithOrigin(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: "hello\nworld\nfoo"
+	f.SetContent(Plain("hello\nworld\nfoo"))
+
+	// Scroll so "world\n" is the first visible line
+	f.SetOrigin(6)
+
+	// Rune 6 ('w') is now the first visible char - should be at frame origin
+	pt := f.Ptofchar(6)
+	want := rect.Min
+	if pt != want {
+		t.Errorf("Ptofchar(6) with origin=6: got %v, want %v", pt, want)
+	}
+
+	// Rune 8 ('r') is 2 chars into the first visible line
+	pt = f.Ptofchar(8)
+	want = image.Point{X: rect.Min.X + 20, Y: rect.Min.Y}
+	if pt != want {
+		t.Errorf("Ptofchar(8) with origin=6: got %v, want %v", pt, want)
+	}
+
+	// Rune 12 ('f' of "foo") is at the start of the second visible line
+	pt = f.Ptofchar(12)
+	want = image.Point{X: rect.Min.X, Y: rect.Min.Y + 14}
+	if pt != want {
+		t.Errorf("Ptofchar(12) with origin=6: got %v, want %v", pt, want)
+	}
+}
+
+// TestCharofptPtofcharRoundTripWithOrigin tests that Charofpt(Ptofchar(p)) == p
+// for all visible positions after scrolling with a non-zero origin.
+func TestCharofptPtofcharRoundTripWithOrigin(t *testing.T) {
+	rect := image.Rect(20, 10, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: "hello\nworld\nfoo\nbar\nbaz"
+	// Line 0: "hello\n" (runes 0-5)
+	// Line 1: "world\n" (runes 6-11)
+	// Line 2: "foo\n" (runes 12-15)
+	// Line 3: "bar\n" (runes 16-19)
+	// Line 4: "baz" (runes 20-22)
+	f.SetContent(Plain("hello\nworld\nfoo\nbar\nbaz"))
+
+	// Scroll to show from "world" onwards
+	f.SetOrigin(6)
+
+	// Test round-trip for all visible rune positions (6 through 22)
+	for i := 6; i <= 22; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("origin=6: Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+
+	// Also test with a different origin
+	f.SetOrigin(12) // Start from "foo"
+
+	for i := 12; i <= 22; i++ {
+		pt := f.Ptofchar(i)
+		got := f.Charofpt(pt)
+		if got != i {
+			t.Errorf("origin=12: Charofpt(Ptofchar(%d)) = %d, want %d (pt=%v)", i, got, i, pt)
+		}
+	}
+}
+
 // TestDrawBoxBackground tests that Style.Bg causes a background fill before text.
 func TestDrawBoxBackground(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300)

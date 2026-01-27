@@ -131,19 +131,17 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 		return f.rect.Min
 	}
 
-	// Convert content to boxes
-	boxes := contentToBoxes(f.content)
-	if len(boxes) == 0 {
+	// Use layoutFromOrigin to get viewport-relative lines and the origin rune offset.
+	// p is a content-absolute rune position; we subtract originRune to get a
+	// viewport-relative position for searching through the visible lines.
+	lines, originRune := f.layoutFromOrigin()
+	if len(lines) == 0 {
 		return f.rect.Min
 	}
 
-	// Calculate frame width and tab width for layout
-	frameWidth := f.rect.Dx()
-	maxtab := 8 * f.font.StringWidth("0")
-
-	// Layout boxes into lines (using cache if available)
-	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
-	if len(lines) == 0 {
+	// Adjust p to be relative to the origin
+	p -= originRune
+	if p <= 0 {
 		return f.rect.Min
 	}
 
@@ -217,20 +215,13 @@ func (f *frameImpl) Ptofchar(p int) image.Point {
 // The point is in screen coordinates. Returns the rune offset
 // of the character at that position.
 func (f *frameImpl) Charofpt(pt image.Point) int {
-	// Convert content to boxes
-	boxes := contentToBoxes(f.content)
-	if len(boxes) == 0 {
-		return 0
-	}
-
-	// Calculate frame width and tab width for layout
-	frameWidth := f.rect.Dx()
-	maxtab := 8 * f.font.StringWidth("0")
-
-	// Layout boxes into lines (using cache if available)
-	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
+	// Use layoutFromOrigin to get viewport-relative lines and the origin rune offset.
+	// After scrolling, click coordinates are viewport-relative but layoutBoxes()
+	// returns document-absolute Y positions. layoutFromOrigin() adjusts Y to start
+	// from 0 at the first visible line.
+	lines, originRune := f.layoutFromOrigin()
 	if len(lines) == 0 {
-		return 0
+		return originRune
 	}
 
 	// Convert point to frame-relative coordinates
@@ -261,7 +252,7 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 		}
 	}
 
-	// Count runes up to the target line
+	// Count runes up to the target line (viewport-relative)
 	runeCount := 0
 	for i := 0; i < lineIdx; i++ {
 		for _, pb := range lines[i].Boxes {
@@ -284,7 +275,7 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 			// Point at or after the newline position returns the newline's position
 			// We return here because we've found the position
 			if relX >= boxStart {
-				return runeCount
+				return originRune + runeCount
 			}
 			continue
 		}
@@ -298,10 +289,10 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 			}
 			if relX >= boxStart {
 				// Point is within the tab
-				return runeCount
+				return originRune + runeCount
 			}
 			// Point is before this box
-			return runeCount
+			return originRune + runeCount
 		}
 
 		// Handle text boxes
@@ -314,16 +305,16 @@ func (f *frameImpl) Charofpt(pt image.Point) int {
 		if relX >= boxStart {
 			// Point is within this box - find which character
 			localX := relX - boxStart
-			return runeCount + f.runeAtX(pb.Box.Text, pb.Box.Style, localX)
+			return originRune + runeCount + f.runeAtX(pb.Box.Text, pb.Box.Style, localX)
 		}
 
 		// Point is before this box (shouldn't normally happen
 		// since boxes are laid out left to right)
-		return runeCount
+		return originRune + runeCount
 	}
 
 	// Point is past all content on this line
-	return runeCount
+	return originRune + runeCount
 }
 
 // runeAtX finds which rune in text corresponds to pixel offset x.
@@ -1000,27 +991,24 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 // The selection spans from p0 to p1 (rune offsets).
 // For multi-line selections, multiple rectangles are drawn.
 func (f *frameImpl) drawSelectionTo(target edwooddraw.Image, offset image.Point) {
-	// Convert content to boxes
-	boxes := contentToBoxes(f.content)
-	if len(boxes) == 0 {
-		return
-	}
-
-	// Calculate frame width and tab width for layout
-	frameWidth := f.rect.Dx()
-	frameHeight := f.rect.Dy()
-	maxtab := 8 * f.font.StringWidth("0")
-
-	// Layout boxes into lines (using cache if available)
-	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
+	// Use layoutFromOrigin to get viewport-relative lines and origin rune offset.
+	// Selection positions (f.p0, f.p1) are content-absolute, so we subtract
+	// originRune to compare against viewport-relative rune counting.
+	lines, originRune := f.layoutFromOrigin()
 	if len(lines) == 0 {
 		return
 	}
+
+	frameWidth := f.rect.Dx()
+	frameHeight := f.rect.Dy()
 
 	p0, p1 := f.p0, f.p1
 	if p0 > p1 {
 		p0, p1 = p1, p0
 	}
+	// Adjust selection to viewport-relative rune positions
+	p0 -= originRune
+	p1 -= originRune
 
 	// Walk through lines and boxes, tracking rune position
 	runePos := 0
