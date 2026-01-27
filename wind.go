@@ -985,15 +985,12 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			global.snarfContext = w.selectionContext
 
 		case chordButtons&2 != 0: // B1+B2: Cut (copy + delete)
-			if snarfed := w.PreviewSnarf(); len(snarfed) > 0 {
-				global.snarfbuf = snarfed
-				global.snarfContext = w.selectionContext
-			}
-			// Delete the selected source text
-			if w.body.q0 < w.body.q1 {
-				w.body.file.DeleteAt(w.body.q0, w.body.q1)
-				w.UpdatePreview()
-			}
+			w.body.TypeCommit()
+			global.seq++
+			w.body.file.Mark(global.seq)
+			cut(&w.body, &w.body, nil, true, true, "")
+			global.snarfContext = w.selectionContext
+			w.UpdatePreview()
 
 		case chordButtons&4 != 0: // B1+B3: Paste (replace selection with snarf)
 			if len(global.snarfbuf) > 0 {

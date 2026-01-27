@@ -4923,6 +4923,11 @@ func setupPreviewChordTestWindow(t *testing.T) (*Window, *RichText, image.Rectan
 	}
 	w.col = &Column{safe: true}
 	w.r = rect
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: display}
+	t.Cleanup(func() { global.row = Row{} })
 
 	font := edwoodtest.NewFont(10, 14)
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
@@ -4961,6 +4966,13 @@ func setupPreviewChordTestWindow(t *testing.T) (*Window, *RichText, image.Rectan
 // 3. B1 press and release without B2/B3 is a normal selection (no chord)
 func TestPreviewChordDetection(t *testing.T) {
 	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Ensure body.w is set so cut() can operate on the text properly
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: w.display}
+	defer func() { global.row = Row{} }()
 
 	// Test 1: B1 sweep to select "Hello" (chars 0-5), then B2 pressed while B1 held
 	// This should be detected as B1+B2 chord (Cut)
@@ -5075,8 +5087,17 @@ func TestPreviewChordDetection(t *testing.T) {
 // TestPreviewChordCut tests that the B1+B2 chord in preview mode performs a Cut
 // operation: the selected text is copied to the snarf buffer and deleted from
 // the source body buffer. The preview should reflect the deletion.
+// It also verifies that the cut operation uses the standard cut() path,
+// which means undo works and the system clipboard is synced.
 func TestPreviewChordCut(t *testing.T) {
 	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Ensure body.w is set so cut() can operate on the text properly
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: w.display}
+	defer func() { global.row = Row{} }()
 
 	// Select "Hello" (chars 0-5) with B1, then chord B2 to cut
 	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
@@ -5100,8 +5121,12 @@ func TestPreviewChordCut(t *testing.T) {
 	}
 	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
 
-	// Clear snarf buffer before test
+	// Clear snarf buffer and display snarf before test
 	global.snarfbuf = nil
+	w.display.WriteSnarf(nil)
+
+	originalText := "Hello world test"
+	originalLen := len([]rune(originalText))
 
 	handled := w.HandlePreviewMouse(&m, mc)
 	if !handled {
@@ -5115,9 +5140,27 @@ func TestPreviewChordCut(t *testing.T) {
 
 	// The source body should have the selected text removed
 	bodyLen := w.body.file.Nr()
-	originalLen := len([]rune("Hello world test"))
 	if bodyLen >= originalLen {
 		t.Errorf("body length should decrease after cut: got %d, original %d", bodyLen, originalLen)
+	}
+
+	// Verify the standard cut path was used: acmeputsnarf() should have
+	// synced global.snarfbuf to the display's system clipboard via WriteSnarf().
+	clipBuf := make([]byte, 1024)
+	n, _, err := w.display.ReadSnarf(clipBuf)
+	if err != nil {
+		t.Fatalf("ReadSnarf failed: %v", err)
+	}
+	if n == 0 {
+		t.Error("system clipboard (display snarf) should be updated after chord cut; acmeputsnarf() was not called")
+	}
+
+	// Verify undo restores the original text: the cut should have set up
+	// proper undo sequence (TypeCommit + seq++ + Mark) so Undo works.
+	w.Undo(true)
+	afterUndoLen := w.body.file.Nr()
+	if afterUndoLen != originalLen {
+		t.Errorf("after undo, body length should be restored to %d, got %d", originalLen, afterUndoLen)
 	}
 
 	_ = rt
@@ -5274,6 +5317,11 @@ func TestPreviewCutSourceMapping(t *testing.T) {
 	}
 	w.col = &Column{safe: true}
 	w.r = rect
+	w.body.w = w
+
+	// Set up global.row so acmeputsnarf() can call display.WriteSnarf()
+	global.row = Row{display: display}
+	defer func() { global.row = Row{} }()
 
 	font := edwoodtest.NewFont(10, 14)
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
