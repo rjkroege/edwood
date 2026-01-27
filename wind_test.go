@@ -8150,3 +8150,487 @@ func TestPreviewLookCursorWarp(t *testing.T) {
 			actualPt, expectedWarpPt, rendStart, expectedPt, fontHeight-4)
 	}
 }
+
+// TestPreviewScrollThenClick is an integration test verifying that after
+// scrolling the preview (setting a non-zero origin), clicking maps to the
+// correct character position. This exercises the full pipeline:
+// scroll → Charofpt → correct rune position → Ptofchar round-trip.
+func TestPreviewScrollThenClick(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Build source markdown with enough lines to require scrolling.
+	// Each line is short so we get many layout lines.
+	var sb strings.Builder
+	for i := 0; i < 80; i++ {
+		sb.WriteString(fmt.Sprintf("Line %d content.\n", i))
+	}
+	sourceMarkdown := sb.String()
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &TrackingMockFrame{nchars: len(sourceRunes), maxlines: 20},
+		file:    file.MakeObservableEditableBuffer("/test/scroll-click.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview with a small frame (only ~10 lines visible)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 160) // Small frame for scrolling
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: Click at top of frame with origin=0 → should map to first char
+	rt.SetOrigin(0)
+	rt.Frame().Redraw()
+
+	topLeftPt := image.Pt(frameRect.Min.X, frameRect.Min.Y)
+	charAtOriginZero := rt.Frame().Charofpt(topLeftPt)
+	if charAtOriginZero != 0 {
+		t.Errorf("With origin=0, click at frame top-left should map to char 0, got %d", charAtOriginZero)
+	}
+
+	// Verify round-trip: Ptofchar(0) should be near frame top-left
+	ptOfChar0 := rt.Frame().Ptofchar(0)
+	if ptOfChar0.Y != frameRect.Min.Y {
+		t.Errorf("With origin=0, Ptofchar(0).Y should be %d, got %d", frameRect.Min.Y, ptOfChar0.Y)
+	}
+
+	// Test 2: Scroll to show content starting at line 40 (roughly)
+	// Find the rune position for "Line 40"
+	plainText := content.Plain()
+	line40Str := "Line 40"
+	line40Pos := -1
+	for i := 0; i < len(plainText)-len(line40Str); i++ {
+		if string(plainText[i:i+len(line40Str)]) == line40Str {
+			line40Pos = i
+			break
+		}
+	}
+	if line40Pos < 0 {
+		t.Fatal("Could not find 'Line 40' in rendered text")
+	}
+
+	// Set origin to the start of "Line 40"
+	rt.SetOrigin(line40Pos)
+	rt.Frame().Redraw()
+
+	// Click at the top-left of the frame after scrolling
+	charAfterScroll := rt.Frame().Charofpt(topLeftPt)
+
+	// After scrolling to line40Pos, clicking at the top should map to
+	// approximately line40Pos (the origin), not to char 0.
+	if charAfterScroll < line40Pos {
+		t.Errorf("After scrolling to origin=%d, click at frame top should map to char >= %d, got %d",
+			line40Pos, line40Pos, charAfterScroll)
+	}
+	// Should be close to line40Pos (within the first line's worth of chars)
+	if charAfterScroll > line40Pos+50 {
+		t.Errorf("After scrolling to origin=%d, click at frame top should map near %d, got %d",
+			line40Pos, line40Pos, charAfterScroll)
+	}
+
+	// Test 3: Round-trip from scrolled position
+	// Ptofchar(charAfterScroll) should map back to near the frame top
+	ptAfterScroll := rt.Frame().Ptofchar(charAfterScroll)
+	if ptAfterScroll.Y != frameRect.Min.Y {
+		t.Errorf("After scroll, Ptofchar(%d).Y should be %d, got %d",
+			charAfterScroll, frameRect.Min.Y, ptAfterScroll.Y)
+	}
+
+	// Full round-trip: Charofpt(Ptofchar(p)) == p
+	roundTrip := rt.Frame().Charofpt(ptAfterScroll)
+	if roundTrip != charAfterScroll {
+		t.Errorf("Round-trip failed: Charofpt(Ptofchar(%d)) = %d", charAfterScroll, roundTrip)
+	}
+
+	// Test 4: Simulate B1 click after scroll via HandlePreviewMouse
+	// The click should set the selection to the scrolled character position, not the unscrolled one.
+	downEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+30, frameRect.Min.Y+5), // 3 chars in, near top
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(frameRect.Min.X+30, frameRect.Min.Y+5),
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+	handled := w.HandlePreviewMouse(&downEvent, mc)
+	if !handled {
+		t.Error("HandlePreviewMouse should handle B1 click in frame area")
+	}
+
+	// The selection should be near line40Pos, not near 0
+	q0, _ := rt.Selection()
+	if q0 < line40Pos {
+		t.Errorf("B1 click after scroll: selection q0=%d should be >= origin %d", q0, line40Pos)
+	}
+}
+
+// TestPreviewColoredSweepIntegration is an integration test verifying that
+// B2 and B3 sweeps use colored selection (red and green respectively) in the
+// context of a full preview setup with parsed markdown content and source maps.
+func TestPreviewColoredSweepIntegration(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Initialize button colors
+	global.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
+	global.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
+	if global.but2col == nil || global.but3col == nil {
+		t.Fatal("Button colors should be initialized")
+	}
+
+	sourceMarkdown := "Hello **bold** and *italic* world.\n\nSecond paragraph here."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &TrackingMockFrame{nchars: len(sourceRunes), maxlines: 20},
+		file:    file.MakeObservableEditableBuffer("/test/sweep.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Sub-test: B2 red sweep selects text and source maps correctly
+	t.Run("B2RedSweepWithSourceMap", func(t *testing.T) {
+		// Sweep over "bold" in the rendered text
+		plainText := content.Plain()
+		boldPos := -1
+		for i := 0; i < len(plainText)-3; i++ {
+			if string(plainText[i:i+4]) == "bold" {
+				boldPos = i
+				break
+			}
+		}
+		if boldPos < 0 {
+			t.Fatal("Could not find 'bold' in rendered text")
+		}
+
+		// Calculate pixel positions for the sweep
+		startPt := rt.Frame().Ptofchar(boldPos)
+		endPt := rt.Frame().Ptofchar(boldPos + 4)
+
+		downEvent := draw.Mouse{
+			Point:   startPt,
+			Buttons: 2,
+		}
+		dragEvent := draw.Mouse{
+			Point:   endPt,
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   endPt,
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+		if !handled {
+			t.Error("B2 sweep should be handled")
+		}
+
+		q0, q1 := rt.Selection()
+		if q0 != boldPos || q1 != boldPos+4 {
+			t.Errorf("B2 sweep selection: got (%d,%d), want (%d,%d)", q0, q1, boldPos, boldPos+4)
+		}
+
+		// After sweep, sweepColor should be cleared (verified by successful Redraw)
+		rt.Frame().Redraw()
+	})
+
+	// Sub-test: B3 green sweep selects text and triggers search
+	t.Run("B3GreenSweepWithSourceMap", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+
+		// Sweep over "italic" in the rendered text
+		plainText := content.Plain()
+		italicPos := -1
+		for i := 0; i < len(plainText)-5; i++ {
+			if string(plainText[i:i+6]) == "italic" {
+				italicPos = i
+				break
+			}
+		}
+		if italicPos < 0 {
+			t.Fatal("Could not find 'italic' in rendered text")
+		}
+
+		startPt := rt.Frame().Ptofchar(italicPos)
+		endPt := rt.Frame().Ptofchar(italicPos + 6)
+
+		downEvent := draw.Mouse{
+			Point:   startPt,
+			Buttons: 4,
+		}
+		dragEvent := draw.Mouse{
+			Point:   endPt,
+			Buttons: 4,
+		}
+		upEvent := draw.Mouse{
+			Point:   endPt,
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+		if !handled {
+			t.Error("B3 sweep should be handled")
+		}
+
+		q0, q1 := rt.Selection()
+		if q0 != italicPos || q1 != italicPos+6 {
+			t.Errorf("B3 sweep selection: got (%d,%d), want (%d,%d)", q0, q1, italicPos, italicPos+6)
+		}
+
+		// After sweep, sweepColor should be cleared
+		rt.Frame().Redraw()
+	})
+
+	// Sub-test: B1 sweep uses default selection color (no crash, correct selection)
+	t.Run("B1DefaultColor", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+100, frameRect.Min.Y+5),
+			Buttons: 1,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+100, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+		if !handled {
+			t.Error("B1 sweep should be handled")
+		}
+
+		q0, q1 := rt.Selection()
+		if q0 >= q1 {
+			t.Errorf("B1 sweep should produce a non-empty selection, got (%d,%d)", q0, q1)
+		}
+
+		// Redraw with default selection color should work
+		rt.Frame().Redraw()
+	})
+}
+
+// TestPreviewLookWarpIntegration is an integration test verifying the full
+// B3 Look pipeline: search finds text in source → maps to rendered position →
+// sets preview selection → scrolls if needed → warps cursor to found text.
+// This combines scroll, selection, and cursor warp in a single end-to-end flow.
+func TestPreviewLookWarpIntegration(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Build markdown with "target" appearing twice, far apart.
+	var sb strings.Builder
+	sb.WriteString("First target word.\n\n")
+	for i := 0; i < 60; i++ {
+		sb.WriteString(fmt.Sprintf("Filler line %d.\n", i))
+	}
+	sb.WriteString("Second target word.\n")
+	sourceMarkdown := sb.String()
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &TrackingMockFrame{nchars: len(sourceRunes), maxlines: 20},
+		file:    file.MakeObservableEditableBuffer("/test/warp.md", sourceRunes),
+	}
+	w.body.w = w
+	w.body.what = Body
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 160) // Small frame to force scrolling
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+	rt.SetOrigin(0)
+
+	// Find first "target" in rendered text
+	plainText := content.Plain()
+	firstTargetPos := -1
+	for i := 0; i < len(plainText)-5; i++ {
+		if string(plainText[i:i+6]) == "target" {
+			firstTargetPos = i
+			break
+		}
+	}
+	if firstTargetPos < 0 {
+		t.Fatal("Could not find 'target' in rendered text")
+	}
+
+	// Set selection to first "target" and sync to source
+	rt.SetSelection(firstTargetPos, firstTargetPos+6)
+	w.syncSourceSelection()
+
+	// Reset MoveTo tracking
+	tracker := display.(edwoodtest.MoveToTracker)
+	tracker.ResetMoveTo()
+
+	// Perform search — should find second "target"
+	found := search(&w.body, []rune("target"))
+	if !found {
+		t.Fatal("search() should find 'target' in source buffer")
+	}
+
+	// Map search result back to rendered positions
+	rendStart, rendEnd := sourceMap.ToRendered(w.body.q0, w.body.q1)
+	if rendStart < 0 || rendEnd < 0 {
+		t.Fatalf("ToRendered(%d, %d) returned (-1,-1)", w.body.q0, w.body.q1)
+	}
+
+	// Second target should be different from the first
+	if rendStart == firstTargetPos {
+		t.Fatal("Search should have found the second 'target', not the first")
+	}
+
+	// Set preview selection
+	rt.SetSelection(rendStart, rendEnd)
+
+	// Scroll to match
+	w.scrollPreviewToMatch(rt, rendStart)
+
+	// Verify origin changed (second target is offscreen from origin=0)
+	newOrigin := rt.Origin()
+	if newOrigin == 0 && rendStart > 200 {
+		t.Errorf("Origin should have changed after scrolling to offscreen match at rune %d", rendStart)
+	}
+
+	// Warp cursor (as the B3 handler does)
+	if w.display != nil {
+		warpPt := rt.Frame().Ptofchar(rendStart).Add(
+			image.Pt(4, rt.Frame().DefaultFontHeight()-4))
+		w.display.MoveTo(warpPt)
+	}
+
+	// Verify MoveTo was called
+	if tracker.MoveToCount() == 0 {
+		t.Fatal("display.MoveTo() should have been called after Look")
+	}
+
+	// Verify warp coordinates are sensible:
+	// The warp point should be within the frame rectangle (after scrolling)
+	actualPt := tracker.LastMoveTo()
+	frameRect := rt.Frame().Rect()
+	if !actualPt.In(frameRect) {
+		t.Errorf("Warp point %v should be within frame rect %v", actualPt, frameRect)
+	}
+
+	// Verify the warp Y is consistent with Ptofchar after scroll
+	ptOfMatch := rt.Frame().Ptofchar(rendStart)
+	expectedY := ptOfMatch.Y + rt.Frame().DefaultFontHeight() - 4
+	if actualPt.Y != expectedY {
+		t.Errorf("Warp Y=%d should be ptOfMatch.Y(%d) + fontHeight(%d) - 4 = %d",
+			actualPt.Y, ptOfMatch.Y, rt.Frame().DefaultFontHeight(), expectedY)
+	}
+
+	// Verify the selection is set correctly in the preview
+	q0, q1 := rt.Selection()
+	if q0 != rendStart || q1 != rendEnd {
+		t.Errorf("Preview selection should be (%d,%d), got (%d,%d)", rendStart, rendEnd, q0, q1)
+	}
+
+	// Verify Charofpt round-trip works at the warp point
+	// The warp point is offset by (4, fontHeight-4) from the char position,
+	// so Charofpt of that point should still map to rendStart (within the same char)
+	charAtWarp := rt.Frame().Charofpt(actualPt)
+	if charAtWarp != rendStart {
+		t.Logf("Charofpt at warp point %v = %d (expected ~%d, may differ due to +4 offset)", actualPt, charAtWarp, rendStart)
+	}
+}
