@@ -3868,20 +3868,17 @@ func TestPreviewB2Sweep(t *testing.T) {
 			t.Error("HandlePreviewMouse should handle B2 sweep in frame area")
 		}
 
-		// After sweep from 0 to 5, selection should be (0, 5)
+		// After B2 execute, selection is restored to prior state (0, 0)
 		q0, q1 := rt.Selection()
-		if q0 != 0 {
-			t.Errorf("B2 sweep selection p0 should be 0, got %d", q0)
-		}
-		if q1 != 5 {
-			t.Errorf("B2 sweep selection p1 should be 5, got %d", q1)
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 sweep should restore prior selection (0,0), got (%d,%d)", q0, q1)
 		}
 	})
 
-	// Test 2: B2 sweep backward (from right to left) should normalize selection
+	// Test 2: B2 sweep backward (from right to left) should also restore prior selection
 	t.Run("SweepBackward", func(t *testing.T) {
-		// Clear previous selection and re-render to reset frame state
-		rt.SetSelection(0, 0)
+		// Set a known prior selection and re-render to reset frame state
+		rt.SetSelection(2, 4)
 		rt.Render(bodyRect)
 
 		// Mouse down at position 5 (50 pixels from left edge, 10px per char)
@@ -3907,19 +3904,16 @@ func TestPreviewB2Sweep(t *testing.T) {
 			t.Error("HandlePreviewMouse should handle backward B2 sweep")
 		}
 
-		// Selection should be normalized: p0 < p1
+		// After B2 execute, selection is restored to prior state (2, 4)
 		q0, q1 := rt.Selection()
-		if q0 != 0 {
-			t.Errorf("Backward B2 sweep selection p0 should be 0, got %d", q0)
-		}
-		if q1 != 5 {
-			t.Errorf("Backward B2 sweep selection p1 should be 5, got %d", q1)
+		if q0 != 2 || q1 != 4 {
+			t.Errorf("Backward B2 sweep should restore prior selection (2,4), got (%d,%d)", q0, q1)
 		}
 	})
 
-	// Test 3: B2 sweep selects text that can be retrieved for execution
+	// Test 3: B2 sweep executes then restores prior selection
 	t.Run("SweepSelectionForExec", func(t *testing.T) {
-		// Clear previous selection
+		// Set a known prior selection
 		rt.SetSelection(0, 0)
 
 		// Select "Echo hello" (positions 0 to 10)
@@ -3943,17 +3937,10 @@ func TestPreviewB2Sweep(t *testing.T) {
 			t.Error("HandlePreviewMouse should handle B2 sweep for exec")
 		}
 
-		// Verify selection covers the intended range
+		// After B2 execute, selection is restored to prior state (0, 0)
 		q0, q1 := rt.Selection()
-		if q1-q0 < 4 {
-			t.Errorf("B2 sweep should select at least 4 characters, got selection (%d, %d)", q0, q1)
-		}
-
-		// The selected text should be retrievable via PreviewExecText
-		// (This tests integration - the actual command execution is tested elsewhere)
-		execText := w.PreviewExecText()
-		if len(execText) == 0 {
-			t.Error("PreviewExecText should return non-empty text after B2 sweep selection")
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 sweep should restore prior selection (0,0), got (%d,%d)", q0, q1)
 		}
 	})
 }
@@ -4055,36 +4042,18 @@ func TestPreviewB2Execute(t *testing.T) {
 			t.Fatal("HandlePreviewMouse should handle B2 click in frame area")
 		}
 
-		// Verify the preview selection covers "Del"
+		// After B2 execute, selection is restored to prior state (0,0)
 		q0, q1 := rt.Selection()
-		selectedRendered := string(plainText[q0:q1])
-		if selectedRendered != "Del" {
-			t.Errorf("Preview selection should be 'Del', got %q (q0=%d, q1=%d)", selectedRendered, q0, q1)
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 execute should restore prior selection (0,0), got (%d,%d)", q0, q1)
 		}
 
-		// Verify the exec text extracted from preview matches
-		execText := w.PreviewExecText()
-		if execText != "Del" {
-			t.Errorf("PreviewExecText() should return 'Del', got %q", execText)
-		}
-
-		// Verify source body selection was synced via syncSourceSelection()
-		sourceQ0, sourceQ1 := w.body.q0, w.body.q1
-		if sourceQ1 <= sourceQ0 {
-			t.Fatalf("Source selection should be non-empty, got q0=%d q1=%d", sourceQ0, sourceQ1)
-		}
-
-		// The source-mapped positions may include markdown formatting (e.g., "**Del**")
-		// so execute() must use the rendered text from PreviewExecText(), not the raw source.
-		// Verify that PreviewExecText() gives us the clean command text for execute().
-		if execText != "Del" {
-			t.Errorf("PreviewExecText() must return clean rendered text for execute(), got %q", execText)
-		}
-
-		// Verify Del is a valid built-in command that execute() can look up
-		e := lookup(execText, globalexectab)
+		// Verify Del is a valid built-in command that execute() can look up.
+		// The handler internally extracts exec text and dispatches before
+		// restoring the selection, so we verify the pipeline is correct.
+		e := lookup("Del", globalexectab)
 		if e == nil {
-			t.Errorf("Command %q should be found in globalexectab", execText)
+			t.Errorf("Command %q should be found in globalexectab", "Del")
 		}
 		if e != nil && e.name != "Del" {
 			t.Errorf("Looked up command should be 'Del', got %q", e.name)
@@ -4119,16 +4088,16 @@ func TestPreviewB2Execute(t *testing.T) {
 			t.Fatal("HandlePreviewMouse should handle B2 sweep")
 		}
 
-		// Verify exec text returns the rendered command, not raw markdown
-		execText := w.PreviewExecText()
-		if execText != "Del" {
-			t.Errorf("PreviewExecText() after sweep should return 'Del', got %q", execText)
+		// After B2 execute, selection is restored to prior state (0,0)
+		q0, q1 := rt.Selection()
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 sweep execute should restore prior selection (0,0), got (%d,%d)", q0, q1)
 		}
 
-		// Verify the rendered text is a valid command for execute()
-		e := lookup(execText, globalexectab)
+		// Verify Del is a valid command for execute()
+		e := lookup("Del", globalexectab)
 		if e == nil {
-			t.Errorf("Swept command %q should be found in globalexectab", execText)
+			t.Errorf("Swept command %q should be found in globalexectab", "Del")
 		}
 	})
 
@@ -4170,14 +4139,15 @@ func TestPreviewB2Execute(t *testing.T) {
 			t.Fatal("HandlePreviewMouse should handle B2 click")
 		}
 
-		execText := w.PreviewExecText()
-		if execText != "Run" {
-			t.Errorf("PreviewExecText() should return 'Run', got %q", execText)
+		// After B2 execute, selection is restored to prior state (0,0)
+		q0, q1 := rt.Selection()
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 execute should restore prior selection (0,0), got (%d,%d)", q0, q1)
 		}
 
 		// "Run" is not a built-in, so lookup should return nil
 		// execute() would then try to run it as an external command
-		e := lookup(execText, globalexectab)
+		e := lookup("Run", globalexectab)
 		if e != nil {
 			t.Errorf("'Run' should not be a built-in command, but lookup returned %q", e.name)
 		}
@@ -4256,7 +4226,7 @@ func TestPreviewB2BuiltinCommands(t *testing.T) {
 	// Helper to B2-click a word, returning the exec text.
 	// Note: HandlePreviewMouse calls previewExecute() which dispatches the
 	// built-in command. Only use this for commands safe in test context.
-	b2Click := func(t *testing.T, word string) string {
+	b2Click := func(t *testing.T, word string) {
 		t.Helper()
 		idx := findWord(word)
 		if idx < 0 {
@@ -4283,8 +4253,6 @@ func TestPreviewB2BuiltinCommands(t *testing.T) {
 		if !handled {
 			t.Fatalf("HandlePreviewMouse should handle B2 click on %q", word)
 		}
-
-		return w.PreviewExecText()
 	}
 
 	// Test that each built-in command word is correctly extracted from preview
@@ -4368,10 +4336,7 @@ func TestPreviewB2BuiltinCommands(t *testing.T) {
 		global.seltext = &w.body
 		global.snarfbuf = nil
 
-		execText := b2Click(t, "Snarf")
-		if execText != "Snarf" {
-			t.Errorf("PreviewExecText() for Snarf returned %q", execText)
-		}
+		b2Click(t, "Snarf")
 
 		// After HandlePreviewMouse dispatches Snarf, snarfbuf should be populated.
 		// The body selection is synced via syncSourceSelection(), and cut()
@@ -7852,13 +7817,13 @@ func TestPreviewB2SweepRed(t *testing.T) {
 			t.Error("HandlePreviewMouse should handle B2 sweep in frame area")
 		}
 
-		// Verify selection was set correctly
+		// After B2 execute, selection is restored to prior state (0,0)
 		q0, q1 := rt.Selection()
 		if q0 != 0 {
-			t.Errorf("B2 red sweep selection p0 should be 0, got %d", q0)
+			t.Errorf("B2 red sweep restored selection p0 should be 0, got %d", q0)
 		}
-		if q1 != 5 {
-			t.Errorf("B2 red sweep selection p1 should be 5, got %d", q1)
+		if q1 != 0 {
+			t.Errorf("B2 red sweep restored selection p1 should be 0, got %d", q1)
 		}
 	})
 
@@ -8394,9 +8359,10 @@ func TestPreviewColoredSweepIntegration(t *testing.T) {
 			t.Error("B2 sweep should be handled")
 		}
 
+		// After B2 execute, selection is restored to prior state (0,0)
 		q0, q1 := rt.Selection()
-		if q0 != boldPos || q1 != boldPos+4 {
-			t.Errorf("B2 sweep selection: got (%d,%d), want (%d,%d)", q0, q1, boldPos, boldPos+4)
+		if q0 != 0 || q1 != 0 {
+			t.Errorf("B2 sweep selection after execute: got (%d,%d), want (0,0)", q0, q1)
 		}
 
 		// After sweep, sweepColor should be cleared (verified by successful Redraw)

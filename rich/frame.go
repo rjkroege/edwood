@@ -1139,7 +1139,7 @@ func (f *frameImpl) drawSelectionTo(target edwooddraw.Image, offset image.Point)
 				if f.sweepColor != nil {
 					color = f.sweepColor
 				}
-				target.Draw(selRect, color, color, image.ZP)
+				target.Draw(selRect, color, nil, image.ZP)
 			}
 		}
 

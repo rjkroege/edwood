@@ -965,11 +965,10 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
 		var chordButtons int
 		if mc != nil {
-			// Use SelectWithChordAndColor for drag selection with chord detection.
+			// Use SelectWithChord for drag selection with chord detection.
 			// Detects B2/B3 pressed while B1 is held for Cut/Paste/Snarf.
-			// Pass global.but2col (red) to match normal Acme B1 chord behavior.
 			var p0, p1 int
-			p0, p1, chordButtons = rt.Frame().SelectWithChordAndColor(mc, m, global.but2col)
+			p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
 			rt.SetSelection(p0, p1)
 		} else {
 			charPos := rt.Frame().Charofpt(m.Point)
@@ -1010,6 +1009,9 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 	// Handle button 2 (B2/middle-click) in frame area for Execute action
 	if m.Point.In(frameRect) && m.Buttons&2 != 0 {
+		// Save the prior selection to restore after B2 execute
+		priorP0, priorP1 := rt.Selection()
+
 		var p0, p1 int
 		if mc != nil {
 			// Use Frame.SelectWithColor() for proper drag selection with B2
@@ -1040,6 +1042,12 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		cmdText := w.PreviewExecText()
 		if cmdText != "" {
 			previewExecute(&w.body, cmdText)
+		}
+		// Restore prior selection after B2 execute action
+		rt.SetSelection(priorP0, priorP1)
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
 		}
 		return true
 	}
