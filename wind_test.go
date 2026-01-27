@@ -5369,6 +5369,261 @@ func TestPreviewReRenderAfterEdit(t *testing.T) {
 	}
 }
 
+// TestSelectionContext tests the SelectionContext struct used for context-aware
+// paste operations in preview mode. SelectionContext tracks metadata about the
+// current selection including source/rendered positions, content type, and
+// formatting information needed to adapt paste behavior.
+func TestSelectionContext(t *testing.T) {
+	t.Run("ZeroValue", func(t *testing.T) {
+		// A zero-value SelectionContext should have ContentPlain type
+		var ctx SelectionContext
+		if ctx.ContentType != ContentPlain {
+			t.Errorf("zero-value ContentType = %v, want ContentPlain (%v)", ctx.ContentType, ContentPlain)
+		}
+		if ctx.SourceStart != 0 || ctx.SourceEnd != 0 {
+			t.Errorf("zero-value source range = (%d,%d), want (0,0)", ctx.SourceStart, ctx.SourceEnd)
+		}
+		if ctx.RenderedStart != 0 || ctx.RenderedEnd != 0 {
+			t.Errorf("zero-value rendered range = (%d,%d), want (0,0)", ctx.RenderedStart, ctx.RenderedEnd)
+		}
+		if ctx.CodeLanguage != "" {
+			t.Errorf("zero-value CodeLanguage = %q, want empty", ctx.CodeLanguage)
+		}
+		if ctx.IncludesOpenMarker || ctx.IncludesCloseMarker {
+			t.Error("zero-value should not include markers")
+		}
+	})
+
+	t.Run("ContentTypes", func(t *testing.T) {
+		// Verify all content type constants are distinct
+		types := []SelectionContentType{
+			ContentPlain,
+			ContentHeading,
+			ContentBold,
+			ContentItalic,
+			ContentBoldItalic,
+			ContentCode,
+			ContentCodeBlock,
+			ContentLink,
+			ContentImage,
+			ContentMixed,
+		}
+		seen := make(map[SelectionContentType]bool)
+		for _, ct := range types {
+			if seen[ct] {
+				t.Errorf("duplicate content type value: %v", ct)
+			}
+			seen[ct] = true
+		}
+	})
+
+	t.Run("PlainText", func(t *testing.T) {
+		ctx := SelectionContext{
+			SourceStart:   0,
+			SourceEnd:     5,
+			RenderedStart: 0,
+			RenderedEnd:   5,
+			ContentType:   ContentPlain,
+		}
+		if ctx.ContentType != ContentPlain {
+			t.Errorf("ContentType = %v, want ContentPlain", ctx.ContentType)
+		}
+		if ctx.SourceEnd-ctx.SourceStart != 5 {
+			t.Errorf("source length = %d, want 5", ctx.SourceEnd-ctx.SourceStart)
+		}
+	})
+
+	t.Run("BoldSelection", func(t *testing.T) {
+		// Selecting "bold" from "**bold**" in rendered text
+		// Source: "**bold**" (positions 0-8)
+		// Rendered: "bold" (positions 0-4)
+		ctx := SelectionContext{
+			SourceStart:        0,
+			SourceEnd:          8,
+			RenderedStart:      0,
+			RenderedEnd:        4,
+			ContentType:        ContentBold,
+			PrimaryStyle:       rich.Style{Bold: true, Scale: 1.0},
+			IncludesOpenMarker: true,
+			IncludesCloseMarker: true,
+		}
+		if ctx.ContentType != ContentBold {
+			t.Errorf("ContentType = %v, want ContentBold", ctx.ContentType)
+		}
+		if !ctx.IncludesOpenMarker || !ctx.IncludesCloseMarker {
+			t.Error("full bold selection should include both markers")
+		}
+		if !ctx.PrimaryStyle.Bold {
+			t.Error("PrimaryStyle should have Bold set")
+		}
+	})
+
+	t.Run("PartialBoldSelection", func(t *testing.T) {
+		// Selecting "ol" from "**bold**" in rendered text
+		// Source: positions within "**bold**" excluding markers
+		// Rendered: "ol" (positions 1-3)
+		ctx := SelectionContext{
+			SourceStart:         4, // "**b|ol|d**" -> source pos of 'o'
+			SourceEnd:           6, // source pos after 'l'
+			RenderedStart:       1,
+			RenderedEnd:         3,
+			ContentType:         ContentBold,
+			PrimaryStyle:        rich.Style{Bold: true, Scale: 1.0},
+			IncludesOpenMarker:  false,
+			IncludesCloseMarker: false,
+		}
+		if ctx.ContentType != ContentBold {
+			t.Errorf("ContentType = %v, want ContentBold", ctx.ContentType)
+		}
+		if ctx.IncludesOpenMarker || ctx.IncludesCloseMarker {
+			t.Error("partial bold selection should not include markers")
+		}
+	})
+
+	t.Run("HeadingSelection", func(t *testing.T) {
+		// Selecting entire heading text from "# Heading"
+		// Source: "# Heading\n" (positions 0-10)
+		// Rendered: "Heading\n" (positions 0-8)
+		ctx := SelectionContext{
+			SourceStart:        0,
+			SourceEnd:          10,
+			RenderedStart:      0,
+			RenderedEnd:        8,
+			ContentType:        ContentHeading,
+			PrimaryStyle:       rich.Style{Bold: true, Scale: 2.0},
+			IncludesOpenMarker: true,
+		}
+		if ctx.ContentType != ContentHeading {
+			t.Errorf("ContentType = %v, want ContentHeading", ctx.ContentType)
+		}
+		if !ctx.IncludesOpenMarker {
+			t.Error("heading selection from start should include open marker")
+		}
+	})
+
+	t.Run("CodeBlockSelection", func(t *testing.T) {
+		// Selecting text inside a fenced code block
+		ctx := SelectionContext{
+			SourceStart:   0,
+			SourceEnd:     30,
+			RenderedStart: 0,
+			RenderedEnd:   15,
+			ContentType:   ContentCodeBlock,
+			CodeLanguage:  "go",
+			PrimaryStyle:  rich.Style{Code: true, Block: true, Scale: 1.0},
+		}
+		if ctx.ContentType != ContentCodeBlock {
+			t.Errorf("ContentType = %v, want ContentCodeBlock", ctx.ContentType)
+		}
+		if ctx.CodeLanguage != "go" {
+			t.Errorf("CodeLanguage = %q, want %q", ctx.CodeLanguage, "go")
+		}
+	})
+
+	t.Run("InlineCodeSelection", func(t *testing.T) {
+		// Selecting inline code "`code`"
+		ctx := SelectionContext{
+			SourceStart:         0,
+			SourceEnd:           6, // `code`
+			RenderedStart:       0,
+			RenderedEnd:         4, // code
+			ContentType:         ContentCode,
+			PrimaryStyle:        rich.Style{Code: true, Scale: 1.0},
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		if ctx.ContentType != ContentCode {
+			t.Errorf("ContentType = %v, want ContentCode", ctx.ContentType)
+		}
+	})
+
+	t.Run("LinkSelection", func(t *testing.T) {
+		// Selecting link text from "[link](url)"
+		ctx := SelectionContext{
+			SourceStart:         0,
+			SourceEnd:           12,
+			RenderedStart:       0,
+			RenderedEnd:         4,
+			ContentType:         ContentLink,
+			PrimaryStyle:        rich.Style{Link: true, Fg: rich.LinkBlue, Scale: 1.0},
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		if ctx.ContentType != ContentLink {
+			t.Errorf("ContentType = %v, want ContentLink", ctx.ContentType)
+		}
+		if !ctx.PrimaryStyle.Link {
+			t.Error("PrimaryStyle should have Link set")
+		}
+	})
+
+	t.Run("ImageSelection", func(t *testing.T) {
+		// Selecting image placeholder
+		ctx := SelectionContext{
+			SourceStart:   0,
+			SourceEnd:     22, // ![alt text](image.png)
+			RenderedStart: 0,
+			RenderedEnd:   16, // [Image: alt text]
+			ContentType:   ContentImage,
+			PrimaryStyle:  rich.Style{Image: true, Scale: 1.0},
+		}
+		if ctx.ContentType != ContentImage {
+			t.Errorf("ContentType = %v, want ContentImage", ctx.ContentType)
+		}
+	})
+
+	t.Run("MixedSelection", func(t *testing.T) {
+		// Selecting across multiple formatting types
+		// e.g., "plain **bold** *italic*"
+		ctx := SelectionContext{
+			SourceStart:   0,
+			SourceEnd:     24,
+			RenderedStart: 0,
+			RenderedEnd:   18,
+			ContentType:   ContentMixed,
+		}
+		if ctx.ContentType != ContentMixed {
+			t.Errorf("ContentType = %v, want ContentMixed", ctx.ContentType)
+		}
+	})
+
+	t.Run("ItalicSelection", func(t *testing.T) {
+		ctx := SelectionContext{
+			SourceStart:         0,
+			SourceEnd:           8, // *italic*
+			RenderedStart:       0,
+			RenderedEnd:         6, // italic
+			ContentType:         ContentItalic,
+			PrimaryStyle:        rich.Style{Italic: true, Scale: 1.0},
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		if ctx.ContentType != ContentItalic {
+			t.Errorf("ContentType = %v, want ContentItalic", ctx.ContentType)
+		}
+		if !ctx.PrimaryStyle.Italic {
+			t.Error("PrimaryStyle should have Italic set")
+		}
+	})
+
+	t.Run("BoldItalicSelection", func(t *testing.T) {
+		ctx := SelectionContext{
+			SourceStart:   0,
+			SourceEnd:     13, // ***both***
+			RenderedStart: 0,
+			RenderedEnd:   4, // both
+			ContentType:   ContentBoldItalic,
+			PrimaryStyle:  rich.Style{Bold: true, Italic: true, Scale: 1.0},
+		}
+		if ctx.ContentType != ContentBoldItalic {
+			t.Errorf("ContentType = %v, want ContentBoldItalic", ctx.ContentType)
+		}
+		if !ctx.PrimaryStyle.Bold || !ctx.PrimaryStyle.Italic {
+			t.Error("PrimaryStyle should have both Bold and Italic set")
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0

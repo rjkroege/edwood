@@ -599,6 +599,39 @@ func (w *Window) UpdateTag(newtagstatus file.TagStatus) {
 	w.setTag1()
 }
 
+// SelectionContentType identifies the markdown formatting type of a selection.
+type SelectionContentType int
+
+const (
+	ContentPlain      SelectionContentType = iota // Plain unformatted text
+	ContentHeading                                // Heading (# ... ######)
+	ContentBold                                   // Bold (**text**)
+	ContentItalic                                 // Italic (*text*)
+	ContentBoldItalic                             // Bold+Italic (***text***)
+	ContentCode                                   // Inline code (`text`)
+	ContentCodeBlock                              // Fenced code block (```...```)
+	ContentLink                                   // Link ([text](url))
+	ContentImage                                  // Image (![alt](url))
+	ContentMixed                                  // Selection spans multiple formatting types
+)
+
+// SelectionContext holds metadata about the current selection in preview mode,
+// including source and rendered positions, content type, and formatting style.
+// This is used for context-aware paste operations that adapt formatting based
+// on the source and destination context.
+type SelectionContext struct {
+	SourceStart   int                  // Start offset in source markdown text
+	SourceEnd     int                  // End offset in source markdown text
+	RenderedStart int                  // Start offset in rendered text
+	RenderedEnd   int                  // End offset in rendered text
+	ContentType   SelectionContentType // Type of content selected
+	PrimaryStyle  rich.Style           // Dominant style of the selection
+	CodeLanguage  string               // Language tag for code blocks (e.g., "go")
+
+	IncludesOpenMarker  bool // Selection includes the opening formatting marker
+	IncludesCloseMarker bool // Selection includes the closing formatting marker
+}
+
 // IsPreviewMode returns true if the window is in preview mode (showing rendered markdown).
 func (w *Window) IsPreviewMode() bool {
 	return w.previewMode
