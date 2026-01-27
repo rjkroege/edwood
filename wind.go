@@ -965,10 +965,11 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
 		var chordButtons int
 		if mc != nil {
-			// Use SelectWithChord for drag selection with chord detection.
+			// Use SelectWithChordAndColor for drag selection with chord detection.
 			// Detects B2/B3 pressed while B1 is held for Cut/Paste/Snarf.
+			// Pass global.but2col (red) to match normal Acme B1 chord behavior.
 			var p0, p1 int
-			p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
+			p0, p1, chordButtons = rt.Frame().SelectWithChordAndColor(mc, m, global.but2col)
 			rt.SetSelection(p0, p1)
 		} else {
 			charPos := rt.Frame().Charofpt(m.Point)
@@ -1011,8 +1012,9 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	if m.Point.In(frameRect) && m.Buttons&2 != 0 {
 		var p0, p1 int
 		if mc != nil {
-			// Use Frame.Select() for proper drag selection with B2
-			p0, p1 = rt.Frame().Select(mc, m)
+			// Use Frame.SelectWithColor() for proper drag selection with B2
+			// Pass global.but2col (red) for colored sweep during drag
+			p0, p1 = rt.Frame().SelectWithColor(mc, m, global.but2col)
 			rt.SetSelection(p0, p1)
 		} else {
 			// Fallback: just set point selection if no Mousectl available
@@ -1047,7 +1049,9 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		// First, perform sweep selection (like B1/B2)
 		var p0, p1 int
 		if mc != nil {
-			p0, p1 = rt.Frame().Select(mc, m)
+			// Use Frame.SelectWithColor() for proper drag selection with B3
+			// Pass global.but3col (green) for colored sweep during drag
+			p0, p1 = rt.Frame().SelectWithColor(mc, m, global.but3col)
 			rt.SetSelection(p0, p1)
 		} else {
 			charPos := rt.Frame().Charofpt(m.Point)

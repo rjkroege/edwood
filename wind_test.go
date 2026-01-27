@@ -7774,3 +7774,262 @@ func searchString(s, substr string) int {
 	}
 	return -1
 }
+
+// TestPreviewB2SweepRed tests that B2 sweep in preview mode uses the red
+// sweep color (global.but2col) by calling SelectWithColor on the rich frame.
+// The color itself is validated at the rich frame level (TestSelectWithColor
+// in rich/select_test.go); this test verifies the wiring in HandlePreviewMouse.
+func TestPreviewB2SweepRed(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Initialize B2 color (red) - normally done by iconinit()
+	global.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
+	if global.but2col == nil {
+		t.Fatal("global.but2col should be initialized")
+	}
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Echo hello world")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Echo hello world" (16 chars)
+	content := rich.Plain("Echo hello world")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// B2 sweep from position 0 to position 5: should produce selection (0, 5)
+	// with red sweep color during the drag. The colored sweep is handled by
+	// SelectWithColor(mc, m, global.but2col) in the B2 handler.
+	t.Run("B2SweepUsesRedColor", func(t *testing.T) {
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 2, // Button 2 (middle button)
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B2 sweep in frame area")
+		}
+
+		// Verify selection was set correctly
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("B2 red sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("B2 red sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// After B2 sweep completes, the sweepColor should be cleared so the
+	// final selection renders in normal highlight color (not red).
+	t.Run("B2SweepColorClearedAfter", func(t *testing.T) {
+		// Reset selection
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+10, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+10, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+		w.HandlePreviewMouse(&downEvent, mc)
+
+		// The sweep color should be cleared after the drag completes.
+		// We can't directly observe this from outside the package, but
+		// a subsequent Redraw should use the normal selectionColor.
+		// This is verified by TestSweepColorCleared in rich/select_test.go.
+		// Here we just verify no crash occurs.
+		rt.Frame().Redraw()
+	})
+}
+
+// TestPreviewB3SweepGreen tests that B3 sweep in preview mode uses the green
+// sweep color (global.but3col) by calling SelectWithColor on the rich frame.
+// The color itself is validated at the rich frame level (TestSelectWithColor
+// in rich/select_test.go); this test verifies the wiring in HandlePreviewMouse.
+func TestPreviewB3SweepGreen(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Initialize B3 color (green) - normally done by iconinit()
+	global.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
+	if global.but3col == nil {
+		t.Fatal("global.but3col should be initialized")
+	}
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Hello world test")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Hello world test" (16 chars)
+	content := rich.Plain("Hello world test")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// B3 sweep from position 0 to position 5: should produce selection (0, 5)
+	// with green sweep color during the drag. The colored sweep is handled by
+	// SelectWithColor(mc, m, global.but3col) in the B3 handler.
+	t.Run("B3SweepUsesGreenColor", func(t *testing.T) {
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 4, // Button 3 (right button)
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B3 sweep in frame area")
+		}
+
+		// Verify selection was set correctly
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("B3 green sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("B3 green sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// B3 sweep backward should also work with green color
+	t.Run("B3SweepBackwardGreen", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle backward B3 sweep")
+		}
+
+		// Selection should be normalized: p0 < p1
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("Backward B3 green sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("Backward B3 green sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// After B3 sweep completes, sweepColor should be cleared
+	t.Run("B3SweepColorClearedAfter", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+10, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+10, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+		w.HandlePreviewMouse(&downEvent, mc)
+
+		// Verify no crash on subsequent Redraw (sweepColor should be nil)
+		rt.Frame().Redraw()
+	})
+}
