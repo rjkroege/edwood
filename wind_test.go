@@ -6564,6 +6564,248 @@ func TestPasteTransformCode(t *testing.T) {
 	})
 }
 
+func TestPasteHeadingStructural(t *testing.T) {
+	// Tests for structural heading paste — when the selection includes a
+	// trailing newline, the heading markers (# prefix) are preserved because
+	// the user intends to paste the heading as a structural element.
+
+	setupWindow := func(t *testing.T, srcText string, selStart, selEnd int) *Window {
+		t.Helper()
+		rect := image.Rect(0, 0, 800, 600)
+		display := edwoodtest.NewDisplay(rect)
+		global.configureGlobals(display)
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", nil),
+		}
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.col = &Column{safe: true}
+
+		w.body.file.InsertAt(0, []rune(srcText))
+
+		font := edwoodtest.NewFont(10, 14)
+		bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+		textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+		content, sourceMap, _ := markdown.ParseWithSourceMap(srcText)
+
+		rt := NewRichText()
+		bodyRect := image.Rect(12, 20, 800, 600)
+		rt.Init(display, font,
+			WithRichTextBackground(bgImage),
+			WithRichTextColor(textImage),
+		)
+		rt.Render(bodyRect)
+		rt.SetContent(content)
+		rt.SetSelection(selStart, selEnd)
+
+		w.richBody = rt
+		w.previewSourceMap = sourceMap
+		w.SetPreviewMode(true)
+		return w
+	}
+
+	t.Run("H1StructuralPastePreservesPrefix", func(t *testing.T) {
+		// Snarf "# Heading\n" (full line with newline) → paste into plain context.
+		// The trailing newline signals structural paste, so "# " prefix is preserved.
+		w := setupWindow(t, "# Heading\n", 0, 8) // select full heading including newline in rendered text
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for heading selection")
+		}
+
+		sourceCtx := w.selectionContext
+		if sourceCtx == nil {
+			t.Fatal("selectionContext is nil after heading snarf")
+		}
+		if sourceCtx.ContentType != ContentHeading {
+			t.Errorf("sourceCtx.ContentType = %v, want ContentHeading", sourceCtx.ContentType)
+		}
+
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		// Simulate structural paste: text with trailing newline.
+		result := transformForPaste([]byte("# Heading\n"), sourceCtx, destCtx)
+		if string(result) != "# Heading\n" {
+			t.Errorf("structural paste: transformForPaste = %q, want %q", string(result), "# Heading\n")
+		}
+	})
+
+	t.Run("H2StructuralPastePreservesPrefix", func(t *testing.T) {
+		// Snarf "## Subheading\n" with trailing newline → structural paste preserves markers.
+		w := setupWindow(t, "## Subheading\n", 0, 11)
+		w.updateSelectionContext()
+
+		sourceCtx := w.selectionContext
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("## Subheading\n"), sourceCtx, destCtx)
+		if string(result) != "## Subheading\n" {
+			t.Errorf("structural paste: transformForPaste = %q, want %q", string(result), "## Subheading\n")
+		}
+	})
+
+	t.Run("H3StructuralPastePreservesPrefix", func(t *testing.T) {
+		// ### level heading with trailing newline → structural paste.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("### Section\n"), sourceCtx, destCtx)
+		if string(result) != "### Section\n" {
+			t.Errorf("structural paste: transformForPaste = %q, want %q", string(result), "### Section\n")
+		}
+	})
+
+	t.Run("StructuralPasteIntoHeadingContext", func(t *testing.T) {
+		// Pasting a heading with newline into another heading context.
+		// Same-type paste strips markers even for structural paste.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentHeading}
+		result := transformForPaste([]byte("# Heading"), sourceCtx, destCtx)
+		if string(result) != "Heading" {
+			t.Errorf("heading-to-heading paste: transformForPaste = %q, want %q", string(result), "Heading")
+		}
+	})
+
+	t.Run("MultipleHeadingsStructural", func(t *testing.T) {
+		// Pasting multiple headings (structural block) preserves all prefixes.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		text := "# First\n## Second\n"
+		result := transformForPaste([]byte(text), sourceCtx, destCtx)
+		if string(result) != text {
+			t.Errorf("multi-heading structural paste: transformForPaste = %q, want %q", string(result), text)
+		}
+	})
+}
+
+func TestPasteHeadingText(t *testing.T) {
+	// Tests for text-only heading paste — when the selection does NOT include a
+	// trailing newline, the heading markers (# prefix) are stripped because the
+	// user is pasting the heading content as inline text.
+
+	setupWindow := func(t *testing.T, srcText string, selStart, selEnd int) *Window {
+		t.Helper()
+		rect := image.Rect(0, 0, 800, 600)
+		display := edwoodtest.NewDisplay(rect)
+		global.configureGlobals(display)
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", nil),
+		}
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.col = &Column{safe: true}
+
+		w.body.file.InsertAt(0, []rune(srcText))
+
+		font := edwoodtest.NewFont(10, 14)
+		bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+		textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+		content, sourceMap, _ := markdown.ParseWithSourceMap(srcText)
+
+		rt := NewRichText()
+		bodyRect := image.Rect(12, 20, 800, 600)
+		rt.Init(display, font,
+			WithRichTextBackground(bgImage),
+			WithRichTextColor(textImage),
+		)
+		rt.Render(bodyRect)
+		rt.SetContent(content)
+		rt.SetSelection(selStart, selEnd)
+
+		w.richBody = rt
+		w.previewSourceMap = sourceMap
+		w.SetPreviewMode(true)
+		return w
+	}
+
+	t.Run("H1TextPasteStripsPrefix", func(t *testing.T) {
+		// Snarf "# Heading" (no trailing newline) → paste into plain context.
+		// No trailing newline signals text paste, so "# " prefix is stripped.
+		w := setupWindow(t, "# Heading\n", 0, 7) // select heading text without newline
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for heading selection")
+		}
+
+		sourceCtx := w.selectionContext
+		if sourceCtx == nil {
+			t.Fatal("selectionContext is nil after heading snarf")
+		}
+
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		// Text paste: heading content without trailing newline.
+		result := transformForPaste([]byte("# Heading"), sourceCtx, destCtx)
+		if string(result) != "Heading" {
+			t.Errorf("text paste: transformForPaste = %q, want %q", string(result), "Heading")
+		}
+	})
+
+	t.Run("H2TextPasteStripsPrefix", func(t *testing.T) {
+		// "## Subheading" without trailing newline → strip markers.
+		w := setupWindow(t, "## Subheading\n", 0, 10)
+		w.updateSelectionContext()
+
+		sourceCtx := w.selectionContext
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("## Subheading"), sourceCtx, destCtx)
+		if string(result) != "Subheading" {
+			t.Errorf("text paste: transformForPaste = %q, want %q", string(result), "Subheading")
+		}
+	})
+
+	t.Run("H3TextPasteStripsPrefix", func(t *testing.T) {
+		// "### Section" without trailing newline → strip ### prefix.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("### Section"), sourceCtx, destCtx)
+		if string(result) != "Section" {
+			t.Errorf("text paste: transformForPaste = %q, want %q", string(result), "Section")
+		}
+	})
+
+	t.Run("PartialHeadingTextPaste", func(t *testing.T) {
+		// Selecting part of a heading's text (e.g., "Head" from "# Heading")
+		// without trailing newline → strip prefix, return just selected text.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("# Head"), sourceCtx, destCtx)
+		if string(result) != "Head" {
+			t.Errorf("partial text paste: transformForPaste = %q, want %q", string(result), "Head")
+		}
+	})
+
+	t.Run("HeadingTextPasteIntoParagraph", func(t *testing.T) {
+		// Pasting heading text (no newline) mid-paragraph should give just the text.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte("# Title"), sourceCtx, destCtx)
+		if string(result) != "Title" {
+			t.Errorf("mid-paragraph paste: transformForPaste = %q, want %q", string(result), "Title")
+		}
+	})
+
+	t.Run("HeadingTextPasteIntoBold", func(t *testing.T) {
+		// Pasting heading text (no newline) into bold context → just text, no markers.
+		sourceCtx := &SelectionContext{ContentType: ContentHeading}
+		destCtx := &SelectionContext{ContentType: ContentBold}
+		result := transformForPaste([]byte("# Important"), sourceCtx, destCtx)
+		if string(result) != "Important" {
+			t.Errorf("heading-to-bold paste: transformForPaste = %q, want %q", string(result), "Important")
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0
