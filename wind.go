@@ -74,6 +74,7 @@ type Window struct {
 	previewLinkMap     *markdown.LinkMap   // maps rendered positions to link URLs
 	previewUpdateTimer *time.Timer         // debounce timer for preview updates
 	imageCache         *rich.ImageCache    // cache for loaded images in preview mode
+	selectionContext   *SelectionContext   // context metadata for the current preview selection
 }
 
 var (
@@ -699,6 +700,46 @@ func (w *Window) analyzeSelectionContent(rStart, rEnd int) SelectionContentType 
 		return ContentPlain
 	}
 	return foundType
+}
+
+// updateSelectionContext reads the current selection from richBody, translates
+// the rendered positions to source positions via the previewSourceMap, analyzes
+// the content type, and stores the result in w.selectionContext. This should be
+// called after each selection change in preview mode.
+func (w *Window) updateSelectionContext() {
+	if !w.previewMode || w.richBody == nil || w.previewSourceMap == nil {
+		w.selectionContext = nil
+		return
+	}
+
+	p0, p1 := w.richBody.Selection()
+	contentType := w.analyzeSelectionContent(p0, p1)
+
+	// Translate rendered positions to source positions.
+	srcStart, srcEnd := w.previewSourceMap.ToSource(p0, p1)
+
+	// Determine the primary style from the first overlapping span.
+	var primaryStyle rich.Style
+	content := w.richBody.Content()
+	pos := 0
+	for _, span := range content {
+		runeLen := len([]rune(span.Text))
+		spanEnd := pos + runeLen
+		if spanEnd > p0 && pos < p1 {
+			primaryStyle = span.Style
+			break
+		}
+		pos = spanEnd
+	}
+
+	w.selectionContext = &SelectionContext{
+		SourceStart:   srcStart,
+		SourceEnd:     srcEnd,
+		RenderedStart: p0,
+		RenderedEnd:   p1,
+		ContentType:   contentType,
+		PrimaryStyle:  primaryStyle,
+	}
 }
 
 // IsPreviewMode returns true if the window is in preview mode (showing rendered markdown).

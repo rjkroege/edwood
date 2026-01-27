@@ -5878,6 +5878,216 @@ func TestAnalyzeSelectionContent(t *testing.T) {
 	})
 }
 
+// TestUpdateSelectionContext tests the updateSelectionContext method which is
+// called after each selection change in preview mode. It should read the current
+// selection from richBody, translate positions via the previewSourceMap, analyze
+// the content type, and store the result in w.selectionContext.
+func TestUpdateSelectionContext(t *testing.T) {
+	// Helper to create a window with richBody, source map, and selection set.
+	setupWindow := func(t *testing.T, srcText string, selStart, selEnd int) *Window {
+		t.Helper()
+		rect := image.Rect(0, 0, 800, 600)
+		display := edwoodtest.NewDisplay(rect)
+		global.configureGlobals(display)
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", nil),
+		}
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.col = &Column{safe: true}
+
+		font := edwoodtest.NewFont(10, 14)
+		bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+		textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+		// Parse the source markdown to get content and source map.
+		content, sourceMap, _ := markdown.ParseWithSourceMap(srcText)
+
+		rt := NewRichText()
+		bodyRect := image.Rect(12, 20, 800, 600)
+		rt.Init(display, font,
+			WithRichTextBackground(bgImage),
+			WithRichTextColor(textImage),
+		)
+		rt.Render(bodyRect)
+		rt.SetContent(content)
+		rt.SetSelection(selStart, selEnd)
+
+		w.richBody = rt
+		w.previewSourceMap = sourceMap
+		w.SetPreviewMode(true)
+		return w
+	}
+
+	t.Run("PlainTextSelection", func(t *testing.T) {
+		// Source: "Hello world" — plain text, no formatting markers.
+		// Select "Hello" (rendered positions 0-5).
+		w := setupWindow(t, "Hello world", 0, 5)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext")
+		}
+		ctx := w.selectionContext
+		if ctx.RenderedStart != 0 || ctx.RenderedEnd != 5 {
+			t.Errorf("rendered range = [%d,%d), want [0,5)", ctx.RenderedStart, ctx.RenderedEnd)
+		}
+		if ctx.ContentType != ContentPlain {
+			t.Errorf("ContentType = %v, want ContentPlain", ctx.ContentType)
+		}
+	})
+
+	t.Run("BoldTextSelection", func(t *testing.T) {
+		// Source: "**bold**" — bold text. Rendered as "bold" (4 chars).
+		// Select all rendered text (0-4).
+		w := setupWindow(t, "**bold**", 0, 4)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext")
+		}
+		ctx := w.selectionContext
+		if ctx.RenderedStart != 0 || ctx.RenderedEnd != 4 {
+			t.Errorf("rendered range = [%d,%d), want [0,4)", ctx.RenderedStart, ctx.RenderedEnd)
+		}
+		if ctx.ContentType != ContentBold {
+			t.Errorf("ContentType = %v, want ContentBold", ctx.ContentType)
+		}
+		// Source positions should include the ** markers: [0, 8).
+		if ctx.SourceStart != 0 || ctx.SourceEnd != 8 {
+			t.Errorf("source range = [%d,%d), want [0,8)", ctx.SourceStart, ctx.SourceEnd)
+		}
+	})
+
+	t.Run("HeadingSelection", func(t *testing.T) {
+		// Source: "# Heading\n" — heading. Rendered as "Heading\n" (8 chars).
+		// Select "Heading" (0-7).
+		w := setupWindow(t, "# Heading\n", 0, 7)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext")
+		}
+		ctx := w.selectionContext
+		if ctx.ContentType != ContentHeading {
+			t.Errorf("ContentType = %v, want ContentHeading", ctx.ContentType)
+		}
+	})
+
+	t.Run("EmptySelection", func(t *testing.T) {
+		// When selection is empty (p0 == p1), context should reflect that.
+		w := setupWindow(t, "Hello world", 3, 3)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext for empty selection")
+		}
+		ctx := w.selectionContext
+		if ctx.RenderedStart != 3 || ctx.RenderedEnd != 3 {
+			t.Errorf("rendered range = [%d,%d), want [3,3)", ctx.RenderedStart, ctx.RenderedEnd)
+		}
+		// Empty selection is ContentPlain.
+		if ctx.ContentType != ContentPlain {
+			t.Errorf("ContentType = %v, want ContentPlain", ctx.ContentType)
+		}
+	})
+
+	t.Run("NotPreviewMode", func(t *testing.T) {
+		// When not in preview mode, updateSelectionContext should not set context.
+		w := setupWindow(t, "Hello world", 0, 5)
+		w.SetPreviewMode(false)
+		w.updateSelectionContext()
+
+		if w.selectionContext != nil {
+			t.Errorf("selectionContext should be nil when not in preview mode, got %+v", w.selectionContext)
+		}
+	})
+
+	t.Run("NilRichBody", func(t *testing.T) {
+		// When richBody is nil, updateSelectionContext should not panic.
+		w := setupWindow(t, "Hello", 0, 5)
+		w.richBody = nil
+		w.updateSelectionContext()
+
+		if w.selectionContext != nil {
+			t.Errorf("selectionContext should be nil when richBody is nil, got %+v", w.selectionContext)
+		}
+	})
+
+	t.Run("NilSourceMap", func(t *testing.T) {
+		// When previewSourceMap is nil, updateSelectionContext should not panic.
+		w := setupWindow(t, "Hello", 0, 5)
+		w.previewSourceMap = nil
+		w.updateSelectionContext()
+
+		if w.selectionContext != nil {
+			t.Errorf("selectionContext should be nil when previewSourceMap is nil, got %+v", w.selectionContext)
+		}
+	})
+
+	t.Run("InlineCodeSelection", func(t *testing.T) {
+		// Source: "`code`" — inline code. Rendered as "code" (4 chars).
+		// Select all rendered text (0-4).
+		w := setupWindow(t, "`code`", 0, 4)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext")
+		}
+		ctx := w.selectionContext
+		if ctx.ContentType != ContentCode {
+			t.Errorf("ContentType = %v, want ContentCode", ctx.ContentType)
+		}
+	})
+
+	t.Run("MixedContentSelection", func(t *testing.T) {
+		// Source: "plain **bold**" — mixed plain and bold.
+		// Rendered as "plain bold" (10 chars). Selecting all should be ContentMixed.
+		w := setupWindow(t, "plain **bold**", 0, 10)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after updateSelectionContext")
+		}
+		ctx := w.selectionContext
+		if ctx.ContentType != ContentMixed {
+			t.Errorf("ContentType = %v, want ContentMixed", ctx.ContentType)
+		}
+	})
+
+	t.Run("SelectionUpdatesOnChange", func(t *testing.T) {
+		// Verify that calling updateSelectionContext again with a new selection
+		// replaces the previous context.
+		w := setupWindow(t, "Hello **bold** world", 0, 5)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after first updateSelectionContext")
+		}
+		firstType := w.selectionContext.ContentType
+
+		// Change selection to cover the bold portion.
+		// "Hello bold world" rendered: "Hello " = 6, "bold" = 4, " world" = 6
+		// Bold portion is at rendered positions 6-10.
+		w.richBody.SetSelection(6, 10)
+		w.updateSelectionContext()
+
+		if w.selectionContext == nil {
+			t.Fatal("selectionContext is nil after second updateSelectionContext")
+		}
+		if w.selectionContext.ContentType == firstType && firstType == ContentPlain {
+			// First selection was plain "Hello", second should be bold.
+			if w.selectionContext.ContentType != ContentBold {
+				t.Errorf("after changing selection, ContentType = %v, want ContentBold", w.selectionContext.ContentType)
+			}
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0
