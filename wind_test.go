@@ -6263,6 +6263,307 @@ func TestSnarfWithContext(t *testing.T) {
 	})
 }
 
+func TestPasteTransformBold(t *testing.T) {
+	// Tests for transformForPaste with bold content.
+	// Design rule: partial formatted text should be re-wrapped at destination.
+	// Exception: if destination is already bold, just insert text (inherits context).
+
+	t.Run("BoldTextToPlainDest", func(t *testing.T) {
+		// Pasting bold text ("bold text") from a bold source into a plain destination
+		// should wrap the text in **...** markers.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("bold text"), sourceCtx, destCtx)
+		if string(result) != "**bold text**" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "**bold text**")
+		}
+	})
+
+	t.Run("BoldTextToBoldDest", func(t *testing.T) {
+		// Pasting bold text into an already-bold destination should NOT double-wrap.
+		// The text inherits the destination's bold formatting.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("bold text"), sourceCtx, destCtx)
+		if string(result) != "bold text" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "bold text")
+		}
+	})
+
+	t.Run("PartialBoldToPlainDest", func(t *testing.T) {
+		// Pasting partial bold text (e.g., "bol" from "**bold**") into plain dest
+		// should re-wrap with bold markers.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentBold,
+			IncludesOpenMarker:  false,
+			IncludesCloseMarker: false,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("bol"), sourceCtx, destCtx)
+		if string(result) != "**bol**" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "**bol**")
+		}
+	})
+
+	t.Run("PlainTextToPlainDest", func(t *testing.T) {
+		// Pasting plain text into plain destination should pass through unchanged.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("hello"), sourceCtx, destCtx)
+		if string(result) != "hello" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "hello")
+		}
+	})
+
+	t.Run("PlainTextToBoldDest", func(t *testing.T) {
+		// Pasting plain text into bold destination — just insert, inherits context.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentBold,
+		}
+		result := transformForPaste([]byte("hello"), sourceCtx, destCtx)
+		if string(result) != "hello" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "hello")
+		}
+	})
+
+	t.Run("NilSourceContext", func(t *testing.T) {
+		// When source context is nil (e.g., paste from external), pass through.
+		result := transformForPaste([]byte("text"), nil, &SelectionContext{ContentType: ContentPlain})
+		if string(result) != "text" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "text")
+		}
+	})
+
+	t.Run("NilDestContext", func(t *testing.T) {
+		// When destination context is nil, pass through unchanged.
+		sourceCtx := &SelectionContext{ContentType: ContentBold}
+		result := transformForPaste([]byte("text"), sourceCtx, nil)
+		if string(result) != "text" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "text")
+		}
+	})
+}
+
+func TestPasteTransformHeading(t *testing.T) {
+	// Tests for transformForPaste with heading content.
+	// Design rule for structural elements:
+	//   - With trailing newline: preserve structural markers (e.g., "# Heading\n")
+	//   - Without trailing newline: strip markers, treat as "just text"
+
+	t.Run("HeadingWithNewline", func(t *testing.T) {
+		// "# Heading\n" with trailing newline → structural paste, preserve # prefix.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("# Heading\n"), sourceCtx, destCtx)
+		if string(result) != "# Heading\n" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "# Heading\n")
+		}
+	})
+
+	t.Run("HeadingWithoutNewline", func(t *testing.T) {
+		// "# Heading" without trailing newline → text-only paste, strip # prefix.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("# Heading"), sourceCtx, destCtx)
+		if string(result) != "Heading" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "Heading")
+		}
+	})
+
+	t.Run("H2WithoutNewline", func(t *testing.T) {
+		// "## Subheading" without trailing newline → strip ## prefix.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("## Subheading"), sourceCtx, destCtx)
+		if string(result) != "Subheading" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "Subheading")
+		}
+	})
+
+	t.Run("H2WithNewline", func(t *testing.T) {
+		// "## Subheading\n" with trailing newline → preserve structural markers.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("## Subheading\n"), sourceCtx, destCtx)
+		if string(result) != "## Subheading\n" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "## Subheading\n")
+		}
+	})
+
+	t.Run("HeadingToHeadingDest", func(t *testing.T) {
+		// Pasting heading text into a heading context — just insert the text.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentHeading,
+		}
+		result := transformForPaste([]byte("# Heading"), sourceCtx, destCtx)
+		if string(result) != "Heading" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "Heading")
+		}
+	})
+}
+
+func TestPasteTransformCode(t *testing.T) {
+	// Tests for transformForPaste with code content.
+	// Similar to bold: re-wrap in backticks unless destination is already code.
+
+	t.Run("InlineCodeToPlainDest", func(t *testing.T) {
+		// Pasting inline code text into a plain destination should wrap in backticks.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentCode,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("fmt.Println"), sourceCtx, destCtx)
+		if string(result) != "`fmt.Println`" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "`fmt.Println`")
+		}
+	})
+
+	t.Run("InlineCodeToCodeDest", func(t *testing.T) {
+		// Pasting code into already-code destination — don't double-wrap.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentCode,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentCode,
+		}
+		result := transformForPaste([]byte("fmt.Println"), sourceCtx, destCtx)
+		if string(result) != "fmt.Println" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "fmt.Println")
+		}
+	})
+
+	t.Run("CodeBlockToPlainDest", func(t *testing.T) {
+		// Pasting code block content with trailing newline → structural paste.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentCodeBlock,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("```go\nfunc main() {}\n```\n"), sourceCtx, destCtx)
+		if string(result) != "```go\nfunc main() {}\n```\n" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "```go\\nfunc main() {}\\n```\\n")
+		}
+	})
+
+	t.Run("CodeBlockWithoutNewline", func(t *testing.T) {
+		// Code block content without trailing newline → strip fences, just text.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentCodeBlock,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("func main() {}"), sourceCtx, destCtx)
+		// Code block text without fences and no newline → just the code text.
+		if string(result) != "func main() {}" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "func main() {}")
+		}
+	})
+
+	t.Run("PlainTextToCodeDest", func(t *testing.T) {
+		// Pasting plain text into code destination — just insert, inherits context.
+		sourceCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentCode,
+		}
+		result := transformForPaste([]byte("hello"), sourceCtx, destCtx)
+		if string(result) != "hello" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "hello")
+		}
+	})
+
+	t.Run("ItalicTextToPlainDest", func(t *testing.T) {
+		// Italic source to plain dest → re-wrap with * markers.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentPlain,
+		}
+		result := transformForPaste([]byte("italic text"), sourceCtx, destCtx)
+		if string(result) != "*italic text*" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "*italic text*")
+		}
+	})
+
+	t.Run("ItalicTextToItalicDest", func(t *testing.T) {
+		// Italic source to italic dest → don't double-wrap.
+		sourceCtx := &SelectionContext{
+			ContentType:         ContentItalic,
+			IncludesOpenMarker:  true,
+			IncludesCloseMarker: true,
+		}
+		destCtx := &SelectionContext{
+			ContentType: ContentItalic,
+		}
+		result := transformForPaste([]byte("italic text"), sourceCtx, destCtx)
+		if string(result) != "italic text" {
+			t.Errorf("transformForPaste = %q, want %q", string(result), "italic text")
+		}
+	})
+
+	t.Run("EmptyText", func(t *testing.T) {
+		// Empty text should return empty regardless of context.
+		sourceCtx := &SelectionContext{ContentType: ContentBold}
+		destCtx := &SelectionContext{ContentType: ContentPlain}
+		result := transformForPaste([]byte(""), sourceCtx, destCtx)
+		if string(result) != "" {
+			t.Errorf("transformForPaste = %q, want empty", string(result))
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0

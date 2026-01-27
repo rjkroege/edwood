@@ -742,6 +742,105 @@ func (w *Window) updateSelectionContext() {
 	}
 }
 
+// transformForPaste adapts the pasted text based on source and destination
+// context. It applies formatting rules: re-wraps formatted text for plain
+// destinations, strips markers when destination already has the same format,
+// and handles structural elements (headings, code blocks) based on whether
+// the text includes a trailing newline.
+func transformForPaste(text []byte, sourceCtx, destCtx *SelectionContext) []byte {
+	// Pass through when context is missing or text is empty.
+	if sourceCtx == nil || destCtx == nil || len(text) == 0 {
+		return text
+	}
+
+	srcType := sourceCtx.ContentType
+	dstType := destCtx.ContentType
+
+	// If source and destination are the same formatting type, strip markers
+	// (the destination context already provides the formatting).
+	if srcType == dstType {
+		return stripMarkers(text, srcType)
+	}
+
+	// Handle structural elements (headings, code blocks).
+	switch srcType {
+	case ContentHeading:
+		// Trailing newline means structural paste — preserve as-is.
+		if len(text) > 0 && text[len(text)-1] == '\n' {
+			return text
+		}
+		// No trailing newline — strip the heading prefix, treat as text.
+		return stripHeadingPrefix(text)
+
+	case ContentCodeBlock:
+		// Trailing newline means structural paste — preserve fences.
+		if len(text) > 0 && text[len(text)-1] == '\n' {
+			return text
+		}
+		// No trailing newline — just the code text, no fences.
+		return text
+
+	case ContentBold:
+		if dstType == ContentPlain {
+			return wrapWith(text, "**")
+		}
+		return text
+
+	case ContentItalic:
+		if dstType == ContentPlain {
+			return wrapWith(text, "*")
+		}
+		return text
+
+	case ContentBoldItalic:
+		if dstType == ContentPlain {
+			return wrapWith(text, "***")
+		}
+		return text
+
+	case ContentCode:
+		if dstType == ContentPlain {
+			return wrapWith(text, "`")
+		}
+		return text
+	}
+
+	// Plain text or unrecognized — pass through.
+	return text
+}
+
+// stripMarkers removes formatting markers for same-type paste (e.g., heading prefix).
+func stripMarkers(text []byte, ct SelectionContentType) []byte {
+	switch ct {
+	case ContentHeading:
+		return stripHeadingPrefix(text)
+	default:
+		return text
+	}
+}
+
+// stripHeadingPrefix removes leading # characters and the following space.
+func stripHeadingPrefix(text []byte) []byte {
+	i := 0
+	for i < len(text) && text[i] == '#' {
+		i++
+	}
+	if i > 0 && i < len(text) && text[i] == ' ' {
+		i++
+	}
+	return text[i:]
+}
+
+// wrapWith wraps text in the given marker string (e.g., "**", "*", "`").
+func wrapWith(text []byte, marker string) []byte {
+	m := []byte(marker)
+	result := make([]byte, 0, len(m)+len(text)+len(m))
+	result = append(result, m...)
+	result = append(result, text...)
+	result = append(result, m...)
+	return result
+}
+
 // IsPreviewMode returns true if the window is in preview mode (showing rendered markdown).
 func (w *Window) IsPreviewMode() bool {
 	return w.previewMode
