@@ -759,3 +759,181 @@ func TestSelectWithMouseAtFrameEdge(t *testing.T) {
 		t.Errorf("Select() at frame offset: got (%d, %d), want (2, 2)", p0, p1)
 	}
 }
+
+// TestSelectWithColor tests that SelectWithColor uses a custom sweep color
+// during the drag and returns the correct selection range.
+func TestSelectWithColor(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+	sweepImage := edwoodtest.NewImage(display, "sweep-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// "hello world" with 10px per char
+	f.SetContent(Plain("hello world"))
+
+	fi := f.(*frameImpl)
+
+	// Verify sweepColor starts nil
+	if fi.sweepColor != nil {
+		t.Fatal("sweepColor should be nil before SelectWithColor")
+	}
+
+	// Mouse down at position 1 (X=10), drag to position 5 (X=50), release
+	downEvent := draw.Mouse{
+		Point:   image.Pt(10, 7),
+		Buttons: 1,
+	}
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, upEvent})
+	p0, p1 := fi.SelectWithColor(mc, &downEvent, sweepImage)
+
+	// Should select positions 1-5 ("ello ")
+	if p0 != 1 {
+		t.Errorf("SelectWithColor() p0: got %d, want 1", p0)
+	}
+	if p1 != 5 {
+		t.Errorf("SelectWithColor() p1: got %d, want 5", p1)
+	}
+
+	// sweepColor must be cleared after selection completes
+	if fi.sweepColor != nil {
+		t.Error("sweepColor should be nil after SelectWithColor completes")
+	}
+}
+
+// TestSelectWithChordAndColor tests that SelectWithChordAndColor uses a custom
+// sweep color during the drag and detects chord buttons.
+func TestSelectWithChordAndColor(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+	sweepImage := edwoodtest.NewImage(display, "sweep-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello world"))
+
+	fi := f.(*frameImpl)
+
+	// Mouse down B1 at position 1 (X=10), drag, chord B2, release
+	downEvent := draw.Mouse{
+		Point:   image.Pt(10, 7),
+		Buttons: 1,
+	}
+	dragEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1,
+	}
+	// Chord: B1+B2 pressed simultaneously
+	chordEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 1 | 2, // B1+B2
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(50, 7),
+		Buttons: 0,
+	}
+
+	mc := mockMousectl([]draw.Mouse{dragEvent, chordEvent, upEvent})
+	p0, p1, chord := fi.SelectWithChordAndColor(mc, &downEvent, sweepImage)
+
+	// Should select positions 1-5
+	if p0 != 1 {
+		t.Errorf("SelectWithChordAndColor() p0: got %d, want 1", p0)
+	}
+	if p1 != 5 {
+		t.Errorf("SelectWithChordAndColor() p1: got %d, want 5", p1)
+	}
+
+	// Should detect B1+B2 chord
+	if chord != (1 | 2) {
+		t.Errorf("SelectWithChordAndColor() chord: got %d, want %d", chord, 1|2)
+	}
+
+	// sweepColor must be cleared after selection completes
+	if fi.sweepColor != nil {
+		t.Error("sweepColor should be nil after SelectWithChordAndColor completes")
+	}
+}
+
+// TestSweepColorCleared tests that sweepColor is always cleared after
+// any colored select call completes, even for a simple click (no drag).
+func TestSweepColorCleared(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage := edwoodtest.NewImage(display, "background", image.Rect(0, 0, 1, 1))
+	textImage := edwoodtest.NewImage(display, "text-color", image.Rect(0, 0, 1, 1))
+	selImage := edwoodtest.NewImage(display, "selection-color", image.Rect(0, 0, 1, 1))
+	sweepImage := edwoodtest.NewImage(display, "sweep-color", image.Rect(0, 0, 1, 1))
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	f.SetContent(Plain("hello world"))
+
+	fi := f.(*frameImpl)
+
+	// Simple click (no drag) - button down then immediately up
+	downEvent := draw.Mouse{
+		Point:   image.Pt(30, 7),
+		Buttons: 1,
+	}
+	upEvent := draw.Mouse{
+		Point:   image.Pt(30, 7),
+		Buttons: 0,
+	}
+
+	// Test SelectWithColor clears sweepColor after click
+	mc := mockMousectl([]draw.Mouse{upEvent})
+	fi.SelectWithColor(mc, &downEvent, sweepImage)
+	if fi.sweepColor != nil {
+		t.Error("sweepColor should be nil after SelectWithColor click (no drag)")
+	}
+
+	// Test SelectWithChordAndColor clears sweepColor after click
+	mc = mockMousectl([]draw.Mouse{upEvent})
+	fi.SelectWithChordAndColor(mc, &downEvent, sweepImage)
+	if fi.sweepColor != nil {
+		t.Error("sweepColor should be nil after SelectWithChordAndColor click (no drag)")
+	}
+}

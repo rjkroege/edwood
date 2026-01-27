@@ -30,6 +30,8 @@ type Frame interface {
 	// Selection
 	Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int)
 	SelectWithChord(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int, chordButtons int)
+	SelectWithColor(mc *draw.Mousectl, m *draw.Mouse, col edwooddraw.Image) (p0, p1 int)
+	SelectWithChordAndColor(mc *draw.Mousectl, m *draw.Mouse, col edwooddraw.Image) (p0, p1 int, chordButtons int)
 	SetSelection(p0, p1 int)
 	GetSelection() (p0, p1 int)
 
@@ -82,6 +84,11 @@ type frameImpl struct {
 
 	// Base path for resolving relative image paths (e.g., the markdown file path)
 	basePath string
+
+	// Temporary sweep color override for colored selection during B2/B3 drags.
+	// When non-nil, drawSelectionTo uses this instead of selectionColor.
+	// Cleared after each SelectWithColor/SelectWithChordAndColor call.
+	sweepColor edwooddraw.Image
 }
 
 // NewFrame creates a new Frame.
@@ -462,6 +469,25 @@ func (f *frameImpl) SelectWithChord(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 in
 	}
 
 	return f.p0, f.p1, chordButtons
+}
+
+// SelectWithColor performs a mouse drag selection using a custom sweep color
+// for the selection highlight during the drag. After the drag completes, the
+// sweep color is cleared so subsequent redraws use the normal selectionColor.
+// This matches normal Acme's SelectOpt behavior for B2 (red) and B3 (green) sweeps.
+func (f *frameImpl) SelectWithColor(mc *draw.Mousectl, m *draw.Mouse, col edwooddraw.Image) (p0, p1 int) {
+	f.sweepColor = col
+	defer func() { f.sweepColor = nil }()
+	return f.Select(mc, m)
+}
+
+// SelectWithChordAndColor performs a mouse drag selection with chord detection
+// using a custom sweep color for the selection highlight during the drag.
+// After the drag completes, the sweep color is cleared.
+func (f *frameImpl) SelectWithChordAndColor(mc *draw.Mousectl, m *draw.Mouse, col edwooddraw.Image) (p0, p1 int, chordButtons int) {
+	f.sweepColor = col
+	defer func() { f.sweepColor = nil }()
+	return f.SelectWithChord(mc, m)
 }
 
 // SetSelection sets the selection range.
@@ -1106,7 +1132,11 @@ func (f *frameImpl) drawSelectionTo(target edwooddraw.Image, offset image.Point)
 			clipRect := image.Rect(offset.X, offset.Y, offset.X+frameWidth, offset.Y+frameHeight)
 			selRect = selRect.Intersect(clipRect)
 			if !selRect.Empty() {
-				target.Draw(selRect, f.selectionColor, f.selectionColor, image.ZP)
+				color := f.selectionColor
+				if f.sweepColor != nil {
+					color = f.sweepColor
+				}
+				target.Draw(selRect, color, color, image.ZP)
 			}
 		}
 
