@@ -29,6 +29,7 @@ type Frame interface {
 
 	// Selection
 	Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int)
+	SelectWithChord(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int, chordButtons int)
 	SetSelection(p0, p1 int)
 	GetSelection() (p0, p1 int)
 
@@ -429,6 +430,47 @@ func (f *frameImpl) Select(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int) {
 
 	// Return normalized selection (p0 <= p1)
 	return f.p0, f.p1
+}
+
+// SelectWithChord handles mouse selection with chord detection.
+// Like Select, it tracks drag from the initial B1 mouse-down event,
+// but also detects when additional buttons (B2, B3) are pressed during
+// the drag. Returns the selection range and the button state at chord
+// time (0 if no chord was detected, i.e. only B1 was held).
+func (f *frameImpl) SelectWithChord(mc *draw.Mousectl, m *draw.Mouse) (p0, p1 int, chordButtons int) {
+	anchor := f.Charofpt(m.Point)
+	current := anchor
+	initialButtons := m.Buttons
+
+	for {
+		me := <-mc.C
+		current = f.Charofpt(me.Point)
+
+		if anchor <= current {
+			f.p0 = anchor
+			f.p1 = current
+		} else {
+			f.p0 = current
+			f.p1 = anchor
+		}
+
+		f.Redraw()
+
+		if f.display != nil {
+			f.display.Flush()
+		}
+
+		// Detect chord: additional buttons pressed beyond the initial button
+		if me.Buttons != 0 && me.Buttons != initialButtons && chordButtons == 0 {
+			chordButtons = me.Buttons
+		}
+
+		if me.Buttons == 0 {
+			break
+		}
+	}
+
+	return f.p0, f.p1, chordButtons
 }
 
 // SetSelection sets the selection range.

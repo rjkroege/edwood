@@ -4895,6 +4895,480 @@ func TestPreviewB3OnSelection(t *testing.T) {
 	})
 }
 
+// setupPreviewChordTestWindow creates a Window in preview mode for chord testing.
+// It sets up markdown content "Hello world test" with a source map, and returns
+// the window, RichText, and frame rect for positioning mouse events.
+func setupPreviewChordTestWindow(t *testing.T) (*Window, *RichText, image.Rectangle) {
+	t.Helper()
+
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	sourceMarkdown := "Hello world test"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content with source map for source position mapping
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+	return w, rt, frameRect
+}
+
+// TestPreviewChordDetection tests that after a B1 selection in preview mode,
+// additional button presses (B2 or B3) while B1 is still held are detected
+// as chord events. In Acme, chording is a core interaction pattern:
+//   - B1+B2 = Cut (copy to snarf buffer and delete)
+//   - B1+B3 = Paste (replace selection with snarf buffer)
+//   - B1+B2+B3 = Snarf (copy to snarf buffer, no delete)
+//
+// This test verifies:
+// 1. B1 press followed by B2 while B1 held is detected as a chord
+// 2. B1 press followed by B3 while B1 held is detected as a chord
+// 3. B1 press and release without B2/B3 is a normal selection (no chord)
+func TestPreviewChordDetection(t *testing.T) {
+	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Test 1: B1 sweep to select "Hello" (chars 0-5), then B2 pressed while B1 held
+	// This should be detected as B1+B2 chord (Cut)
+	t.Run("B1ThenB2Chord", func(t *testing.T) {
+		// B1 mouse down at char 0
+		downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   downPt,
+			Buttons: 1, // B1 down
+		}
+		// Drag to char 5 with B1 held
+		dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+		dragEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 1, // B1 still held
+		}
+		// B2 pressed while B1 still held (chord event)
+		chordEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 3, // B1 (1) + B2 (2) = 3
+		}
+		// All buttons released
+		upEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B1 click in frame area")
+		}
+
+		// After chord detection, a selection should exist
+		p0, p1 := rt.Selection()
+		if p0 == p1 {
+			t.Error("Expected non-empty selection after B1 sweep for chord")
+		}
+	})
+
+	// Test 2: B1 sweep to select "world" (chars 6-11), then B3 pressed while B1 held
+	// This should be detected as B1+B3 chord (Paste)
+	t.Run("B1ThenB3Chord", func(t *testing.T) {
+		// B1 mouse down at char 6
+		downPt := image.Pt(frameRect.Min.X+60, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   downPt,
+			Buttons: 1, // B1 down
+		}
+		// Drag to char 11 with B1 held
+		dragPt := image.Pt(frameRect.Min.X+110, frameRect.Min.Y+5)
+		dragEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 1,
+		}
+		// B3 pressed while B1 still held (chord event)
+		chordEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 5, // B1 (1) + B3 (4) = 5
+		}
+		// All buttons released
+		upEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 0,
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B1 click in frame area")
+		}
+
+		p0, p1 := rt.Selection()
+		if p0 == p1 {
+			t.Error("Expected non-empty selection after B1 sweep for chord")
+		}
+	})
+
+	// Test 3: B1 sweep and release (no chord) should be a normal selection
+	t.Run("B1OnlyNoChord", func(t *testing.T) {
+		downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+		m := draw.Mouse{
+			Point:   downPt,
+			Buttons: 1,
+		}
+		dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+		dragEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 1,
+		}
+		upEvent := draw.Mouse{
+			Point:   dragPt,
+			Buttons: 0, // B1 released, no chord
+		}
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+
+		handled := w.HandlePreviewMouse(&m, mc)
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B1 click in frame area")
+		}
+
+		// Normal selection should still work
+		p0, p1 := rt.Selection()
+		if p0 >= p1 {
+			t.Error("Expected non-empty selection after B1 sweep")
+		}
+	})
+
+	_ = w
+}
+
+// TestPreviewChordCut tests that the B1+B2 chord in preview mode performs a Cut
+// operation: the selected text is copied to the snarf buffer and deleted from
+// the source body buffer. The preview should reflect the deletion.
+func TestPreviewChordCut(t *testing.T) {
+	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Select "Hello" (chars 0-5) with B1, then chord B2 to cut
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	// B1+B2 chord (Cut)
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 3, // B1 + B2
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	// Clear snarf buffer before test
+	global.snarfbuf = nil
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle B1+B2 chord")
+	}
+
+	// After B1+B2 chord, the snarf buffer should contain the cut text
+	if len(global.snarfbuf) == 0 {
+		t.Error("snarf buffer should contain cut text after B1+B2 chord")
+	}
+
+	// The source body should have the selected text removed
+	bodyLen := w.body.file.Nr()
+	originalLen := len([]rune("Hello world test"))
+	if bodyLen >= originalLen {
+		t.Errorf("body length should decrease after cut: got %d, original %d", bodyLen, originalLen)
+	}
+
+	_ = rt
+}
+
+// TestPreviewChordPaste tests that the B1+B3 chord in preview mode performs a Paste
+// operation: the snarf buffer content replaces the current selection in the source
+// body buffer. The preview should reflect the replacement.
+func TestPreviewChordPaste(t *testing.T) {
+	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Pre-fill snarf buffer with replacement text
+	global.snarfbuf = []byte("Goodbye")
+
+	// Select "Hello" (chars 0-5) with B1, then chord B3 to paste
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	// B1+B3 chord (Paste)
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 5, // B1 (1) + B3 (4) = 5
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle B1+B3 chord")
+	}
+
+	// After B1+B3 chord, the source body should contain the pasted text
+	bodyLen := w.body.file.Nr()
+	buf := make([]rune, bodyLen)
+	w.body.file.Read(0, buf)
+	bodyText := string(buf)
+
+	// "Hello" should be replaced with "Goodbye"
+	if !containsSubstring(bodyText, "Goodbye") {
+		t.Errorf("body should contain 'Goodbye' after paste, got %q", bodyText)
+	}
+
+	_ = rt
+}
+
+// TestPreviewChordSnarf tests that the B1+B2+B3 chord in preview mode performs a
+// Snarf (copy) operation: the selected text is copied to the snarf buffer but NOT
+// deleted from the source. This is different from Cut (B1+B2) which also deletes.
+func TestPreviewChordSnarf(t *testing.T) {
+	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Select "Hello" (chars 0-5) with B1, then chord B2+B3 to snarf
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	// B1+B2+B3 chord (Snarf): all three buttons held
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 7, // B1 (1) + B2 (2) + B3 (4) = 7
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	// Clear snarf buffer before test
+	global.snarfbuf = nil
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle B1+B2+B3 chord")
+	}
+
+	// After B1+B2+B3 chord, the snarf buffer should contain the selected text
+	if len(global.snarfbuf) == 0 {
+		t.Error("snarf buffer should contain snarfed text after B1+B2+B3 chord")
+	}
+
+	// Source body should NOT be modified (snarf copies but doesn't delete)
+	bodyLen := w.body.file.Nr()
+	originalLen := len([]rune("Hello world test"))
+	if bodyLen != originalLen {
+		t.Errorf("body length should be unchanged after snarf: got %d, expected %d", bodyLen, originalLen)
+	}
+
+	_ = rt
+}
+
+// TestPreviewCutSourceMapping tests that chord operations (Cut, Paste) correctly
+// map the preview selection back to source positions using the source map.
+// This ensures that edits happen at the correct positions in the markdown source,
+// not the rendered positions.
+func TestPreviewCutSourceMapping(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Use markdown with formatting so rendered positions differ from source positions
+	sourceMarkdown := "Hello **bold** world"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// The rendered text is "Hello bold world" (no ** markers).
+	// Select "bold" in the rendered view (chars 6-10 in rendered text).
+	// This should map to source positions covering "**bold**" (chars 6-14).
+	downPt := image.Pt(frameRect.Min.X+60, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+100, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	// B1+B2 chord (Cut) to verify source mapping
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 3, // B1 + B2
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	global.snarfbuf = nil
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle chord in frame area")
+	}
+
+	// The cut should have operated on source positions, removing the markdown
+	// formatting markers along with the word
+	bodyLen := w.body.file.Nr()
+	buf := make([]rune, bodyLen)
+	w.body.file.Read(0, buf)
+	bodyText := string(buf)
+
+	// After cutting "bold" from rendered view, the source should have the
+	// corresponding markdown removed. The exact result depends on source map
+	// granularity, but "**bold**" should no longer be present.
+	if containsSubstring(bodyText, "**bold**") {
+		t.Errorf("source should not contain '**bold**' after cut, got %q", bodyText)
+	}
+
+	_ = rt
+}
+
+// TestPreviewReRenderAfterEdit tests that after a chord edit operation (Cut or Paste),
+// the preview is re-rendered to reflect the changed source content. This ensures the
+// user sees an up-to-date rendered view after each chord operation.
+func TestPreviewReRenderAfterEdit(t *testing.T) {
+	w, rt, frameRect := setupPreviewChordTestWindow(t)
+
+	// Get initial content length from preview
+	initialContent := rt.Content()
+	initialLen := initialContent.Len()
+
+	// Select "Hello" (chars 0-5) with B1, then chord B2 to cut
+	downPt := image.Pt(frameRect.Min.X, frameRect.Min.Y+5)
+	m := draw.Mouse{
+		Point:   downPt,
+		Buttons: 1,
+	}
+	dragPt := image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5)
+	dragEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 1,
+	}
+	chordEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 3, // B1+B2 (Cut)
+	}
+	upEvent := draw.Mouse{
+		Point:   dragPt,
+		Buttons: 0,
+	}
+	mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, chordEvent, upEvent})
+
+	global.snarfbuf = nil
+
+	handled := w.HandlePreviewMouse(&m, mc)
+	if !handled {
+		t.Fatal("HandlePreviewMouse should handle chord")
+	}
+
+	// After cutting text, the preview content should be re-rendered with shorter content
+	updatedContent := rt.Content()
+	updatedLen := updatedContent.Len()
+
+	if updatedLen >= initialLen {
+		t.Errorf("preview content length should decrease after cut: initial=%d, updated=%d", initialLen, updatedLen)
+	}
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0

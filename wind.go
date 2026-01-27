@@ -718,22 +718,53 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		}
 	}
 
-	// Handle button 1 in frame area for text selection
+	// Handle button 1 in frame area for text selection and chording
 	frameRect := rt.Frame().Rect()
 	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
+		var chordButtons int
 		if mc != nil {
-			// Use Frame.Select() for proper drag selection
-			// This reads subsequent mouse events from mc.C until button release
-			p0, p1 := rt.Frame().Select(mc, m)
+			// Use SelectWithChord for drag selection with chord detection.
+			// Detects B2/B3 pressed while B1 is held for Cut/Paste/Snarf.
+			var p0, p1 int
+			p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
 			rt.SetSelection(p0, p1)
 		} else {
-			// Fallback: just set point selection if no Mousectl available
 			charPos := rt.Frame().Charofpt(m.Point)
 			rt.SetSelection(charPos, charPos)
 		}
+
 		// Sync the preview selection to the source body buffer
-		// This enables Snarf and other Acme commands to work correctly
 		w.syncSourceSelection()
+
+		// Process chords
+		switch {
+		case chordButtons == 7: // B1+B2+B3: Snarf (copy, no delete)
+			if snarfed := w.PreviewSnarf(); len(snarfed) > 0 {
+				global.snarfbuf = snarfed
+			}
+
+		case chordButtons&2 != 0: // B1+B2: Cut (copy + delete)
+			if snarfed := w.PreviewSnarf(); len(snarfed) > 0 {
+				global.snarfbuf = snarfed
+			}
+			// Delete the selected source text
+			if w.body.q0 < w.body.q1 {
+				w.body.file.DeleteAt(w.body.q0, w.body.q1)
+				w.UpdatePreview()
+			}
+
+		case chordButtons&4 != 0: // B1+B3: Paste (replace selection with snarf)
+			if len(global.snarfbuf) > 0 {
+				// Delete current selection from source
+				if w.body.q0 < w.body.q1 {
+					w.body.file.DeleteAt(w.body.q0, w.body.q1)
+				}
+				// Insert snarf content at the selection start
+				w.body.file.InsertAt(w.body.q0, []rune(string(global.snarfbuf)))
+				w.UpdatePreview()
+			}
+		}
+
 		w.Draw()
 		if w.display != nil {
 			w.display.Flush()
