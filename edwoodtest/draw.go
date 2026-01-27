@@ -33,11 +33,20 @@ type GettableDrawOps interface {
 	SVGDrawOps(w io.Writer) error
 }
 
+// MoveToTracker display implementations can track MoveTo calls.
+type MoveToTracker interface {
+	LastMoveTo() image.Point
+	MoveToCount() int
+	ResetMoveTo()
+}
+
 // mockDisplay implements draw.Display.
 type mockDisplay struct {
-	snarfbuf []byte
-	mu       sync.Mutex
-	drawops  []string
+	snarfbuf    []byte
+	mu          sync.Mutex
+	drawops     []string
+	lastMoveTo  image.Point
+	moveToCount int
 
 	// TODO(rjk): This is essentially the same as drawops above. Except that
 	// I have pruned the drawops array at various points. And that would mean
@@ -140,7 +149,35 @@ func (d *mockDisplay) WriteSnarf(data []byte) error {
 	return nil
 }
 
-func (d *mockDisplay) MoveTo(pt image.Point) error    { return nil }
+func (d *mockDisplay) MoveTo(pt image.Point) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lastMoveTo = pt
+	d.moveToCount++
+	return nil
+}
+
+// LastMoveTo returns the point from the most recent MoveTo call.
+func (d *mockDisplay) LastMoveTo() image.Point {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.lastMoveTo
+}
+
+// MoveToCount returns how many times MoveTo has been called.
+func (d *mockDisplay) MoveToCount() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.moveToCount
+}
+
+// ResetMoveTo resets the MoveTo tracking state.
+func (d *mockDisplay) ResetMoveTo() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lastMoveTo = image.Point{}
+	d.moveToCount = 0
+}
 func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
 func (d *mockDisplay) DrawOps() []string              { return d.drawops }
 func (d *mockDisplay) Clear()                         { d.drawops = nil }

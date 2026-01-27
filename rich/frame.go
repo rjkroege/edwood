@@ -49,6 +49,9 @@ type Frame interface {
 	// Content queries
 	ImageURLAt(pos int) string // Returns image URL at position, or "" if not an image
 
+	// Font metrics
+	DefaultFontHeight() int // Height of the default font
+
 	// Status
 	Full() bool // True if frame is at capacity
 }
@@ -1175,6 +1178,14 @@ func (f *frameImpl) allocColorImage(c color.Color) edwooddraw.Image {
 		return nil
 	}
 	return img
+}
+
+// DefaultFontHeight returns the height of the default font.
+func (f *frameImpl) DefaultFontHeight() int {
+	if f.font != nil {
+		return f.font.Height()
+	}
+	return 0
 }
 
 // Full returns true if the frame is at capacity.

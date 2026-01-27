@@ -1141,6 +1141,12 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 					if rendStart >= 0 && rendEnd >= 0 {
 						rt.SetSelection(rendStart, rendEnd)
 						w.scrollPreviewToMatch(rt, rendStart)
+						// Warp cursor to found text, matching normal Acme's look3() behavior
+						if w.display != nil {
+							warpPt := rt.Frame().Ptofchar(rendStart).Add(
+								image.Pt(4, rt.Frame().DefaultFontHeight()-4))
+							w.display.MoveTo(warpPt)
+						}
 					}
 				}
 			}
