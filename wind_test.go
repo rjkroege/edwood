@@ -3567,3 +3567,170 @@ func TestPreviewB2Click(t *testing.T) {
 		}
 	}
 }
+
+// TestPreviewB2Sweep tests that B2 (middle button) sweep selection in preview mode
+// selects a range of text from the anchor point to the release point. This is used
+// to select text for command execution (the selected text will be executed as a command).
+// This test verifies:
+// 1. B2 sweep in frame area creates a selection
+// 2. The selection spans from the mouse-down position to the mouse-up position
+// 3. The selection is properly normalized (p0 < p1)
+func TestPreviewB2Sweep(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Echo hello world")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600) // 12px scrollbar width
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Echo hello world" (16 chars)
+	content := rich.Plain("Echo hello world")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B2 sweep from position 0 to position 5 (select "Echo ")
+	// Position 0 is at X = frameRect.Min.X
+	// Position 5 is at X = frameRect.Min.X + 50 (10px per char)
+	t.Run("SweepForward", func(t *testing.T) {
+		// Mouse down at position 0
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 2, // Button 2 (middle button)
+		}
+		// Drag to position 5 (still holding button)
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		// Mouse up at position 5
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B2 sweep in frame area")
+		}
+
+		// After sweep from 0 to 5, selection should be (0, 5)
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("B2 sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("B2 sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// Test 2: B2 sweep backward (from right to left) should normalize selection
+	t.Run("SweepBackward", func(t *testing.T) {
+		// Clear previous selection and re-render to reset frame state
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Mouse down at position 5 (50 pixels from left edge, 10px per char)
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		// Drag to position 0 (still holding button)
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		// Mouse up at position 0
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle backward B2 sweep")
+		}
+
+		// Selection should be normalized: p0 < p1
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("Backward B2 sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("Backward B2 sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// Test 3: B2 sweep selects text that can be retrieved for execution
+	t.Run("SweepSelectionForExec", func(t *testing.T) {
+		// Clear previous selection
+		rt.SetSelection(0, 0)
+
+		// Select "Echo hello" (positions 0 to 10)
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+100, frameRect.Min.Y+5),
+			Buttons: 2,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+100, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B2 sweep for exec")
+		}
+
+		// Verify selection covers the intended range
+		q0, q1 := rt.Selection()
+		if q1-q0 < 4 {
+			t.Errorf("B2 sweep should select at least 4 characters, got selection (%d, %d)", q0, q1)
+		}
+
+		// The selected text should be retrievable via PreviewExecText
+		// (This tests integration - the actual command execution is tested elsewhere)
+		execText := w.PreviewExecText()
+		if len(execText) == 0 {
+			t.Error("PreviewExecText should return non-empty text after B2 sweep selection")
+		}
+	})
+}
