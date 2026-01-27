@@ -1469,6 +1469,85 @@ func TestPreviewExec(t *testing.T) {
 	}
 }
 
+// TestPreviewExecText tests PreviewExecText() directly:
+// - returns empty string when not in preview mode
+// - returns empty string when no selection
+// - returns rendered text from selection (not source markdown)
+func TestPreviewExecText(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	sourceMarkdown := "Run **Echo** now"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/exec.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Before preview mode, should return empty
+	if got := w.PreviewExecText(); got != "" {
+		t.Errorf("PreviewExecText() before preview mode should return empty, got %q", got)
+	}
+
+	// Set up rich text and enter preview mode
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(0, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	// No selection should return empty
+	if got := w.PreviewExecText(); got != "" {
+		t.Errorf("PreviewExecText() with no selection should return empty, got %q", got)
+	}
+
+	// Set selection on "Echo" in rendered text (rendered as "Run Echo now")
+	plainText := rt.Content().Plain()
+	echoIdx := -1
+	for i := 0; i < len(plainText)-3; i++ {
+		if string(plainText[i:i+4]) == "Echo" {
+			echoIdx = i
+			break
+		}
+	}
+	if echoIdx < 0 {
+		t.Fatalf("Could not find 'Echo' in rendered text: %q", string(plainText))
+	}
+
+	rt.SetSelection(echoIdx, echoIdx+4)
+
+	// Should return the rendered text
+	if got := w.PreviewExecText(); got != "Echo" {
+		t.Errorf("PreviewExecText() should return 'Echo', got %q", got)
+	}
+}
+
 // TestPreviewLookExpand tests that B3 Look with no selection expands to word at click point.
 func TestPreviewLookExpand(t *testing.T) {
 	rect := image.Rect(0, 0, 800, 600)
