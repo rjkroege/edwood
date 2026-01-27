@@ -752,3 +752,280 @@ func TestListSourceMap(t *testing.T) {
 		})
 	}
 }
+
+// TestSourceMapToRendered tests the reverse mapping: given source rune positions,
+// find the corresponding rendered rune positions. This is the inverse of ToSource().
+func TestSourceMapToRendered(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		srcRuneStart  int
+		srcRuneEnd    int
+		wantRendStart int
+		wantRendEnd   int
+	}{
+		{
+			name:          "plain text 1:1 mapping",
+			input:         "Hello, World!",
+			srcRuneStart:  0,
+			srcRuneEnd:    5, // "Hello"
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name:          "plain text middle",
+			input:         "Hello, World!",
+			srcRuneStart:  7,
+			srcRuneEnd:    12, // "World"
+			wantRendStart: 7,
+			wantRendEnd:   12,
+		},
+		{
+			name:          "bold text - full source range",
+			input:         "**bold**",
+			// Source: "**bold**" (8 runes), rendered: "bold" (4 runes)
+			srcRuneStart:  0,
+			srcRuneEnd:    8,
+			wantRendStart: 0,
+			wantRendEnd:   4,
+		},
+		{
+			name:          "bold text - inner content only",
+			input:         "**bold**",
+			// Source rune positions 2-6 = "bold" inside the markers
+			srcRuneStart:  2,
+			srcRuneEnd:    6,
+			wantRendStart: 0,
+			wantRendEnd:   4,
+		},
+		{
+			name:          "bold in middle of text - select bold source",
+			input:         "some **bold** text",
+			// Source: "some **bold** text" (18 runes)
+			// Rendered: "some bold text" (14 runes)
+			// "**bold**" is at source positions 5-13
+			srcRuneStart:  5,
+			srcRuneEnd:    13,
+			wantRendStart: 5,
+			wantRendEnd:   9, // "bold" in rendered
+		},
+		{
+			name:          "text after bold",
+			input:         "some **bold** text",
+			// " text" is at source positions 13-18
+			// In rendered, " text" is at positions 9-14
+			srcRuneStart:  13,
+			srcRuneEnd:    18,
+			wantRendStart: 9,
+			wantRendEnd:   14,
+		},
+		{
+			name:          "heading - full source",
+			input:         "# Title",
+			// Source: "# Title" (7 runes), rendered: "Title" (5 runes)
+			srcRuneStart:  0,
+			srcRuneEnd:    7,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name:          "heading - content only",
+			input:         "# Title",
+			// "Title" starts at source rune 2 (after "# ")
+			srcRuneStart:  2,
+			srcRuneEnd:    7,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name:          "italic text",
+			input:         "*italic*",
+			// Source: "*italic*" (8 runes), rendered: "italic" (6 runes)
+			srcRuneStart:  0,
+			srcRuneEnd:    8,
+			wantRendStart: 0,
+			wantRendEnd:   6,
+		},
+		{
+			name:          "inline code",
+			input:         "`code`",
+			// Source: "`code`" (6 runes), rendered: "code" (4 runes)
+			srcRuneStart:  0,
+			srcRuneEnd:    6,
+			wantRendStart: 0,
+			wantRendEnd:   4,
+		},
+		{
+			name:          "fenced code block - code content",
+			input:         "```\ncode\n```",
+			// Source: "```\ncode\n```" - "code\n" starts at byte 4, rune 4
+			// Rendered: "code\n" (5 runes)
+			srcRuneStart:  4,
+			srcRuneEnd:    9, // "code\n"
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name:          "text before and after code block",
+			input:         "Before\n```\ncode\n```\nAfter",
+			// Rendered: "Before\ncode\nAfter" (17 runes)
+			// "After" in source starts at rune 20
+			srcRuneStart:  20,
+			srcRuneEnd:    25, // "After"
+			wantRendStart: 12,
+			wantRendEnd:   17,
+		},
+		{
+			name:          "no mapping found returns -1,-1",
+			input:         "",
+			srcRuneStart:  5,
+			srcRuneEnd:    10,
+			wantRendStart: -1,
+			wantRendEnd:   -1,
+		},
+		{
+			name:          "bold+italic",
+			input:         "***bolditalic***",
+			// Source: 16 runes, rendered: "bolditalic" (10 runes)
+			srcRuneStart:  0,
+			srcRuneEnd:    16,
+			wantRendStart: 0,
+			wantRendEnd:   10,
+		},
+		{
+			name:          "mixed content - select bold in second line",
+			input:         "# Title\nSome **bold** text\n",
+			// Rendered: "Title\nSome bold text\n" (21 runes)
+			// "**bold**" in source at runes 13-21
+			srcRuneStart:  13,
+			srcRuneEnd:    21,
+			wantRendStart: 11,
+			wantRendEnd:   15, // "bold" in rendered
+		},
+		{
+			name:          "unordered list - content",
+			input:         "- item\n",
+			// Source: "- item\n" (7 runes)
+			// Rendered: "• item\n" (7 runes)
+			// "item" at source runes 2-6
+			srcRuneStart:  2,
+			srcRuneEnd:    6,
+			wantRendStart: 2,
+			wantRendEnd:   6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			rendStart, rendEnd := sm.ToRendered(tt.srcRuneStart, tt.srcRuneEnd)
+			if rendStart != tt.wantRendStart || rendEnd != tt.wantRendEnd {
+				t.Errorf("ToRendered(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.srcRuneStart, tt.srcRuneEnd, rendStart, rendEnd,
+					tt.wantRendStart, tt.wantRendEnd)
+			}
+		})
+	}
+}
+
+// TestSourceMapToRenderedRoundTrip verifies that mapping rendered→source→rendered
+// produces the original rendered positions (or expanded ones for formatted elements).
+// This tests the consistency of ToSource() and ToRendered() as inverse operations.
+func TestSourceMapToRenderedRoundTrip(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		renderedStart int
+		renderedEnd   int
+	}{
+		{
+			name:          "plain text round trip",
+			input:         "Hello, World!",
+			renderedStart: 0,
+			renderedEnd:   5,
+		},
+		{
+			name:          "bold text round trip",
+			input:         "**bold**",
+			renderedStart: 0,
+			renderedEnd:   4, // "bold"
+		},
+		{
+			name:          "italic text round trip",
+			input:         "*italic*",
+			renderedStart: 0,
+			renderedEnd:   6, // "italic"
+		},
+		{
+			name:          "heading round trip",
+			input:         "# Title",
+			renderedStart: 0,
+			renderedEnd:   5, // "Title"
+		},
+		{
+			name:          "inline code round trip",
+			input:         "some `code` here",
+			renderedStart: 5,
+			renderedEnd:   9, // "code"
+		},
+		{
+			name:          "bold in middle round trip",
+			input:         "some **bold** text",
+			renderedStart: 5,
+			renderedEnd:   9, // "bold"
+		},
+		{
+			name:          "plain text in mixed content",
+			input:         "some **bold** text",
+			renderedStart: 0,
+			renderedEnd:   5, // "some "
+		},
+		{
+			name:          "fenced code block content",
+			input:         "```\nhello\n```",
+			renderedStart: 0,
+			renderedEnd:   6, // "hello\n"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+
+			// Step 1: rendered → source (byte positions)
+			srcStart, srcEnd := sm.ToSource(tt.renderedStart, tt.renderedEnd)
+
+			// Step 2: source → rendered (round trip)
+			// ToSource returns byte positions but ToRendered accepts rune positions.
+			// Convert byte→rune using the source text.
+			srcRuneStart := byteToRunePos(tt.input, srcStart)
+			srcRuneEnd := byteToRunePos(tt.input, srcEnd)
+
+			rendStart, rendEnd := sm.ToRendered(srcRuneStart, srcRuneEnd)
+
+			// The round trip should produce positions that contain the original selection.
+			// For formatted elements, the result may be equal or expanded (since
+			// ToSource expands to include markers, and ToRendered maps back to
+			// the full rendered element).
+			if rendStart > tt.renderedStart || rendEnd < tt.renderedEnd {
+				t.Errorf("round trip failed: rendered(%d,%d) → source(%d,%d) [runes: %d,%d] → rendered(%d,%d); want rendered to contain [%d,%d]",
+					tt.renderedStart, tt.renderedEnd,
+					srcStart, srcEnd,
+					srcRuneStart, srcRuneEnd,
+					rendStart, rendEnd,
+					tt.renderedStart, tt.renderedEnd)
+			}
+		})
+	}
+}
+
+// byteToRunePos converts a byte position in a string to a rune position.
+func byteToRunePos(s string, bytePos int) int {
+	if bytePos <= 0 {
+		return 0
+	}
+	if bytePos >= len(s) {
+		return len([]rune(s))
+	}
+	return len([]rune(s[:bytePos]))
+}

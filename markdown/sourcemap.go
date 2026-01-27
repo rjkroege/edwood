@@ -14,11 +14,13 @@ type SourceMap struct {
 
 // SourceMapEntry maps a range in rendered content to a range in source markdown.
 type SourceMapEntry struct {
-	RenderedStart int // Rune position in rendered content
-	RenderedEnd   int
-	SourceStart   int // Byte position in source markdown
-	SourceEnd     int
-	PrefixLen     int // Length of source prefix not in rendered (e.g., "# " for headings)
+	RenderedStart   int // Rune position in rendered content
+	RenderedEnd     int
+	SourceStart     int // Byte position in source markdown
+	SourceEnd       int
+	SourceRuneStart int // Rune position in source markdown
+	SourceRuneEnd   int
+	PrefixLen       int // Length of source prefix not in rendered (e.g., "# " for headings)
 }
 
 // ToSource maps a range in rendered content (renderedStart, renderedEnd) to
@@ -85,6 +87,99 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	}
 
 	return srcStart, srcEnd
+}
+
+// ToRendered maps a range in source markdown (srcRuneStart, srcRuneEnd as rune positions)
+// to the corresponding range in the rendered content (as rune positions).
+// Returns (-1, -1) if no mapping exists.
+// This is the inverse of ToSource(): given source positions (e.g., from search()),
+// find where that content appears in the rendered preview.
+func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, renderedEnd int) {
+	if len(sm.entries) == 0 {
+		return -1, -1
+	}
+
+	// Find the entry containing srcRuneStart
+	renderedStart = -1
+	for i := range sm.entries {
+		e := &sm.entries[i]
+		if srcRuneStart >= e.SourceRuneStart && srcRuneStart < e.SourceRuneEnd {
+			renderedStart = sm.sourceRuneToRendered(e, srcRuneStart)
+			break
+		}
+	}
+
+	if renderedStart == -1 {
+		return -1, -1
+	}
+
+	// Find the entry containing srcRuneEnd-1 (or handle edge cases)
+	renderedEnd = -1
+	lookupPos := srcRuneEnd
+	if srcRuneEnd > srcRuneStart {
+		lookupPos = srcRuneEnd - 1
+	}
+	for i := range sm.entries {
+		e := &sm.entries[i]
+		if lookupPos >= e.SourceRuneStart && lookupPos < e.SourceRuneEnd {
+			// For end position, if srcRuneEnd is at or past the entry end,
+			// map to the full rendered end
+			if srcRuneEnd >= e.SourceRuneEnd {
+				renderedEnd = e.RenderedEnd
+			} else {
+				renderedEnd = sm.sourceRuneToRendered(e, srcRuneEnd)
+			}
+			break
+		}
+	}
+
+	if renderedEnd == -1 {
+		return -1, -1
+	}
+
+	return renderedStart, renderedEnd
+}
+
+// sourceRuneToRendered maps a single source rune position to a rendered position
+// within a given entry. For 1:1 entries (plain text), the offset is direct.
+// For formatted entries (bold, italic, heading, code), the source contains
+// opening and closing markers around the rendered content.
+func (sm *SourceMap) sourceRuneToRendered(e *SourceMapEntry, srcRunePos int) int {
+	offset := srcRunePos - e.SourceRuneStart
+	renderedLen := e.RenderedEnd - e.RenderedStart
+	sourceRuneLen := e.SourceRuneEnd - e.SourceRuneStart
+
+	if renderedLen == sourceRuneLen {
+		// 1:1 mapping (plain text, code block content, list content, etc.)
+		return e.RenderedStart + offset
+	}
+
+	// Formatted element: source has markers around rendered content.
+	// Compute the opening marker length in runes.
+	// For headings: PrefixLen is the byte length of "# " etc.; since markers are ASCII, bytes=runes.
+	// For symmetric markers (**bold**, *italic*, `code`, ***bi***): opening = closing = (extra / 2).
+	var openingLen int
+	if e.PrefixLen > 0 {
+		// Heading-style prefix (e.g., "# ", "## ")
+		openingLen = e.PrefixLen
+	} else {
+		// Symmetric markers (**, *, `, ***)
+		extra := sourceRuneLen - renderedLen
+		openingLen = extra / 2
+	}
+
+	if offset <= openingLen {
+		// Within or at the opening marker - map to rendered start
+		return e.RenderedStart
+	}
+
+	contentOffset := offset - openingLen
+	if contentOffset >= renderedLen {
+		// Within or at the closing marker - map to rendered end
+		return e.RenderedEnd
+	}
+
+	return e.RenderedStart + contentOffset
 }
 
 // ParseWithSourceMap parses markdown and returns the styled content,
@@ -389,7 +484,53 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		emitIndentedBlock()
 	}
 
+	// Post-process: populate SourceRuneStart/SourceRuneEnd from byte positions.
+	// Build a byte-to-rune mapping table for the source text.
+	sm.populateRunePositions(text)
+
 	return result, sm, lm
+}
+
+// populateRunePositions fills in SourceRuneStart/SourceRuneEnd for all entries
+// by converting byte positions to rune positions using the source text.
+func (sm *SourceMap) populateRunePositions(source string) {
+	if len(sm.entries) == 0 {
+		return
+	}
+
+	sourceLen := len(source)
+
+	// Build byte-to-rune position lookup table.
+	// b2r[byteOffset] = runeOffset for each valid byte boundary.
+	b2r := make([]int, sourceLen+1)
+	runePos := 0
+	bi := 0
+	for _, r := range source {
+		b2r[bi] = runePos
+		bi += len(string(r))
+		runePos++
+	}
+	b2r[sourceLen] = runePos
+
+	for i := range sm.entries {
+		e := &sm.entries[i]
+		start := e.SourceStart
+		end := e.SourceEnd
+		if start < 0 {
+			start = 0
+		}
+		if start > sourceLen {
+			start = sourceLen
+		}
+		if end < 0 {
+			end = 0
+		}
+		if end > sourceLen {
+			end = sourceLen
+		}
+		e.SourceRuneStart = b2r[start]
+		e.SourceRuneEnd = b2r[end]
+	}
 }
 
 // parseLineWithSourceMap parses a single line and returns spans, source map entries, and link entries.
