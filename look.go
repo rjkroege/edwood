@@ -436,6 +436,10 @@ func openfile(t *Text, e *Expand) *Window {
 		w.SetName(e.name)
 		t.Load(0, e.name, true)
 		t.file.Clean()
+		// Auto-enable preview mode for markdown files
+		if strings.HasSuffix(strings.ToLower(e.name), ".md") {
+			previewcmd(&w.body, nil, nil, false, false, "")
+		}
 		t.w.tag.SetSelect(t.w.tag.file.Nr(), t.w.tag.file.Nr())
 		if ow != nil {
 			for _, inc := range ow.incl {
