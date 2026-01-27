@@ -1121,15 +1121,29 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 		// Not a link or image - use selected text for Look (search in body)
 		w.syncSourceSelection()
+
+		// Read source text from body selection (not rendered text)
+		// This ensures we search for the actual markdown source, not stripped text
+		srcLen := w.body.q1 - w.body.q0
+		if srcLen > 0 {
+			srcBuf := make([]rune, srcLen)
+			w.body.file.Read(w.body.q0, srcBuf)
+
+			// Search source buffer for the source text
+			if search(&w.body, srcBuf) {
+				// Map the search result (body.q0/q1) back to rendered positions
+				if w.previewSourceMap != nil {
+					rendStart, rendEnd := w.previewSourceMap.ToRendered(w.body.q0, w.body.q1)
+					if rendStart >= 0 && rendEnd >= 0 {
+						rt.SetSelection(rendStart, rendEnd)
+					}
+				}
+			}
+		}
+
 		w.Draw()
 		if w.display != nil {
 			w.display.Flush()
-		}
-
-		lookText := w.PreviewLookText()
-		if lookText != "" {
-			// Search for the text in the body buffer
-			search(&w.body, []rune(lookText))
 		}
 		return true
 	}
