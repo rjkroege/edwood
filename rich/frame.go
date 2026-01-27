@@ -1241,6 +1241,19 @@ func (f *frameImpl) initTick(height int) {
 	f.tickHeight = height
 }
 
+// boxHeight returns the height of a box in pixels.
+// For text boxes, this is the font height for the box's style.
+// For image boxes, this is the scaled image height (via imageBoxDimensions).
+func (f *frameImpl) boxHeight(box Box) int {
+	if box.Style.Image && box.IsImage() {
+		_, h := imageBoxDimensions(&box, f.rect.Dx())
+		if h > 0 {
+			return h
+		}
+	}
+	return f.fontForStyle(box.Style).Height()
+}
+
 // Full returns true if the frame is at capacity.
 // A frame is full when more content is visible than can fit in the frame.
 func (f *frameImpl) Full() bool {

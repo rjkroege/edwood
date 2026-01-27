@@ -2495,3 +2495,81 @@ func TestInitTickReusesForSameHeight(t *testing.T) {
 		}
 	}
 }
+
+// TestBoxHeightBody verifies that boxHeight returns the body font height
+// for a regular text box with no special styling.
+func TestBoxHeightBody(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithFont(font))
+
+	box := Box{
+		Text:  []byte("hello"),
+		Nrune: 5,
+		Style: Style{},
+	}
+
+	h := fi.boxHeight(box)
+	if h != 14 {
+		t.Errorf("boxHeight for body text = %d, want 14", h)
+	}
+}
+
+// TestBoxHeightHeading verifies that boxHeight returns the heading font height
+// for a box styled with Scale 2.0 (H1 heading).
+func TestBoxHeightHeading(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+	h1Font := edwoodtest.NewFont(20, 28) // H1 is larger
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithFont(font), WithScaledFont(2.0, h1Font))
+
+	box := Box{
+		Text:  []byte("Heading"),
+		Nrune: 7,
+		Style: Style{Scale: 2.0, Bold: true},
+	}
+
+	h := fi.boxHeight(box)
+	if h != 28 {
+		t.Errorf("boxHeight for H1 heading = %d, want 28", h)
+	}
+}
+
+// TestBoxHeightImage verifies that boxHeight returns the scaled image height
+// for an image box, using imageBoxDimensions with the frame width.
+func TestBoxHeightImage(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithFont(font))
+
+	box := Box{
+		Style: Style{
+			Image:    true,
+			ImageURL: "test.png",
+		},
+		ImageData: &CachedImage{
+			Width:    200,
+			Height:   100,
+			Data:     []byte{0},
+			Original: image.NewRGBA(image.Rect(0, 0, 200, 100)),
+		},
+	}
+
+	h := fi.boxHeight(box)
+	// Image is 200px wide, frame is 400px, so no scaling. Height = 100.
+	if h != 100 {
+		t.Errorf("boxHeight for image = %d, want 100", h)
+	}
+}
