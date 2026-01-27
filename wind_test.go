@@ -6088,6 +6088,181 @@ func TestUpdateSelectionContext(t *testing.T) {
 	})
 }
 
+func TestSnarfWithContext(t *testing.T) {
+	// Helper to create a window with richBody, source map, selection, and body buffer.
+	setupWindow := func(t *testing.T, srcText string, selStart, selEnd int) *Window {
+		t.Helper()
+		rect := image.Rect(0, 0, 800, 600)
+		display := edwoodtest.NewDisplay(rect)
+		global.configureGlobals(display)
+
+		w := NewWindow().initHeadless(nil)
+		w.display = display
+		w.body = Text{
+			display: display,
+			fr:      &MockFrame{},
+			file:    file.MakeObservableEditableBuffer("/test/readme.md", nil),
+		}
+		w.body.all = image.Rect(0, 20, 800, 600)
+		w.col = &Column{safe: true}
+
+		// Insert source text into body buffer.
+		w.body.file.InsertAt(0, []rune(srcText))
+
+		font := edwoodtest.NewFont(10, 14)
+		bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+		textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+		content, sourceMap, _ := markdown.ParseWithSourceMap(srcText)
+
+		rt := NewRichText()
+		bodyRect := image.Rect(12, 20, 800, 600)
+		rt.Init(display, font,
+			WithRichTextBackground(bgImage),
+			WithRichTextColor(textImage),
+		)
+		rt.Render(bodyRect)
+		rt.SetContent(content)
+		rt.SetSelection(selStart, selEnd)
+
+		w.richBody = rt
+		w.previewSourceMap = sourceMap
+		w.SetPreviewMode(true)
+		return w
+	}
+
+	t.Run("PlainTextSnarf", func(t *testing.T) {
+		// Source: "Hello world" — select "Hello" (rendered 0-5), snarf it.
+		w := setupWindow(t, "Hello world", 0, 5)
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for valid selection")
+		}
+
+		// Store snarf with context (the behavior under test).
+		global.snarfbuf = snarfed
+		global.snarfContext = w.selectionContext
+
+		if global.snarfContext == nil {
+			t.Fatal("snarfContext is nil after snarf operation")
+		}
+		if global.snarfContext.ContentType != ContentPlain {
+			t.Errorf("snarfContext.ContentType = %v, want ContentPlain", global.snarfContext.ContentType)
+		}
+		if string(global.snarfbuf) != "Hello" {
+			t.Errorf("snarfbuf = %q, want %q", string(global.snarfbuf), "Hello")
+		}
+	})
+
+	t.Run("BoldTextSnarf", func(t *testing.T) {
+		// Source: "**bold text**" — select the rendered bold text, snarf it.
+		w := setupWindow(t, "**bold text**", 0, 9)
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for bold selection")
+		}
+
+		global.snarfbuf = snarfed
+		global.snarfContext = w.selectionContext
+
+		if global.snarfContext == nil {
+			t.Fatal("snarfContext is nil after bold snarf")
+		}
+		if global.snarfContext.ContentType != ContentBold {
+			t.Errorf("snarfContext.ContentType = %v, want ContentBold", global.snarfContext.ContentType)
+		}
+	})
+
+	t.Run("HeadingSnarf", func(t *testing.T) {
+		// Source: "# Heading\n" — select the rendered heading text.
+		w := setupWindow(t, "# Heading\n", 0, 7)
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for heading selection")
+		}
+
+		global.snarfbuf = snarfed
+		global.snarfContext = w.selectionContext
+
+		if global.snarfContext == nil {
+			t.Fatal("snarfContext is nil after heading snarf")
+		}
+		if global.snarfContext.ContentType != ContentHeading {
+			t.Errorf("snarfContext.ContentType = %v, want ContentHeading", global.snarfContext.ContentType)
+		}
+	})
+
+	t.Run("CodeSnarf", func(t *testing.T) {
+		// Source: "`code`" — select the rendered inline code.
+		w := setupWindow(t, "`code`", 0, 4)
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) == 0 {
+			t.Fatal("PreviewSnarf returned empty for code selection")
+		}
+
+		global.snarfbuf = snarfed
+		global.snarfContext = w.selectionContext
+
+		if global.snarfContext == nil {
+			t.Fatal("snarfContext is nil after code snarf")
+		}
+		if global.snarfContext.ContentType != ContentCode {
+			t.Errorf("snarfContext.ContentType = %v, want ContentCode", global.snarfContext.ContentType)
+		}
+	})
+
+	t.Run("SnarfClearsContextWhenEmpty", func(t *testing.T) {
+		// Set up previous snarf context, then snarf an empty selection.
+		global.snarfContext = &SelectionContext{ContentType: ContentBold}
+		global.snarfbuf = []byte("old")
+
+		w := setupWindow(t, "Hello world", 3, 3) // empty selection
+		w.updateSelectionContext()
+
+		snarfed := w.PreviewSnarf()
+		if len(snarfed) > 0 {
+			t.Fatal("PreviewSnarf returned non-empty for empty selection")
+		}
+		// When snarf returns nothing, context should not be updated
+		// (previous context is preserved — only overwritten on successful snarf).
+		if global.snarfContext == nil {
+			t.Fatal("snarfContext should be preserved when snarf returns empty")
+		}
+	})
+
+	t.Run("ContextMatchesSnarfContent", func(t *testing.T) {
+		// Snarf plain, then snarf bold — context should update to match.
+		w1 := setupWindow(t, "Hello world", 0, 5)
+		w1.updateSelectionContext()
+		snarfed := w1.PreviewSnarf()
+		global.snarfbuf = snarfed
+		global.snarfContext = w1.selectionContext
+
+		if global.snarfContext.ContentType != ContentPlain {
+			t.Fatalf("first snarf: ContentType = %v, want ContentPlain", global.snarfContext.ContentType)
+		}
+
+		// Now snarf bold text.
+		w2 := setupWindow(t, "**bold**", 0, 4)
+		w2.updateSelectionContext()
+		snarfed = w2.PreviewSnarf()
+		global.snarfbuf = snarfed
+		global.snarfContext = w2.selectionContext
+
+		if global.snarfContext.ContentType != ContentBold {
+			t.Errorf("second snarf: ContentType = %v, want ContentBold", global.snarfContext.ContentType)
+		}
+	})
+}
+
 // containsSubstring checks if s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr) >= 0

@@ -42,7 +42,8 @@ type globals struct {
 
 	activewin  *Window
 	activecol  *Column
-	snarfbuf   []byte
+	snarfbuf     []byte
+	snarfContext *SelectionContext
 	home       string
 	acmeshell  string
 	tagcolors  [frame.NumColours]draw.Image
