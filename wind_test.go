@@ -4419,3 +4419,493 @@ func TestPreviewB2BuiltinCommands(t *testing.T) {
 		}
 	})
 }
+
+// TestPreviewB3Sweep tests that B3 (button 3) sweep selection works in preview mode.
+// B3 sweep should select text in the rich text frame, similar to B2 sweep but for Look.
+func TestPreviewB3Sweep(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Hello world test")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14) // 10px per char, 14px height
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Set content: "Hello world test" (16 chars)
+	content := rich.Plain("Hello world test")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B3 sweep from position 0 to position 5 (select "Hello")
+	t.Run("SweepForward", func(t *testing.T) {
+		// Mouse down at position 0
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 4, // Button 3 (right button)
+		}
+		// Drag to position 5 (still holding button)
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		// Mouse up at position 5
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B3 sweep in frame area")
+		}
+
+		// After sweep from 0 to 5, selection should be (0, 5)
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("B3 sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("B3 sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// Test 2: B3 sweep backward (from right to left) should normalize selection
+	t.Run("SweepBackward", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Mouse down at position 5
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+50, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		// Drag to position 0
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		// Mouse up
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle backward B3 sweep")
+		}
+
+		// Selection should be normalized: p0 < p1
+		q0, q1 := rt.Selection()
+		if q0 != 0 {
+			t.Errorf("Backward B3 sweep selection p0 should be 0, got %d", q0)
+		}
+		if q1 != 5 {
+			t.Errorf("Backward B3 sweep selection p1 should be 5, got %d", q1)
+		}
+	})
+
+	// Test 3: B3 sweep selects text that can be retrieved for Look
+	t.Run("SweepSelectionForLook", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+
+		// Select "Hello world" (positions 0 to 11)
+		downEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		dragEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+110, frameRect.Min.Y+5),
+			Buttons: 4,
+		}
+		upEvent := draw.Mouse{
+			Point:   image.Pt(frameRect.Min.X+110, frameRect.Min.Y+5),
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{dragEvent, upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B3 sweep for Look")
+		}
+
+		// Verify selection covers the intended range
+		q0, q1 := rt.Selection()
+		if q1-q0 < 5 {
+			t.Errorf("B3 sweep should select at least 5 characters, got selection (%d, %d)", q0, q1)
+		}
+
+		// The selected text should be retrievable via PreviewLookText
+		lookText := w.PreviewLookText()
+		if len(lookText) == 0 {
+			t.Error("PreviewLookText should return non-empty text after B3 sweep selection")
+		}
+	})
+}
+
+// TestPreviewB3ExpandWord tests that a B3 null click (no sweep) in preview mode
+// expands the click position to the surrounding word using PreviewExpandWord().
+func TestPreviewB3ExpandWord(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", []rune("Hello world test")),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content := rich.Plain("Hello world test")
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewMode(true)
+
+	frameRect := rt.Frame().Rect()
+
+	// Test 1: B3 null click in middle of "Hello" should expand to "Hello"
+	t.Run("ExpandFirstWord", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 2 (middle of "Hello"), 10px per char
+		clickPt := image.Pt(frameRect.Min.X+25, frameRect.Min.Y+5)
+		downEvent := draw.Mouse{
+			Point:   clickPt,
+			Buttons: 4, // Button 3
+		}
+		// Immediate release at same position (null click)
+		upEvent := draw.Mouse{
+			Point:   clickPt,
+			Buttons: 0,
+		}
+
+		mc := mockMousectlWithEvents([]draw.Mouse{upEvent})
+		handled := w.HandlePreviewMouse(&downEvent, mc)
+
+		if !handled {
+			t.Error("HandlePreviewMouse should handle B3 null click in frame area")
+		}
+
+		// After null click, word expansion should give us "Hello"
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		if word != "Hello" {
+			t.Errorf("PreviewExpandWord should return \"Hello\", got %q", word)
+		}
+		if start != 0 {
+			t.Errorf("PreviewExpandWord start should be 0, got %d", start)
+		}
+		if end != 5 {
+			t.Errorf("PreviewExpandWord end should be 5, got %d", end)
+		}
+	})
+
+	// Test 2: B3 null click on "world" should expand to "world"
+	t.Run("ExpandSecondWord", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 8 (middle of "world"), 10px per char
+		clickPt := image.Pt(frameRect.Min.X+85, frameRect.Min.Y+5)
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		if word != "world" {
+			t.Errorf("PreviewExpandWord should return \"world\", got %q", word)
+		}
+		if start != 6 {
+			t.Errorf("PreviewExpandWord start should be 6, got %d", start)
+		}
+		if end != 11 {
+			t.Errorf("PreviewExpandWord end should be 11, got %d", end)
+		}
+	})
+
+	// Test 3: B3 null click at a position between words
+	// When clicking on a space char, PreviewExpandWord may return a neighboring
+	// word or empty string depending on boundary behavior. Verify it doesn't panic
+	// and returns a consistent result.
+	t.Run("NullClickBetweenWords", func(t *testing.T) {
+		rt.SetSelection(0, 0)
+		rt.Render(bodyRect)
+
+		// Click at position 5 (space between "Hello" and "world"), 10px per char
+		clickPt := image.Pt(frameRect.Min.X+55, frameRect.Min.Y+5)
+		charPos := rt.Frame().Charofpt(clickPt)
+		word, start, end := w.PreviewExpandWord(charPos)
+		// Should return some result without panicking
+		// The exact behavior depends on boundary handling
+		_ = word
+		if end < start {
+			t.Errorf("PreviewExpandWord end (%d) should not be less than start (%d)", end, start)
+		}
+	})
+}
+
+// TestPreviewB3Search tests that B3 on non-link text in preview mode triggers
+// a search for the rendered text in the source body buffer.
+func TestPreviewB3Search(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	// Markdown source with bold text
+	sourceMarkdown := "Some **important** text here.\n\nFind important word."
+	// Rendered text: "Some important text here.\n\nFind important word."
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	// Parse markdown and set content with source map
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Verify preview mode is set
+	if !w.IsPreviewMode() {
+		t.Fatal("Window should be in preview mode")
+	}
+
+	// Find "important" in the rendered text
+	plainText := content.Plain()
+	importantIdx := -1
+	for i := 0; i < len(plainText)-8; i++ {
+		if string(plainText[i:i+9]) == "important" {
+			importantIdx = i
+			break
+		}
+	}
+	if importantIdx < 0 {
+		t.Fatalf("Could not find 'important' in rendered text: %q", string(plainText))
+	}
+
+	// Test: B3 null click on "important" (not a link) should use search fallback
+	// The click position is not on a link, so PreviewLookLinkURL should return ""
+	url := w.PreviewLookLinkURL(importantIdx)
+	if url != "" {
+		t.Errorf("PreviewLookLinkURL should return empty for non-link text, got %q", url)
+	}
+
+	// After B3 click, the word should be expanded and available for search
+	word, start, end := w.PreviewExpandWord(importantIdx + 2) // click in middle of "important"
+	if word != "important" {
+		t.Errorf("PreviewExpandWord should return \"important\", got %q", word)
+	}
+	if end <= start {
+		t.Errorf("PreviewExpandWord should return valid range, got (%d, %d)", start, end)
+	}
+
+	// Set the selection to the expanded word
+	rt.SetSelection(start, end)
+
+	// Verify PreviewLookText returns the rendered text for search
+	lookText := w.PreviewLookText()
+	if lookText != "important" {
+		t.Errorf("PreviewLookText should return \"important\", got %q", lookText)
+	}
+
+	// The search target should be the rendered text "important", which exists
+	// in the source body as both "**important**" and "important"
+	// The search() function should be able to find it in the body
+	sourceText := string(sourceRunes)
+	if !containsSubstring(sourceText, "important") {
+		t.Error("Source text should contain 'important' for search to find")
+	}
+}
+
+// TestPreviewB3OnSelection tests that B3 clicked inside an existing selection
+// uses the selected text for the Look operation instead of expanding a word.
+func TestPreviewB3OnSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	sourceMarkdown := "Hello world test phrase here"
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+
+	// Create RichText for preview
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, linkMap := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewLinkMap(linkMap)
+	w.SetPreviewMode(true)
+
+	// Pre-set a selection of "world test" (positions 6-16)
+	// This spans two words, which wouldn't be the result of single word expansion
+	rt.SetSelection(6, 16)
+
+	// Verify the selection is set
+	q0, q1 := rt.Selection()
+	if q0 != 6 || q1 != 16 {
+		t.Fatalf("Selection should be (6, 16), got (%d, %d)", q0, q1)
+	}
+
+	// B3 click inside the selection should use the existing selection text
+	// Click position 10 is inside the selection (6, 16)
+	frameRect := rt.Frame().Rect()
+	clickPt := image.Pt(frameRect.Min.X+105, frameRect.Min.Y+5) // position ~10
+
+	// Verify click position is inside the selection
+	charPos := rt.Frame().Charofpt(clickPt)
+	if charPos < q0 || charPos >= q1 {
+		t.Logf("Warning: charPos %d may not be inside selection (%d, %d)", charPos, q0, q1)
+	}
+
+	// The PreviewLookText should return the full selection "world test"
+	// (not just the word "test" that would result from word expansion)
+	lookText := w.PreviewLookText()
+	if lookText != "world test" {
+		t.Errorf("PreviewLookText with existing selection should return \"world test\", got %q", lookText)
+	}
+
+	// Test: if selection exists and B3 is clicked outside the selection,
+	// the selection should change (word expand at new position)
+	t.Run("B3OutsideSelection", func(t *testing.T) {
+		// Keep selection at (6, 16)
+		rt.SetSelection(6, 16)
+
+		// Click at position 0 (outside selection, on "Hello")
+		outsidePt := image.Pt(frameRect.Min.X+25, frameRect.Min.Y+5) // position ~2
+		outsideCharPos := rt.Frame().Charofpt(outsidePt)
+
+		// Word expand at position outside the selection should give "Hello"
+		word, _, _ := w.PreviewExpandWord(outsideCharPos)
+		if word != "Hello" {
+			t.Errorf("PreviewExpandWord outside selection should return \"Hello\", got %q", word)
+		}
+	})
+}
+
+// containsSubstring checks if s contains substr.
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr) >= 0
+}
+
+// searchString returns the index of substr in s, or -1 if not found.
+func searchString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}

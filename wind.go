@@ -778,15 +778,40 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 	// Handle button 3 (B3/right-click) in frame area for Look action
 	if m.Point.In(frameRect) && m.Buttons&4 != 0 {
-		// Get character position at click point
-		charPos := rt.Frame().Charofpt(m.Point)
+		// First, perform sweep selection (like B1/B2)
+		var p0, p1 int
+		if mc != nil {
+			p0, p1 = rt.Frame().Select(mc, m)
+			rt.SetSelection(p0, p1)
+		} else {
+			charPos := rt.Frame().Charofpt(m.Point)
+			p0, p1 = charPos, charPos
+			rt.SetSelection(charPos, charPos)
+		}
 
-		// Debug output: show position and link map status
-		warning(nil, "Markdeep B3 click: charPos=%d, linkMap=%v\n", charPos, w.previewLinkMap != nil)
+		// Determine the character position for link/image checks
+		charPos := p0
+
+		// If null click (no sweep), check for existing selection or expand to word
+		if p0 == p1 {
+			// Check if click is inside an existing selection
+			q0, q1 := rt.Selection()
+			if q0 != q1 && charPos >= q0 && charPos < q1 {
+				// Click inside existing selection - use it as-is
+				p0, p1 = q0, q1
+				rt.SetSelection(q0, q1)
+			} else {
+				// Expand to word under cursor
+				_, wordStart, wordEnd := w.PreviewExpandWord(p0)
+				if wordStart != wordEnd {
+					rt.SetSelection(wordStart, wordEnd)
+					p0, p1 = wordStart, wordEnd
+				}
+			}
+		}
 
 		// Check if this position is within a link
 		url := w.PreviewLookLinkURL(charPos)
-		warning(nil, "Markdeep B3 click: url=%q\n", url)
 
 		if url != "" {
 			// Plumb the URL using the same mechanism as look3
@@ -828,8 +853,19 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			return true
 		}
 
-		// Not a link or image - fall through to normal Look behavior
-		return false
+		// Not a link or image - use selected text for Look (search in body)
+		w.syncSourceSelection()
+		w.Draw()
+		if w.display != nil {
+			w.display.Flush()
+		}
+
+		lookText := w.PreviewLookText()
+		if lookText != "" {
+			// Search for the text in the body buffer
+			search(&w.body, []rune(lookText))
+		}
+		return true
 	}
 
 	return false
