@@ -297,3 +297,234 @@ func TestLayoutMetricsEquality(t *testing.T) {
 		t.Error("metrics with different values should not be equal")
 	}
 }
+
+// TestLayoutMetricsPixelHeightFromLines calculates correct pixel height from lines.
+// This tests the fix for the TODO in col.go:394 about variable font heights.
+func TestLayoutMetricsPixelHeightFromLines(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		bodyLines  int
+		want       int
+	}{
+		// When tag and body have same height, behaves like simple multiplication
+		{"same heights", 16, 16, 2, 10, 2*16 + 10*16},
+		// When tag is taller, tag lines contribute more pixels
+		{"tag taller", 20, 14, 2, 10, 2*20 + 10*14},
+		// When body is taller, body lines contribute more pixels
+		{"body taller", 14, 20, 2, 10, 2*14 + 10*20},
+		// Single line tag
+		{"single tag line", 18, 14, 1, 5, 18 + 5*14},
+		// No body lines (collapsed window)
+		{"no body lines", 16, 14, 2, 0, 2 * 16},
+		// Multi-line tag (expanded)
+		{"expanded tag", 16, 14, 5, 10, 5*16 + 10*14},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.PixelHeightFromLines(tt.tagLines, tt.bodyLines)
+			if got != tt.want {
+				t.Errorf("PixelHeightFromLines(%d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsBodyLinesFromPixelHeight converts pixel height to body lines.
+// This addresses the col.go:481 TODO about using correct frame font height.
+func TestLayoutMetricsBodyLinesFromPixelHeight(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		pixelHeight int
+		wantBody   int
+	}{
+		// With 1 tag line (16px), remaining 84px = 6 body lines (14px each)
+		{"basic", 16, 14, 1, 100, 6},
+		// With 2 tag lines (32px), remaining 68px = 4 body lines
+		{"multi-tag", 16, 14, 2, 100, 4},
+		// Different font heights - 1 tag (20px), remaining 80px = 4 body lines (20px each)
+		{"larger body font", 20, 20, 1, 100, 4},
+		// Zero remaining height after tag
+		{"no room for body", 20, 14, 5, 100, 0},
+		// Large body font, 1 tag line
+		{"large body font", 14, 25, 1, 100, 3}, // (100-14)/25 = 3.44 -> 3
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.BodyLinesFromPixelHeight(tt.tagLines, tt.pixelHeight)
+			if got != tt.wantBody {
+				t.Errorf("BodyLinesFromPixelHeight(%d, %d) = %d; want %d",
+					tt.tagLines, tt.pixelHeight, got, tt.wantBody)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsProportionalResize handles resize calculations.
+// This tests the logic needed for col.go:399-403 where lines are distributed.
+func TestLayoutMetricsProportionalResize(t *testing.T) {
+	tests := []struct {
+		name            string
+		tagHeight       int
+		bodyHeight      int
+		tagLines        int
+		currentBodyLines int
+		availableHeight int
+		wantBodyLines   int
+	}{
+		// Shrink: window with 10 body lines, new space only fits 5
+		{"shrink", 16, 14, 1, 10, 16 + 5*14, 5},
+		// Grow: window with 5 body lines, new space fits 10
+		{"grow", 16, 14, 1, 5, 16 + 10*14, 10},
+		// Different tag/body heights: 2 tag lines (20px each = 40px), remaining 60px = 3 body lines (20px each)
+		{"different heights", 20, 20, 2, 5, 100, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.BodyLinesFromPixelHeight(tt.tagLines, tt.availableHeight)
+			if got != tt.wantBodyLines {
+				t.Errorf("BodyLinesFromPixelHeight(%d, %d) = %d; want %d",
+					tt.tagLines, tt.availableHeight, got, tt.wantBodyLines)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsTotalPixelHeight computes total window height including border.
+// This is useful for col.go packColumn which needs to compute complete window sizes.
+func TestLayoutMetricsTotalPixelHeight(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		bodyLines  int
+		border     int
+		separator  int
+		want       int
+	}{
+		// Standard window: 1 tag line + border + body lines + separator
+		{"standard", 16, 14, 1, 10, 2, 1, 16 + 2 + 10*14 + 1},
+		// Multi-line tag
+		{"multi-tag", 18, 14, 3, 5, 2, 1, 3*18 + 2 + 5*14 + 1},
+		// Different fonts
+		{"different fonts", 20, 16, 2, 8, 2, 1, 2*20 + 2 + 8*16 + 1},
+		// Minimal window (1 tag, 1 body line)
+		{"minimal", 16, 14, 1, 1, 2, 1, 16 + 2 + 14 + 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.TotalPixelHeight(tt.tagLines, tt.bodyLines, tt.border, tt.separator)
+			if got != tt.want {
+				t.Errorf("TotalPixelHeight(%d, %d, %d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, tt.border, tt.separator, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsLinesTotalFromPixels converts total pixel height back to line count.
+// This addresses the col.go:399-403 TODO where the code incorrectly adds taglines-1 to maxlines.
+func TestLayoutMetricsLinesTotalFromPixels(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		totalPixels int
+		border     int
+		separator  int
+		wantBody   int
+	}{
+		// 100px total - 16px tag - 2 border - 1 sep = 81px for body = 5 lines (14px each)
+		{"standard", 16, 14, 1, 100, 2, 1, 5},
+		// Multi-line tag: 100px - 48px (3*16) - 2 - 1 = 49px = 3 body lines
+		{"multi-tag", 16, 14, 3, 100, 2, 1, 3},
+		// Different fonts: 100px - 40px (2*20) - 2 - 1 = 57px = 3 body lines (16px each)
+		{"different fonts", 20, 16, 2, 100, 2, 1, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.BodyLinesFromTotalPixels(tt.tagLines, tt.totalPixels, tt.border, tt.separator)
+			if got != tt.wantBody {
+				t.Errorf("BodyLinesFromTotalPixels(%d, %d, %d, %d) = %d; want %d",
+					tt.tagLines, tt.totalPixels, tt.border, tt.separator, got, tt.wantBody)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsEffectiveLines converts tag+body lines to a common unit.
+// This is needed for col.go:399-403 where the code needs to sum lines across windows
+// with potentially different font heights for distribution calculations.
+func TestLayoutMetricsEffectiveLines(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		bodyLines  int
+		want       int // effective lines in body-line units
+	}{
+		// Same heights: 2 tag + 10 body = 12 effective lines
+		{"same heights", 16, 16, 2, 10, 12},
+		// Tag taller (20px vs 10px): 2 tag lines = 4 body-equivalent, total = 14
+		{"tag taller", 20, 10, 2, 10, 14},
+		// Body taller (10px vs 20px): 4 tag lines = 2 body-equivalent, total = 12
+		{"body taller", 10, 20, 4, 10, 12},
+		// Single tag line
+		{"single tag", 16, 14, 1, 10, 11}, // 16/14 = 1.14 -> 1, total 11
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			got := lm.TotalLinesEquivalent(tt.tagLines, tt.bodyLines)
+			if got != tt.want {
+				t.Errorf("TotalLinesEquivalent(%d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsZeroDivisionNewMethods tests new methods don't panic with zero heights.
+func TestLayoutMetricsZeroDivisionNewMethods(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("function panicked: %v", r)
+		}
+	}()
+
+	lm := NewLayoutMetrics(0, 0)
+
+	// These should return 0 or handle gracefully, not panic
+	if got := lm.PixelHeightFromLines(2, 10); got != 0 {
+		t.Errorf("PixelHeightFromLines with zero heights = %d; want 0", got)
+	}
+	if got := lm.BodyLinesFromPixelHeight(1, 100); got != 0 {
+		t.Errorf("BodyLinesFromPixelHeight with zero body height = %d; want 0", got)
+	}
+	if got := lm.TotalPixelHeight(1, 10, 2, 1); got != 3 {
+		t.Errorf("TotalPixelHeight with zero heights = %d; want 3 (just border+separator)", got)
+	}
+	if got := lm.BodyLinesFromTotalPixels(1, 100, 2, 1); got != 0 {
+		t.Errorf("BodyLinesFromTotalPixels with zero heights = %d; want 0", got)
+	}
+}

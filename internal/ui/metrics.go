@@ -99,3 +99,41 @@ func (lm *LayoutMetrics) Equal(other *LayoutMetrics) bool {
 	return lm.tagFontHeight == other.tagFontHeight &&
 		lm.bodyFontHeight == other.bodyFontHeight
 }
+
+// PixelHeightFromLines returns the total pixel height for the given
+// number of tag and body lines, accounting for different font heights.
+// This is the raw content height without borders or separators.
+func (lm *LayoutMetrics) PixelHeightFromLines(tagLines, bodyLines int) int {
+	return tagLines*lm.tagFontHeight + bodyLines*lm.bodyFontHeight
+}
+
+// BodyLinesFromPixelHeight returns the number of complete body lines
+// that fit in the given pixel height after accounting for tag lines.
+func (lm *LayoutMetrics) BodyLinesFromPixelHeight(tagLines, pixelHeight int) int {
+	if lm.bodyFontHeight == 0 {
+		return 0
+	}
+	tagPixels := tagLines * lm.tagFontHeight
+	remaining := pixelHeight - tagPixels
+	if remaining < 0 {
+		return 0
+	}
+	return remaining / lm.bodyFontHeight
+}
+
+// TotalPixelHeight returns the total pixel height for a window including
+// tag lines, body lines, border, and separator.
+func (lm *LayoutMetrics) TotalPixelHeight(tagLines, bodyLines, border, separator int) int {
+	return lm.PixelHeightFromLines(tagLines, bodyLines) + border + separator
+}
+
+// BodyLinesFromTotalPixels returns the number of complete body lines
+// that fit in the given total pixel height after accounting for
+// tag lines, border, and separator.
+func (lm *LayoutMetrics) BodyLinesFromTotalPixels(tagLines, totalPixels, border, separator int) int {
+	if lm.bodyFontHeight == 0 {
+		return 0
+	}
+	contentPixels := totalPixels - border - separator
+	return lm.BodyLinesFromPixelHeight(tagLines, contentPixels)
+}
