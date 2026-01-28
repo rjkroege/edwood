@@ -32,9 +32,10 @@ type Style struct {
 	TableAlign  Alignment // Cell alignment (left, center, right)
 
 	// Image placeholder
-	Image    bool   // This span is an image placeholder
-	ImageURL string // URL/path of the image
-	ImageAlt string // Alt text
+	Image      bool   // This span is an image placeholder
+	ImageURL   string // URL/path of the image
+	ImageAlt   string // Alt text
+	ImageWidth int    // Explicit width in pixels (0 = use natural size)
 
 	// Size multiplier (1.0 = normal body text)
 	// Used for headings: H1=2.0, H2=1.5, H3=1.25, etc.
