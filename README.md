@@ -7,7 +7,7 @@ increasingly divergent. ProjectSerenity was itself a transliteration
 of the original Acme and libframe C code from
 [plan9port](https://9fans.github.io/plan9port/)
 
-Named *edwood* in celebration of the  formative influence of Ed Wood on
+Named *edwood* in celebration of the formative influence of Ed Wood on
 Plan9 and the truth of
 [ed](http://www.dcs.ed.ac.uk/home/jec/texts/ed.html)-iting.
 
