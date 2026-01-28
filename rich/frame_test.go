@@ -1860,6 +1860,8 @@ func TestDrawBoxBackgroundMultiple(t *testing.T) {
 		{Text: "code2", Style: codeStyle},
 	}
 	f.SetContent(content)
+	// Set a range selection to avoid cursor tick drawing (this test is about box backgrounds)
+	f.SetSelection(0, 1)
 
 	display.(edwoodtest.GettableDrawOps).Clear()
 	f.Redraw()
@@ -2761,5 +2763,95 @@ func TestTickHeightBodyText(t *testing.T) {
 	}
 	if fi.tickHeight != 14 {
 		t.Errorf("tick height = %d, want 14 (body font height)", fi.tickHeight)
+	}
+}
+
+// TestRedrawDrawsTickWhenCursorPoint verifies that Redraw() draws the cursor
+// tick when the selection is a point (p0 == p1). After drawing text and
+// selection, Redraw should call drawTickTo to render the insertion cursor.
+func TestRedrawDrawsTickWhenCursorPoint(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+	)
+
+	// Set content with cursor at position 3 (point selection)
+	f.SetContent(Plain("hello"))
+	fi.p0 = 3
+	fi.p1 = 3
+
+	// Clear draw ops before Redraw
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Redraw — it should draw the tick since p0 == p1
+	f.Redraw()
+
+	// Verify that a tick was drawn. The cursor at position 3 in "hello"
+	// with font width 10 → X=30 in scratch coords.
+	// Tick rect is (30,0)-(33,14) in scratch image coords.
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	foundTick := false
+	for _, op := range ops {
+		if strings.Contains(op, "(30,0)-(33,14)") {
+			foundTick = true
+			break
+		}
+	}
+	if !foundTick {
+		t.Errorf("Redraw() with p0==p1 should draw tick at (30,0)-(33,14)\ngot ops: %v", ops)
+	}
+
+	// Verify tick image was created
+	if fi.tickImage == nil {
+		t.Error("Redraw() with point selection should create tickImage")
+	}
+}
+
+// TestRedrawNoTickWhenSelection verifies that Redraw() does NOT draw the
+// cursor tick when there is a range selection (p0 != p1). The tick should
+// only appear when the selection is a point.
+func TestRedrawNoTickWhenSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	selImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// Set content with a range selection (p0 != p1)
+	f.SetContent(Plain("hello world"))
+	f.SetSelection(2, 5)
+
+	// Clear draw ops before Redraw
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Redraw — it should NOT draw the tick since p0 != p1
+	f.Redraw()
+
+	// Verify no tick image was created
+	if fi.tickImage != nil {
+		t.Error("Redraw() with range selection (p0 != p1) should not create tickImage")
 	}
 }

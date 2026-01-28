@@ -659,6 +659,11 @@ func (f *frameImpl) Redraw() {
 		f.drawTextTo(scratch, drawOffset)
 	}
 
+	// Draw cursor tick when selection is a point (p0 == p1)
+	if f.content != nil && f.font != nil && f.display != nil && f.p0 == f.p1 {
+		f.drawTickTo(scratch, drawOffset)
+	}
+
 	// If we used a scratch image, blit it to the screen
 	if scratch != screen {
 		screen.Draw(f.rect, scratch, nil, image.ZP)
