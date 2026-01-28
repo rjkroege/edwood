@@ -73,8 +73,99 @@ Call `drawTickTo()` from `Redraw()` after text drawing, when `p0 == p1`. This dr
 
 ---
 
-## Future Enhancements (Post Phase 23)
+## Phase 24: Table Grid Layout and Visual Polish
 
+Tables currently render as raw ASCII passthrough — no column normalization, no
+alignment application, no grid lines. This phase fixes all three, bringing
+tables up to proper visual quality.
+
+See `docs/tables-lists-images-design.md` § "Table Remediation: Grid Layout and
+Visual Polish" for the full design.
+
+### Phase 24A: Column Width Normalization and Alignment
+
+Wire up `calculateColumnWidths()` in `parseTableBlock()` so all cells are
+padded to uniform column widths. Apply the per-column alignment parsed from
+the separator row (`AlignLeft`, `AlignCenter`, `AlignRight`) when padding.
+
+**Files:** `markdown/parse.go`, `markdown/sourcemap.go`, `markdown/parse_test.go`
+
+**What to do:**
+1. In `parseTableBlock()`, after collecting all table lines, parse every row
+   into `[][]string` cells via `splitTableCells()`.
+2. Call `calculateColumnWidths()` to get max widths per column.
+3. Call `parseTableSeparator()` on the separator line to get `[]Alignment`.
+4. Rebuild each data/header row: pad each cell to its column width respecting
+   alignment (left = trailing spaces, right = leading spaces, center = split).
+5. Rebuild the separator row with dashes padded to column widths.
+6. Emit the rebuilt text as spans (still one span per row).
+7. Update `parseTableBlockWithSourceMap()` in `sourcemap.go` with the same
+   normalization logic; padding spaces are synthetic and must be skipped in
+   source map entries.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | `TestParseTableNormalizedWidths`, `TestParseTableRightAlign`, `TestParseTableCenterAlign`, `TestParseTableSourceMapWithPadding` in `markdown/parse_test.go` |
+| Code written | [x] | Normalization + alignment in `parseTableBlock()` and `parseTableBlockWithSourceMap()`; added `padCell()`, `rebuildTableRow()`, `rebuildSeparatorRow()` helpers; updated `TestParseSimpleTable` expected values and `TestParseTableSourceMapWithPadding` bounds check for padded output |
+| Tests pass | [x] | `go test ./markdown/...` passes |
+| Code committed | [x] | Commit 4233b9f |
+
+### Phase 24B: Box-Drawing Grid Lines
+
+Replace ASCII pipes and dashes with Unicode box-drawing characters. Add top
+border, bottom border, and replace the raw `|---|` separator with `├──┼──┤`.
+Replace `|` cell delimiters with `│`.
+
+**Files:** `markdown/parse.go`, `markdown/sourcemap.go`, `markdown/parse_test.go`
+
+**What to do:**
+1. Add helper `buildGridLine(widths []int, left, mid, right, fill rune) string`
+   that builds a horizontal border/separator from column widths.
+2. After normalization (Phase 24A), generate three synthetic lines:
+   - Top border: `┌` + `─`×(w+2) joined by `┬` + `┐`
+   - Header separator: `├` + `─`×(w+2) joined by `┼` + `┤`
+   - Bottom border: `└` + `─`×(w+2) joined by `┴` + `┘`
+3. Replace `|` delimiters with `│` in header and data rows.
+4. Emit border lines as spans with `Style{Table: true, Code: true, Block: true}`.
+5. Update `parseTableBlockWithSourceMap()` — border lines are synthetic with
+   no source mapping (zero-length source ranges). Cell content source mapping
+   must skip the `│` delimiters.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | `TestParseTableBoxDrawing`, `TestParseTableTopBorder`, `TestParseTableBottomBorder`, `TestParseTableHeaderSeparator`, `TestParseTableVerticalRules`, `TestParseTableSourceMapBoxDrawing` in `markdown/parse_test.go` |
+| Code written | [x] | `buildGridLine()` helper, `replaceDelimiters()` helper, box-drawing emission in `parseTableBlock()` and `parseTableBlockWithSourceMap()`; fixed `TestParseTableSourceMapBoxDrawing` to use rune-based index for multi-byte `│` chars |
+| Tests pass | [x] | `go test ./markdown/...` passes |
+| Code committed | [x] | Commit 67dde46 |
+
+### Phase 24C: Update Existing Table Tests
+
+The existing 11+ table tests assert on raw ASCII passthrough output. After
+Phases 24A and 24B change the emitted text, these tests will break. Update
+them to expect normalized, box-drawn output.
+
+**Files:** `markdown/parse_test.go`
+
+**What to do:**
+1. Update `TestParseSimpleTable`, `TestParseTableWithAlignment`,
+   `TestEmitAlignedTable`, `TestEmitTableWithWrap` to expect padded columns
+   and box-drawing characters.
+2. Update `TestTableSourceMap`, `TestTableInDocument` for the new output shape
+   (extra border lines, `│` delimiters).
+3. Update `TestTableNotTable` — negative cases should be unaffected; verify.
+4. Run `go test ./markdown/... ./rich/...` to confirm no regressions.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests updated | [x] | All existing table tests already expect new output format; `TestParseSimpleTable` was updated in Phase 24A (commit 4233b9f), remaining tests (`TestParseTableWithAlignment`, `TestEmitAlignedTable`, `TestEmitTableWithWrap`, `TestTableSourceMap`, `TestTableInDocument`, `TestTableNotTable`) only assert structural properties (table spans exist, source map valid, negative cases) and pass without changes |
+| Tests pass | [x] | `go test ./markdown/... ./rich/...` passes |
+| Code committed | [x] | No separate commit needed — tests already passed in prior commits (4233b9f, 67dde46); no test files were modified |
+
+---
+
+## Future Enhancements (Post Phase 24)
+
+- **Per-cell table spans**: Emit individual spans per cell for true grid layout (Phase 3 in design doc)
 - **Blockquotes**: `>` syntax with indentation and vertical bar
 - **Task lists**: `- [ ]` and `- [x]` checkbox syntax
 - **Definition lists**: `term : definition` syntax

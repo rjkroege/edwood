@@ -24,9 +24,10 @@ type SourceMapEntry struct {
 }
 
 // ToSource maps a range in rendered content (renderedStart, renderedEnd) to
-// the corresponding range in the source markdown.
+// the corresponding range in the source markdown as RUNE positions.
+// This is used by syncSourceSelection to set body.q0/q1 which expect rune positions.
 // When the selection spans formatted elements, it expands to include the full
-// source markup (e.g., selecting "bold" in "**bold**" returns 0-8).
+// source markup (e.g., selecting "bold" in "**bold**" returns the rune range of "**bold**").
 func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd int) {
 	if len(sm.entries) == 0 {
 		return renderedStart, renderedEnd
@@ -47,13 +48,13 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 		srcStart = renderedStart
 	} else {
 		// If the selection starts at the beginning of a formatted element,
-		// include the opening marker
+		// include the opening marker. Use SourceRuneStart for rune positions.
 		if renderedStart == startEntry.RenderedStart {
-			srcStart = startEntry.SourceStart
+			srcStart = startEntry.SourceRuneStart
 		} else {
-			// Calculate offset within this entry
+			// Calculate offset within this entry (runes, not bytes)
 			offset := renderedStart - startEntry.RenderedStart
-			srcStart = startEntry.SourceStart + offset
+			srcStart = startEntry.SourceRuneStart + offset
 		}
 	}
 
@@ -76,13 +77,13 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 		srcEnd = renderedEnd
 	} else {
 		// If the selection ends at the end of a formatted element,
-		// include the closing marker
+		// include the closing marker. Use SourceRuneEnd for rune positions.
 		if renderedEnd == endEntry.RenderedEnd {
-			srcEnd = endEntry.SourceEnd
+			srcEnd = endEntry.SourceRuneEnd
 		} else {
-			// Calculate offset within this entry, accounting for any prefix
+			// Calculate offset within this entry, accounting for any prefix (runes, not bytes)
 			offset := renderedEnd - endEntry.RenderedStart
-			srcEnd = endEntry.SourceStart + endEntry.PrefixLen + offset
+			srcEnd = endEntry.SourceRuneStart + endEntry.PrefixLen + offset
 		}
 	}
 
@@ -1493,10 +1494,10 @@ func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, re
 		}
 	}
 
-	// Bottom border (synthetic — no source mapping, zero-length source range)
-	bottomLen := len([]rune(bottomBorder))
+	// Bottom border with trailing newline (synthetic — no source mapping, zero-length source range)
+	bottomLen := len([]rune(bottomBorder)) + 1 // +1 for trailing newline
 	spans = append(spans, rich.Span{
-		Text:  bottomBorder,
+		Text:  bottomBorder + "\n",
 		Style: borderStyle,
 	})
 	entries = append(entries, SourceMapEntry{

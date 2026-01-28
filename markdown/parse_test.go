@@ -2933,7 +2933,7 @@ func TestParseSimpleTable(t *testing.T) {
 				// Data row
 				{text: "│ 1   │ 2   │\n", table: true, tableHeader: false, code: true, block: true},
 				// Bottom border
-				{text: "└─────┴─────┘", table: true, tableHeader: false, code: true, block: true},
+				{text: "└─────┴─────┘\n", table: true, tableHeader: false, code: true, block: true},
 			},
 		},
 		{
@@ -2959,7 +2959,7 @@ func TestParseSimpleTable(t *testing.T) {
 				{text: "│ foo  │ 1     │\n", table: true, tableHeader: false, code: true, block: true},
 				{text: "│ bar  │ 2     │\n", table: true, tableHeader: false, code: true, block: true},
 				// Bottom border
-				{text: "└──────┴───────┘", table: true, tableHeader: false, code: true, block: true},
+				{text: "└──────┴───────┘\n", table: true, tableHeader: false, code: true, block: true},
 			},
 		},
 	}

@@ -1086,16 +1086,27 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, offset image.Point, frameWidth, frameHeight int) {
 	// Find the background color and left indent from a block-styled box on this line
 	var bgColor color.Color
-	leftIndent := 0
+	leftIndent := -1 // -1 means "not found yet"
 	for _, pb := range line.Boxes {
 		if pb.Box.Style.Block && pb.Box.Style.Bg != nil {
 			bgColor = pb.Box.Style.Bg
-			leftIndent = pb.X // Use the box's X position as the left edge
+			// Only use this box's X if it's not a newline. Newline boxes on
+			// blank lines are positioned at X=0, but the background should
+			// still respect the code block indent.
+			if !pb.Box.IsNewline() {
+				leftIndent = pb.X
+			}
 			break
 		}
 	}
 	if bgColor == nil {
 		return
+	}
+
+	// If we didn't find a valid indent (blank line with only a newline box),
+	// compute the expected code block indent from font metrics.
+	if leftIndent < 0 {
+		leftIndent = f.computeCodeBlockIndent()
 	}
 
 	bgImg := f.allocColorImage(bgColor)
@@ -1119,6 +1130,19 @@ func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, of
 	}
 
 	target.Draw(bgRect, bgImg, nil, image.ZP)
+}
+
+// computeCodeBlockIndent returns the expected left indent for code blocks,
+// computed from font metrics (CodeBlockIndentChars * M-width of code font).
+func (f *frameImpl) computeCodeBlockIndent() int {
+	font := f.font
+	if f.codeFont != nil {
+		font = f.codeFont
+	}
+	if font == nil {
+		return CodeBlockIndent // Fallback to default constant
+	}
+	return CodeBlockIndentChars * font.BytesWidth([]byte("M"))
 }
 
 // drawBoxBackgroundTo draws the background color for a positioned box.

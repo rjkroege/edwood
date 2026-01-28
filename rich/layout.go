@@ -351,13 +351,13 @@ func findBlockRegions(lines []Line) []BlockRegion {
 
 // lineBlockKind determines the block kind of a line based on its boxes.
 // Returns the kind and true if the line is a block element, or false if it's
-// normal text. A line is considered a block element if any of its non-newline
-// boxes have a block style.
+// normal text. A line is considered a block element if any of its boxes
+// (including newlines) have a block style. This ensures blank lines within
+// code blocks are included in block regions.
 func lineBlockKind(line *Line) (BlockKind, bool) {
 	for _, pb := range line.Boxes {
-		if pb.Box.IsNewline() {
-			continue
-		}
+		// Don't skip newlines - blank lines in code blocks only have a newline
+		// box but should still be considered part of the code block region.
 		if pb.Box.Style.Block && pb.Box.Style.Code {
 			return BlockCode, true
 		}
@@ -413,6 +413,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 	xPos := 0
 	pendingParaBreak := false // Track if we just had a paragraph break
 	currentListIndent := 0    // Track current list indentation level for wrapped lines
+	actualLineHeight := 0     // Track actual max height of content boxes on current line
 
 	for i := range boxes {
 		box := &boxes[i]
@@ -428,6 +429,11 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			}
 		}
 
+		// Track actual content height (for non-newline, non-tab boxes)
+		if !box.IsNewline() && !box.IsTab() && boxHeight > actualLineHeight {
+			actualLineHeight = boxHeight
+		}
+
 		if boxHeight > currentLine.Height {
 			currentLine.Height = boxHeight
 		}
@@ -439,18 +445,29 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				Box: *box,
 				X:   xPos,
 			})
+
+			// Use actual content height if we had content, otherwise use inherited height
+			if actualLineHeight > 0 {
+				currentLine.Height = actualLineHeight
+			}
 			lines = append(lines, currentLine)
 
-			// Calculate Y offset (just the line height for now)
+			// Calculate Y offset based on the finalized line height
 			yOffset := currentLine.Height
 
-			// Start new line
+			// Start new line with height based on the newline's style
+			// This ensures code blocks use code font height, not default font height
+			nextLineHeight := getFontHeight(box.Style)
+			if nextLineHeight == 0 {
+				nextLineHeight = defaultFontHeight
+			}
 			currentLine = Line{
 				Y:      currentLine.Y + yOffset,
-				Height: defaultFontHeight,
+				Height: nextLineHeight,
 			}
 			xPos = 0
 			currentListIndent = 0 // Reset list indent on explicit newline
+			actualLineHeight = 0  // Reset for next line
 
 			// Mark that we have a pending paragraph break if this newline is a para break
 			if box.Style.ParaBreak {
@@ -465,6 +482,11 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			fontHeight := getFontHeight(box.Style)
 			currentLine.Y += fontHeight / 2
 			pendingParaBreak = false
+		} else if xPos == 0 && box.Style.Scale > 1.0 && currentLine.Y > 0 && !box.IsTab() {
+			// Add half-height spacing before headings (Scale > 1.0 indicates H1, H2, H3, etc.)
+			// This ensures headers have visual separation from preceding content
+			fontHeight := getFontHeight(box.Style)
+			currentLine.Y += fontHeight / 2
 		}
 
 		// Calculate indentation for this box
@@ -518,6 +540,10 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 
 			if width <= effectiveFrameWidth {
 				// Box fits on new line, start new line
+				// Use actual content height if available
+				if actualLineHeight > 0 {
+					currentLine.Height = actualLineHeight
+				}
 				lines = append(lines, currentLine)
 				currentLine = Line{
 					Y:      currentLine.Y + currentLine.Height,
@@ -525,6 +551,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 				}
 				// Maintain indentation on wrapped lines
 				xPos = currentIndent
+				actualLineHeight = 0 // Reset for new line
 
 				// Recalculate tab width at new position
 				if box.IsTab() {

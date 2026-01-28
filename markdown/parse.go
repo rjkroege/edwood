@@ -1896,9 +1896,9 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 		}
 	}
 
-	// Bottom border (no trailing newline — it's the last element)
+	// Bottom border with trailing newline to properly end the table block
 	spans = append(spans, rich.Span{
-		Text:  bottomBorder,
+		Text:  bottomBorder + "\n",
 		Style: borderStyle,
 	})
 
