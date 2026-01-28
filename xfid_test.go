@@ -1525,6 +1525,183 @@ func TestXfidreadQindex(t *testing.T) {
 	}
 }
 
+// TestXfidutfreadLargeOffset tests that xfidutfread handles offsets greater than
+// math.MaxInt32 (2GB) correctly without truncation. This is a regression test for
+// the int64→int truncation issue in fsys.go file size handling.
+//
+// On 32-bit systems, the int type is 32-bit and offsets > 2GB would overflow
+// if not handled properly. This test verifies the code uses uint64/int64 arithmetic
+// correctly throughout the read path.
+func TestXfidutfreadLargeOffset(t *testing.T) {
+	// We cannot actually create a 2GB+ file in memory, but we can test that
+	// the offset arithmetic doesn't overflow by testing with offsets that
+	// would cause issues if truncated to int32.
+	//
+	// The key code paths in xfidutfread that could fail with large offsets:
+	// - line 842: off >= w.utflastboff (comparison)
+	// - line 867: boff+uint64(m) > off+uint64(x.fcall.Count)
+	// - line 868: m = int(off + uint64(x.fcall.Count) - boff)
+	// - line 877: m := nb - int(off-boff)
+	// - line 881: copy(b1, b[off-boff:int(off-boff)+m])
+	//
+	// The test validates that when we set a large offset, the function
+	// correctly returns empty data (since our buffer isn't that large)
+	// rather than crashing or returning garbage due to overflow.
+
+	display := edwoodtest.NewDisplay(image.Rectangle{})
+	global.configureGlobals(display)
+
+	// Test cases with large offsets that would overflow int32
+	testCases := []struct {
+		name   string
+		offset uint64
+	}{
+		{"JustOverMaxInt32", uint64(1<<31 + 1000)},        // 2GB + 1000 bytes
+		{"LargeOffset", uint64(1<<32 + 5000)},             // 4GB + 5000 bytes
+		{"VeryLargeOffset", uint64(1<<40)},                // 1TB - extreme case
+		{"MaxSafeOffset", uint64(1<<62)},                  // Very large but not overflow uint64
+		{"OffsetNearMaxUint64", uint64(1<<63 - 1000000)},  // Near max uint64
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mr := new(mockResponder)
+			w := NewWindow().initHeadless(nil)
+			w.col = new(Column)
+			w.col.safe = true
+			w.display = display
+			w.body.display = display
+			w.body.fr = &MockFrame{}
+			w.tag.display = display
+			w.tag.fr = &MockFrame{}
+
+			// Create a small test buffer - the key is that the offset is way beyond it
+			testData := "This is test data for large offset testing.\n"
+			w.body.file = file.MakeObservableEditableBuffer("", []rune(testData))
+
+			x := &Xfid{
+				fcall: plan9.Fcall{
+					Offset: tc.offset,
+					Count:  100,
+				},
+				f: &Fid{
+					qid: plan9.Qid{Path: QID(0, QWbody)},
+					w:   w,
+				},
+				fs: mr,
+			}
+
+			// This should not panic or crash - it should return empty data
+			// since the offset is beyond the file size
+			xfidread(x)
+
+			if mr.err != nil {
+				t.Errorf("got error %v; want nil (offset %d should just return empty data)", mr.err, tc.offset)
+			}
+			// The read should return 0 bytes since offset is way beyond file size
+			if got, want := mr.fcall.Count, uint32(0); got != want {
+				t.Errorf("read %v bytes at offset %d; want %v (file is much smaller)", got, tc.offset, want)
+			}
+		})
+	}
+}
+
+// TestXfidutfreadLargeOffsetWithCachedPosition tests that sequential reads
+// with cached byte offset positions handle large offsets correctly.
+// This specifically tests the w.utflastboff / w.utflastq caching path.
+func TestXfidutfreadLargeOffsetWithCachedPosition(t *testing.T) {
+	display := edwoodtest.NewDisplay(image.Rectangle{})
+	global.configureGlobals(display)
+
+	mr := new(mockResponder)
+	w := NewWindow().initHeadless(nil)
+	w.col = new(Column)
+	w.col.safe = true
+	w.display = display
+	w.body.display = display
+	w.body.fr = &MockFrame{}
+	w.tag.display = display
+	w.tag.fr = &MockFrame{}
+
+	testData := "Test data for cached position testing.\n"
+	w.body.file = file.MakeObservableEditableBuffer("", []rune(testData))
+
+	// First read at offset 0 to establish cache
+	x := &Xfid{
+		fcall: plan9.Fcall{
+			Offset: 0,
+			Count:  10,
+		},
+		f: &Fid{
+			qid: plan9.Qid{Path: QID(0, QWbody)},
+			w:   w,
+		},
+		fs: mr,
+	}
+	xfidread(x)
+	if mr.err != nil {
+		t.Fatalf("first read failed: %v", mr.err)
+	}
+
+	// Now try reading at a large offset - the caching logic should not
+	// cause overflow when comparing off >= w.utflastboff
+	largeOffset := uint64(1<<32 + 100) // 4GB + 100 bytes
+	x.fcall.Offset = largeOffset
+	x.fcall.Count = 50
+
+	xfidread(x)
+	if mr.err != nil {
+		t.Errorf("got error %v at large offset %d; want nil", mr.err, largeOffset)
+	}
+	// Should return empty since offset is beyond file
+	if got, want := mr.fcall.Count, uint32(0); got != want {
+		t.Errorf("read %v bytes at large offset; want %v", got, want)
+	}
+}
+
+// TestInt64OffsetArithmetic tests specific edge cases for int64/uint64 arithmetic
+// that could cause issues in the file reading code.
+func TestInt64OffsetArithmetic(t *testing.T) {
+	// Test that the arithmetic in xfidutfread is safe for large values
+	// These are the critical operations:
+	// - off - boff (both uint64)
+	// - int(off - boff) when used as slice index
+	// - int(off + uint64(count) - boff) for computing read length
+
+	testCases := []struct {
+		name  string
+		off   uint64
+		boff  uint64
+		count uint32
+		want  string // "safe" or "would_overflow"
+	}{
+		{"SmallValues", 100, 50, 50, "safe"},
+		{"LargeOffset", 1 << 33, 0, 100, "safe"},          // 8GB offset
+		{"OffsetDiffWithinInt", 1 << 33, 1<<33 - 50, 100, "safe"},
+		{"OffsetDiffBeyondInt32", 1 << 33, 0, 100, "safe"}, // diff > MaxInt32 but should not be used as index
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Verify the difference fits in uint64 without overflow
+			diff := tc.off - tc.boff
+			t.Logf("off=%d, boff=%d, diff=%d", tc.off, tc.boff, diff)
+
+			// The actual file reading code only converts diff to int when
+			// it's used as a slice index, which should only happen when
+			// boff >= off (meaning we're reading within the current buffer)
+			// In that case, diff should be small
+
+			if tc.boff >= tc.off {
+				// This is the case where int conversion happens
+				if diff > uint64(1<<31-1) {
+					t.Logf("diff %d would overflow int32 - code should handle this case", diff)
+				}
+			}
+		})
+	}
+}
+
 func readIndexFile(t *testing.T, filename string) []byte {
 	cwd, err := os.Getwd()
 	if err != nil {

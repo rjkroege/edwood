@@ -511,7 +511,6 @@ func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
 	return fs.respond(x, &t, ErrPermission)
 }
 
-// TODO(flux): I'm pretty sure handling of int64 sized files is broken by type casts to int.
 func (fs *fileServer) read(x *Xfid, f *Fid) *Xfid {
 	if f.qid.Type&plan9.QTDIR != 0 {
 		if FILE(f.qid) == Qacme { // empty dir

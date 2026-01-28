@@ -440,9 +440,8 @@ func xfidwrite(x *Xfid) {
 	//x.fcall.Data[x.fcall.Count] = 0; // null-terminate. unneeded
 	switch qid {
 	case Qcons:
-		global.row.lk.Lock()
+		// errorwin handles row locking internally
 		w = errorwin(x.f.mntdir, 'X')
-		global.row.lk.Unlock()
 		updateText(&w.body)
 
 	case Qlabel:
@@ -866,7 +865,11 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		if boff >= off {
 			m := len(b)
 			if boff+uint64(m) > off+uint64(x.fcall.Count) {
-				m = int(off + uint64(x.fcall.Count) - boff)
+				// Compute the number of bytes to copy. The difference
+				// off + count - boff is guaranteed to be small here since
+				// boff >= off and we're limiting to x.fcall.Count bytes.
+				diff := off + uint64(x.fcall.Count) - boff
+				m = int(diff)
 			}
 			copy(b1[n:], []byte(b[:m]))
 			n += m
@@ -875,11 +878,16 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 				if n != 0 {
 					util.AcmeError("bad count in utfrune", nil)
 				}
-				m := nb - int(off-boff)
+				// off - boff is the byte offset into the current buffer b.
+				// Since boff + nb > off (we're in this branch), and nb is at most
+				// BUFSIZE, the difference off - boff must be less than BUFSIZE,
+				// which fits safely in an int.
+				delta := off - boff
+				m := nb - int(delta)
 				if m > int(x.fcall.Count) {
 					m = int(x.fcall.Count)
 				}
-				copy(b1, b[off-boff:int(off-boff)+m])
+				copy(b1, b[delta:delta+uint64(m)])
 				n += m
 			}
 		}
