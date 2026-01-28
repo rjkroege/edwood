@@ -63,9 +63,10 @@ const (
 // When the renderer encounters this rune, it draws a horizontal line instead of text.
 const HRuleRune = '\u2500' // ─ (BOX DRAWINGS LIGHT HORIZONTAL)
 
-// InlineCodeBg is the light gray background for inline code spans.
-// Uses RGB values around 230 for a subtle but visible distinction.
-var InlineCodeBg = color.RGBA{R: 230, G: 230, B: 230, A: 255}
+// InlineCodeBg is the light gray background for inline code spans and
+// fenced code blocks. Light enough that the Darkyellow (0xEEEE9E)
+// selection highlight is clearly visible against it.
+var InlineCodeBg = color.RGBA{R: 245, G: 245, B: 245, A: 255}
 
 // Common styles
 var (

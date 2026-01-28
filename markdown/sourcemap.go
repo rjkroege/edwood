@@ -194,6 +194,13 @@ func (sm *SourceMap) sourceRuneToRendered(e *SourceMapEntry, srcRunePos int) int
 // ParseWithSourceMap parses markdown and returns the styled content,
 // a source map for mapping rendered positions back to source positions,
 // and a link map for tracking which rendered positions contain links.
+//
+// TODO: This function duplicates the inline formatting logic from
+// parseInlineFormatting in parse.go (via parseInlineWithSourceMap and
+// parseInlineWithSourceMapNoLinks). The two copies have diverged,
+// causing bugs where fixes to one are missed in the other. Refactor to
+// share a single inline-parsing implementation that optionally produces
+// source map entries.
 func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	if text == "" {
 		return rich.Content{}, &SourceMap{}, NewLinkMap()
@@ -945,7 +952,7 @@ func parseInlineWithSourceMap(text string, baseStyle rich.Style, sourceOffset, r
 					Text: codeText,
 					Style: rich.Style{
 						Fg:    baseStyle.Fg,
-						Bg:    baseStyle.Bg,
+						Bg:    rich.InlineCodeBg,
 						Code:  true,
 						Scale: baseStyle.Scale,
 					},
@@ -1150,7 +1157,7 @@ func parseInlineWithSourceMapNoLinks(text string, baseStyle rich.Style, sourceOf
 					Text: codeText,
 					Style: rich.Style{
 						Fg:    baseStyle.Fg,
-						Bg:    baseStyle.Bg,
+						Bg:    rich.InlineCodeBg,
 						Code:  true,
 						Link:  baseStyle.Link,
 						Scale: baseStyle.Scale,
