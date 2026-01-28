@@ -596,13 +596,22 @@ func (rt *RichText) ScrollWheel(up bool) int {
 		return 0
 	}
 
-	// Get visual line information from the frame
-	lineCount := rt.frame.TotalLines()
+	// Get per-line pixel heights and line start runes
+	lineHeights := rt.frame.LinePixelHeights()
 	lineStarts := rt.frame.LineStartRunes()
-	maxLines := rt.frame.MaxLines()
+	if len(lineHeights) == 0 {
+		return 0
+	}
+
+	// Compute total pixel height
+	totalPixelHeight := 0
+	for _, h := range lineHeights {
+		totalPixelHeight += h
+	}
+	frameHeight := rt.frame.Rect().Dy()
 
 	// If all content fits, no scrolling needed
-	if lineCount <= maxLines {
+	if totalPixelHeight <= frameHeight {
 		return 0
 	}
 

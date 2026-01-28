@@ -2,10 +2,15 @@ package main
 
 import (
 	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/edwoodtest"
+	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/rich"
 )
 
@@ -1670,5 +1675,182 @@ func TestRichTextWithImageCachePassedToFrame(t *testing.T) {
 		t.Error("Cached entry should not be nil")
 	} else if cached.Err == nil {
 		t.Error("Expected error in cached entry for nonexistent file")
+	}
+}
+
+// TestImageWidthEndToEnd is an integration test that exercises the full pipeline:
+// 1. Parse markdown with width tag → Content with ImageWidth set
+// 2. Layout with image cache → boxes sized to explicit width
+// 3. Rendering path → draw operations emitted without panic
+func TestImageWidthEndToEnd(t *testing.T) {
+	// Create a temporary directory with a test PNG image (400x200 pixels)
+	tmpDir := t.TempDir()
+	imgPath := filepath.Join(tmpDir, "photo.png")
+	img := image.NewRGBA(image.Rect(0, 0, 400, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 400; x++ {
+			img.Set(x, y, color.RGBA{R: 0, G: 128, B: 255, A: 255})
+		}
+	}
+	f, err := os.Create(imgPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode test PNG: %v", err)
+	}
+	f.Close()
+
+	// Step 1: Parse markdown with width tag
+	md := "![Photo](" + imgPath + " \"width=200px\")\n"
+	content := markdown.Parse(md)
+
+	// Verify parsing: find the image span and check ImageWidth
+	foundImage := false
+	for _, span := range content {
+		if span.Style.Image {
+			foundImage = true
+			if span.Style.ImageWidth != 200 {
+				t.Errorf("parsed ImageWidth = %d, want 200", span.Style.ImageWidth)
+			}
+			if span.Style.ImageURL != imgPath {
+				t.Errorf("parsed ImageURL = %q, want %q", span.Style.ImageURL, imgPath)
+			}
+		}
+	}
+	if !foundImage {
+		t.Fatal("markdown.Parse did not produce an image span")
+	}
+
+	// Step 2: Set up RichText with image cache and render
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	cache := rich.NewImageCache(10)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+		WithRichTextImageCache(cache),
+	)
+
+	rt.SetContent(content)
+
+	renderRect := image.Rect(0, 0, 600, 400)
+	rt.Render(renderRect)
+
+	// Step 3: Verify the image was loaded into the cache
+	cached, ok := cache.Get(imgPath)
+	if !ok {
+		t.Fatal("image was not loaded into cache during layout")
+	}
+	if cached.Err != nil {
+		t.Fatalf("image cache error: %v", cached.Err)
+	}
+	if cached.Width != 400 || cached.Height != 200 {
+		t.Errorf("cached image dimensions = %dx%d, want 400x200", cached.Width, cached.Height)
+	}
+
+	// Step 4: Verify draw operations occurred (rendering didn't panic)
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Error("Render() did not produce any draw operations")
+	}
+
+	// Step 5: Redraw and verify it still works
+	display.(edwoodtest.GettableDrawOps).Clear()
+	rt.Redraw()
+
+	ops = display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Error("Redraw() did not produce any draw operations")
+	}
+}
+
+// TestImageWidthEndToEndNoWidthTag verifies that an image without a width tag
+// renders at its natural size through the full pipeline.
+func TestImageWidthEndToEndNoWidthTag(t *testing.T) {
+	// Create a temporary directory with a test PNG image (100x80 pixels)
+	tmpDir := t.TempDir()
+	imgPath := filepath.Join(tmpDir, "small.png")
+	img := image.NewRGBA(image.Rect(0, 0, 100, 80))
+	for y := 0; y < 80; y++ {
+		for x := 0; x < 100; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	f, err := os.Create(imgPath)
+	if err != nil {
+		t.Fatalf("failed to create test PNG: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode test PNG: %v", err)
+	}
+	f.Close()
+
+	// Parse markdown without width tag
+	md := "![Small](" + imgPath + ")\n"
+	content := markdown.Parse(md)
+
+	// Verify ImageWidth is 0 (natural size)
+	for _, span := range content {
+		if span.Style.Image {
+			if span.Style.ImageWidth != 0 {
+				t.Errorf("parsed ImageWidth = %d, want 0 (natural size)", span.Style.ImageWidth)
+			}
+		}
+	}
+
+	// Render through RichText
+	displayRect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(displayRect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	scrBg, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palebluegreen)
+	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	cache := rich.NewImageCache(10)
+
+	rt := NewRichText()
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+		WithScrollbarColors(scrBg, scrThumb),
+		WithRichTextImageCache(cache),
+	)
+
+	rt.SetContent(content)
+
+	renderRect := image.Rect(0, 0, 600, 400)
+	rt.Render(renderRect)
+
+	// Verify image loaded at natural size
+	cached, ok := cache.Get(imgPath)
+	if !ok {
+		t.Fatal("image was not loaded into cache during layout")
+	}
+	if cached.Err != nil {
+		t.Fatalf("image cache error: %v", cached.Err)
+	}
+	if cached.Width != 100 || cached.Height != 80 {
+		t.Errorf("cached image dimensions = %dx%d, want 100x80", cached.Width, cached.Height)
+	}
+
+	// Verify rendering succeeded
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Error("Render() did not produce any draw operations")
 	}
 }
