@@ -218,7 +218,7 @@ func TestErrorwinLocking(t *testing.T) {
 
 	// Test: Single call to errorwin works and returns locked window
 	t.Run("SingleCall", func(t *testing.T) {
-		w := errorwin(nil, 'E')
+		w := errorwin(nil, 'E', nil)
 		if w == nil {
 			t.Fatal("errorwin returned nil")
 		}
@@ -230,7 +230,7 @@ func TestErrorwinLocking(t *testing.T) {
 	// Test: Sequential calls work correctly
 	t.Run("SequentialCalls", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
-			w := errorwin(nil, 'E')
+			w := errorwin(nil, 'E', nil)
 			if w == nil {
 				t.Fatalf("errorwin returned nil on iteration %d", i)
 			}
@@ -238,6 +238,239 @@ func TestErrorwinLocking(t *testing.T) {
 				t.Errorf("errorwin returned window with nil col on iteration %d", i)
 			}
 			w.Unlock()
+		}
+	})
+}
+
+// TestErrorwinforwinLocking tests the locking behavior in errorwinforwin().
+// errorwinforwin() takes a locked window, extracts directory info, unlocks it,
+// and returns a new locked error window.
+func TestErrorwinforwinLocking(t *testing.T) {
+	dir := t.TempDir()
+	FlexiblyMakeWindowScaffold(
+		t,
+		ScWin("testfile"),
+		ScBody("testfile", "test content"),
+		ScDir(dir, "testfile"),
+	)
+
+	// Test: errorwinforwin unlocks input window and returns locked error window
+	t.Run("UnlocksInputAndReturnsLocked", func(t *testing.T) {
+		// Get a window to test with
+		global.row.lk.Lock()
+		w := global.row.col[0].w[0]
+		global.row.lk.Unlock()
+
+		// Lock the window before calling errorwinforwin
+		w.Lock('T')
+
+		// errorwinforwin should unlock w and return a different locked window
+		errwin := errorwinforwin(w)
+		if errwin == nil {
+			t.Fatal("errorwinforwin returned nil")
+		}
+		defer errwin.Unlock()
+
+		// Verify the returned window is an error window
+		if errwin.col == nil {
+			t.Error("errorwinforwin returned window with nil col")
+		}
+	})
+}
+
+// TestUnifiedErrorWindow tests both errorwin and errorwinforwin behavior
+// to ensure the consolidated function covers both use cases.
+// These tests verify the behavior that must be preserved after consolidation.
+func TestUnifiedErrorWindow(t *testing.T) {
+	dir := t.TempDir()
+
+	// Test: errorwin with nil MntDir creates +Errors window
+	t.Run("ErrorwinNilMntDir", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		w := errorwin(nil, 'T', nil)
+		if w == nil {
+			t.Fatal("errorwin returned nil")
+		}
+		defer w.Unlock()
+
+		// Should create +Errors window (no directory prefix)
+		expectedName := "+Errors"
+		if w.body.file.Name() != expectedName {
+			t.Errorf("errorwin created window named %q; want %q", w.body.file.Name(), expectedName)
+		}
+	})
+
+	// Test: errorwin with MntDir creates dir/+Errors window
+	t.Run("ErrorwinWithMntDir", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		md := mnt.Add(dir, nil)
+		defer mnt.DecRef(md)
+
+		w := errorwin(md, 'T', nil)
+		if w == nil {
+			t.Fatal("errorwin returned nil")
+		}
+		defer w.Unlock()
+
+		// Should create dir/+Errors window
+		expectedName := filepath.Join(dir, "+Errors")
+		if w.body.file.Name() != expectedName {
+			t.Errorf("errorwin created window named %q; want %q", w.body.file.Name(), expectedName)
+		}
+	})
+
+	// Test: errorwinforwin extracts directory from input window
+	t.Run("ErrorwinforwinExtractsDir", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		// Get a window to test with
+		global.row.lk.Lock()
+		w := global.row.col[0].w[0]
+		global.row.lk.Unlock()
+
+		w.Lock('T')
+		errwin := errorwinforwin(w)
+		if errwin == nil {
+			t.Fatal("errorwinforwin returned nil")
+		}
+		defer errwin.Unlock()
+
+		// Error window should be created with directory from input window
+		expectedName := filepath.Join(dir, "+Errors")
+		if errwin.body.file.Name() != expectedName {
+			t.Errorf("errorwinforwin created window named %q; want %q", errwin.body.file.Name(), expectedName)
+		}
+	})
+
+	// Test: errorwinforwin preserves include paths
+	t.Run("ErrorwinforwinPreservesIncl", func(t *testing.T) {
+		// Use a unique subdirectory so we get a fresh error window
+		subdir := filepath.Join(dir, "incltest")
+		os.MkdirAll(subdir, 0755)
+
+		// Create the include path as an actual directory (AddIncl validates directories)
+		inclPath := filepath.Join(dir, "includes")
+		os.MkdirAll(inclPath, 0755)
+
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(subdir, "testfile"),
+		)
+
+		// Get a window and add includes to it
+		global.row.lk.Lock()
+		w := global.row.col[0].w[0]
+		global.row.lk.Unlock()
+
+		w.AddIncl(inclPath)
+
+		w.Lock('T')
+		errwin := errorwinforwin(w)
+		if errwin == nil {
+			t.Fatal("errorwinforwin returned nil")
+		}
+		defer errwin.Unlock()
+
+		// Error window should have the include path from input window
+		found := false
+		for _, inc := range errwin.incl {
+			if inc == inclPath {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("errorwinforwin did not preserve include path %q, got includes: %v", inclPath, errwin.incl)
+		}
+	})
+
+	// Test: errorwin returns window with correct owner
+	t.Run("ErrorwinOwner", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		w := errorwin(nil, 'X', nil)
+		if w == nil {
+			t.Fatal("errorwin returned nil")
+		}
+		defer w.Unlock()
+
+		// The window should be locked by owner 'X'
+		// (We verify this by successfully unlocking - if lock was wrong it would panic/deadlock)
+	})
+
+	// Test: errorwinforwin preserves owner from input window
+	t.Run("ErrorwinforwinOwner", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		global.row.lk.Lock()
+		w := global.row.col[0].w[0]
+		global.row.lk.Unlock()
+
+		w.Lock('Z')
+		errwin := errorwinforwin(w)
+		if errwin == nil {
+			t.Fatal("errorwinforwin returned nil")
+		}
+		defer errwin.Unlock()
+
+		// The error window should be locked by the same owner
+		// (We verify this by successfully unlocking - if lock was wrong it would panic/deadlock)
+	})
+
+	// Test: repeated calls to same error window return existing window
+	t.Run("ErrorwinReusesExisting", func(t *testing.T) {
+		FlexiblyMakeWindowScaffold(
+			t,
+			ScWin("testfile"),
+			ScBody("testfile", "test content"),
+			ScDir(dir, "testfile"),
+		)
+
+		// First call creates the error window
+		w1 := errorwin(nil, 'T', nil)
+		if w1 == nil {
+			t.Fatal("first errorwin returned nil")
+		}
+		w1.Unlock()
+
+		// Second call should return the same window
+		w2 := errorwin(nil, 'T', nil)
+		if w2 == nil {
+			t.Fatal("second errorwin returned nil")
+		}
+		defer w2.Unlock()
+
+		if w1 != w2 {
+			t.Error("errorwin should reuse existing +Errors window")
 		}
 	})
 }

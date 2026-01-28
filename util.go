@@ -85,19 +85,33 @@ func errorwin1(dir string, incl []string) *Window {
 	return w
 }
 
-// make new window, if necessary; return with it locked
-func errorwin(md *MntDir, owner int) *Window {
-	var w *Window
+// errorwin creates or finds an error window and returns it locked.
+// If srcWin is non-nil, extracts directory and includes from it
+// (srcWin must be locked; it will be unlocked before returning).
+// If srcWin is nil, uses md for directory and includes.
+func errorwin(md *MntDir, owner int, srcWin *Window) *Window {
+	var (
+		dir  string
+		incl []string
+		w    *Window
+	)
+
+	if srcWin != nil {
+		// Extract info from source window and unlock it
+		dir = srcWin.body.DirName("")
+		incl = append(incl, srcWin.incl...)
+		owner = srcWin.owner
+		srcWin.Unlock()
+	} else if md != nil {
+		dir = md.dir
+		incl = md.incl
+	}
 
 	for {
 		// Hold row lock during errorwin1 and window locking to ensure
 		// consistent access to global.row.col. Lock ordering: row -> window.
 		global.row.lk.Lock()
-		if md == nil {
-			w = errorwin1("", nil)
-		} else {
-			w = errorwin1(md.dir, md.incl)
-		}
+		w = errorwin1(dir, incl)
 		w.Lock(owner)
 		global.row.lk.Unlock()
 
@@ -110,36 +124,12 @@ func errorwin(md *MntDir, owner int) *Window {
 	return w
 }
 
-// Incoming window should be locked.
-// It will be unlocked and returned window
-// will be locked in its place.
+// errorwinforwin creates an error window for the given window's directory.
+// The incoming window must be locked; it will be unlocked and the returned
+// error window will be locked in its place.
+// Deprecated: Use errorwin(nil, 0, w) instead.
 func errorwinforwin(w *Window) *Window {
-	var (
-		owner int
-		incl  []string
-		t     *Text
-	)
-
-	t = &w.body
-	dir := t.DirName("")
-	incl = append(incl, w.incl...)
-	owner = w.owner
-	w.Unlock()
-	for {
-		// Hold row lock during errorwin1 and window locking to ensure
-		// consistent access to global.row.col. Lock ordering: row -> window.
-		global.row.lk.Lock()
-		w = errorwin1(dir, incl)
-		w.Lock(owner)
-		global.row.lk.Unlock()
-
-		if w.col != nil {
-			break
-		}
-		// window deleted too fast
-		w.Unlock()
-	}
-	return w
+	return errorwin(nil, 0, w)
 }
 
 // Heuristic city.
@@ -232,7 +222,7 @@ func flushwarnings() {
 		owner int
 	)
 	for _, warn := range localWarnings {
-		w = errorwin(warn.md, 'E')
+		w = errorwin(warn.md, 'E', nil)
 		t = &w.body
 		owner = w.owner
 		if owner == 0 {
