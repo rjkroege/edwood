@@ -219,6 +219,18 @@ type AdjustedBlockRegion struct {
 	HasScrollbar bool // True if this region overflows and needs a horizontal scrollbar
 	ScrollbarY   int  // Y position of the scrollbar (bottom of the block region, after adjustment)
 	RegionTopY   int  // Y position of the top of the block region (first line's Y)
+	LeftIndent   int  // X pixel offset where block content starts (scrollbar left edge)
+}
+
+// blockLeftIndent returns the X position of the first block-styled box on the
+// given line, which is the left indent of the block content area.
+func blockLeftIndent(line *Line) int {
+	for _, pb := range line.Boxes {
+		if pb.Box.Style.Block || pb.Box.Style.Table || pb.Box.IsImage() {
+			return pb.X
+		}
+	}
+	return 0
 }
 
 // adjustLayoutForScrollbars performs pass 2 of the two-pass layout.
@@ -260,10 +272,11 @@ func adjustLayoutForScrollbars(lines []Line, regions []BlockRegion, frameWidth, 
 		}
 	}
 
-	// Record the top Y of each region from the adjusted line positions.
+	// Record the top Y and left indent of each region from the adjusted line positions.
 	for i := range adjusted {
 		if adjusted[i].StartLine < len(lines) {
 			adjusted[i].RegionTopY = lines[adjusted[i].StartLine].Y
+			adjusted[i].LeftIndent = blockLeftIndent(&lines[adjusted[i].StartLine])
 		}
 	}
 
@@ -286,9 +299,10 @@ func computeScrollbarMetadata(lines []Line, regions []BlockRegion, frameWidth, s
 			lastLine := lines[r.EndLine-1]
 			adjusted[i].ScrollbarY = lastLine.Y + lastLine.Height
 		}
-		// RegionTopY is the first line's Y.
+		// RegionTopY and LeftIndent from the first line.
 		if r.StartLine < len(lines) {
 			adjusted[i].RegionTopY = lines[r.StartLine].Y
+			adjusted[i].LeftIndent = blockLeftIndent(&lines[r.StartLine])
 		}
 	}
 	return adjusted

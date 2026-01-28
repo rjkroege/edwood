@@ -1298,10 +1298,10 @@ func (w *Window) previewHScrollLatch(rt *RichText, mc *draw.Mousectl, button int
 			break
 		}
 
-		// Clamp X and lock Y to center of scrollbar band.
+		// Clamp X to scrollbar bounds and lock Y to center of scrollbar band.
 		mx := mc.Mouse.Point.X
-		if mx < frameRect.Min.X {
-			mx = frameRect.Min.X
+		if mx < barRect.Min.X {
+			mx = barRect.Min.X
 		}
 		if mx >= frameRect.Max.X {
 			mx = frameRect.Max.X

@@ -387,3 +387,49 @@ Same structure via `previewHScrollLatch(rt, mc, button, regionIndex)`:
    minimum thumb height. Should use the same (10px minimum thumb width)
    for horizontal.
    Answer: Sure, that's a good start
+
+## Scrollbar Left Indent (Gutter)
+
+### Problem
+
+The horizontal scrollbar spans the full frame width, starting at X=0.
+This means the left gutter area (to the left of the code block content)
+is part of the scrollbar, so vertical swipe gestures in that area are
+captured by horizontal scrollbar hit-testing instead of scrolling
+vertically.
+
+### Design
+
+Limit the horizontal scrollbar to the block content area. Code blocks
+are indented by `codeBlockIndent` pixels (4 × code font M-width,
+typically ~40px). The scrollbar should start at that indent, leaving a
+gutter on the left where vertical scroll gestures pass through.
+
+### Changes
+
+1. **Add `LeftIndent` to `AdjustedBlockRegion`** (`rich/layout.go`):
+   New `int` field recording the X pixel offset where block content
+   starts. Populated in both `adjustLayoutForScrollbars` and
+   `computeScrollbarMetadata` by scanning `lines[StartLine].Boxes` for
+   the first block-styled box's X position (same logic as
+   `drawBlockBackgroundTo`).
+
+2. **Update `drawHScrollbarsTo`** (`rich/frame.go`): Scrollbar
+   background and thumb start at `offset.X + ar.LeftIndent`. Scrollbar
+   width becomes `frameWidth - ar.LeftIndent`. Thumb calculations use
+   this narrower width.
+
+3. **Update `HScrollBarAt`** (`rich/frame.go`): Hit-test X range
+   changes from `[0, frameWidth)` to `[ar.LeftIndent, frameWidth)`.
+
+4. **Update `HScrollBarRect`** (`rich/frame.go`): Returned rectangle's
+   `Min.X` changes from `f.rect.Min.X` to
+   `f.rect.Min.X + ar.LeftIndent`.
+
+5. **Update `HScrollClick`** (`rich/frame.go`): Click proportion uses
+   `relX` relative to `ar.LeftIndent` and divides by scrollbar width
+   (`frameWidth - ar.LeftIndent`) instead of `frameWidth`.
+
+6. **Update `previewHScrollLatch`** (`wind.go`): X clamping uses
+   `barRect.Min.X` (which now reflects indent) instead of
+   `frameRect.Min.X`.

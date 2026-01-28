@@ -3466,17 +3466,18 @@ func TestHScrollbarThumbPosition(t *testing.T) {
 	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, frameWidth)
 	opsAtZero := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// Find the thumb rect (should be the narrower draw in the scrollbar area,
-	// not the full-width background). The thumb is the second draw op in the area.
+	// Find the thumb rect (the narrowest draw in the scrollbar area).
+	// The background spans the full scrollbar width; the thumb is narrower.
 	thumbXAtZero := -1
+	thumbWidthAtZero := frameWidth + 1
 	for _, op := range opsAtZero {
 		r, ok := extractDrawRect(op)
 		if !ok {
 			continue
 		}
-		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < frameWidth {
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < thumbWidthAtZero {
 			thumbXAtZero = r.Min.X
-			break
+			thumbWidthAtZero = r.Dx()
 		}
 	}
 
@@ -3491,14 +3492,15 @@ func TestHScrollbarThumbPosition(t *testing.T) {
 	opsAtHalf := display.(edwoodtest.GettableDrawOps).DrawOps()
 
 	thumbXAtHalf := -1
+	thumbWidthAtHalf := frameWidth + 1
 	for _, op := range opsAtHalf {
 		r, ok := extractDrawRect(op)
 		if !ok {
 			continue
 		}
-		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < frameWidth {
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < thumbWidthAtHalf {
 			thumbXAtHalf = r.Min.X
-			break
+			thumbWidthAtHalf = r.Dx()
 		}
 	}
 

@@ -810,6 +810,19 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 		return f.GetHScrollOrigin(ri)
 	}
 
+	// leftIndentForLine returns the LeftIndent for a line in a scrollable block
+	// region, or 0 if the line is not in one.
+	leftIndentForLine := func(lineIdx int) int {
+		if lineIdx < 0 || lineIdx >= len(lineRegion) {
+			return 0
+		}
+		ri := lineRegion[lineIdx]
+		if ri < 0 {
+			return 0
+		}
+		return adjustedRegions[ri].LeftIndent
+	}
+
 	// Phase 1: Draw block-level backgrounds (full line width for fenced code blocks)
 	// This must happen first so text appears on top.
 	// Block backgrounds remain full-width and unshifted by horizontal scroll.
@@ -956,6 +969,31 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 			shiftedPB := pb
 			shiftedPB.X -= hOff
 			f.drawImageTo(target, shiftedPB, line, offset, frameWidth, frameHeight)
+		}
+	}
+
+	// Phase 5b: Repaint gutter for scrollable block regions.
+	// When horizontally scrolled, text may render to the left of the block's
+	// LeftIndent. Repaint the gutter column [0, LeftIndent) with the frame
+	// background to clip any overflow.
+	for lineIdx, line := range lines {
+		if line.Y >= frameHeight {
+			break
+		}
+		indent := leftIndentForLine(lineIdx)
+		if indent <= 0 || hOffsetForLine(lineIdx) <= 0 {
+			continue
+		}
+		gutterRect := image.Rect(
+			offset.X,
+			offset.Y+line.Y,
+			offset.X+indent,
+			offset.Y+line.Y+line.Height,
+		)
+		clipRect := image.Rect(offset.X, offset.Y, offset.X+frameWidth, offset.Y+frameHeight)
+		gutterRect = gutterRect.Intersect(clipRect)
+		if !gutterRect.Empty() {
+			target.Draw(gutterRect, f.background, f.background, image.ZP)
 		}
 	}
 
@@ -1572,8 +1610,8 @@ func (f *frameImpl) HScrollBarAt(pt image.Point) (regionIndex int, ok bool) {
 		if !ar.HasScrollbar {
 			continue
 		}
-		// Scrollbar rectangle: [0, frameWidth) x [ScrollbarY, ScrollbarY+scrollbarHeight)
-		if relX >= 0 && relX < frameWidth &&
+		// Scrollbar rectangle: [LeftIndent, frameWidth) x [ScrollbarY, ScrollbarY+scrollbarHeight)
+		if relX >= ar.LeftIndent && relX < frameWidth &&
 			relY >= ar.ScrollbarY && relY < ar.ScrollbarY+scrollbarHeight {
 			return i, true
 		}
@@ -1594,7 +1632,7 @@ func (f *frameImpl) HScrollBarRect(regionIndex int) image.Rectangle {
 		return image.Rectangle{}
 	}
 	return image.Rect(
-		f.rect.Min.X,
+		f.rect.Min.X+ar.LeftIndent,
 		f.rect.Min.Y+ar.ScrollbarY,
 		f.rect.Max.X,
 		f.rect.Min.Y+ar.ScrollbarY+scrollbarHeight,
@@ -1624,14 +1662,19 @@ func (f *frameImpl) HScrollClick(button int, pt image.Point, regionIndex int) {
 	}
 
 	// Compute click X proportion within the scrollbar (0.0 = left edge, 1.0 = right edge).
-	relX := pt.X - f.rect.Min.X
+	// The scrollbar starts at ar.LeftIndent, not at X=0.
+	scrollbarWidth := frameWidth - ar.LeftIndent
+	if scrollbarWidth <= 0 {
+		return
+	}
+	relX := pt.X - f.rect.Min.X - ar.LeftIndent
 	if relX < 0 {
 		relX = 0
 	}
-	if relX > frameWidth {
-		relX = frameWidth
+	if relX > scrollbarWidth {
+		relX = scrollbarWidth
 	}
-	clickProportion := float64(relX) / float64(frameWidth)
+	clickProportion := float64(relX) / float64(scrollbarWidth)
 
 	currentOffset := f.GetHScrollOrigin(regionIndex)
 	var newOffset int
@@ -1689,10 +1732,11 @@ func (f *frameImpl) PointInBlockRegion(pt image.Point) (regionIndex int, ok bool
 		if !ar.HasScrollbar {
 			continue
 		}
-		// Block region spans [0, frameWidth) x [RegionTopY, ScrollbarY + scrollbarHeight).
+		// Block region spans [LeftIndent, frameWidth) x [RegionTopY, ScrollbarY + scrollbarHeight).
 		// The scrollbar is at the bottom; include it in the region.
+		// The gutter to the left of LeftIndent is excluded so vertical swipes pass through.
 		scrollbarHeight := 12 // Scrollwid
-		if relX >= 0 && relX < frameWidth &&
+		if relX >= ar.LeftIndent && relX < frameWidth &&
 			relY >= ar.RegionTopY && relY < ar.ScrollbarY+scrollbarHeight {
 			return i, true
 		}
@@ -1756,43 +1800,48 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			continue
 		}
 
-		// Draw scrollbar background: full width at ScrollbarY
+		// Scrollbar starts at the block's left indent, leaving a gutter
+		// on the left for vertical scroll gestures.
+		scrollbarLeft := ar.LeftIndent
+		scrollbarWidth := frameWidth - scrollbarLeft
+		if scrollbarWidth <= 0 {
+			continue
+		}
+
+		// Draw scrollbar background at ScrollbarY
 		bgImg := f.allocColorImage(HScrollBgColor)
 		if bgImg == nil {
 			continue
 		}
 		bgRect := image.Rect(
-			offset.X,
+			offset.X+scrollbarLeft,
 			offset.Y+ar.ScrollbarY,
 			offset.X+frameWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
 		target.Draw(bgRect, bgImg, bgImg, image.ZP)
 
-		// Compute thumb dimensions
-		// thumbWidth = max(10, (frameWidth / maxContentWidth) * frameWidth)
-		thumbWidth := (frameWidth * frameWidth) / maxContentWidth
+		// Compute thumb dimensions within the scrollbar width
+		thumbWidth := (scrollbarWidth * scrollbarWidth) / maxContentWidth
 		if thumbWidth < 10 {
 			thumbWidth = 10
 		}
-		if thumbWidth > frameWidth {
-			thumbWidth = frameWidth
+		if thumbWidth > scrollbarWidth {
+			thumbWidth = scrollbarWidth
 		}
 
-		// Compute thumb position
-		// maxScrollable = maxContentWidth - frameWidth
-		// thumbLeft = (hOffset / maxScrollable) * (frameWidth - thumbWidth)
+		// Compute thumb position within the scrollbar
 		maxScrollable := maxContentWidth - frameWidth
 		hOffset := f.GetHScrollOrigin(i)
 		thumbLeft := 0
 		if maxScrollable > 0 && hOffset > 0 {
-			thumbLeft = (hOffset * (frameWidth - thumbWidth)) / maxScrollable
+			thumbLeft = (hOffset * (scrollbarWidth - thumbWidth)) / maxScrollable
 		}
 		if thumbLeft < 0 {
 			thumbLeft = 0
 		}
-		if thumbLeft+thumbWidth > frameWidth {
-			thumbLeft = frameWidth - thumbWidth
+		if thumbLeft+thumbWidth > scrollbarWidth {
+			thumbLeft = scrollbarWidth - thumbWidth
 		}
 
 		// Draw thumb
@@ -1801,9 +1850,9 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			continue
 		}
 		thumbRect := image.Rect(
-			offset.X+thumbLeft,
+			offset.X+scrollbarLeft+thumbLeft,
 			offset.Y+ar.ScrollbarY,
-			offset.X+thumbLeft+thumbWidth,
+			offset.X+scrollbarLeft+thumbLeft+thumbWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
 		target.Draw(thumbRect, thumbImg, thumbImg, image.ZP)
