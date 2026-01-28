@@ -56,6 +56,11 @@ type Frame interface {
 	// Content queries
 	ImageURLAt(pos int) string // Returns image URL at position, or "" if not an image
 
+	// ExpandAtPos returns the expanded selection range for double-click.
+	// If pos is inside a code block (Block && Code), returns the full
+	// code block rune range. Otherwise returns word boundaries.
+	ExpandAtPos(pos int) (q0, q1 int)
+
 	// Font metrics
 	DefaultFontHeight() int // Height of the default font
 
@@ -437,6 +442,77 @@ func (f *frameImpl) ImageURLAt(pos int) string {
 	return ""
 }
 
+// ExpandAtPos returns the expanded selection range for a double-click at pos.
+// If pos is inside a code block (Block && Code), returns the rune range of the
+// entire contiguous code block. Otherwise returns word boundaries (alphanumeric
+// + underscore), matching acme's double-click behavior.
+func (f *frameImpl) ExpandAtPos(pos int) (q0, q1 int) {
+	q0, q1 = pos, pos
+
+	// Walk spans to find which span contains pos and its rune offset.
+	runeOffset := 0
+	spanIdx := -1
+	for i, s := range f.content {
+		sLen := len([]rune(s.Text))
+		if pos >= runeOffset && pos < runeOffset+sLen {
+			spanIdx = i
+			break
+		}
+		runeOffset += sLen
+	}
+	if spanIdx < 0 {
+		return q0, q1
+	}
+
+	span := f.content[spanIdx]
+
+	// If inside a fenced code block, select the entire contiguous block.
+	if span.Style.Block && span.Style.Code {
+		// Scan backward for contiguous Block && Code spans.
+		blockStart := runeOffset
+		for i := spanIdx - 1; i >= 0; i-- {
+			s := f.content[i]
+			if !(s.Style.Block && s.Style.Code) {
+				break
+			}
+			blockStart -= len([]rune(s.Text))
+		}
+		// Scan forward for contiguous Block && Code spans.
+		blockEnd := runeOffset
+		for i := spanIdx; i < len(f.content); i++ {
+			s := f.content[i]
+			if !(s.Style.Block && s.Style.Code) {
+				break
+			}
+			blockEnd += len([]rune(s.Text))
+		}
+		return blockStart, blockEnd
+	}
+
+	// If inside an inline code span, select the entire span.
+	if span.Style.Code {
+		return runeOffset, runeOffset + len([]rune(span.Text))
+	}
+
+	// Not in a code block: expand to word (alphanumeric + underscore).
+	plain := f.content.Plain()
+	q0 = pos
+	for q0 > 0 && isExpandWordChar(plain[q0-1]) {
+		q0--
+	}
+	q1 = pos
+	for q1 < len(plain) && isExpandWordChar(plain[q1]) {
+		q1++
+	}
+	return q0, q1
+}
+
+// isExpandWordChar returns true if the rune is part of a word for double-click
+// expansion (alphanumeric or underscore).
+func isExpandWordChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+}
+
 // Select handles mouse selection.
 // It takes the Mousectl for reading subsequent mouse events and the
 // initial mouse-down event. It tracks the mouse drag and returns the
@@ -706,14 +782,11 @@ func (f *frameImpl) Redraw() {
 	}
 
 	// Fill with background color
-	scratch.Draw(drawRect, f.background, f.background, image.ZP)
+	scratch.Draw(drawRect, f.background, nil, image.ZP)
 
-	// Draw selection highlight (before text so text appears on top)
-	if f.content != nil && f.font != nil && f.selectionColor != nil && f.p0 != f.p1 {
-		f.drawSelectionTo(scratch, drawOffset)
-	}
-
-	// Draw text if we have content, font, and text color
+	// Draw text (and selection) if we have content, font, and text color.
+	// Selection highlight is drawn inside drawTextTo after background phases
+	// so that code block and inline code backgrounds don't overwrite it.
 	if f.content != nil && f.font != nil && f.textColor != nil {
 		f.drawTextTo(scratch, drawOffset)
 	}
@@ -868,6 +941,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 		}
 	}
 
+	// Phase 2b: Draw selection highlight on top of backgrounds but under text.
+	// This must come after Phase 1 and Phase 2 so the highlight is not
+	// overwritten by code block or inline code backgrounds.
+	if f.selectionColor != nil && f.p0 != f.p1 {
+		f.drawSelectionTo(target, offset)
+	}
+
 	// Phase 3: Draw horizontal rules
 	for _, line := range lines {
 		// Skip lines that start at or below the frame bottom
@@ -993,7 +1073,7 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 		clipRect := image.Rect(offset.X, offset.Y, offset.X+frameWidth, offset.Y+frameHeight)
 		gutterRect = gutterRect.Intersect(clipRect)
 		if !gutterRect.Empty() {
-			target.Draw(gutterRect, f.background, f.background, image.ZP)
+			target.Draw(gutterRect, f.background, nil, image.ZP)
 		}
 	}
 
@@ -1038,7 +1118,7 @@ func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, of
 		return
 	}
 
-	target.Draw(bgRect, bgImg, bgImg, image.ZP)
+	target.Draw(bgRect, bgImg, nil, image.ZP)
 }
 
 // drawBoxBackgroundTo draws the background color for a positioned box.
@@ -1066,7 +1146,7 @@ func (f *frameImpl) drawBoxBackgroundTo(target edwooddraw.Image, pb PositionedBo
 		return
 	}
 
-	target.Draw(bgRect, bgImg, bgImg, image.ZP)
+	target.Draw(bgRect, bgImg, nil, image.ZP)
 }
 
 // HRuleColor is the gray color used for horizontal rule lines.
@@ -1100,7 +1180,7 @@ func (f *frameImpl) drawHorizontalRuleTo(target edwooddraw.Image, line Line, off
 		return
 	}
 
-	target.Draw(ruleRect, ruleImg, ruleImg, image.ZP)
+	target.Draw(ruleRect, ruleImg, nil, image.ZP)
 }
 
 // layoutFromOrigin returns the layout lines starting from the origin position.
@@ -1819,7 +1899,7 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			offset.X+frameWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
-		target.Draw(bgRect, bgImg, bgImg, image.ZP)
+		target.Draw(bgRect, bgImg, nil, image.ZP)
 
 		// Compute thumb dimensions within the scrollbar width
 		thumbWidth := (scrollbarWidth * scrollbarWidth) / maxContentWidth
@@ -1855,7 +1935,7 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			offset.X+scrollbarLeft+thumbLeft+thumbWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
-		target.Draw(thumbRect, thumbImg, thumbImg, image.ZP)
+		target.Draw(thumbRect, thumbImg, nil, image.ZP)
 	}
 }
 
