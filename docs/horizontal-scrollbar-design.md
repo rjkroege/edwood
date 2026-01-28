@@ -304,20 +304,32 @@ button is released, even if the cursor leaves the scrollbar area.
 ### Acme Pattern (from `scrl.go:101-166`)
 
 ```
-1. Initial scroll action
-2. Loop {
+1. x = center of scrollbar
+2. Initial scroll action
+3. Loop {
      flush display
-     clamp cursor to scrollbar bounds
-     recompute scroll from (clamped) cursor position
+     my = clamp(mouse.Y, scrollbar top, scrollbar bottom)
+     if mouse != (x, my):
+         display.MoveTo(x, my)   // WARP cursor back into scrollbar
+         mc.Read()               // absorb synthetic move event
+     recompute scroll from (x, my)
      redraw
      debounce: 200ms on first iteration, then ScrSleep(80ms)
      if button released → break
    }
-3. Drain remaining mouse events until all buttons released
+4. Drain remaining mouse events until all buttons released
 ```
 
-B2 (middle) tracks continuously per-event (live thumb drag). B1/B3 use
-timer-based debounce for auto-repeat scrolling while held.
+Key details:
+- The cursor is **physically warped** back into the scrollbar via
+  `display.MoveTo()` on every iteration. The user cannot move the
+  cursor out of the scrollbar while the button is held.
+- For the vertical scrollbar, X is locked to the center of the
+  scrollbar column and Y is clamped to the scrollbar's Y range.
+- The `MoveTo` call generates a synthetic mouse event which must be
+  absorbed by reading from the mouse channel.
+- B2 (middle) tracks continuously per-event (live thumb drag).
+  B1/B3 use timer-based debounce for auto-repeat scrolling.
 
 ### Implementation
 
@@ -325,10 +337,13 @@ timer-based debounce for auto-repeat scrolling while held.
 
 Replace the three single-shot `ScrollClick` calls with a call to a new
 `previewVScrollLatch(rt, mc, button, scrRect)` method that:
+- Computes `centerX = (scrRect.Min.X + scrRect.Max.X) / 2`
 - Performs initial `ScrollClick(button, mouse.Point)` + draw + flush
 - Loops reading from `mc.C`
 - Clamps mouse Y to `scrRect` bounds
-- Calls `ScrollClick(button, clampedPt)` each iteration
+- Warps cursor to `(centerX, clampedY)` via `display.MoveTo` if it
+  has moved away; absorbs the resulting synthetic mouse event
+- Calls `ScrollClick(button, warpedPt)` each iteration
 - B2: reads per-event (live thumb drag)
 - B1/B3: debounce with 200ms initial, then 80ms repeat (matching acme)
 - Breaks when `buttons & (1 << (button-1)) == 0`
@@ -337,8 +352,10 @@ Replace the three single-shot `ScrollClick` calls with a call to a new
 **Horizontal scrollbar** (`wind.go`, `HandlePreviewMouse`):
 
 Same structure via `previewHScrollLatch(rt, mc, button, regionIndex)`:
-- Uses X-axis clamping to frame bounds
-- Calls `HScrollClick(button, clampedPt, regionIndex)` each iteration
+- Computes `centerY` of the scrollbar band (from `hscrollRegions`)
+- Clamps mouse X to frame bounds
+- Warps cursor to `(clampedX, centerY)` via `display.MoveTo`
+- Calls `HScrollClick(button, warpedPt, regionIndex)` each iteration
 - Same debounce timing and break/drain logic
 
 **Debounce helper** (`previewScrSleep`): matches `ScrSleep` from

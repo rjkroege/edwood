@@ -62,6 +62,11 @@ type Frame interface {
 	// Horizontal scrollbar hit testing
 	HScrollBarAt(pt image.Point) (regionIndex int, ok bool)
 
+	// HScrollBarRect returns the screen-coordinate rectangle of the
+	// horizontal scrollbar for the given block region. Returns the zero
+	// rectangle if the region has no scrollbar.
+	HScrollBarRect(regionIndex int) image.Rectangle
+
 	// Horizontal scrollbar click handling (acme three-button semantics)
 	HScrollClick(button int, pt image.Point, regionIndex int)
 
@@ -1574,6 +1579,26 @@ func (f *frameImpl) HScrollBarAt(pt image.Point) (regionIndex int, ok bool) {
 		}
 	}
 	return 0, false
+}
+
+// HScrollBarRect returns the screen-coordinate rectangle of the horizontal
+// scrollbar for the given block region. Returns the zero rectangle if the
+// region index is out of range or the region has no scrollbar.
+func (f *frameImpl) HScrollBarRect(regionIndex int) image.Rectangle {
+	scrollbarHeight := 12 // Scrollwid
+	if regionIndex < 0 || regionIndex >= len(f.hscrollRegions) {
+		return image.Rectangle{}
+	}
+	ar := f.hscrollRegions[regionIndex]
+	if !ar.HasScrollbar {
+		return image.Rectangle{}
+	}
+	return image.Rect(
+		f.rect.Min.X,
+		f.rect.Min.Y+ar.ScrollbarY,
+		f.rect.Max.X,
+		f.rect.Min.Y+ar.ScrollbarY+scrollbarHeight,
+	)
 }
 
 // HScrollClick handles a mouse click on a horizontal scrollbar with acme
