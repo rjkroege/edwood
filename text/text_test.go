@@ -873,3 +873,474 @@ func TestAllTypesIndependent(t *testing.T) {
 		t.Error("SelectionManager should be modified independently")
 	}
 }
+
+// =============================================================================
+// Tests for DisplayManager (Phase 6C)
+// =============================================================================
+
+// TestDisplayManagerNew tests that NewDisplayManager creates a valid manager.
+func TestDisplayManagerNew(t *testing.T) {
+	dm := NewDisplayManager(nil)
+	if dm == nil {
+		t.Fatal("NewDisplayManager(nil) returned nil")
+	}
+
+	// Should create its own state
+	if dm.State() == nil {
+		t.Error("DisplayManager should have non-nil state")
+	}
+
+	// Test with provided state
+	state := NewDisplayState()
+	state.SetOrg(100)
+	dm = NewDisplayManager(state)
+	if dm.State() != state {
+		t.Error("DisplayManager should use provided state")
+	}
+	if dm.Org() != 100 {
+		t.Error("DisplayManager should reflect provided state's org")
+	}
+}
+
+// TestDisplayManagerBasicOps tests basic display operations.
+func TestDisplayManagerBasicOps(t *testing.T) {
+	dm := NewDisplayManager(nil)
+
+	// Initial state
+	if dm.Org() != 0 {
+		t.Errorf("initial org should be 0; got %d", dm.Org())
+	}
+	if dm.NeedsRedraw() {
+		t.Error("initial state should not need redraw")
+	}
+
+	// Set org
+	dm.SetOrg(100)
+	if dm.Org() != 100 {
+		t.Errorf("org should be 100; got %d", dm.Org())
+	}
+	if !dm.NeedsRedraw() {
+		t.Error("setting org should trigger redraw")
+	}
+
+	// Clear redraw
+	dm.ClearRedrawFlag()
+	if dm.NeedsRedraw() {
+		t.Error("redraw flag should be cleared")
+	}
+
+	// Set needs redraw explicitly
+	dm.SetNeedsRedraw(true)
+	if !dm.NeedsRedraw() {
+		t.Error("should need redraw after SetNeedsRedraw(true)")
+	}
+}
+
+// TestDisplayManagerOrgClamping tests that negative org values are clamped.
+func TestDisplayManagerOrgClamping(t *testing.T) {
+	dm := NewDisplayManager(nil)
+
+	dm.SetOrg(-10)
+	if dm.Org() != 0 {
+		t.Errorf("negative org should be clamped to 0; got %d", dm.Org())
+	}
+}
+
+// TestDisplayManagerCalculateVisibleRange tests visible range calculation.
+func TestDisplayManagerCalculateVisibleRange(t *testing.T) {
+	tests := []struct {
+		name   string
+		org    int
+		nchars int
+		want   Range
+	}{
+		{"zero org", 0, 100, Range{0, 100}},
+		{"non-zero org", 50, 100, Range{50, 150}},
+		{"zero nchars", 100, 0, Range{100, 100}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.CalculateVisibleRange(tc.nchars)
+			if got.Start != tc.want.Start || got.End != tc.want.End {
+				t.Errorf("CalculateVisibleRange(%d) = (%d, %d); want (%d, %d)",
+					tc.nchars, got.Start, got.End, tc.want.Start, tc.want.End)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerIsPositionVisible tests position visibility checking.
+func TestDisplayManagerIsPositionVisible(t *testing.T) {
+	tests := []struct {
+		name    string
+		org     int
+		nchars  int
+		pos     int
+		visible bool
+	}{
+		{"at start", 100, 50, 100, true},
+		{"in middle", 100, 50, 125, true},
+		{"at end (exclusive)", 100, 50, 150, false},
+		{"before start", 100, 50, 99, false},
+		{"after end", 100, 50, 151, false},
+		{"zero org visible", 0, 100, 50, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.IsPositionVisible(tc.pos, tc.nchars)
+			if got != tc.visible {
+				t.Errorf("IsPositionVisible(%d, %d) with org=%d = %v; want %v",
+					tc.pos, tc.nchars, tc.org, got, tc.visible)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerIsRangeVisible tests range visibility checking.
+func TestDisplayManagerIsRangeVisible(t *testing.T) {
+	tests := []struct {
+		name    string
+		org     int
+		nchars  int
+		r       Range
+		visible bool
+	}{
+		{"fully visible", 100, 50, Range{110, 140}, true},
+		{"overlaps start", 100, 50, Range{80, 120}, true},
+		{"overlaps end", 100, 50, Range{140, 160}, true},
+		{"contains visible", 100, 50, Range{80, 180}, true},
+		{"before visible", 100, 50, Range{50, 90}, false},
+		{"after visible", 100, 50, Range{160, 180}, false},
+		{"at end boundary", 100, 50, Range{150, 160}, false},
+		{"at start boundary", 100, 50, Range{90, 100}, false},
+		{"empty range at start", 100, 50, Range{100, 100}, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.IsRangeVisible(tc.r, tc.nchars)
+			if got != tc.visible {
+				t.Errorf("IsRangeVisible((%d, %d), %d) with org=%d = %v; want %v",
+					tc.r.Start, tc.r.End, tc.nchars, tc.org, got, tc.visible)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerIsRangeFullyVisible tests full range visibility checking.
+func TestDisplayManagerIsRangeFullyVisible(t *testing.T) {
+	tests := []struct {
+		name    string
+		org     int
+		nchars  int
+		r       Range
+		visible bool
+	}{
+		{"fully visible", 100, 50, Range{110, 140}, true},
+		{"at boundaries", 100, 50, Range{100, 150}, true},
+		{"overlaps start", 100, 50, Range{80, 120}, false},
+		{"overlaps end", 100, 50, Range{140, 160}, false},
+		{"extends both ends", 100, 50, Range{80, 180}, false},
+		{"empty at start", 100, 50, Range{100, 100}, true},
+		{"empty in middle", 100, 50, Range{125, 125}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.IsRangeFullyVisible(tc.r, tc.nchars)
+			if got != tc.visible {
+				t.Errorf("IsRangeFullyVisible((%d, %d), %d) with org=%d = %v; want %v",
+					tc.r.Start, tc.r.End, tc.nchars, tc.org, got, tc.visible)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerPositionToFrameOffset tests position to offset conversion.
+func TestDisplayManagerPositionToFrameOffset(t *testing.T) {
+	tests := []struct {
+		name   string
+		org    int
+		pos    int
+		offset int
+	}{
+		{"at origin", 100, 100, 0},
+		{"after origin", 100, 150, 50},
+		{"before origin", 100, 50, -1},
+		{"zero org", 0, 50, 50},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.PositionToFrameOffset(tc.pos)
+			if got != tc.offset {
+				t.Errorf("PositionToFrameOffset(%d) with org=%d = %d; want %d",
+					tc.pos, tc.org, got, tc.offset)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerFrameOffsetToPosition tests offset to position conversion.
+func TestDisplayManagerFrameOffsetToPosition(t *testing.T) {
+	tests := []struct {
+		name   string
+		org    int
+		offset int
+		pos    int
+	}{
+		{"zero offset", 100, 0, 100},
+		{"positive offset", 100, 50, 150},
+		{"zero org", 0, 50, 50},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			got := dm.FrameOffsetToPosition(tc.offset)
+			if got != tc.pos {
+				t.Errorf("FrameOffsetToPosition(%d) with org=%d = %d; want %d",
+					tc.offset, tc.org, got, tc.pos)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerBackNL tests backing up by newlines.
+func TestDisplayManagerBackNL(t *testing.T) {
+	tests := []struct {
+		name       string
+		text       string
+		startPos   int
+		nLines     int
+		wantPos    int
+		maxLineLen int
+	}{
+		{"back 0 lines from line start", "hello\nworld\n", 6, 0, 6, 128},
+		{"back 0 lines from mid line", "hello\nworld\n", 8, 0, 6, 128},
+		{"back 1 line", "hello\nworld\n", 12, 1, 6, 128},
+		{"back 2 lines", "hello\nworld\nfoo\n", 16, 2, 6, 128},
+		{"back from first line", "hello\nworld\n", 3, 1, 0, 128},
+		{"back beyond start", "hello\nworld\n", 3, 5, 0, 128},
+		{"empty text", "", 0, 1, 0, 128},
+		{"single char", "a", 1, 0, 0, 128},
+		{"long line truncated", "a" + string(make([]rune, 200)) + "\nb", 202, 1, 73, 128},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := dm.BackNL(tc.startPos, tc.nLines, charReader, tc.maxLineLen)
+			if got != tc.wantPos {
+				t.Errorf("BackNL(%d, %d) in %q = %d; want %d",
+					tc.startPos, tc.nLines, tc.text, got, tc.wantPos)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerAdjustOriginForExact tests origin adjustment for line boundaries.
+func TestDisplayManagerAdjustOriginForExact(t *testing.T) {
+	tests := []struct {
+		name    string
+		text    string
+		org     int
+		exact   bool
+		wantOrg int
+	}{
+		{"exact mode no change", "hello\nworld\n", 3, true, 3},
+		{"at line start", "hello\nworld\n", 6, false, 6},
+		{"mid line adjusts forward", "hello\nworld\n", 3, false, 6},
+		{"zero org unchanged", "hello\nworld\n", 0, false, 0},
+		{"negative org unchanged", "hello\nworld\n", -1, false, -1},
+		{"at newline", "hello\nworld\n", 5, false, 6},
+		{"no newline within 256", "a" + string(make([]rune, 300)), 1, false, 257},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := dm.AdjustOriginForExact(tc.org, tc.exact, charReader, len(textRunes))
+			if got != tc.wantOrg {
+				t.Errorf("AdjustOriginForExact(%d, %v) in %q = %d; want %d",
+					tc.org, tc.exact, tc.text, got, tc.wantOrg)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerCalculateNewOrigin tests new origin calculation for scrolling.
+func TestDisplayManagerCalculateNewOrigin(t *testing.T) {
+	tests := []struct {
+		name          string
+		text          string
+		org           int
+		targetPos     int
+		nchars        int
+		maxlines      int
+		quarterScroll bool
+		wantOrg       int
+	}{
+		// Target already visible - no change
+		{"target visible", "hello\nworld\nfoo\nbar\n", 0, 5, 20, 4, false, 0},
+		// Target at boundary but end of file
+		{"target at end of file", "hello", 0, 5, 5, 4, false, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+			dm.SetOrg(tc.org)
+			dm.ClearRedrawFlag()
+
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := dm.CalculateNewOrigin(tc.targetPos, tc.nchars, tc.maxlines, tc.quarterScroll, charReader, len(textRunes))
+			if got != tc.wantOrg {
+				t.Errorf("CalculateNewOrigin(%d, %d, %d, %v) with org=%d in %q = %d; want %d",
+					tc.targetPos, tc.nchars, tc.maxlines, tc.quarterScroll, tc.org, tc.text, got, tc.wantOrg)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerScrollDelta tests scroll delta calculation.
+func TestDisplayManagerScrollDelta(t *testing.T) {
+	tests := []struct {
+		name    string
+		org     int
+		delta   int
+		nchars  int
+		textLen int
+		wantOrg int
+	}{
+		{"zero delta", 100, 0, 50, 200, 100},
+		{"at end of file", 150, 1, 50, 200, 150},
+		{"scroll down needs calc", 100, 1, 50, 200, -1},
+		{"scroll up needs BackNL", 100, -1, 50, 200, -1},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dm := NewDisplayManager(nil)
+
+			got := dm.ScrollDelta(tc.org, tc.delta, tc.nchars, tc.textLen)
+			if got != tc.wantOrg {
+				t.Errorf("ScrollDelta(%d, %d, %d, %d) = %d; want %d",
+					tc.org, tc.delta, tc.nchars, tc.textLen, got, tc.wantOrg)
+			}
+		})
+	}
+}
+
+// TestDisplayManagerRoundTrip tests that frame offset conversions are inverses.
+func TestDisplayManagerRoundTrip(t *testing.T) {
+	dm := NewDisplayManager(nil)
+	dm.SetOrg(100)
+	dm.ClearRedrawFlag()
+
+	// Position -> Offset -> Position
+	origPos := 150
+	offset := dm.PositionToFrameOffset(origPos)
+	if offset < 0 {
+		t.Fatalf("position %d should have non-negative offset", origPos)
+	}
+	roundTrip := dm.FrameOffsetToPosition(offset)
+	if roundTrip != origPos {
+		t.Errorf("round trip: %d -> %d -> %d (expected %d)",
+			origPos, offset, roundTrip, origPos)
+	}
+}
+
+// TestDisplayManagerIntegration tests DisplayManager in a realistic scenario.
+func TestDisplayManagerIntegration(t *testing.T) {
+	dm := NewDisplayManager(nil)
+
+	// Simulate initial setup
+	dm.SetOrg(0)
+	if !dm.NeedsRedraw() {
+		t.Error("initial SetOrg should trigger redraw")
+	}
+	dm.ClearRedrawFlag()
+
+	// Simulate scrolling down
+	dm.SetOrg(100)
+	if !dm.NeedsRedraw() {
+		t.Error("scrolling should trigger redraw")
+	}
+	dm.ClearRedrawFlag()
+
+	// Check visibility with 50 chars visible
+	nchars := 50
+	if !dm.IsPositionVisible(100, nchars) {
+		t.Error("position at org should be visible")
+	}
+	if !dm.IsPositionVisible(149, nchars) {
+		t.Error("position just before end should be visible")
+	}
+	if dm.IsPositionVisible(150, nchars) {
+		t.Error("position at end should not be visible")
+	}
+
+	// Test range visibility
+	r := Range{Start: 90, End: 110}
+	if !dm.IsRangeVisible(r, nchars) {
+		t.Error("overlapping range should be visible")
+	}
+	if dm.IsRangeFullyVisible(r, nchars) {
+		t.Error("partially overlapping range should not be fully visible")
+	}
+
+	// Test frame offset conversion
+	offset := dm.PositionToFrameOffset(125)
+	if offset != 25 {
+		t.Errorf("offset should be 25; got %d", offset)
+	}
+}
