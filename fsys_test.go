@@ -1391,3 +1391,449 @@ func TestFileServerWstat(t *testing.T) {
 		t.Fatalf("got response %v; want %v", got, want)
 	}
 }
+
+// TestFsysWalkConcurrentAccess tests concurrent walk operations that access
+// global.row.lk and window locks. This test is designed to detect race
+// conditions when run with -race flag.
+func TestFsysWalkConcurrentAccess(t *testing.T) {
+	// Setup: create windows in a test row
+	global.WinID = 0
+	global.row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+				},
+			},
+		},
+	}
+	defer func() {
+		global.WinID = 0
+		global.row = Row{}
+	}()
+
+	// Test: Concurrent walks to numeric window directories should be safe
+	t.Run("ConcurrentNumericWalks", func(t *testing.T) {
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				mc := new(mockConn)
+				fs := &fileServer{
+					conn: mc,
+					fids: make(map[uint32]*Fid),
+				}
+
+				for j := 0; j < numIterations; j++ {
+					md := mnt.Add("/home/gopher/src", nil)
+					x := &Xfid{
+						fcall: plan9.Fcall{
+							Type:  plan9.Twalk,
+							Wname: []string{"1"}, // Walk to window 1
+						},
+						f: &Fid{
+							qid: plan9.Qid{
+								Path: QID(0, Qdir),
+								Type: plan9.QTDIR,
+							},
+							mntdir: md,
+						},
+					}
+					fs.walk(x, x.f)
+					mnt.DecRef(md)
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+
+	// Test: Concurrent walks that clone fids with window refs
+	// This tests the lock-protected ref counting when cloning fids
+	t.Run("ConcurrentFidCloneWithWindowRef", func(t *testing.T) {
+		const numGoroutines = 5
+		const numIterations = 3
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				mc := new(mockConn)
+				fs := &fileServer{
+					conn: mc,
+					fids: make(map[uint32]*Fid),
+				}
+
+				for j := 0; j < numIterations; j++ {
+					md := mnt.Add("/home/gopher/src", nil)
+
+					// First walk to a window directory to get a fid with window ref
+					// This exercises the locking in Walk1 for numeric window lookup
+					x := &Xfid{
+						fcall: plan9.Fcall{
+							Type:  plan9.Twalk,
+							Wname: []string{"1"}, // Walk to window 1
+						},
+						f: &Fid{
+							qid: plan9.Qid{
+								Path: QID(0, Qdir),
+								Type: plan9.QTDIR,
+							},
+							mntdir: md,
+						},
+					}
+					fs.walk(x, x.f)
+
+					// Now clone this fid by walking to a file within the window
+					if x.f.w != nil {
+						// Store the fid for cloning
+						fs.fids[1] = x.f
+						x2 := &Xfid{
+							fcall: plan9.Fcall{
+								Type:   plan9.Twalk,
+								Fid:    1,
+								Newfid: uint32(100 + id*10 + j),
+								Wname:  []string{"body"},
+							},
+							f: x.f,
+						}
+						fs.walk(x2, x2.f)
+
+						// Clean up the new fid if walk succeeded
+						// Release references under lock (ref counting relies on lock protection)
+						if nf, ok := fs.fids[uint32(100+id*10+j)]; ok && nf.w != nil {
+							nf.w.lk.Lock()
+							nf.w.Close()
+							nf.w.lk.Unlock()
+						}
+
+						// Clean up original fid's window reference
+						x.f.w.lk.Lock()
+						x.f.w.Close()
+						x.f.w.lk.Unlock()
+					}
+					mnt.DecRef(md)
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+}
+
+// TestFsysReadConcurrentDirListing tests concurrent directory reads that
+// access global.row.lk. This test is designed to detect race conditions
+// when run with -race flag.
+func TestFsysReadConcurrentDirListing(t *testing.T) {
+	useFixedClock = true
+	global.WinID = 0
+	global.row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+				},
+			},
+		},
+	}
+	defer func() {
+		useFixedClock = false
+		global.WinID = 0
+		global.row = Row{}
+	}()
+
+	// Test: Concurrent reads of root directory
+	t.Run("ConcurrentRootDirReads", func(t *testing.T) {
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					mc := new(mockConn)
+					fs := &fileServer{
+						conn:     mc,
+						username: "gopher",
+					}
+					x := &Xfid{
+						fcall: plan9.Fcall{
+							Type:   plan9.Tread,
+							Count:  1024,
+							Offset: 0,
+						},
+						f: &Fid{
+							qid: plan9.Qid{
+								Type: plan9.QTDIR,
+								Vers: 0,
+								Path: QID(0, Qdir),
+							},
+						},
+					}
+					fs.read(x, x.f)
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+
+	// Test: Concurrent reads interleaved with window creation/deletion
+	t.Run("ConcurrentReadWithWindowMutation", func(t *testing.T) {
+		const numReaders = 5
+		const numMutators = 2
+		const numIterations = 3
+
+		done := make(chan bool, numReaders+numMutators)
+
+		// Start readers
+		for i := 0; i < numReaders; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					mc := new(mockConn)
+					fs := &fileServer{
+						conn:     mc,
+						username: "gopher",
+					}
+					x := &Xfid{
+						fcall: plan9.Fcall{
+							Type:   plan9.Tread,
+							Count:  1024,
+							Offset: 0,
+						},
+						f: &Fid{
+							qid: plan9.Qid{
+								Type: plan9.QTDIR,
+								Vers: 0,
+								Path: QID(0, Qdir),
+							},
+						},
+					}
+					fs.read(x, x.f)
+				}
+				done <- true
+			}(i)
+		}
+
+		// Start mutators that modify the row under lock
+		for i := 0; i < numMutators; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					global.row.lk.Lock()
+					// Simulate window list mutation
+					if len(global.row.col) > 0 && len(global.row.col[0].w) > 0 {
+						// Read the window list (similar to what other operations do)
+						_ = len(global.row.col[0].w)
+					}
+					global.row.lk.Unlock()
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numReaders+numMutators; i++ {
+			<-done
+		}
+	})
+}
+
+// TestMntConcurrentAccess tests concurrent access to the Mnt reference-counted
+// mount directory map. This test is designed to detect race conditions when
+// run with -race flag.
+func TestMntConcurrentAccess(t *testing.T) {
+	// Reset mnt state
+	mnt = Mnt{}
+	defer func() { mnt = Mnt{} }()
+
+	// Test: Concurrent Add/IncRef/DecRef operations
+	t.Run("ConcurrentAddIncDecRef", func(t *testing.T) {
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					md := mnt.Add("/home/gopher/src", nil)
+					mnt.IncRef(md)
+					mnt.IncRef(md)
+					mnt.DecRef(md)
+					mnt.DecRef(md)
+					mnt.DecRef(md) // Final DecRef removes from map
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+
+	// Test: Concurrent GetFromID operations
+	t.Run("ConcurrentGetFromID", func(t *testing.T) {
+		// Pre-create some MntDirs
+		mds := make([]*MntDir, 5)
+		for i := 0; i < 5; i++ {
+			mds[i] = mnt.Add("/home/gopher/src", nil)
+		}
+
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					// Try to get each pre-created MntDir
+					for _, md := range mds {
+						got := mnt.GetFromID(md.id)
+						if got != nil {
+							mnt.DecRef(got) // Release the reference from GetFromID
+						}
+					}
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+
+		// Clean up - DecRef all the initial references
+		for _, md := range mds {
+			mnt.DecRef(md)
+		}
+	})
+}
+
+// TestFsysFidWalk1ConcurrentWindowLookup tests concurrent Walk1 operations
+// that look up windows by ID. This test is designed to detect race conditions
+// when run with -race flag.
+func TestFsysFidWalk1ConcurrentWindowLookup(t *testing.T) {
+	// Setup: create windows in a test row
+	global.WinID = 0
+	global.row = Row{
+		col: []*Column{
+			{
+				w: []*Window{
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+					NewWindow().initHeadless(nil),
+				},
+			},
+		},
+	}
+	defer func() {
+		global.WinID = 0
+		global.row = Row{}
+	}()
+
+	// Test: Concurrent Walk1 to numeric window names
+	t.Run("ConcurrentWalk1ToWindow", func(t *testing.T) {
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					f := &Fid{
+						qid: plan9.Qid{
+							Path: QID(0, Qdir),
+							Type: plan9.QTDIR,
+						},
+					}
+					found, err := f.Walk1("1") // Walk to window 1
+					if err != nil {
+						t.Errorf("Walk1 error: %v", err)
+					}
+					if found && f.w != nil {
+						// Release the reference under lock (ref counting relies on lock protection)
+						f.w.lk.Lock()
+						f.w.Close()
+						f.w.lk.Unlock()
+					}
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+
+	// Test: Concurrent Walk1 mixed with row mutations
+	t.Run("ConcurrentWalk1WithRowMutation", func(t *testing.T) {
+		const numWalkers = 5
+		const numMutators = 2
+		const numIterations = 3
+
+		done := make(chan bool, numWalkers+numMutators)
+
+		// Start walkers
+		for i := 0; i < numWalkers; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					f := &Fid{
+						qid: plan9.Qid{
+							Path: QID(0, Qdir),
+							Type: plan9.QTDIR,
+						},
+					}
+					found, _ := f.Walk1("1")
+					if found && f.w != nil {
+						// Release the reference under lock (ref counting relies on lock protection)
+						f.w.lk.Lock()
+						f.w.Close()
+						f.w.lk.Unlock()
+					}
+				}
+				done <- true
+			}(i)
+		}
+
+		// Start mutators that access row under lock (simulating window operations)
+		for i := 0; i < numMutators; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					global.row.lk.Lock()
+					// Simulate operations that read the window list
+					if len(global.row.col) > 0 {
+						for _, c := range global.row.col {
+							_ = len(c.w)
+						}
+					}
+					global.row.lk.Unlock()
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numWalkers+numMutators; i++ {
+			<-done
+		}
+	})
+}

@@ -169,6 +169,7 @@ func (fs *fileServer) fsysproc() {
 // Add creates a new MntDir and returns a new reference to it.
 func (mnt *Mnt) Add(dir string, incl []string) *MntDir {
 	mnt.lk.Lock()
+	defer mnt.lk.Unlock()
 	mnt.id++
 	m := &MntDir{
 		id:   mnt.id,
@@ -180,15 +181,14 @@ func (mnt *Mnt) Add(dir string, incl []string) *MntDir {
 		mnt.md = make(map[uint64]*MntDir)
 	}
 	mnt.md[m.id] = m
-	mnt.lk.Unlock()
 	return m
 }
 
 // IncRef increments reference to given MntDir.
 func (mnt *Mnt) IncRef(m *MntDir) {
 	mnt.lk.Lock()
+	defer mnt.lk.Unlock()
 	m.ref++
-	mnt.lk.Unlock()
 }
 
 // DecRef decrements reference to given MntDir.
@@ -428,15 +428,19 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 			id64, _ := strconv.ParseInt(wname, 10, 32)
 			id = int(id64)
 		}
+		// Look up window under row lock, then increment ref under window lock.
+		// This follows the lock ordering: row lock -> window lock.
 		global.row.lk.Lock()
-		f.w = global.row.LookupWin(id)
-		if f.w == nil {
+		w := global.row.LookupWin(id)
+		if w == nil {
 			global.row.lk.Unlock()
 			return false, nil
 		}
-		f.w.ref.Inc() // we'll drop reference at end if there's an error
+		w.lk.Lock()
 		global.row.lk.Unlock()
-
+		w.ref.Inc() // we'll drop reference at end if there's an error
+		w.lk.Unlock()
+		f.w = w
 		f.dir = dirtabw[0] // '.'
 		f.qid.Type = plan9.QTDIR
 		f.qid.Vers = 0
