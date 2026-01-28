@@ -270,6 +270,7 @@ func (rt *RichText) ScrollClick(button int, pt image.Point) int {
 }
 
 // scrollClickAt handles a click on the scrollbar using a given scroll rectangle.
+// Uses pixel heights so that lines containing images scroll correctly.
 func (rt *RichText) scrollClickAt(button int, pt image.Point, scrollRect image.Rectangle) int {
 	// If no content or frame, return 0
 	if rt.content == nil || rt.frame == nil {
@@ -281,13 +282,23 @@ func (rt *RichText) scrollClickAt(button int, pt image.Point, scrollRect image.R
 		return 0
 	}
 
-	// Get visual line information from the frame
-	lineCount := rt.frame.TotalLines()
+	// Get per-line pixel heights and line start runes
+	lineHeights := rt.frame.LinePixelHeights()
 	lineStarts := rt.frame.LineStartRunes()
-	maxLines := rt.frame.MaxLines()
+	lineCount := len(lineHeights)
+	if lineCount == 0 {
+		return 0
+	}
+
+	// Compute total pixel height and frame height
+	totalPixelHeight := 0
+	for _, h := range lineHeights {
+		totalPixelHeight += h
+	}
+	frameHeight := rt.frame.Rect().Dy()
 
 	// If all content fits, no scrolling needed
-	if lineCount <= maxLines {
+	if totalPixelHeight <= frameHeight {
 		return 0
 	}
 
@@ -306,81 +317,76 @@ func (rt *RichText) scrollClickAt(button int, pt image.Point, scrollRect image.R
 	}
 	clickProportion := float64(clickY) / float64(scrollHeight)
 
-	// Calculate the number of lines that can be scrolled
-	// (total lines minus the lines that fit in the visible area)
-	scrollableLines := lineCount - maxLines
-	if scrollableLines < 0 {
-		scrollableLines = 0
+	// Find current origin line
+	currentOrigin := rt.Origin()
+	currentLine := 0
+	for i, start := range lineStarts {
+		if currentOrigin >= start {
+			currentLine = i
+		} else {
+			break
+		}
 	}
 
 	var newOrigin int
 
 	switch button {
 	case 1:
-		// Button 1 (left): scroll up - move back by a number of lines based on click position
-		// Clicking higher in the scrollbar scrolls up more
-		linesToMove := int(float64(maxLines) * (1.0 - clickProportion))
-		if linesToMove < 1 {
-			linesToMove = 1
+		// Button 1 (left): scroll up by a screenful scaled by click position
+		pixelsToMove := int(float64(frameHeight) * (1.0 - clickProportion))
+		if pixelsToMove < 1 {
+			pixelsToMove = 1
 		}
 
-		// Find current line
-		currentOrigin := rt.Origin()
-		currentLine := 0
-		for i, start := range lineStarts {
-			if currentOrigin >= start {
-				currentLine = i
-			} else {
-				break
-			}
-		}
-
-		// Calculate new line
-		newLine := currentLine - linesToMove
-		if newLine < 0 {
-			newLine = 0
+		// Walk backwards from current line, summing pixel heights
+		newLine := currentLine
+		accumulated := 0
+		for newLine > 0 && accumulated < pixelsToMove {
+			newLine--
+			accumulated += lineHeights[newLine]
 		}
 
 		newOrigin = lineStarts[newLine]
 
 	case 2:
-		// Button 2 (middle): jump to absolute position based on click location
-		// The click proportion maps to the entire content range (all lines)
-		targetLine := int(float64(lineCount-1) * clickProportion)
-		if targetLine < 0 {
-			targetLine = 0
+		// Button 2 (middle): jump to absolute position
+		// Map click proportion to a target pixel offset, then find the line there
+		targetPixelY := int(float64(totalPixelHeight) * clickProportion)
+
+		targetLine := 0
+		accumulated := 0
+		for i, h := range lineHeights {
+			if accumulated+h > targetPixelY {
+				targetLine = i
+				break
+			}
+			accumulated += h
+			targetLine = i
 		}
+
 		if targetLine >= len(lineStarts) {
 			targetLine = len(lineStarts) - 1
 		}
 		newOrigin = lineStarts[targetLine]
 
 	case 3:
-		// Button 3 (right): scroll down - move forward by a number of lines based on click position
-		// Clicking lower in the scrollbar scrolls down more
-		linesToMove := int(float64(maxLines) * clickProportion)
-		if linesToMove < 1 {
-			linesToMove = 1
+		// Button 3 (right): scroll down by a screenful scaled by click position
+		pixelsToMove := int(float64(frameHeight) * clickProportion)
+		if pixelsToMove < 1 {
+			pixelsToMove = 1
 		}
 
-		// Find current line
-		currentOrigin := rt.Origin()
-		currentLine := 0
-		for i, start := range lineStarts {
-			if currentOrigin >= start {
-				currentLine = i
-			} else {
-				break
-			}
+		// Walk forwards from current line, summing pixel heights
+		newLine := currentLine
+		accumulated := 0
+		for newLine < lineCount-1 && accumulated < pixelsToMove {
+			accumulated += lineHeights[newLine]
+			newLine++
 		}
 
-		// Calculate new line (can't go past the last scrollable line)
-		newLine := currentLine + linesToMove
-		maxScrollLine := len(lineStarts) - 1
-		if newLine > maxScrollLine {
-			newLine = maxScrollLine
+		if newLine >= len(lineStarts) {
+			newLine = len(lineStarts) - 1
 		}
-
 		newOrigin = lineStarts[newLine]
 
 	default:
@@ -399,7 +405,8 @@ func (rt *RichText) scrThumbRect() image.Rectangle {
 
 // scrThumbRectAt computes thumb position for a given scrollbar rectangle.
 // The thumb position and size reflect the current scroll position and
-// the proportion of visible content to total content.
+// the proportion of visible content to total content, using pixel heights
+// so that lines containing images are properly accounted for.
 func (rt *RichText) scrThumbRectAt(scrollRect image.Rectangle) image.Rectangle {
 	// If no content or frame, fill the whole scrollbar
 	if rt.content == nil || rt.frame == nil {
@@ -408,35 +415,43 @@ func (rt *RichText) scrThumbRectAt(scrollRect image.Rectangle) image.Rectangle {
 
 	totalRunes := rt.content.Len()
 	if totalRunes == 0 {
-		// No content - thumb fills the whole scrollbar
 		return scrollRect
 	}
 
-	// Get scroll metrics from the frame using visual line counts
-	origin := rt.frame.GetOrigin()
-	maxLines := rt.frame.MaxLines()
-	lineCount := rt.frame.TotalLines()
+	// Get per-line pixel heights and line start runes
+	lineHeights := rt.frame.LinePixelHeights()
 	lineStarts := rt.frame.LineStartRunes()
+	if len(lineHeights) == 0 {
+		return scrollRect
+	}
 
+	// Compute total pixel height of all content
+	totalPixelHeight := 0
+	for _, h := range lineHeights {
+		totalPixelHeight += h
+	}
+
+	frameHeight := rt.frame.Rect().Dy()
 	scrollHeight := scrollRect.Dy()
 
-	// If all content fits, fill the scrollbar
-	if lineCount <= maxLines {
+	// If all content fits in the frame, fill the scrollbar
+	if totalPixelHeight <= frameHeight {
 		return scrollRect
 	}
 
-	// Calculate thumb height based on visible vs total lines
-	visibleProportion := float64(maxLines) / float64(lineCount)
+	// Thumb height: proportion of frame to total content, in pixels
+	visibleProportion := float64(frameHeight) / float64(totalPixelHeight)
 	if visibleProportion > 1.0 {
 		visibleProportion = 1.0
 	}
 
 	thumbHeight := int(float64(scrollHeight) * visibleProportion)
 	if thumbHeight < 10 {
-		thumbHeight = 10 // Minimum thumb height for usability
+		thumbHeight = 10
 	}
 
 	// Find which line the origin corresponds to
+	origin := rt.frame.GetOrigin()
 	originLine := 0
 	for i, start := range lineStarts {
 		if origin >= start {
@@ -446,33 +461,20 @@ func (rt *RichText) scrThumbRectAt(scrollRect image.Rectangle) image.Rectangle {
 		}
 	}
 
-	// Position proportion based on line position in the document
-	// Use (lineCount - 1) as denominator so that last line maps to bottom.
-	denominator := lineCount - 1
-	if denominator < 1 {
-		denominator = 1
-	}
-	posProportion := float64(originLine) / float64(denominator)
-	if posProportion > 1.0 {
-		posProportion = 1.0
+	// Compute pixel offset of the origin line
+	originPixelY := 0
+	for i := 0; i < originLine && i < len(lineHeights); i++ {
+		originPixelY += lineHeights[i]
 	}
 
-	// When viewing content near the end of the document (past ~70% of lines),
-	// adjust the position to ensure the thumb reaches the bottom.
-	// This ensures "near the end" positions map to "near the bottom" of scrollbar.
-	endThreshold := float64(lineCount) * 0.70 // 70% threshold
-	if float64(originLine) >= endThreshold {
-		// Map from [endThreshold, lineCount-1] to [currentProportion, 1.0]
-		// Scale faster toward 1.0 for end positions
-		linesBeyondThreshold := float64(originLine) - endThreshold
-		linesInEndRange := float64(lineCount-1) - endThreshold
-		if linesInEndRange > 0 {
-			// Linear approach to bottom - more aggressive than ease-out
-			normalizedPos := linesBeyondThreshold / linesInEndRange
-			// Remap: at normalizedPos 0.5, we want to be 90%+ of the way to the bottom
-			adjustment := normalizedPos * (1.0 - posProportion)
-			posProportion += adjustment
-		}
+	// Position proportion based on pixel offset
+	scrollablePixels := totalPixelHeight - frameHeight
+	if scrollablePixels < 1 {
+		scrollablePixels = 1
+	}
+	posProportion := float64(originPixelY) / float64(scrollablePixels)
+	if posProportion > 1.0 {
+		posProportion = 1.0
 	}
 
 	// Available space for thumb movement

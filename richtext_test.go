@@ -480,8 +480,10 @@ func TestScrollbarThumbMiddle(t *testing.T) {
 	rect := image.Rect(0, 0, 400, 300)
 	rt.Render(rect)
 
-	// Set origin to roughly halfway (line 15 = rune 75)
-	rt.SetOrigin(75)
+	// Set origin to roughly the middle of the scrollable range.
+	// 30 lines * 14px = 420px total, 300px frame → 120px scrollable.
+	// Middle of scrollable = 60px ≈ line 4 (56px). Line 4 = rune 20.
+	rt.SetOrigin(20)
 
 	display.(edwoodtest.GettableDrawOps).Clear()
 	rt.Redraw()

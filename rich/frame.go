@@ -45,8 +45,9 @@ type Frame interface {
 	GetOrigin() int
 	MaxLines() int
 	VisibleLines() int
-	TotalLines() int       // Total number of layout lines in the content
-	LineStartRunes() []int // Rune offset at the start of each visual line
+	TotalLines() int           // Total number of layout lines in the content
+	LineStartRunes() []int     // Rune offset at the start of each visual line
+	LinePixelHeights() []int   // Pixel height of each visual line (accounts for images)
 
 	// Rendering
 	Redraw()
@@ -612,6 +613,29 @@ func (f *frameImpl) LineStartRunes() []int {
 	}
 
 	return lineStarts
+}
+
+// LinePixelHeights returns the pixel height of each visual line.
+// For lines containing images, the height will be larger than the default font height.
+func (f *frameImpl) LinePixelHeights() []int {
+	if f.font == nil || f.content == nil {
+		return nil
+	}
+
+	boxes := contentToBoxes(f.content)
+	if len(boxes) == 0 {
+		return nil
+	}
+
+	frameWidth := f.rect.Dx()
+	maxtab := 8 * f.font.StringWidth("0")
+	lines := f.layoutBoxes(boxes, frameWidth, maxtab)
+
+	heights := make([]int, len(lines))
+	for i, line := range lines {
+		heights[i] = line.Height
+	}
+	return heights
 }
 
 // Redraw redraws the frame.
