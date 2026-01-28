@@ -1019,6 +1019,35 @@ func TestSourceMapToRenderedRoundTrip(t *testing.T) {
 	}
 }
 
+// TestSourceMapPointSelectionHeading verifies that a point selection (q0==q1)
+// in rendered content maps to a point selection in source, not a range.
+// Regression test for the bug where clicking in a heading in preview mode
+// produced a 3-character selection (spanning "## ") when exiting Markdeep.
+func TestSourceMapPointSelectionHeading(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		renderedPos int
+	}{
+		{"h1 start", "# Hello", 0},
+		{"h1 middle", "# Hello", 3},
+		{"h2 start", "## Hello", 0},
+		{"h2 middle", "## Hello", 2},
+		{"h3 start", "### Hello", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedPos)
+			if srcStart != srcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection (srcStart == srcEnd)",
+					tt.renderedPos, tt.renderedPos, srcStart, srcEnd)
+			}
+		})
+	}
+}
+
 // byteToRunePos converts a byte position in a string to a rune position.
 func byteToRunePos(s string, bytePos int) int {
 	if bytePos <= 0 {

@@ -1239,18 +1239,12 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		return
 	}
 
-	// Allocate selection highlight color (light blue, matching Acme's standard selection)
-	selImage, err := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x9EEEEEFF)
-	if err != nil {
-		warning(nil, "Markdeep: failed to allocate selection color: %v\n", err)
-		return
-	}
-
 	// Build RichText options
+	// Use the same selection highlight color as normal body text (Darkyellow)
 	rtOpts := []RichTextOption{
 		WithRichTextBackground(bgImage),
 		WithRichTextColor(textImage),
-		WithRichTextSelectionColor(selImage),
+		WithRichTextSelectionColor(global.textcolors[frame.ColHigh]),
 		WithScrollbarColors(global.textcolors[frame.ColBord], global.textcolors[frame.ColBack]),
 	}
 	if boldFont != nil {
@@ -1299,13 +1293,20 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 
 	rt.SetContent(content)
 
-	// Set the scroll origin to match the text body's current position
-	rt.SetOrigin(w.body.org)
-
 	// Set up the window's preview components
 	w.richBody = rt
 	w.SetPreviewSourceMap(sourceMap)
 	w.SetPreviewLinkMap(linkMap)
+
+	// Map the source cursor/selection position to the rendered position
+	// so the cursor appears in the corresponding place in the preview.
+	rendStart, rendEnd := sourceMap.ToRendered(w.body.q0, w.body.q1)
+	if rendStart >= 0 && rendEnd >= 0 {
+		rt.SetSelection(rendStart, rendEnd)
+	}
+
+	// Set the scroll origin to match the text body's current position
+	rt.SetOrigin(w.body.org)
 
 	// Enter preview mode
 	w.SetPreviewMode(true)

@@ -86,6 +86,15 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 		}
 	}
 
+	// A point selection in rendered content must map to a point in source.
+	// The srcStart and srcEnd formulas diverge for entries with PrefixLen > 0
+	// (e.g., headings where "## " is stripped): srcEnd accounts for PrefixLen
+	// but srcStart does not at entry boundaries. Normalize to srcEnd which
+	// correctly maps to the content position past the prefix.
+	if renderedStart == renderedEnd && srcStart != srcEnd {
+		srcStart = srcEnd
+	}
+
 	return srcStart, srcEnd
 }
 
