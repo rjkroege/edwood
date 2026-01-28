@@ -770,7 +770,7 @@ func TestXfidwriteQcons(t *testing.T) {
 	if got, want := mr.fcall.Count, uint32(len(data)); got != want {
 		t.Errorf("fcall.Count is %v; want %v", got, want)
 	}
-	w := errorwin(x.f.mntdir, 'X')
+	w := errorwin(x.f.mntdir, 'X', nil)
 	if got, want := w.body.file.String(), string(data); got != want {
 		t.Errorf("+Errors window body is %q; want %q", got, want)
 	}

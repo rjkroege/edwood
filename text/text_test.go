@@ -1943,3 +1943,409 @@ func TestEditingManagerFileWidth(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Tests for Text interface (Phase 6E)
+// These tests validate the Text interface and TextBase implementation.
+// =============================================================================
+
+// TestTextInterfaceImplementation verifies TextBase implements the Text interface.
+func TestTextInterfaceImplementation(t *testing.T) {
+	var _ Text = (*TextBase)(nil)
+	var _ Text = NewTextBase()
+}
+
+// TestTextBaseTextInterface tests that TextBase provides all Text interface methods.
+func TestTextBaseTextInterface(t *testing.T) {
+	tb := NewTextBase()
+
+	// Use as Text interface
+	var txt Text = tb
+
+	// Test selection accessors
+	txt.SetQ0(10)
+	txt.SetQ1(20)
+	if txt.Q0() != 10 {
+		t.Errorf("Q0 should be 10; got %d", txt.Q0())
+	}
+	if txt.Q1() != 20 {
+		t.Errorf("Q1 should be 20; got %d", txt.Q1())
+	}
+	if !txt.HasSelection() {
+		t.Error("should have selection when Q0 != Q1")
+	}
+	txt.ClearSelection()
+	if txt.HasSelection() {
+		t.Error("should not have selection after ClearSelection")
+	}
+
+	// Test display accessors
+	txt.SetOrg(100)
+	if txt.Org() != 100 {
+		t.Errorf("Org should be 100; got %d", txt.Org())
+	}
+	if !txt.NeedsRedraw() {
+		t.Error("should need redraw after SetOrg")
+	}
+	txt.ClearRedrawFlag()
+	if txt.NeedsRedraw() {
+		t.Error("should not need redraw after ClearRedrawFlag")
+	}
+	txt.SetNeedsRedraw(true)
+	if !txt.NeedsRedraw() {
+		t.Error("should need redraw after SetNeedsRedraw(true)")
+	}
+
+	// Test edit state accessors
+	txt.SetIQ1(50)
+	if txt.IQ1() != 50 {
+		t.Errorf("IQ1 should be 50; got %d", txt.IQ1())
+	}
+	txt.SetEQ0(25)
+	if txt.EQ0() != 25 {
+		t.Errorf("EQ0 should be 25; got %d", txt.EQ0())
+	}
+
+	// Test tab settings
+	txt.SetTabStop(8)
+	if txt.TabStop() != 8 {
+		t.Errorf("TabStop should be 8; got %d", txt.TabStop())
+	}
+	txt.SetTabExpand(true)
+	if !txt.TabExpand() {
+		t.Error("TabExpand should be true")
+	}
+
+	// Test fill control
+	txt.SetNoFill(true)
+	if !txt.NoFill() {
+		t.Error("NoFill should be true")
+	}
+}
+
+// TestTextBaseWithManagers tests using TextBase alongside manager types.
+func TestTextBaseWithManagers(t *testing.T) {
+	tb := NewTextBase()
+
+	// Create managers using TextBase's state components
+	sm := NewSelectionManager(tb.Selection)
+	dm := NewDisplayManager(tb.Display)
+	em := NewEditingManager(tb.Edit, tb.Selection)
+
+	// Changes through TextBase should be visible through managers
+	tb.SetQ0(10)
+	tb.SetQ1(20)
+	sel := sm.Selection()
+	if sel.Start != 10 || sel.End != 20 {
+		t.Errorf("SelectionManager should see (10, 20); got (%d, %d)", sel.Start, sel.End)
+	}
+
+	tb.SetOrg(100)
+	if dm.Org() != 100 {
+		t.Errorf("DisplayManager should see org=100; got %d", dm.Org())
+	}
+
+	tb.Edit.SetIQ1(50)
+	if em.IQ1() != 50 {
+		t.Errorf("EditingManager should see iq1=50; got %d", em.IQ1())
+	}
+
+	// Changes through managers should be visible through TextBase
+	sm.SetSelection(30, 40)
+	if tb.Q0() != 30 || tb.Q1() != 40 {
+		t.Errorf("TextBase should see (30, 40); got (%d, %d)", tb.Q0(), tb.Q1())
+	}
+
+	dm.SetOrg(200)
+	if tb.Org() != 200 {
+		t.Errorf("TextBase should see org=200; got %d", tb.Org())
+	}
+
+	em.SetIQ1(75)
+	if tb.IQ1() != 75 {
+		t.Errorf("TextBase should see iq1=75; got %d", tb.IQ1())
+	}
+}
+
+// TestTextBaseEditingScenario tests TextBase in an editing scenario.
+func TestTextBaseEditingScenario(t *testing.T) {
+	tb := NewTextBase()
+
+	// Simulate a text editing session
+	text := []rune("hello world")
+	charReader := func(pos int) rune {
+		if pos < 0 || pos >= len(text) {
+			return 0
+		}
+		return text[pos]
+	}
+
+	// Set up initial state
+	tb.SetOrg(0)
+	tb.SetQ0(11) // end of "world"
+	tb.SetQ1(11)
+	tb.SetTabStop(4)
+	tb.SetTabExpand(false)
+
+	// Create editing manager to use with TextBase's state
+	em := NewEditingManager(tb.Edit, tb.Selection)
+
+	// Test backspace width calculation
+	bsWidth := em.BsWidth(0x08, charReader)
+	if bsWidth != 1 {
+		t.Errorf("BsWidth for single char should be 1; got %d", bsWidth)
+	}
+
+	// Test word erase width - should erase "world"
+	wordWidth := em.BsWidth(0x17, charReader)
+	if wordWidth != 5 {
+		t.Errorf("BsWidth for word erase should be 5; got %d", wordWidth)
+	}
+
+	// Simulate selecting text
+	tb.SetQ0(6)
+	tb.SetQ1(11)
+	if !tb.HasSelection() {
+		t.Error("should have selection")
+	}
+
+	// Test that selection is visible through manager
+	if !em.HasSelection() {
+		t.Error("EditingManager should see selection")
+	}
+	if !em.InSelection(8) {
+		t.Error("position 8 should be in selection")
+	}
+}
+
+// TestTextBaseDisplayScenario tests TextBase in a display scenario.
+func TestTextBaseDisplayScenario(t *testing.T) {
+	tb := NewTextBase()
+	dm := NewDisplayManager(tb.Display)
+
+	// Simulate scrolling
+	tb.SetOrg(0)
+	tb.ClearRedrawFlag()
+
+	// Check visibility with 50 chars visible
+	nchars := 50
+
+	if !dm.IsPositionVisible(25, nchars) {
+		t.Error("position 25 should be visible with org=0 and 50 chars")
+	}
+
+	// Scroll down
+	tb.SetOrg(100)
+	if !tb.NeedsRedraw() {
+		t.Error("should need redraw after scrolling")
+	}
+
+	// Check visibility after scroll
+	if dm.IsPositionVisible(50, nchars) {
+		t.Error("position 50 should not be visible with org=100")
+	}
+	if !dm.IsPositionVisible(125, nchars) {
+		t.Error("position 125 should be visible with org=100 and 50 chars")
+	}
+
+	// Test range visibility
+	r := Range{Start: 90, End: 110}
+	if !dm.IsRangeVisible(r, nchars) {
+		t.Error("range (90, 110) should be partially visible with org=100")
+	}
+	if dm.IsRangeFullyVisible(r, nchars) {
+		t.Error("range (90, 110) should not be fully visible with org=100")
+	}
+}
+
+// TestTextBaseSelectionScenario tests TextBase in a selection scenario.
+func TestTextBaseSelectionScenario(t *testing.T) {
+	tb := NewTextBase()
+	sm := NewSelectionManager(tb.Selection)
+
+	text := []rune("func main() {\n\tfmt.Println(\"hello\")\n}")
+	textReader := func(start, end int) []rune {
+		if start < 0 {
+			start = 0
+		}
+		if end > len(text) {
+			end = len(text)
+		}
+		if start >= end {
+			return nil
+		}
+		return text[start:end]
+	}
+	charReader := func(pos int) rune {
+		if pos < 0 || pos >= len(text) {
+			return 0
+		}
+		return text[pos]
+	}
+
+	// Double-click to select word "main"
+	pos := 7 // position in "main"
+	wordRange := sm.ExpandToWord(pos, textReader)
+	if wordRange.Start != 5 || wordRange.End != 9 {
+		t.Errorf("word selection should be (5, 9); got (%d, %d)", wordRange.Start, wordRange.End)
+	}
+
+	// Apply selection to TextBase
+	tb.SetQ0(wordRange.Start)
+	tb.SetQ1(wordRange.End)
+	if !tb.HasSelection() {
+		t.Error("should have selection after word expand")
+	}
+
+	// Triple-click to select line
+	lineRange := sm.ExpandToLine(20, textReader) // position in second line
+	if lineRange.Start != 14 {
+		t.Errorf("line start should be 14; got %d", lineRange.Start)
+	}
+
+	// Test bracket matching - position inside parentheses "Println()"
+	// Position 27 is inside "hello", between the quotes
+	// ExpandToBrackets at position right after opening quote (pos 28) should match quotes
+	bracketRange := sm.ExpandToBrackets(28, len(text), textReader, charReader)
+	// Position 27 is the opening quote, position 33 is the closing quote
+	// When at position 28 (after opening quote), it should expand to content between quotes
+	if bracketRange.Start != 28 || bracketRange.End != 33 {
+		t.Errorf("quote match should be (28, 33); got (%d, %d)", bracketRange.Start, bracketRange.End)
+	}
+}
+
+// TestTextInterfacePolymorphism tests that Text interface can be used polymorphically.
+func TestTextInterfacePolymorphism(t *testing.T) {
+	// Create a TextBase and use it as Text interface
+	tb := NewTextBase()
+	tb.SetQ0(10)
+	tb.SetQ1(20)
+	tb.SetOrg(100)
+	tb.SetTabStop(8)
+
+	// Use as Text interface
+	var txt Text = tb
+
+	if txt.Q0() != 10 {
+		t.Errorf("Text.Q0() should be 10; got %d", txt.Q0())
+	}
+	if txt.Q1() != 20 {
+		t.Errorf("Text.Q1() should be 20; got %d", txt.Q1())
+	}
+	if txt.Org() != 100 {
+		t.Errorf("Text.Org() should be 100; got %d", txt.Org())
+	}
+	if txt.TabStop() != 8 {
+		t.Errorf("Text.TabStop() should be 8; got %d", txt.TabStop())
+	}
+	if !txt.HasSelection() {
+		t.Error("Text.HasSelection() should be true")
+	}
+}
+
+// TestTextBaseAdjustAfterInsert tests TextBase state adjustment after text insertion.
+func TestTextBaseAdjustAfterInsert(t *testing.T) {
+	tb := NewTextBase()
+	sm := NewSelectionManager(tb.Selection)
+	em := NewEditingManager(tb.Edit, tb.Selection)
+
+	// Set up initial selection
+	tb.SetQ0(10)
+	tb.SetQ1(20)
+	tb.Edit.SetIQ1(15)
+
+	// Simulate inserting 5 chars at position 5 (before selection)
+	em.AdjustForInsert(5, 5)
+
+	// Selection should be shifted
+	if tb.Q0() != 15 || tb.Q1() != 25 {
+		t.Errorf("selection should be shifted to (15, 25); got (%d, %d)", tb.Q0(), tb.Q1())
+	}
+	if tb.IQ1() != 20 {
+		t.Errorf("iq1 should be shifted to 20; got %d", tb.IQ1())
+	}
+
+	// Verify through SelectionManager
+	sel := sm.Selection()
+	if sel.Start != 15 || sel.End != 25 {
+		t.Errorf("SelectionManager should see (15, 25); got (%d, %d)", sel.Start, sel.End)
+	}
+}
+
+// TestTextBaseAdjustAfterDelete tests TextBase state adjustment after text deletion.
+func TestTextBaseAdjustAfterDelete(t *testing.T) {
+	tb := NewTextBase()
+	sm := NewSelectionManager(tb.Selection)
+	em := NewEditingManager(tb.Edit, tb.Selection)
+
+	// Set up initial selection
+	tb.SetQ0(10)
+	tb.SetQ1(20)
+	tb.Edit.SetIQ1(15)
+
+	// Simulate deleting 3 chars at position 5 (before selection)
+	em.AdjustForDelete(5, 8)
+
+	// Selection should be shifted back
+	if tb.Q0() != 7 || tb.Q1() != 17 {
+		t.Errorf("selection should be shifted to (7, 17); got (%d, %d)", tb.Q0(), tb.Q1())
+	}
+	if tb.IQ1() != 12 {
+		t.Errorf("iq1 should be shifted to 12; got %d", tb.IQ1())
+	}
+
+	// Verify through SelectionManager
+	sel := sm.Selection()
+	if sel.Start != 7 || sel.End != 17 {
+		t.Errorf("SelectionManager should see (7, 17); got (%d, %d)", sel.Start, sel.End)
+	}
+}
+
+// TestTextBaseComposition tests that TextBase properly composes all state types.
+func TestTextBaseComposition(t *testing.T) {
+	tb := NewTextBase()
+
+	// Simulate a complete text setup
+	tb.SetQ0(100)
+	tb.SetQ1(200)
+	tb.SetOrg(50)
+	tb.Edit.SetIQ1(150)
+	tb.Edit.SetEQ0(100)
+	tb.SetTabStop(8)
+	tb.SetTabExpand(true)
+	tb.SetNoFill(false)
+
+	// Verify all state is correctly set across components
+	if tb.Q0() != 100 || tb.Q1() != 200 {
+		t.Errorf("selection should be (100, 200); got (%d, %d)", tb.Q0(), tb.Q1())
+	}
+	if tb.Org() != 50 {
+		t.Errorf("org should be 50; got %d", tb.Org())
+	}
+	if tb.IQ1() != 150 {
+		t.Errorf("iq1 should be 150; got %d", tb.IQ1())
+	}
+	if tb.EQ0() != 100 {
+		t.Errorf("eq0 should be 100; got %d", tb.EQ0())
+	}
+	if tb.TabStop() != 8 {
+		t.Errorf("tabstop should be 8; got %d", tb.TabStop())
+	}
+	if !tb.TabExpand() {
+		t.Error("tabexpand should be true")
+	}
+	if tb.NoFill() {
+		t.Error("nofill should be false")
+	}
+
+	// Verify state is synchronized across components
+	if tb.Selection.Q0() != 100 || tb.Selection.Q1() != 200 {
+		t.Error("SelectionState should match")
+	}
+	if tb.Display.Org() != 50 {
+		t.Error("DisplayState should match")
+	}
+	if tb.Edit.IQ1() != 150 {
+		t.Error("EditState should match")
+	}
+}

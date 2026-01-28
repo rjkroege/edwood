@@ -441,7 +441,7 @@ func xfidwrite(x *Xfid) {
 	switch qid {
 	case Qcons:
 		// errorwin handles row locking internally
-		w = errorwin(x.f.mntdir, 'X')
+		w = errorwin(x.f.mntdir, 'X', nil)
 		updateText(&w.body)
 
 	case Qlabel:

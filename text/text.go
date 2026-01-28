@@ -269,3 +269,87 @@ func (tb *TextBase) Org() int {
 func (tb *TextBase) SetOrg(org int) {
 	tb.Display.SetOrg(org)
 }
+
+// IQ1 returns the initial q1 value (insertion point marker).
+func (tb *TextBase) IQ1() int {
+	return tb.Edit.IQ1()
+}
+
+// SetIQ1 sets the initial q1 value.
+func (tb *TextBase) SetIQ1(iq1 int) {
+	tb.Edit.SetIQ1(iq1)
+}
+
+// EQ0 returns the eq0 value (editing start marker).
+func (tb *TextBase) EQ0() int {
+	return tb.Edit.EQ0()
+}
+
+// SetEQ0 sets the eq0 value.
+func (tb *TextBase) SetEQ0(eq0 int) {
+	tb.Edit.SetEQ0(eq0)
+}
+
+// NeedsRedraw returns true if the text needs to be redrawn.
+func (tb *TextBase) NeedsRedraw() bool {
+	return tb.Display.NeedsRedraw()
+}
+
+// SetNeedsRedraw marks the text as needing redraw.
+func (tb *TextBase) SetNeedsRedraw(needs bool) {
+	tb.Display.SetNeedsRedraw(needs)
+}
+
+// ClearRedrawFlag clears the redraw flag after drawing.
+func (tb *TextBase) ClearRedrawFlag() {
+	tb.Display.ClearRedrawFlag()
+}
+
+// HasSelection returns true if there is a non-empty selection.
+func (tb *TextBase) HasSelection() bool {
+	return tb.Selection.HasSelection()
+}
+
+// ClearSelection collapses the selection to the cursor position.
+func (tb *TextBase) ClearSelection() {
+	tb.Selection.ClearSelection()
+}
+
+// Text is the interface that defines the core text view operations.
+// This interface will be implemented by the main Text type once it is
+// moved to this package.
+type Text interface {
+	// Selection accessors
+	Q0() int
+	Q1() int
+	SetQ0(q0 int)
+	SetQ1(q1 int)
+	HasSelection() bool
+	ClearSelection()
+
+	// Display accessors
+	Org() int
+	SetOrg(org int)
+	NeedsRedraw() bool
+	SetNeedsRedraw(needs bool)
+	ClearRedrawFlag()
+
+	// Edit state accessors
+	IQ1() int
+	SetIQ1(iq1 int)
+	EQ0() int
+	SetEQ0(eq0 int)
+
+	// Tab settings
+	TabStop() int
+	SetTabStop(tabstop int)
+	TabExpand() bool
+	SetTabExpand(expand bool)
+
+	// Fill control
+	NoFill() bool
+	SetNoFill(nofill bool)
+}
+
+// Compile-time check that TextBase implements the Text interface
+var _ Text = (*TextBase)(nil)
