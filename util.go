@@ -63,11 +63,11 @@ func errorwin1Name(dir string) string {
 }
 
 // errorwin1 is an internal helper function.
+// Caller must hold global.row.lk.
 func errorwin1(dir string, incl []string) *Window {
 	r := errorwin1Name(dir)
 	w := lookfile(r)
 	if w == nil {
-		// TODO(rjk): This should be inside the row lock.
 		if len(global.row.col) == 0 {
 			if global.row.Add(nil, -1) == nil {
 				util.AcmeError("can't create column to make error window", nil)
@@ -90,15 +90,17 @@ func errorwin(md *MntDir, owner int) *Window {
 	var w *Window
 
 	for {
+		// Hold row lock during errorwin1 and window locking to ensure
+		// consistent access to global.row.col. Lock ordering: row -> window.
+		global.row.lk.Lock()
 		if md == nil {
 			w = errorwin1("", nil)
 		} else {
 			w = errorwin1(md.dir, md.incl)
 		}
-
-		// TODO(rjk): This locking behaviour seems suspect?
-		// There is an implicit assumption of a race condition here?
 		w.Lock(owner)
+		global.row.lk.Unlock()
+
 		if w.col != nil {
 			break
 		}
@@ -124,8 +126,13 @@ func errorwinforwin(w *Window) *Window {
 	owner = w.owner
 	w.Unlock()
 	for {
+		// Hold row lock during errorwin1 and window locking to ensure
+		// consistent access to global.row.col. Lock ordering: row -> window.
+		global.row.lk.Lock()
 		w = errorwin1(dir, incl)
 		w.Lock(owner)
+		global.row.lk.Unlock()
+
 		if w.col != nil {
 			break
 		}
@@ -136,10 +143,14 @@ func errorwinforwin(w *Window) *Window {
 }
 
 // Heuristic city.
-// TODO(rjk): There are multiple places in this file where we access a
-// global row without any locking discipline. I presume that that this
-// can lead to crashes and incorrect behaviour.
+// makenewwindow creates a new window, choosing an appropriate location
+// based on the current state of the editor.
 func makenewwindow(t *Text) *Window {
+	// Hold row lock throughout to protect access to global.row.col,
+	// global.activecol, global.seltext, and column window lists.
+	global.row.lk.Lock()
+	defer global.row.lk.Unlock()
+
 	var (
 		c               *Column
 		w, bigw, emptyw *Window
@@ -206,13 +217,21 @@ var warnings = []*Warning{}
 var warningsMu sync.Mutex
 
 func flushwarnings() {
-	// TODO(rjk): why don't we lock warningsMu?
+	// Lock warningsMu to safely swap out the warnings list.
+	// We make a local copy and clear the global list while holding the lock,
+	// then process the copy without holding warningsMu to avoid lock ordering
+	// issues (we need to acquire row and window locks during processing).
+	warningsMu.Lock()
+	localWarnings := warnings
+	warnings = warnings[:0]
+	warningsMu.Unlock()
+
 	var (
 		w     *Window
 		t     *Text
 		owner int
 	)
-	for _, warn := range warnings {
+	for _, warn := range localWarnings {
 		w = errorwin(warn.md, 'E')
 		t = &w.body
 		owner = w.owner
@@ -237,7 +256,6 @@ func flushwarnings() {
 			mnt.DecRef(warn.md) // IncRef in addwarningtext
 		}
 	}
-	warnings = warnings[0:0]
 }
 
 func warning(md *MntDir, s string, args ...interface{}) {

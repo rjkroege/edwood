@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -117,6 +118,161 @@ func logSomethingWithMntDir(t *testing.T, g *globals, dir string) {
 	warning(md, "I am a second warning\n")
 }
 
+// TestWarningsRace tests concurrent access to the warnings list.
+// This test is designed to detect race conditions when run with -race flag.
+// It verifies that:
+// - warning() properly locks warningsMu when appending
+// - flushwarnings() properly locks warningsMu when reading/clearing the list
+func TestWarningsRace(t *testing.T) {
+	dir := t.TempDir()
+	FlexiblyMakeWindowScaffold(
+		t,
+		ScWin("testfile"),
+		ScBody("testfile", "test content"),
+		ScDir(dir, "testfile"),
+	)
+
+	// Test 1: Multiple concurrent warning() calls should be safe
+	// (warning() properly locks warningsMu)
+	t.Run("ConcurrentWarnings", func(t *testing.T) {
+		const numGoroutines = 10
+		const numIterations = 5
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				for j := 0; j < numIterations; j++ {
+					warning(nil, "warning from goroutine %d iteration %d\n", id, j)
+				}
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+
+		// Clean up - flushwarnings now handles its own locking
+		flushwarnings()
+	})
+
+	// Test 2: Serial warning/flush to verify basic behavior
+	t.Run("SerialWarningFlush", func(t *testing.T) {
+		warning(nil, "test warning 1\n")
+		warning(nil, "test warning 2\n")
+
+		// flushwarnings now handles its own locking for warningsMu
+		// and acquires row lock internally via errorwin
+		flushwarnings()
+	})
+}
+
+// TestErrorwin1RowAccess tests that errorwin1 accesses global.row.col
+// safely when the caller holds the row lock.
+// errorwin1 requires the caller to hold global.row.lk.
+func TestErrorwin1RowAccess(t *testing.T) {
+	dir := t.TempDir()
+	FlexiblyMakeWindowScaffold(
+		t,
+		ScWin("testfile"),
+		ScBody("testfile", "test content"),
+		ScDir(dir, "testfile"),
+	)
+
+	// Test 1: Single call to errorwin1 with row lock held
+	t.Run("SingleCall", func(t *testing.T) {
+		global.row.lk.Lock()
+		w := errorwin1(dir, nil)
+		global.row.lk.Unlock()
+		if w == nil {
+			t.Error("errorwin1 returned nil")
+		}
+	})
+
+	// Test 2: Sequential calls with row lock (required behavior)
+	t.Run("SequentialWithLock", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			subdir := filepath.Join(dir, fmt.Sprintf("subdir%d", i))
+			global.row.lk.Lock()
+			w := errorwin1(subdir, nil)
+			global.row.lk.Unlock()
+			if w == nil {
+				t.Errorf("errorwin1 returned nil for subdir%d", i)
+			}
+		}
+	})
+}
+
+// TestErrorwinLocking tests the locking behavior in errorwin().
+// errorwin() now properly acquires the row lock before calling errorwin1,
+// then acquires the window lock, following the lock ordering: row -> window.
+func TestErrorwinLocking(t *testing.T) {
+	dir := t.TempDir()
+	FlexiblyMakeWindowScaffold(
+		t,
+		ScWin("testfile"),
+		ScBody("testfile", "test content"),
+		ScDir(dir, "testfile"),
+	)
+
+	// Test: Single call to errorwin works and returns locked window
+	t.Run("SingleCall", func(t *testing.T) {
+		w := errorwin(nil, 'E')
+		if w == nil {
+			t.Fatal("errorwin returned nil")
+		}
+		// errorwin should return with the window locked
+		// We unlock it to clean up
+		w.Unlock()
+	})
+
+	// Test: Sequential calls work correctly
+	t.Run("SequentialCalls", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			w := errorwin(nil, 'E')
+			if w == nil {
+				t.Fatalf("errorwin returned nil on iteration %d", i)
+			}
+			if w.col == nil {
+				t.Errorf("errorwin returned window with nil col on iteration %d", i)
+			}
+			w.Unlock()
+		}
+	})
+}
+
+// TestMakenewwindowGlobalAccess tests the global state access in makenewwindow.
+// makenewwindow now properly acquires the row lock internally to protect
+// access to global.row.col, global.activecol, and global.seltext.
+func TestMakenewwindowGlobalAccess(t *testing.T) {
+	dir := t.TempDir()
+	FlexiblyMakeWindowScaffold(
+		t,
+		ScWin("testfile"),
+		ScBody("testfile", "test content"),
+		ScDir(dir, "testfile"),
+	)
+
+	// Test: Single call to makenewwindow works correctly
+	t.Run("SingleCall", func(t *testing.T) {
+		w := makenewwindow(nil)
+		if w == nil {
+			t.Error("makenewwindow returned nil")
+		}
+	})
+
+	// Test: Sequential calls work correctly (makenewwindow handles its own locking)
+	t.Run("SequentialCalls", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			w := makenewwindow(nil)
+			if w == nil {
+				t.Errorf("makenewwindow returned nil on iteration %d", i)
+			}
+		}
+	})
+}
+
 func TestFlushWarnings(t *testing.T) {
 	// TODO(rjk): Write me.
 	dir := t.TempDir()
@@ -218,10 +374,8 @@ func TestFlushWarnings(t *testing.T) {
 
 			tc.fn(t, global, dir)
 
-			// Function under test.
-			global.row.lk.Lock()
+			// Function under test - flushwarnings handles its own locking
 			flushwarnings()
-			global.row.lk.Unlock()
 
 			t.Log(*varfontflag, defaultVarFont)
 
