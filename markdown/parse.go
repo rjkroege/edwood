@@ -3,6 +3,7 @@ package markdown
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/rich"
 )
@@ -1674,6 +1675,7 @@ func parseSeparatorCell(cell string) (rich.Alignment, bool) {
 }
 
 // calculateColumnWidths calculates the maximum width for each column.
+// Width is measured in runes (not bytes) for correct handling of multi-byte UTF-8 characters.
 func calculateColumnWidths(rows [][]string) []int {
 	if len(rows) == 0 {
 		return nil
@@ -1686,7 +1688,7 @@ func calculateColumnWidths(rows [][]string) []int {
 	for _, row := range rows {
 		for i, cell := range row {
 			if i < numCols {
-				w := len(cell)
+				w := utf8.RuneCountInString(cell)
 				if w > widths[i] {
 					widths[i] = w
 				}
@@ -1701,8 +1703,9 @@ func calculateColumnWidths(rows [][]string) []int {
 // AlignLeft: content + trailing spaces
 // AlignRight: leading spaces + content
 // AlignCenter: balanced padding (extra space on right if odd)
+// Width is measured in runes (not bytes) for correct handling of multi-byte UTF-8 characters.
 func padCell(content string, width int, align rich.Alignment) string {
-	padding := width - len(content)
+	padding := width - utf8.RuneCountInString(content)
 	if padding <= 0 {
 		return content
 	}
