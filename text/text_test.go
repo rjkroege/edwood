@@ -1344,3 +1344,602 @@ func TestDisplayManagerIntegration(t *testing.T) {
 		t.Errorf("offset should be 25; got %d", offset)
 	}
 }
+
+// =============================================================================
+// Tests for EditingManager (Phase 6D)
+// =============================================================================
+
+// TestEditingManagerNew tests that NewEditingManager creates a valid manager.
+func TestEditingManagerNew(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+	if em == nil {
+		t.Fatal("NewEditingManager(nil, nil) returned nil")
+	}
+
+	// Should create its own state
+	if em.State() == nil {
+		t.Error("EditingManager should have non-nil edit state")
+	}
+	if em.Selection() == nil {
+		t.Error("EditingManager should have non-nil selection state")
+	}
+
+	// Test with provided states
+	editState := NewEditState()
+	editState.SetIQ1(100)
+	selState := NewSelectionState()
+	selState.SetSelection(10, 20)
+
+	em = NewEditingManager(editState, selState)
+	if em.State() != editState {
+		t.Error("EditingManager should use provided edit state")
+	}
+	if em.Selection() != selState {
+		t.Error("EditingManager should use provided selection state")
+	}
+	if em.IQ1() != 100 {
+		t.Errorf("EditingManager should reflect provided state's IQ1; got %d", em.IQ1())
+	}
+}
+
+// TestEditingManagerBasicOps tests basic editing state operations.
+func TestEditingManagerBasicOps(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+
+	// Initial state
+	if em.IQ1() != 0 {
+		t.Errorf("initial IQ1 should be 0; got %d", em.IQ1())
+	}
+	if em.EQ0() != ^0 {
+		t.Errorf("initial EQ0 should be ^0; got %d", em.EQ0())
+	}
+	if em.TypingStarted() {
+		t.Error("typing should not have started initially")
+	}
+
+	// Set IQ1
+	em.SetIQ1(50)
+	if em.IQ1() != 50 {
+		t.Errorf("IQ1 should be 50; got %d", em.IQ1())
+	}
+
+	// Start typing
+	em.SetEQ0(0)
+	if !em.TypingStarted() {
+		t.Error("typing should have started after SetEQ0(0)")
+	}
+
+	// Reset typing
+	em.ResetTyping()
+	if em.TypingStarted() {
+		t.Error("typing should not have started after ResetTyping")
+	}
+}
+
+// TestEditingManagerPrepareInsert tests preparation for text insertion.
+func TestEditingManagerPrepareInsert(t *testing.T) {
+	tests := []struct {
+		name       string
+		initialQ0  int
+		initialQ1  int
+		initialEQ0 int
+		wantEQ0    int
+	}{
+		{"first insert starts typing", 10, 10, ^0, 10},
+		{"subsequent insert preserves eq0", 15, 15, 10, 10},
+		{"insert with selection", 10, 20, ^0, 10},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetSelection(tc.initialQ0, tc.initialQ1)
+			em.State().SetEQ0(tc.initialEQ0)
+
+			em.PrepareInsert()
+
+			if em.EQ0() != tc.wantEQ0 {
+				t.Errorf("EQ0 after PrepareInsert = %d; want %d", em.EQ0(), tc.wantEQ0)
+			}
+		})
+	}
+}
+
+// TestEditingManagerAdjustForInsert tests selection adjustment after insert.
+// This matches the behavior in text.go's Inserted method where:
+// - if insertPos < iq1, adjust iq1
+// - if insertPos < q1, adjust q1
+// - if insertPos < q0, adjust q0
+func TestEditingManagerAdjustForInsert(t *testing.T) {
+	tests := []struct {
+		name      string
+		q0        int
+		q1        int
+		iq1       int
+		insertPos int
+		insertLen int
+		wantQ0    int
+		wantQ1    int
+		wantIQ1   int
+	}{
+		{"insert before all", 10, 20, 15, 5, 3, 13, 23, 18},       // 5 < 10, 15, 20 - all adjust
+		{"insert at q0", 10, 20, 15, 10, 3, 10, 23, 18},           // 10 < 15, 20 but not < 10 - q1, iq1 adjust
+		{"insert in selection", 10, 20, 15, 15, 3, 10, 23, 15},    // 15 < 20 but not < 10, 15 - only q1 adjusts
+		{"insert after selection", 10, 20, 15, 25, 3, 10, 20, 15}, // 25 not < any - nothing adjusts
+		{"insert at iq1", 10, 20, 15, 15, 3, 10, 23, 15},          // 15 < 20 but not < 15 - only q1 adjusts
+		{"insert after iq1", 10, 20, 15, 20, 3, 10, 20, 15},       // 20 not < any - nothing adjusts
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetSelection(tc.q0, tc.q1)
+			em.SetIQ1(tc.iq1)
+
+			em.AdjustForInsert(tc.insertPos, tc.insertLen)
+
+			if em.Selection().Q0() != tc.wantQ0 || em.Selection().Q1() != tc.wantQ1 {
+				t.Errorf("selection after insert = (%d, %d); want (%d, %d)",
+					em.Selection().Q0(), em.Selection().Q1(), tc.wantQ0, tc.wantQ1)
+			}
+			if em.IQ1() != tc.wantIQ1 {
+				t.Errorf("IQ1 after insert = %d; want %d", em.IQ1(), tc.wantIQ1)
+			}
+		})
+	}
+}
+
+// TestEditingManagerAdjustForDelete tests selection adjustment after delete.
+// This matches the behavior in text.go's Deleted method where:
+// - if delQ0 < iq1, adjust iq1 by min(n, iq1-delQ0)
+// - if delQ0 < q0, adjust q0 by min(n, q0-delQ0)
+// - if delQ0 < q1, adjust q1 by min(n, q1-delQ0)
+func TestEditingManagerAdjustForDelete(t *testing.T) {
+	tests := []struct {
+		name    string
+		q0      int
+		q1      int
+		iq1     int
+		delQ0   int
+		delQ1   int
+		wantQ0  int
+		wantQ1  int
+		wantIQ1 int
+	}{
+		{"delete before all", 10, 20, 15, 2, 5, 7, 17, 12},           // n=3, all adjust by 3
+		{"delete overlapping start", 10, 20, 15, 5, 15, 5, 10, 5},    // n=10, q0-=min(10,5)=5, q1-=min(10,15)=10, iq1-=min(10,10)=10
+		{"delete inside selection", 10, 20, 15, 12, 15, 10, 17, 12},  // n=3, delQ0(12)<q0(10) false, delQ0(12)<q1(20) true, delQ0(12)<iq1(15) true
+		{"delete overlapping end", 10, 20, 15, 15, 25, 10, 15, 15},   // n=10, delQ0(15)<q0(10) false, delQ0(15)<q1(20) true->q1-=5, delQ0(15)<iq1(15) false
+		{"delete containing selection", 10, 20, 15, 5, 25, 5, 5, 5},  // n=20, all adjust
+		{"delete after selection", 10, 20, 15, 25, 30, 10, 20, 15},   // delQ0(25) not < any - nothing adjusts
+		{"delete at iq1", 10, 20, 15, 15, 18, 10, 17, 15},            // n=3, delQ0(15)<q0(10) false, delQ0(15)<q1(20) true->q1-=3, delQ0(15)<iq1(15) false
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetSelection(tc.q0, tc.q1)
+			em.SetIQ1(tc.iq1)
+
+			em.AdjustForDelete(tc.delQ0, tc.delQ1)
+
+			if em.Selection().Q0() != tc.wantQ0 || em.Selection().Q1() != tc.wantQ1 {
+				t.Errorf("selection after delete = (%d, %d); want (%d, %d)",
+					em.Selection().Q0(), em.Selection().Q1(), tc.wantQ0, tc.wantQ1)
+			}
+			if em.IQ1() != tc.wantIQ1 {
+				t.Errorf("IQ1 after delete = %d; want %d", em.IQ1(), tc.wantIQ1)
+			}
+		})
+	}
+}
+
+// TestEditingManagerBsWidth tests backspace width calculation.
+// The word erase behavior:
+// 1. Skip non-alphanumeric characters (skipping = true)
+// 2. When alphanumeric found, stop skipping (skipping = false)
+// 3. Continue erasing alphanumeric until non-alphanumeric found
+func TestEditingManagerBsWidth(t *testing.T) {
+	tests := []struct {
+		name    string
+		text    string
+		q0      int
+		r       rune
+		wantLen int
+	}{
+		// ^H: erase one character
+		{"backspace single char", "hello", 5, 0x08, 1},
+		{"backspace at start", "hello", 0, 0x08, 0},
+		{"backspace mid word", "hello", 3, 0x08, 1},
+
+		// ^W: erase word - skips non-alnum then erases alnum
+		{"erase word at end", "hello world", 11, 0x17, 5},       // "world"
+		{"erase word mid", "hello world", 5, 0x17, 5},           // "hello"
+		{"erase word with spaces", "hello   world", 8, 0x17, 8}, // skips spaces, then erases "hello" = 8 chars
+		{"erase word at start", "hello", 0, 0x17, 0},
+		{"erase word after spaces", "hello   ", 8, 0x17, 8},     // skip spaces, erase "hello"
+
+		// ^U: erase to beginning of line
+		{"erase line", "hello\nworld", 11, 0x15, 5},        // "world"
+		{"erase line mid", "hello\nworld", 8, 0x15, 2},     // "wo"
+		{"erase line at newline", "hello\nworld", 6, 0x15, 1}, // the newline
+		{"erase line at start", "hello", 0, 0x15, 0},
+		{"erase entire first line", "hello", 5, 0x15, 5},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetQ0(tc.q0)
+			em.Selection().SetQ1(tc.q0)
+
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := em.BsWidth(tc.r, charReader)
+			if got != tc.wantLen {
+				t.Errorf("BsWidth(%q, %#x) at pos %d = %d; want %d",
+					tc.text, tc.r, tc.q0, got, tc.wantLen)
+			}
+		})
+	}
+}
+
+// TestEditingManagerDeleteRange tests calculating delete range for backspace ops.
+func TestEditingManagerDeleteRange(t *testing.T) {
+	tests := []struct {
+		name         string
+		text         string
+		q0           int
+		r            rune
+		org          int
+		wantDelQ0    int
+		wantDelQ1    int
+		wantAdjusted bool
+	}{
+		{"normal backspace", "hello", 5, 0x08, 0, 4, 5, false},
+		{"backspace at org boundary", "hello world", 5, 0x08, 5, 5, 5, true}, // adjusted to org
+		{"backspace within org", "hello world", 8, 0x08, 5, 7, 8, false},
+		{"erase word crosses org", "hello world", 11, 0x17, 8, 8, 11, true}, // adjusted to org
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetQ0(tc.q0)
+			em.Selection().SetQ1(tc.q0)
+
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			delQ0, delQ1, adjusted := em.CalculateDeleteRange(tc.r, tc.org, charReader)
+			if delQ0 != tc.wantDelQ0 || delQ1 != tc.wantDelQ1 {
+				t.Errorf("CalculateDeleteRange = (%d, %d); want (%d, %d)",
+					delQ0, delQ1, tc.wantDelQ0, tc.wantDelQ1)
+			}
+			if adjusted != tc.wantAdjusted {
+				t.Errorf("adjusted = %v; want %v", adjusted, tc.wantAdjusted)
+			}
+		})
+	}
+}
+
+// TestEditingManagerTypeCommit tests type commit behavior.
+func TestEditingManagerTypeCommit(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+
+	// Set up some typing state
+	em.SetEQ0(10)
+	em.SetIQ1(20)
+
+	// After commit, eq0 should be reset but iq1 preserved
+	// (actual commit behavior depends on window, but we test state management)
+	if !em.TypingStarted() {
+		// eq0 = 10 means typing has NOT started (typing started when eq0 == 0)
+		// Let's set it to indicate typing started
+		em.SetEQ0(0)
+	}
+
+	if !em.TypingStarted() {
+		t.Error("typing should have started")
+	}
+
+	// Commit resets typing state
+	em.CommitTyping()
+	if em.TypingStarted() {
+		t.Error("typing should not have started after commit")
+	}
+}
+
+// TestEditingManagerHasSelection tests selection presence checking.
+func TestEditingManagerHasSelection(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+
+	if em.HasSelection() {
+		t.Error("new EditingManager should not have selection")
+	}
+
+	em.Selection().SetSelection(10, 20)
+	if !em.HasSelection() {
+		t.Error("EditingManager should have selection after SetSelection")
+	}
+
+	em.Selection().SetSelection(15, 15)
+	if em.HasSelection() {
+		t.Error("EditingManager should not have selection when q0 == q1")
+	}
+}
+
+// TestEditingManagerInSelection tests position-in-selection checking.
+func TestEditingManagerInSelection(t *testing.T) {
+	tests := []struct {
+		name      string
+		q0, q1    int
+		pos       int
+		wantInSel bool
+	}{
+		{"empty selection", 10, 10, 10, false},
+		{"before selection", 10, 20, 5, false},
+		{"at start", 10, 20, 10, true},
+		{"inside", 10, 20, 15, true},
+		{"at end", 10, 20, 20, true},
+		{"after selection", 10, 20, 25, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetSelection(tc.q0, tc.q1)
+
+			result := em.InSelection(tc.pos)
+			if result != tc.wantInSel {
+				t.Errorf("InSelection(%d) with selection (%d, %d) = %v; want %v",
+					tc.pos, tc.q0, tc.q1, result, tc.wantInSel)
+			}
+		})
+	}
+}
+
+// TestEditingManagerSelectToInsertionPoint tests selecting back to insertion point.
+func TestEditingManagerSelectToInsertionPoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		eq0     int
+		q0      int
+		wantQ0  int
+		wantQ1  int
+	}{
+		{"eq0 before q0", 5, 10, 5, 10},
+		{"eq0 after q0", 15, 10, 10, 15},
+		{"eq0 equals q0", 10, 10, 10, 10},
+		{"eq0 sentinel (no change)", ^0, 10, 10, 10},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.SetEQ0(tc.eq0)
+			em.Selection().SetQ0(tc.q0)
+			em.Selection().SetQ1(tc.q0)
+
+			em.SelectToInsertionPoint()
+
+			if em.Selection().Q0() != tc.wantQ0 || em.Selection().Q1() != tc.wantQ1 {
+				t.Errorf("SelectToInsertionPoint with eq0=%d, q0=%d = (%d, %d); want (%d, %d)",
+					tc.eq0, tc.q0, em.Selection().Q0(), em.Selection().Q1(), tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestEditingManagerAutoIndent tests autoindent calculation.
+// It uses BsWidth(^U) to find the beginning of the current line,
+// then extracts leading whitespace from that position.
+func TestEditingManagerAutoIndent(t *testing.T) {
+	// "one\n  two\n    three"
+	//  0123 456789 ...
+	// Position 4 is ' ', 5 is ' ', 6 is 't'
+	// Position 10 is ' ', 11 is ' ', 12 is ' ', 13 is ' ', 14 is 't'
+	tests := []struct {
+		name       string
+		text       string
+		q0         int
+		wantIndent string
+	}{
+		{"no indent", "hello\nworld", 6, ""},          // 'w' is start of line, no indent
+		{"tab indent", "\thello\n\tworld", 8, "\t"},   // line starts with '\t'
+		{"space indent", "    hello\n    world", 15, "    "}, // line starts with "    "
+		{"mixed indent", "\t  hello\n\t  world", 12, "\t  "}, // line starts with "\t  "
+		{"indent at start of file", "hello", 0, ""},
+		{"at end of indented line", "  hello", 7, "  "},      // cursor at end, line starts with "  "
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.Selection().SetQ0(tc.q0)
+			em.Selection().SetQ1(tc.q0)
+
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := em.CalculateAutoIndent(charReader)
+			if got != tc.wantIndent {
+				t.Errorf("CalculateAutoIndent in %q at pos %d = %q; want %q",
+					tc.text, tc.q0, got, tc.wantIndent)
+			}
+		})
+	}
+}
+
+// TestEditingManagerTabExpansion tests tab expansion calculation.
+func TestEditingManagerTabExpansion(t *testing.T) {
+	tests := []struct {
+		name    string
+		tabstop int
+		wantLen int
+	}{
+		{"default tab stop", 4, 4},
+		{"tab stop 8", 8, 8},
+		{"tab stop 2", 2, 2},
+		{"tab stop 1", 1, 1},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+			em.SetTabStop(tc.tabstop)
+
+			got := em.ExpandedTabWidth()
+			if got != tc.wantLen {
+				t.Errorf("ExpandedTabWidth with tabstop=%d = %d; want %d",
+					tc.tabstop, got, tc.wantLen)
+			}
+		})
+	}
+}
+
+// TestEditingManagerUpdateIQ1 tests IQ1 update after operations.
+func TestEditingManagerUpdateIQ1(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+
+	em.Selection().SetQ0(10)
+	em.Selection().SetQ1(20)
+
+	// After paste-like operation, iq1 should be set to q1
+	em.UpdateIQ1AfterPaste()
+	if em.IQ1() != 20 {
+		t.Errorf("IQ1 after paste should be 20; got %d", em.IQ1())
+	}
+
+	// After cut-like operation, iq1 should be set to q0
+	em.Selection().SetQ0(5)
+	em.Selection().SetQ1(5)
+	em.UpdateIQ1AfterCut()
+	if em.IQ1() != 5 {
+		t.Errorf("IQ1 after cut should be 5; got %d", em.IQ1())
+	}
+
+	// After regular typing, iq1 should be set to q0
+	em.Selection().SetQ0(15)
+	em.Selection().SetQ1(15)
+	em.UpdateIQ1AfterType()
+	if em.IQ1() != 15 {
+		t.Errorf("IQ1 after type should be 15; got %d", em.IQ1())
+	}
+}
+
+// TestEditingManagerIntegration tests EditingManager in a realistic scenario.
+func TestEditingManagerIntegration(t *testing.T) {
+	em := NewEditingManager(nil, nil)
+
+	// Simulate typing scenario
+	text := []rune("hello world")
+	charReader := func(pos int) rune {
+		if pos < 0 || pos >= len(text) {
+			return 0
+		}
+		return text[pos]
+	}
+
+	// Position cursor at end
+	em.Selection().SetQ0(11)
+	em.Selection().SetQ1(11)
+	em.SetIQ1(11)
+
+	// Prepare for insert
+	em.PrepareInsert()
+	if em.EQ0() != 11 {
+		t.Errorf("EQ0 should be 11 after PrepareInsert; got %d", em.EQ0())
+	}
+
+	// Simulate inserting "!" (1 rune)
+	em.AdjustForInsert(11, 1)
+	if em.Selection().Q0() != 11 || em.Selection().Q1() != 11 {
+		t.Errorf("selection should be (11, 11) after insert at end; got (%d, %d)",
+			em.Selection().Q0(), em.Selection().Q1())
+	}
+
+	// Update text and move cursor
+	text = append(text, '!')
+	em.Selection().SetQ0(12)
+	em.Selection().SetQ1(12)
+	em.UpdateIQ1AfterType()
+
+	// Test backspace width
+	bsWidth := em.BsWidth(0x08, charReader)
+	if bsWidth != 1 {
+		t.Errorf("BsWidth should be 1; got %d", bsWidth)
+	}
+
+	// Test word erase width
+	// "hello world!" at position 12 - word erase skips "!" (non-alnum),
+	// then erases "world" (5 alnum chars), total = 6
+	wordWidth := em.BsWidth(0x17, charReader)
+	if wordWidth != 6 {
+		t.Errorf("word erase width should be 6 (skip '!', erase 'world'); got %d", wordWidth)
+	}
+
+	// Select some text
+	em.Selection().SetSelection(6, 11) // "world"
+	if !em.HasSelection() {
+		t.Error("should have selection")
+	}
+	if !em.InSelection(8) {
+		t.Error("position 8 should be in selection")
+	}
+}
+
+// TestEditingManagerFileWidth tests file path width calculation.
+func TestEditingManagerFileWidth(t *testing.T) {
+	tests := []struct {
+		name       string
+		text       string
+		q0         int
+		oneElement bool
+		wantWidth  int
+	}{
+		{"simple word", "hello world", 5, false, 5},
+		{"path element", "/usr/local/bin", 14, true, 3},       // "bin"
+		{"path full", "/usr/local/bin", 14, false, 14},        // full path
+		{"space terminates", "hello world", 11, false, 5},     // "world"
+		{"at start", "hello", 0, false, 0},
+		{"with slash", "foo/bar/baz", 11, true, 3},            // "baz"
+		{"with slash full", "foo/bar/baz", 11, false, 11},     // full
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			em := NewEditingManager(nil, nil)
+
+			textRunes := []rune(tc.text)
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+
+			got := em.FileWidth(tc.q0, tc.oneElement, charReader)
+			if got != tc.wantWidth {
+				t.Errorf("FileWidth(%d, %v) in %q = %d; want %d",
+					tc.q0, tc.oneElement, tc.text, got, tc.wantWidth)
+			}
+		})
+	}
+}
