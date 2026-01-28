@@ -25,8 +25,6 @@ type fileServer struct {
 	messagesize int
 }
 
-const DEBUG = false
-
 type fsfunc func(*Xfid, *Fid) *Xfid
 
 func (fs *fileServer) initfcall() {
@@ -135,9 +133,6 @@ func (fs *fileServer) fsysproc() {
 			}
 			util.AcmeError("fsysproc", err)
 		}
-		if DEBUG {
-			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
-		}
 		if x == nil {
 			global.cxfidalloc <- nil
 			x = <-global.cxfidalloc
@@ -243,9 +238,6 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	t.Tag = x.fcall.Tag
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
 		util.AcmeError("write error in respond", err)
-	}
-	if DEBUG {
-		fmt.Fprintf(os.Stderr, "--> %v\n", t)
 	}
 	return x
 }
