@@ -2,6 +2,7 @@
 package rich
 
 import (
+	"crypto/tls"
 	"fmt"
 	"image"
 	_ "image/gif"  // Register GIF decoder
@@ -25,6 +26,18 @@ const (
 // URLImageTimeout is the maximum time to wait for URL image downloads.
 const URLImageTimeout = 10 * time.Second
 
+// isTLSError returns true if the error is a TLS-related error that might
+// be resolved by retrying with InsecureSkipVerify. Checks for "tls:" and
+// "certificate" substrings which cover tls: handshake failure, x509:
+// certificate errors, etc.
+func isTLSError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "tls:") || strings.Contains(msg, "certificate")
+}
+
 // isImageURL returns true if path is an HTTP or HTTPS URL.
 // Only http:// and https:// schemes are supported for security reasons.
 func isImageURL(path string) bool {
@@ -34,6 +47,8 @@ func isImageURL(path string) bool {
 
 // loadImageFromURL fetches an image from an HTTP(S) URL.
 // It enforces timeout, size limits, and content-type validation.
+// On TLS errors, it retries with InsecureSkipVerify to handle servers
+// with legacy or self-signed certificates.
 func loadImageFromURL(url string) (image.Image, error) {
 	// Create HTTP client with timeout
 	client := &http.Client{
@@ -42,6 +57,16 @@ func loadImageFromURL(url string) (image.Image, error) {
 
 	// Make the request
 	resp, err := client.Get(url)
+	if err != nil && isTLSError(err) {
+		// Retry with relaxed TLS settings
+		insecureClient := &http.Client{
+			Timeout: URLImageTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		resp, err = insecureClient.Get(url)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}

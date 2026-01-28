@@ -2,6 +2,7 @@ package rich
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/gif"
@@ -1927,6 +1928,105 @@ func TestLoadImageURLInvalidURL(t *testing.T) {
 				t.Errorf("expected error for invalid URL: %s", url)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Phase 24A: TLS Retry Tests
+// =============================================================================
+
+// TestIsTLSError verifies that isTLSError correctly identifies TLS-related errors.
+func TestIsTLSError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"tls handshake failure", fmt.Errorf("Get https://example.com: tls: handshake failure"), true},
+		{"x509 certificate error", fmt.Errorf("Get https://example.com: x509: certificate signed by unknown authority"), true},
+		{"certificate keyword", fmt.Errorf("remote error: certificate required"), true},
+		{"tls keyword", fmt.Errorf("tls: internal error"), true},
+		{"connection refused", fmt.Errorf("dial tcp 127.0.0.1:443: connect: connection refused"), false},
+		{"timeout", fmt.Errorf("context deadline exceeded"), false},
+		{"dns error", fmt.Errorf("dial tcp: lookup example.com: no such host"), false},
+		{"nil error", nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isTLSError(tt.err)
+			if result != tt.expected {
+				t.Errorf("isTLSError(%v) = %v, want %v", tt.err, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestLoadImageTLSRetry verifies that loadImageFromURL retries with relaxed TLS
+// settings when strict TLS fails. Uses httptest.NewTLSServer which creates a
+// server with a self-signed certificate that will fail normal TLS verification.
+func TestLoadImageTLSRetry(t *testing.T) {
+	// Create a test image
+	testImg := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	red := color.RGBA{255, 0, 0, 255}
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			testImg.Set(x, y, red)
+		}
+	}
+
+	// Encode to PNG bytes
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, testImg); err != nil {
+		t.Fatalf("failed to encode test image: %v", err)
+	}
+	pngBytes := pngBuf.Bytes()
+
+	// Track request count to verify retry happened
+	requestCount := 0
+
+	// Create a TLS server with self-signed cert — a plain http.Client
+	// will get a TLS error, but InsecureSkipVerify: true will succeed.
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(pngBytes)
+	}))
+	defer server.Close()
+
+	// loadImageFromURL should fail on the first attempt (strict TLS)
+	// and succeed on the retry (InsecureSkipVerify: true)
+	img, err := loadImageFromURL(server.URL + "/test.png")
+	if err != nil {
+		t.Fatalf("loadImageFromURL should succeed after TLS retry, got: %v", err)
+	}
+
+	// Verify the image was loaded correctly
+	bounds := img.Bounds()
+	if bounds.Dx() != 10 || bounds.Dy() != 10 {
+		t.Errorf("loaded image size = %dx%d, want 10x10", bounds.Dx(), bounds.Dy())
+	}
+
+	// The server should have been hit exactly once (the retry request)
+	// The first attempt fails before reaching the server due to TLS error
+	if requestCount != 1 {
+		t.Errorf("server request count = %d, want 1 (only the retry should reach server)", requestCount)
+	}
+}
+
+// TestLoadImageTLSRetryNotTriggeredForNonTLSErrors verifies that non-TLS errors
+// do not trigger a retry with relaxed TLS settings.
+func TestLoadImageTLSRetryNotTriggeredForNonTLSErrors(t *testing.T) {
+	// Use a URL that will fail with a connection error, not a TLS error.
+	// Port 1 should give "connection refused" which is not a TLS error.
+	_, err := loadImageFromURL("http://127.0.0.1:1/test.png")
+	if err == nil {
+		t.Error("expected error for connection refused")
+	}
+
+	// The error should NOT trigger TLS retry (it's not a TLS error)
+	if isTLSError(err) {
+		t.Errorf("connection refused should not be identified as TLS error: %v", err)
 	}
 }
 
