@@ -927,6 +927,9 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 			f.drawImageTo(target, shiftedPB, line, offset, frameWidth, frameHeight)
 		}
 	}
+
+	// Phase 6: Draw horizontal scrollbars for overflowing block regions
+	f.drawHScrollbarsTo(target, offset, lines, adjustedRegions, frameWidth)
 }
 
 // drawBlockBackgroundTo draws a full-width background for a line.
@@ -1513,6 +1516,85 @@ func (f *frameImpl) GetHScrollOrigin(regionIndex int) int {
 		return 0
 	}
 	return f.hscrollOrigins[regionIndex]
+}
+
+// HScrollBgColor is the background color of horizontal scrollbars.
+var HScrollBgColor = color.RGBA{R: 153, G: 153, B: 76, A: 255} // dark yellow-green, similar to acme scrollbar
+
+// HScrollThumbColor is the thumb color of horizontal scrollbars.
+var HScrollThumbColor = color.RGBA{R: 153, G: 153, B: 0, A: 255} // darker yellow, similar to acme scrollbar thumb
+
+// drawHScrollbarsTo draws horizontal scrollbars for overflowing block regions.
+// For each block region where MaxContentWidth > frameWidth, it draws a scrollbar
+// background and thumb at the bottom of the block region. The scrollbar height
+// is scrollbarHeight (Scrollwid = 12) pixels. Thumb width is proportional to
+// the visible fraction of content, with a minimum of 10 pixels.
+// Thumb position is proportional to hscrollOrigin for that region.
+func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Point, lines []Line, adjustedRegions []AdjustedBlockRegion, frameWidth int) {
+	scrollbarHeight := 12 // Scrollwid
+
+	for i, ar := range adjustedRegions {
+		if !ar.HasScrollbar {
+			continue
+		}
+
+		maxContentWidth := ar.MaxContentWidth
+		if maxContentWidth <= frameWidth {
+			continue
+		}
+
+		// Draw scrollbar background: full width at ScrollbarY
+		bgImg := f.allocColorImage(HScrollBgColor)
+		if bgImg == nil {
+			continue
+		}
+		bgRect := image.Rect(
+			offset.X,
+			offset.Y+ar.ScrollbarY,
+			offset.X+frameWidth,
+			offset.Y+ar.ScrollbarY+scrollbarHeight,
+		)
+		target.Draw(bgRect, bgImg, bgImg, image.ZP)
+
+		// Compute thumb dimensions
+		// thumbWidth = max(10, (frameWidth / maxContentWidth) * frameWidth)
+		thumbWidth := (frameWidth * frameWidth) / maxContentWidth
+		if thumbWidth < 10 {
+			thumbWidth = 10
+		}
+		if thumbWidth > frameWidth {
+			thumbWidth = frameWidth
+		}
+
+		// Compute thumb position
+		// maxScrollable = maxContentWidth - frameWidth
+		// thumbLeft = (hOffset / maxScrollable) * (frameWidth - thumbWidth)
+		maxScrollable := maxContentWidth - frameWidth
+		hOffset := f.GetHScrollOrigin(i)
+		thumbLeft := 0
+		if maxScrollable > 0 && hOffset > 0 {
+			thumbLeft = (hOffset * (frameWidth - thumbWidth)) / maxScrollable
+		}
+		if thumbLeft < 0 {
+			thumbLeft = 0
+		}
+		if thumbLeft+thumbWidth > frameWidth {
+			thumbLeft = frameWidth - thumbWidth
+		}
+
+		// Draw thumb
+		thumbImg := f.allocColorImage(HScrollThumbColor)
+		if thumbImg == nil {
+			continue
+		}
+		thumbRect := image.Rect(
+			offset.X+thumbLeft,
+			offset.Y+ar.ScrollbarY,
+			offset.X+thumbLeft+thumbWidth,
+			offset.Y+ar.ScrollbarY+scrollbarHeight,
+		)
+		target.Draw(thumbRect, thumbImg, thumbImg, image.ZP)
+	}
 }
 
 // Full returns true if the frame is at capacity.

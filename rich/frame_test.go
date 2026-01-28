@@ -3316,3 +3316,319 @@ func extractYFromOp(op string) int {
 	}
 	return y
 }
+
+// extractDrawRect extracts the rectangle from a draw operation string.
+// Supports both "draw r: (x0,y0)-(x1,y1)" and "fill (x0,y0)-(x1,y1)" formats.
+// Returns the rectangle and true if found, or zero rect and false if not.
+func extractDrawRect(op string) (image.Rectangle, bool) {
+	// Try "draw r: " format first
+	idx := strings.Index(op, "draw r: ")
+	if idx >= 0 {
+		rest := op[idx+len("draw r: "):]
+		var x0, y0, x1, y1 int
+		n, err := fmt.Sscanf(rest, "(%d,%d)-(%d,%d)", &x0, &y0, &x1, &y1)
+		if err == nil && n == 4 {
+			return image.Rect(x0, y0, x1, y1), true
+		}
+	}
+	// Try "fill " format
+	idx = strings.Index(op, "fill ")
+	if idx >= 0 {
+		rest := op[idx+len("fill "):]
+		var x0, y0, x1, y1 int
+		n, err := fmt.Sscanf(rest, "(%d,%d)-(%d,%d)", &x0, &y0, &x1, &y1)
+		if err == nil && n == 4 {
+			return image.Rect(x0, y0, x1, y1), true
+		}
+	}
+	return image.Rectangle{}, false
+}
+
+// TestDrawHScrollbar verifies that an overflowing block region gets a horizontal
+// scrollbar drawn at the bottom of the block. The scrollbar consists of a background
+// fill and a thumb fill in the scrollbar area.
+func TestDrawHScrollbar(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	// Code indent = 4 * 10 = 40px. "a_very_long_code_line_xxxxx" = 27 chars * 10 = 270px.
+	// Total extent = 310px > 200px, so this block overflows.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_xxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	// Run layout to populate lines and regions
+	lines, _ := fi.layoutFromOrigin()
+	regions := findBlockRegions(lines)
+	scrollbarHeight := 12
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, rect.Dx(), scrollbarHeight)
+
+	// Verify we have an overflowing region
+	if len(adjustedRegions) == 0 {
+		t.Fatal("expected at least one block region")
+	}
+	if !adjustedRegions[0].HasScrollbar {
+		t.Fatal("expected block region to have scrollbar (content overflows frame width)")
+	}
+
+	// Draw scrollbars
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, rect.Dx())
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// There should be at least two draw operations in the scrollbar area:
+	// one for the scrollbar background, one for the thumb.
+	// The scrollbar Y is at adjustedRegions[0].ScrollbarY and has height scrollbarHeight.
+	scrollbarY := adjustedRegions[0].ScrollbarY
+	scrollbarBottom := scrollbarY + scrollbarHeight
+
+	drawOpsInScrollbarArea := 0
+	for _, op := range ops {
+		r, ok := extractDrawRect(op)
+		if !ok {
+			continue
+		}
+		// Check if this draw operation overlaps the scrollbar Y range
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarBottom {
+			drawOpsInScrollbarArea++
+		}
+	}
+
+	if drawOpsInScrollbarArea < 2 {
+		t.Errorf("expected at least 2 draw ops in scrollbar area (Y=%d..%d), got %d; ops: %v",
+			scrollbarY, scrollbarBottom, drawOpsInScrollbarArea, ops)
+	}
+}
+
+// TestHScrollbarThumbPosition verifies that the scrollbar thumb position
+// reflects the current horizontal scroll offset. When scrolled to offset 0,
+// the thumb should be at the left edge. When scrolled partway, the thumb should
+// be proportionally positioned.
+func TestHScrollbarThumbPosition(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: 40px indent + 430px text = 470px total, frame is 200px wide.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	longText := "abcdefghijklmnopqrstuvwxyz_abcdefghijklmno" // 43 chars * 10 = 430px
+	content := Content{
+		{Text: longText, Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	lines, _ := fi.layoutFromOrigin()
+	regions := findBlockRegions(lines)
+	scrollbarHeight := 12
+	frameWidth := rect.Dx()
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	if len(adjustedRegions) == 0 || !adjustedRegions[0].HasScrollbar {
+		t.Fatal("expected an overflowing block region with scrollbar")
+	}
+
+	scrollbarY := adjustedRegions[0].ScrollbarY
+
+	// Draw with hscroll offset = 0 (thumb at left)
+	fi.syncHScrollState(len(adjustedRegions))
+	fi.SetHScrollOrigin(0, 0)
+
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, frameWidth)
+	opsAtZero := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Find the thumb rect (should be the narrower draw in the scrollbar area,
+	// not the full-width background). The thumb is the second draw op in the area.
+	thumbXAtZero := -1
+	for _, op := range opsAtZero {
+		r, ok := extractDrawRect(op)
+		if !ok {
+			continue
+		}
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < frameWidth {
+			thumbXAtZero = r.Min.X
+			break
+		}
+	}
+
+	// Now draw with a non-zero offset (thumb should shift right)
+	maxContentWidth := adjustedRegions[0].MaxContentWidth
+	maxScrollable := maxContentWidth - frameWidth
+	halfOffset := maxScrollable / 2
+	fi.SetHScrollOrigin(0, halfOffset)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, frameWidth)
+	opsAtHalf := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	thumbXAtHalf := -1
+	for _, op := range opsAtHalf {
+		r, ok := extractDrawRect(op)
+		if !ok {
+			continue
+		}
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < frameWidth {
+			thumbXAtHalf = r.Min.X
+			break
+		}
+	}
+
+	if thumbXAtZero < 0 || thumbXAtHalf < 0 {
+		t.Fatalf("could not find thumb draw ops; atZero=%d, atHalf=%d; opsAtZero=%v, opsAtHalf=%v",
+			thumbXAtZero, thumbXAtHalf, opsAtZero, opsAtHalf)
+	}
+
+	// When scrolled halfway, the thumb should be further right than at offset 0
+	if thumbXAtHalf <= thumbXAtZero {
+		t.Errorf("thumb X at half scroll (%d) should be greater than at zero scroll (%d)",
+			thumbXAtHalf, thumbXAtZero)
+	}
+}
+
+// TestNoHScrollbarWhenFits verifies that a block region whose content fits
+// within the frame width does NOT get a horizontal scrollbar drawn.
+func TestNoHScrollbarWhenFits(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Short code block: 40px indent + 50px text = 90px, well within 400px frame.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "short", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	lines, _ := fi.layoutFromOrigin()
+	regions := findBlockRegions(lines)
+	scrollbarHeight := 12
+	frameWidth := rect.Dx()
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// The region should exist but should NOT have a scrollbar
+	if len(adjustedRegions) == 0 {
+		t.Fatal("expected at least one block region")
+	}
+	if adjustedRegions[0].HasScrollbar {
+		t.Fatal("block region should NOT have scrollbar (content fits in frame)")
+	}
+
+	// Drawing scrollbars should produce no draw operations for non-overflowing regions
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, frameWidth)
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) > 0 {
+		t.Errorf("expected no draw ops for non-overflowing block region, got %d: %v", len(ops), ops)
+	}
+}
+
+// TestHScrollbarMinThumbWidth verifies that even when content is very wide
+// (making the visible fraction tiny), the scrollbar thumb is at least 10 pixels wide.
+func TestHScrollbarMinThumbWidth(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Very wide content: 40px indent + 5000px text. Frame is 200px.
+	// thumbWidth = (200/5040) * 200 ≈ 7.9, which is below the 10px minimum.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	// 500 chars * 10px = 5000px
+	veryLongText := strings.Repeat("x", 500)
+	content := Content{
+		{Text: veryLongText, Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	lines, _ := fi.layoutFromOrigin()
+	regions := findBlockRegions(lines)
+	scrollbarHeight := 12
+	frameWidth := rect.Dx()
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	if len(adjustedRegions) == 0 || !adjustedRegions[0].HasScrollbar {
+		t.Fatal("expected an overflowing block region with scrollbar")
+	}
+
+	scrollbarY := adjustedRegions[0].ScrollbarY
+	fi.syncHScrollState(len(adjustedRegions))
+	fi.SetHScrollOrigin(0, 0)
+
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawHScrollbarsTo(scratch, image.ZP, lines, adjustedRegions, frameWidth)
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Find the thumb draw op (narrower than full width in the scrollbar area)
+	minThumbWidth := 10
+	thumbFound := false
+	for _, op := range ops {
+		r, ok := extractDrawRect(op)
+		if !ok {
+			continue
+		}
+		if r.Min.Y >= scrollbarY && r.Max.Y <= scrollbarY+scrollbarHeight && r.Dx() < frameWidth {
+			thumbFound = true
+			if r.Dx() < minThumbWidth {
+				t.Errorf("thumb width %d is below minimum %d", r.Dx(), minThumbWidth)
+			}
+			break
+		}
+	}
+	if !thumbFound {
+		t.Errorf("could not find thumb draw op in scrollbar area; ops: %v", ops)
+	}
+}
