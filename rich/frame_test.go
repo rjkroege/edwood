@@ -4104,3 +4104,125 @@ func TestHScrollWheelClampsToRange(t *testing.T) {
 		t.Errorf("HScrollWheel(100) from %d should clamp to %d, got %d", maxScrollable-5, maxScrollable, offset)
 	}
 }
+
+// TestScrollbarHeightInHitTesting verifies that Ptofchar and Charofpt account
+// for scrollbar height when mapping between screen coordinates and rune
+// positions. Without the fix, the cursor/selection would appear above the text
+// by the combined height of scrollbars above.
+func TestScrollbarHeightInHitTesting(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 600)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: overflowing code block followed by normal text.
+	// The code block will get a horizontal scrollbar (12px), which should
+	// push the "normal" text down.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		// Code block line: 70 chars * 10px = 700px > 200px frame → scrollbar
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+		// Normal text after the code block
+		{Text: "normal text here", Style: Style{Scale: 1.0}},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	// The code block occupies 1 line (14px height) + scrollbar (12px) = 26px.
+	// The newline after the code block is another line (14px). So "normal text"
+	// should start at Y = 14 (code line) + 12 (scrollbar) + 14 (newline line) = 40.
+	// Actually, the exact Y depends on layout details. The key assertion is that
+	// Ptofchar returns the same Y as where the text would render.
+
+	// Find rune position of "normal text here"
+	normalRunePos := len([]rune("a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx")) + 1 // +1 for \n
+
+	// Get screen point for the start of "normal text here"
+	pt := f.Ptofchar(normalRunePos)
+	ptY := pt.Y - rect.Min.Y // frame-relative Y
+
+	// Now check the reverse: clicking at that screen Y should map back
+	// to the same rune position (or at least the same line).
+	clickPt := image.Point{X: rect.Min.X + 5, Y: pt.Y}
+	gotRune := f.Charofpt(clickPt)
+
+	// The mapped rune should be on the "normal text here" line.
+	if gotRune < normalRunePos {
+		t.Errorf("Charofpt at Ptofchar Y mapped to rune %d, want >= %d (normal text start)",
+			gotRune, normalRunePos)
+	}
+
+	// Verify the Y is past the scrollbar. With the code block line (14px),
+	// scrollbar (12px), and the newline line, the normal text should be at
+	// Y >= 26. Without the fix it would be at Y = 14 (no scrollbar space).
+	if ptY < 26 {
+		t.Errorf("Ptofchar Y for normal text = %d, want >= 26 (code line 14 + scrollbar 12)",
+			ptY)
+	}
+}
+
+// TestScrollbarHeightAfterVerticalScroll verifies that when scrolled past a
+// scrollbar-bearing code block, cursor positions are still correct. This
+// specifically tests that originY computation accounts for scrollbar heights.
+func TestScrollbarHeightAfterVerticalScroll(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 600)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Content: overflowing code block, then two normal text lines.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	codeText := "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx"
+	content := Content{
+		{Text: codeText, Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+		{Text: "line two", Style: Style{Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "line three", Style: Style{Scale: 1.0}},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	// Get position of "line two" without scroll
+	lineTwoRune := len([]rune(codeText)) + 1 // +1 for \n
+	ptNoScroll := f.Ptofchar(lineTwoRune)
+	yNoScroll := ptNoScroll.Y - rect.Min.Y
+
+	// Now scroll so that "line two" is the first visible line.
+	// Set origin to the rune offset of "line two".
+	f.SetOrigin(lineTwoRune)
+	f.Redraw()
+
+	// "line two" should now be at Y=0 in the viewport.
+	ptScrolled := f.Ptofchar(lineTwoRune)
+	yScrolled := ptScrolled.Y - rect.Min.Y
+
+	if yScrolled != 0 {
+		t.Errorf("after scrolling to line two, Ptofchar Y = %d, want 0", yScrolled)
+	}
+
+	// Verify that clicking at Y=0 maps to "line two" rune position.
+	clickPt := image.Point{X: rect.Min.X + 5, Y: rect.Min.Y}
+	gotRune := f.Charofpt(clickPt)
+	if gotRune < lineTwoRune {
+		t.Errorf("Charofpt at Y=0 after scroll mapped to rune %d, want >= %d",
+			gotRune, lineTwoRune)
+	}
+
+	// Sanity: without scroll, Y should be larger (below the code block + scrollbar)
+	if yNoScroll <= 14 { // Must be at least past the code line + scrollbar
+		t.Errorf("without scroll, line two Y = %d, want > 14 (past code block + scrollbar)",
+			yNoScroll)
+	}
+}

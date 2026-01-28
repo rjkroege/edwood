@@ -767,10 +767,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	frameHeight := f.rect.Dy()
 	frameWidth := f.rect.Dx()
 
-	// Compute block regions and apply two-pass scrollbar height adjustment.
+	// Compute block regions and scrollbar metadata. Lines already have
+	// correct Y values (including scrollbar height) from layoutFromOrigin,
+	// so we use the read-only computeScrollbarMetadata rather than
+	// adjustLayoutForScrollbars which would double-adjust Y.
 	regions := findBlockRegions(lines)
 	scrollbarHeight := 12 // Scrollwid
-	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+	adjustedRegions := computeScrollbarMetadata(lines, regions, frameWidth, scrollbarHeight)
 
 	// Cache the adjusted regions for hit-testing (HScrollBarAt).
 	f.hscrollRegions = adjustedRegions
@@ -1077,9 +1080,11 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 	// If origin is 0, just return the normal layout (using cache if available)
 	if f.origin == 0 {
 		lines := f.layoutBoxes(boxes, frameWidth, maxtab)
-		// Sync horizontal scroll state with current block regions
 		regions := findBlockRegions(lines)
 		f.syncHScrollState(len(regions))
+		// Apply scrollbar height adjustments so all callers get correct Y.
+		scrollbarHeight := 12 // Scrollwid
+		adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
 		return lines, 0
 	}
 
@@ -1089,11 +1094,16 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 		return nil, 0
 	}
 
-	// Sync horizontal scroll state with current block regions
+	// Sync horizontal scroll state and apply scrollbar height adjustments
+	// to ALL lines BEFORE computing originY. This ensures originY accounts
+	// for scrollbar heights of blocks above the viewport.
 	regions := findBlockRegions(allLines)
 	f.syncHScrollState(len(regions))
+	scrollbarHeight := 12 // Scrollwid
+	adjustLayoutForScrollbars(allLines, regions, frameWidth, scrollbarHeight)
 
-	// Find which line contains the origin position
+	// Find which line contains the origin position.
+	// Line Y values now include scrollbar heights.
 	runeCount := 0
 	startLineIdx := 0
 	originY := 0
@@ -1125,15 +1135,16 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 		originY = line.Y
 	}
 
-	// Extract lines from the origin line onwards and adjust Y coordinates
+	// Extract lines from the origin line onwards and adjust Y coordinates.
+	// Y values already include scrollbar heights from the adjustment above.
 	visibleLines := make([]Line, 0, len(allLines)-startLineIdx)
 	for i := startLineIdx; i < len(allLines); i++ {
 		line := allLines[i]
-		// Adjust Y coordinate to start from 0, preserving Height
 		adjustedLine := Line{
-			Y:      line.Y - originY,
-			Height: line.Height,
-			Boxes:  line.Boxes,
+			Y:            line.Y - originY,
+			Height:       line.Height,
+			ContentWidth: line.ContentWidth,
+			Boxes:        line.Boxes,
 		}
 		visibleLines = append(visibleLines, adjustedLine)
 	}

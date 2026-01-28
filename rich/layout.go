@@ -270,6 +270,30 @@ func adjustLayoutForScrollbars(lines []Line, regions []BlockRegion, frameWidth, 
 	return adjusted
 }
 
+// computeScrollbarMetadata returns AdjustedBlockRegion metadata for lines
+// whose Y values already include scrollbar height adjustments (i.e. lines
+// that have already been through adjustLayoutForScrollbars). Unlike
+// adjustLayoutForScrollbars, this does NOT modify line Y values.
+func computeScrollbarMetadata(lines []Line, regions []BlockRegion, frameWidth, scrollbarHeight int) []AdjustedBlockRegion {
+	adjusted := make([]AdjustedBlockRegion, len(regions))
+	for i, r := range regions {
+		adjusted[i] = AdjustedBlockRegion{BlockRegion: r}
+		if r.MaxContentWidth > frameWidth {
+			adjusted[i].HasScrollbar = true
+		}
+		// ScrollbarY is the bottom of the last line of the region.
+		if r.EndLine > 0 && r.EndLine <= len(lines) {
+			lastLine := lines[r.EndLine-1]
+			adjusted[i].ScrollbarY = lastLine.Y + lastLine.Height
+		}
+		// RegionTopY is the first line's Y.
+		if r.StartLine < len(lines) {
+			adjusted[i].RegionTopY = lines[r.StartLine].Y
+		}
+	}
+	return adjusted
+}
+
 // findBlockRegions scans layout lines for contiguous runs where all boxes
 // share the same block kind (Block && Code, Table, or Image). Each region
 // records the start/end line indices, the maximum content width, and the kind.
