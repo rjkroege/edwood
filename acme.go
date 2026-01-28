@@ -15,11 +15,9 @@ import (
 	"strings"
 	"time"
 
-	draw9 "9fans.net/go/draw"
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
-	"github.com/rjkroege/edwood/rich"
 )
 
 var (
@@ -128,16 +126,6 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 			}
 		}
 	}
-	display.Flush()
-
-	// Rich text demo - temporary visual test hook
-	// TODO(rjk): Remove this demo when rich text is fully integrated
-	demoOpts := rich.DemoFrameOptions{
-		BoldFont:       tryLoadFontVariant(display, global.tagfont, "bold"),
-		ItalicFont:     tryLoadFontVariant(display, global.tagfont, "italic"),
-		BoldItalicFont: tryLoadFontVariant(display, global.tagfont, "bolditalic"),
-	}
-	g.richDemo = rich.DemoFrame(display, display.ScreenImage().R(), fontget(global.tagfont, display), demoOpts)
 	display.Flush()
 
 	// After row is initialized
@@ -418,15 +406,6 @@ func findattr(attr *plumb.Attribute, s string) string {
 }
 
 func MovedMouse(g *globals, m draw.Mouse) {
-	// Check if the rich text demo should handle this mouse event
-	// Handle button 1 (selection) and buttons 4/5 (scroll wheel)
-	if g.richDemo != nil && m.Point.In(g.richDemo.Rect) && (m.Buttons&1 != 0 || m.Buttons&8 != 0 || m.Buttons&16 != 0) {
-		// Handle selection or scrolling in demo frame
-		m9 := draw9.Mouse(m)
-		g.richDemo.HandleMouse(g.mousectl, &m9)
-		return
-	}
-
 	g.row.lk.Lock()
 	defer g.row.lk.Unlock()
 
