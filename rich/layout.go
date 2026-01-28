@@ -135,9 +135,10 @@ func tabBoxWidth(box *Box, xPos, minX, maxtab int) int {
 // Line represents a line of positioned boxes in the layout.
 // This is the output of the layout algorithm.
 type Line struct {
-	Boxes  []PositionedBox // Boxes on this line
-	Y      int             // Y position of the line (top)
-	Height int             // Height of this line (max font height of boxes)
+	Boxes        []PositionedBox // Boxes on this line
+	Y            int             // Y position of the line (top)
+	Height       int             // Height of this line (max font height of boxes)
+	ContentWidth int             // Actual pixel width of content (may exceed frameWidth for non-wrapping blocks; 0 for normal text)
 }
 
 // PositionedBox is a Box with its computed screen position.
@@ -317,6 +318,14 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
 
+		// For block-level code, don't wrap - allow horizontal overflow
+		if box.Style.Block && box.Style.Code {
+			box.Wid = width
+			currentLine.Boxes = append(currentLine.Boxes, PositionedBox{Box: *box, X: xPos})
+			xPos += width
+			continue
+		}
+
 		// Effective frame width accounts for indentation
 		effectiveFrameWidth := frameWidth - indentPixels
 
@@ -375,6 +384,27 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 	// Check if the last box was a newline - if so, add the empty line
 	if len(boxes) > 0 && boxes[len(boxes)-1].IsNewline() && len(currentLine.Boxes) == 0 {
 		lines = append(lines, currentLine)
+	}
+
+	// Compute ContentWidth for block code lines.
+	// For lines containing Block && Code boxes, ContentWidth is the rightmost
+	// box extent (X + Wid). For normal text lines, ContentWidth stays 0.
+	for i := range lines {
+		line := &lines[i]
+		isBlockCode := false
+		maxExtent := 0
+		for _, pb := range line.Boxes {
+			if pb.Box.Style.Block && pb.Box.Style.Code {
+				isBlockCode = true
+			}
+			extent := pb.X + pb.Box.Wid
+			if extent > maxExtent {
+				maxExtent = extent
+			}
+		}
+		if isBlockCode {
+			line.ContentWidth = maxExtent
+		}
 	}
 
 	return lines

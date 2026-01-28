@@ -664,28 +664,29 @@ func TestLayoutCodeBlockIndent(t *testing.T) {
 		}
 	})
 
-	t.Run("code block wrapping maintains indentation", func(t *testing.T) {
-		// A long code block line that wraps
+	t.Run("code block does not wrap (horizontal scroll instead)", func(t *testing.T) {
+		// A long code block line should NOT wrap; it extends beyond frame width
+		// and will be horizontally scrollable.
 		content := Content{
-			{Text: "this is a very long line of code that will wrap", Style: Style{Block: true, Code: true, Scale: 1.0}},
+			{Text: "this is a very long line of code that will not wrap", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		}
 		boxes := contentToBoxes(content)
-		// Frame width that forces wrapping: 200 pixels = 20 chars
-		// After 40px indent, only 160px = 16 chars fit per line
+		// Frame width that would force wrapping for normal text: 200 pixels = 20 chars
 		lines := layout(boxes, font, 200, maxtab, nil, nil)
 
-		if len(lines) < 2 {
-			t.Fatalf("expected multiple lines for wrapped code, got %d", len(lines))
+		// Block code should produce a single line (no wrapping)
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line for non-wrapping block code, got %d", len(lines))
 		}
 
-		// All lines should start at the calculated indent
-		for i, line := range lines {
-			if len(line.Boxes) == 0 {
-				continue
-			}
-			if line.Boxes[0].X != expectedIndent {
-				t.Errorf("line %d: code block X = %d, want %d (4 * M-width)", i, line.Boxes[0].X, expectedIndent)
-			}
+		// The line should start at the code block indent
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("code block X = %d, want %d (4 * M-width)", lines[0].Boxes[0].X, expectedIndent)
+		}
+
+		// ContentWidth should exceed frameWidth
+		if lines[0].ContentWidth <= 200 {
+			t.Errorf("ContentWidth = %d, should exceed frameWidth 200", lines[0].ContentWidth)
 		}
 	})
 
@@ -1890,4 +1891,158 @@ func saveTestPNG(path string, img *image.RGBA) error {
 	}
 	defer f.Close()
 	return png.Encode(f, img)
+}
+
+// =============================================================================
+// Phase 25A: ContentWidth and No-Wrap for Block Code
+// =============================================================================
+
+// TestLayoutBlockCodeNoWrap tests that block code content wider than frameWidth
+// produces a single line (no wrapping) with ContentWidth > frameWidth.
+func TestLayoutBlockCodeNoWrap(t *testing.T) {
+	// Mock font with fixed character width of 10 pixels, height 14
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 200
+	maxtab := 80
+
+	// Code block indent = 4 * 10 = 40 pixels
+	codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+
+	// Create a long block code line: 30 chars * 10px = 300px of text content
+	// Plus 40px indent = 340px total, which exceeds frameWidth of 200.
+	longCode := "this_is_a_very_long_code_line!"
+	// 29 chars * 10 = 290 pixels of text, plus 40px indent = 330px total
+	content := Content{
+		{Text: longCode, Style: Style{Block: true, Code: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	// Should produce exactly 1 line (no wrapping for block code)
+	if len(lines) != 1 {
+		var lineContents []string
+		for i, line := range lines {
+			var c string
+			for _, pb := range line.Boxes {
+				c += boxToString(pb.Box)
+			}
+			lineContents = append(lineContents, fmt.Sprintf("line[%d]: %q (Y=%d)", i, c, line.Y))
+		}
+		t.Fatalf("block code should not wrap: got %d lines, want 1\n%s",
+			len(lines), strings.Join(lineContents, "\n"))
+	}
+
+	// ContentWidth should exceed frameWidth
+	expectedContentWidth := codeBlockIndent + len(longCode)*10
+	if lines[0].ContentWidth < frameWidth {
+		t.Errorf("ContentWidth = %d, want > %d (frameWidth); expected ~%d",
+			lines[0].ContentWidth, frameWidth, expectedContentWidth)
+	}
+}
+
+// TestLayoutNormalTextStillWraps verifies that normal prose text still wraps
+// after adding the no-wrap behavior for block code. This is a regression test.
+func TestLayoutNormalTextStillWraps(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 100 // Narrow frame to force wrapping
+	maxtab := 80
+
+	// 20 chars * 10px = 200px, well over the 100px frame width
+	content := Plain("this is some normal text that should wrap")
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	// Normal text should wrap to multiple lines
+	if len(lines) < 2 {
+		t.Errorf("normal text should wrap: got %d lines, want >= 2", len(lines))
+	}
+}
+
+// TestContentWidthComputed verifies that ContentWidth is correctly computed
+// on layout lines for both block code and normal text.
+func TestContentWidthComputed(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	maxtab := 80
+
+	t.Run("block code line has ContentWidth equal to rightmost box extent", func(t *testing.T) {
+		frameWidth := 500 // Wide enough that content fits
+		// "hello" = 5 chars * 10px = 50px text, plus 40px indent = 90px total
+		content := Content{
+			{Text: "hello", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+		expectedCW := codeBlockIndent + 50 // indent + text width
+		if lines[0].ContentWidth != expectedCW {
+			t.Errorf("ContentWidth = %d, want %d", lines[0].ContentWidth, expectedCW)
+		}
+	})
+
+	t.Run("normal text line has ContentWidth zero or capped at frameWidth", func(t *testing.T) {
+		frameWidth := 500
+		content := Plain("hello world")
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// For non-block lines, ContentWidth should be 0 (per the design doc)
+		if lines[0].ContentWidth != 0 {
+			t.Errorf("normal text ContentWidth = %d, want 0", lines[0].ContentWidth)
+		}
+	})
+
+	t.Run("block code wider than frame has ContentWidth exceeding frame", func(t *testing.T) {
+		frameWidth := 100
+		// 20 chars * 10px = 200px + 40px indent = 240px
+		content := Content{
+			{Text: "a_long_code_line_xxxx", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("block code should not wrap: expected 1 line, got %d", len(lines))
+		}
+
+		if lines[0].ContentWidth <= frameWidth {
+			t.Errorf("block code ContentWidth = %d, should exceed frameWidth %d",
+				lines[0].ContentWidth, frameWidth)
+		}
+	})
+
+	t.Run("multi-line content has ContentWidth per line", func(t *testing.T) {
+		frameWidth := 500
+		// Two lines of block code with different widths
+		content := Content{
+			{Text: "short", Style: Style{Block: true, Code: true, Scale: 1.0}},
+			{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+			{Text: "a_longer_line", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 lines, got %d", len(lines))
+		}
+
+		codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+		expectedCW0 := codeBlockIndent + 50  // "short" = 5*10
+		expectedCW1 := codeBlockIndent + 130 // "a_longer_line" = 13*10
+
+		if lines[0].ContentWidth != expectedCW0 {
+			t.Errorf("line 0 ContentWidth = %d, want %d", lines[0].ContentWidth, expectedCW0)
+		}
+		if lines[1].ContentWidth != expectedCW1 {
+			t.Errorf("line 1 ContentWidth = %d, want %d", lines[1].ContentWidth, expectedCW1)
+		}
+	})
 }
