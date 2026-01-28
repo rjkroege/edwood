@@ -389,8 +389,8 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 						// Extract alt text and URL
 						altText := text[i+2 : closeBracket]
 						urlPart := text[urlStart:urlEnd]
-						// Parse URL (may contain title)
-						url := parseURLPart(urlPart)
+						// Parse URL (may contain title with width tag)
+						url, title := parseURLPart(urlPart)
 
 						// Create image placeholder span
 						placeholderText := "[Image: " + altText + "]"
@@ -402,8 +402,9 @@ func parseInlineFormatting(text string, baseStyle rich.Style) []rich.Span {
 							Bg:       baseStyle.Bg,
 							Image:    true,
 							ImageURL: url,
-							ImageAlt: altText,
-							Scale:    baseStyle.Scale,
+							ImageAlt:   altText,
+							ImageWidth: parseImageWidth(title),
+							Scale:      baseStyle.Scale,
 						}
 						spans = append(spans, rich.Span{
 							Text:  placeholderText,
@@ -657,7 +658,7 @@ func parseInlineFormattingWithListStyle(text string, baseStyle rich.Style) []ric
 						}
 						altText := text[i+2 : closeBracket]
 						urlPart := text[urlStart:urlEnd]
-						url := parseURLPart(urlPart)
+						url, title := parseURLPart(urlPart)
 						placeholderText := "[Image: " + altText + "]"
 						if altText == "" {
 							placeholderText = "[Image]"
@@ -668,6 +669,7 @@ func parseInlineFormattingWithListStyle(text string, baseStyle rich.Style) []ric
 							Image:       true,
 							ImageURL:    url,
 							ImageAlt:    altText,
+							ImageWidth:  parseImageWidth(title),
 							ListItem:    baseStyle.ListItem,
 							ListIndent:  baseStyle.ListIndent,
 							ListOrdered: baseStyle.ListOrdered,
@@ -1179,25 +1181,71 @@ func parseInlineFormattingNoLinks(text string, baseStyle rich.Style) []rich.Span
 	return spans
 }
 
-// parseURLPart extracts the URL from a URL part that may contain an optional title.
+// parseURLPart extracts the URL and optional title from a URL part.
 // Handles formats like: "url", "url 'title'", or "url \"title\"".
-func parseURLPart(urlPart string) string {
+// Returns (url, title) where title is the unquoted title string, or "" if absent.
+func parseURLPart(urlPart string) (string, string) {
 	urlPart = strings.TrimSpace(urlPart)
 	if urlPart == "" {
-		return ""
+		return "", ""
 	}
 
 	// Check for title with double quotes: url "title"
 	if idx := strings.Index(urlPart, " \""); idx != -1 {
-		return strings.TrimSpace(urlPart[:idx])
+		url := strings.TrimSpace(urlPart[:idx])
+		title := urlPart[idx+2:]
+		// Strip trailing quote
+		if len(title) > 0 && title[len(title)-1] == '"' {
+			title = title[:len(title)-1]
+		}
+		return url, title
 	}
 
 	// Check for title with single quotes: url 'title'
 	if idx := strings.Index(urlPart, " '"); idx != -1 {
-		return strings.TrimSpace(urlPart[:idx])
+		url := strings.TrimSpace(urlPart[:idx])
+		title := urlPart[idx+2:]
+		// Strip trailing quote
+		if len(title) > 0 && title[len(title)-1] == '\'' {
+			title = title[:len(title)-1]
+		}
+		return url, title
 	}
 
-	return urlPart
+	return urlPart, ""
+}
+
+// parseImageWidth extracts the width in pixels from a title string containing "width=Npx".
+// Returns 0 if not found or invalid.
+func parseImageWidth(title string) int {
+	const prefix = "width="
+	const suffix = "px"
+
+	idx := strings.Index(title, prefix)
+	if idx == -1 {
+		return 0
+	}
+
+	// Extract everything after "width="
+	rest := title[idx+len(prefix):]
+
+	// Find "px" suffix
+	pxIdx := strings.Index(rest, suffix)
+	if pxIdx == -1 || pxIdx == 0 {
+		return 0
+	}
+
+	// Parse the number between "width=" and "px"
+	numStr := rest[:pxIdx]
+	n := 0
+	for _, c := range numStr {
+		if c < '0' || c > '9' {
+			return 0
+		}
+		n = n*10 + int(c-'0')
+	}
+
+	return n
 }
 
 // isHorizontalRule returns true if the line is a horizontal rule.

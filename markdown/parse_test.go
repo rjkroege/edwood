@@ -3707,6 +3707,98 @@ func TestImagePlaceholderStyle(t *testing.T) {
 	}
 }
 
+func TestParseImageWidth(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		want  int
+	}{
+		{name: "width=200px", title: "width=200px", want: 200},
+		{name: "width=50px", title: "width=50px", want: 50},
+		{name: "width=1000px", title: "width=1000px", want: 1000},
+		{name: "empty title", title: "", want: 0},
+		{name: "no width tag", title: "Company Logo", want: 0},
+		{name: "width=0px", title: "width=0px", want: 0},
+		{name: "invalid no px suffix", title: "width=200", want: 0},
+		{name: "invalid non-numeric", title: "width=abcpx", want: 0},
+		{name: "negative width", title: "width=-10px", want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseImageWidth(tt.title)
+			if got != tt.want {
+				t.Errorf("parseImageWidth(%q) = %d, want %d", tt.title, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseURLPartWithTitle(t *testing.T) {
+	tests := []struct {
+		name      string
+		urlPart   string
+		wantURL   string
+		wantTitle string
+	}{
+		{name: "url only", urlPart: "logo.png", wantURL: "logo.png", wantTitle: ""},
+		{name: "url with double-quoted title", urlPart: `logo.png "Company Logo"`, wantURL: "logo.png", wantTitle: "Company Logo"},
+		{name: "url with single-quoted title", urlPart: `logo.png 'Company Logo'`, wantURL: "logo.png", wantTitle: "Company Logo"},
+		{name: "url with width tag", urlPart: `logo.png "width=200px"`, wantURL: "logo.png", wantTitle: "width=200px"},
+		{name: "empty", urlPart: "", wantURL: "", wantTitle: ""},
+		{name: "https url with title", urlPart: `https://example.com/img.jpg "width=400px"`, wantURL: "https://example.com/img.jpg", wantTitle: "width=400px"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotURL, gotTitle := parseURLPart(tt.urlPart)
+			if gotURL != tt.wantURL {
+				t.Errorf("parseURLPart(%q) url = %q, want %q", tt.urlPart, gotURL, tt.wantURL)
+			}
+			if gotTitle != tt.wantTitle {
+				t.Errorf("parseURLPart(%q) title = %q, want %q", tt.urlPart, gotTitle, tt.wantTitle)
+			}
+		})
+	}
+}
+
+func TestParseImageWithWidthTag(t *testing.T) {
+	// Test that parsing an image with width=Npx in the title sets ImageWidth
+	got := Parse(`![Glenda](https://9p.io/plan9/img/plan9bunnyblack.jpg "width=200px")`)
+
+	if len(got) != 1 {
+		t.Fatalf("got %d spans, want 1; spans: %+v", len(got), got)
+	}
+
+	span := got[0]
+	if !span.Style.Image {
+		t.Fatal("span.Style.Image = false, want true")
+	}
+	if span.Style.ImageURL != "https://9p.io/plan9/img/plan9bunnyblack.jpg" {
+		t.Errorf("ImageURL = %q, want %q", span.Style.ImageURL, "https://9p.io/plan9/img/plan9bunnyblack.jpg")
+	}
+	if span.Style.ImageWidth != 200 {
+		t.Errorf("ImageWidth = %d, want 200", span.Style.ImageWidth)
+	}
+}
+
+func TestParseImageWithoutWidthTag(t *testing.T) {
+	// Image with a regular title (no width) should have ImageWidth = 0
+	got := Parse(`![Logo](logo.png "Company Logo")`)
+
+	if len(got) != 1 {
+		t.Fatalf("got %d spans, want 1; spans: %+v", len(got), got)
+	}
+
+	span := got[0]
+	if !span.Style.Image {
+		t.Fatal("span.Style.Image = false, want true")
+	}
+	if span.Style.ImageWidth != 0 {
+		t.Errorf("ImageWidth = %d, want 0 (no width tag)", span.Style.ImageWidth)
+	}
+}
+
 func TestImageSourceMap(t *testing.T) {
 	tests := []struct {
 		name  string
