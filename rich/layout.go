@@ -414,10 +414,10 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		}
 
 		// If we have a pending paragraph break and this is the first content,
-		// add space before this paragraph based on the content's font height
+		// add space before this paragraph based on the font height (not image height)
 		if pendingParaBreak && !box.IsTab() {
-			// Add half the height of the upcoming text before this paragraph
-			currentLine.Y += boxHeight / 2
+			fontHeight := getFontHeight(box.Style)
+			currentLine.Y += fontHeight / 2
 			pendingParaBreak = false
 		}
 

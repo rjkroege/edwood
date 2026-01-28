@@ -59,6 +59,9 @@ type Frame interface {
 	// Font metrics
 	DefaultFontHeight() int // Height of the default font
 
+	// Horizontal scrollbar hit testing
+	HScrollBarAt(pt image.Point) (regionIndex int, ok bool)
+
 	// Status
 	Full() bool // True if frame is at capacity
 }
@@ -113,6 +116,10 @@ type frameImpl struct {
 	// Number of non-wrapping blocks seen on the last layout pass.
 	// Used to detect when blocks are added or removed.
 	hscrollBlockCount int
+
+	// Cached adjusted block regions from the last layout pass.
+	// Used for hit-testing horizontal scrollbar clicks.
+	hscrollRegions []AdjustedBlockRegion
 }
 
 // NewFrame creates a new Frame.
@@ -751,6 +758,9 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	regions := findBlockRegions(lines)
 	scrollbarHeight := 12 // Scrollwid
 	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// Cache the adjusted regions for hit-testing (HScrollBarAt).
+	f.hscrollRegions = adjustedRegions
 
 	// Build per-line region lookup: lineRegion[i] is the index into adjustedRegions,
 	// or -1 if the line is not in a block region.
@@ -1516,6 +1526,30 @@ func (f *frameImpl) GetHScrollOrigin(regionIndex int) int {
 		return 0
 	}
 	return f.hscrollOrigins[regionIndex]
+}
+
+// HScrollBarAt checks if the given screen point falls within any horizontal
+// scrollbar rectangle. Returns the region index and true if hit, or (0, false)
+// if the point is not on a scrollbar.
+func (f *frameImpl) HScrollBarAt(pt image.Point) (regionIndex int, ok bool) {
+	scrollbarHeight := 12 // Scrollwid
+	frameWidth := f.rect.Dx()
+
+	// Convert screen point to frame-relative coordinates
+	relX := pt.X - f.rect.Min.X
+	relY := pt.Y - f.rect.Min.Y
+
+	for i, ar := range f.hscrollRegions {
+		if !ar.HasScrollbar {
+			continue
+		}
+		// Scrollbar rectangle: [0, frameWidth) x [ScrollbarY, ScrollbarY+scrollbarHeight)
+		if relX >= 0 && relX < frameWidth &&
+			relY >= ar.ScrollbarY && relY < ar.ScrollbarY+scrollbarHeight {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // HScrollBgColor is the background color of horizontal scrollbars.

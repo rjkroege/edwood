@@ -3632,3 +3632,120 @@ func TestHScrollbarMinThumbWidth(t *testing.T) {
 		t.Errorf("could not find thumb draw op in scrollbar area; ops: %v", ops)
 	}
 }
+
+// TestHScrollBarAtHit verifies that a point inside a horizontal scrollbar
+// rectangle returns the correct region index and ok=true.
+func TestHScrollBarAtHit(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_xxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	// Trigger layout and rendering so hscrollRegions is populated.
+	f.Redraw()
+
+	// The scrollbar should exist. Look up the cached region to find the scrollbar Y.
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+
+	scrollbarHeight := 12
+	// A point inside the scrollbar area (midpoint of the scrollbar).
+	hitPt := image.Point{
+		X: rect.Min.X + 100,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+
+	regionIndex, ok := f.HScrollBarAt(hitPt)
+	if !ok {
+		t.Errorf("HScrollBarAt(%v) returned ok=false, expected hit on scrollbar at Y=%d..%d",
+			hitPt, ar.ScrollbarY, ar.ScrollbarY+scrollbarHeight)
+	}
+	if regionIndex != 0 {
+		t.Errorf("HScrollBarAt(%v) returned regionIndex=%d, expected 0", hitPt, regionIndex)
+	}
+}
+
+// TestHScrollBarAtMiss verifies that a point outside any horizontal scrollbar
+// rectangle returns ok=false.
+func TestHScrollBarAtMiss(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_xxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	// Trigger layout and rendering so hscrollRegions is populated.
+	f.Redraw()
+
+	// A point well above the scrollbar (in the text area).
+	missPt := image.Point{X: rect.Min.X + 100, Y: rect.Min.Y + 5}
+
+	_, ok := f.HScrollBarAt(missPt)
+	if ok {
+		t.Errorf("HScrollBarAt(%v) returned ok=true, expected miss (point is in text area, not scrollbar)", missPt)
+	}
+}
+
+// TestHScrollBarAtNoOverflow verifies that when no block region overflows,
+// HScrollBarAt always returns ok=false.
+func TestHScrollBarAtNoOverflow(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Short code block that fits within the 400px frame.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "short", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	// Trigger layout and rendering.
+	f.Redraw()
+
+	// Try a point that would be in the scrollbar area if one existed.
+	// With no overflow, there's no scrollbar, so this should miss.
+	testPt := image.Point{X: rect.Min.X + 100, Y: rect.Min.Y + 20}
+	_, ok := f.HScrollBarAt(testPt)
+	if ok {
+		t.Errorf("HScrollBarAt(%v) returned ok=true, expected false (no scrollbar for non-overflowing block)", testPt)
+	}
+}
