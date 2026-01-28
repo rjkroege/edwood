@@ -1373,6 +1373,38 @@ func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, re
 		return nil, nil, 0
 	}
 
+	// Parse alignment from separator row (line index 1)
+	_, aligns := parseTableSeparator(tableLines[1])
+
+	// Parse all rows into cells (skip separator at index 1)
+	var allCells [][]string
+	for i, line := range tableLines {
+		if i == 1 {
+			allCells = append(allCells, nil)
+			continue
+		}
+		_, cells := isTableRow(line)
+		allCells = append(allCells, cells)
+	}
+
+	// Collect non-nil rows for width calculation
+	var dataCells [][]string
+	for _, cells := range allCells {
+		if cells != nil {
+			dataCells = append(dataCells, cells)
+		}
+	}
+
+	// Calculate column widths
+	widths := calculateColumnWidths(dataCells)
+
+	// Ensure minimum width of 3 for separator dashes
+	for i, w := range widths {
+		if w < 3 {
+			widths[i] = 3
+		}
+	}
+
 	// Build spans and source map entries for each table row
 	var spans []rich.Span
 	var entries []SourceMapEntry
@@ -1380,12 +1412,16 @@ func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, re
 	rendPos := renderedOffset
 
 	for i, line := range tableLines {
-		// Normalize line ending
-		lineText := strings.TrimSuffix(line, "\n")
-
-		// Determine if this is header row, separator row, or data row
+		var lineText string
 		isHeader := i == 0
-		isSeparator := i == 1 && isTableSeparatorRow(line)
+		isSeparator := i == 1
+
+		if isSeparator {
+			lineText = rebuildSeparatorRow(widths, aligns)
+		} else {
+			cells := allCells[i]
+			lineText = rebuildTableRow(cells, widths, aligns)
+		}
 
 		// Add newline unless it's the last line
 		if i < len(tableLines)-1 {
@@ -1417,7 +1453,9 @@ func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, re
 			Style: style,
 		})
 
-		// Create source map entry for this line
+		// Create source map entry for this line.
+		// The rendered text may differ from source due to padding,
+		// but we map the entire rendered line to the entire source line.
 		renderedLen := len([]rune(lineText))
 		entries = append(entries, SourceMapEntry{
 			RenderedStart: rendPos,

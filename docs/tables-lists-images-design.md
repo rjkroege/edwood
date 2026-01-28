@@ -376,6 +376,188 @@ Rendering tests:
 
 ---
 
+### Table Remediation: Grid Layout and Visual Polish
+
+The initial table implementation (Phase 15B) established parsing and basic rendering
+but left several gaps. This section describes the improvements needed to bring tables
+up to proper visual quality.
+
+#### Current State Assessment
+
+What works:
+- Detection: `isTableRow()`, `splitTableCells()`, `isTableSeparatorRow()`,
+  `parseTableSeparator()`, `parseSeparatorCell()` all function correctly.
+- Alignment parsing: `parseTableSeparator()` correctly extracts per-column
+  `AlignLeft`/`AlignCenter`/`AlignRight` values.
+- Style fields: `Table`, `TableHeader`, `TableAlign` exist on `Style`.
+- Layout integration: tables recognized as `BlockTable` for scrollbar/block
+  region handling.
+- Test coverage: 11+ test functions covering detection, parsing, alignment,
+  source mapping, and negative cases.
+
+What is broken or missing:
+
+1. **No column width normalization.** `calculateColumnWidths()` exists in
+   `parse.go` but is never called. `parseTableBlock()` emits raw line text
+   verbatim, so misaligned source text stays misaligned in the rendered output.
+
+2. **No grid lines.** The design above envisions box-drawing characters
+   (`┌──┬──┐`, `│`, `├──┼──┤`, `└──┴──┘`) but the current code just passes
+   through the original `|------|` ASCII. There are no proper horizontal rules
+   (top border, header separator, bottom border) or vertical rules.
+
+3. **Alignment parsed but not applied.** `parseTableSeparator()` extracts
+   per-column `Alignment` values, but `parseTableBlock()` never uses them. It
+   does not pad/align cell content. `TableAlign` is effectively always
+   `AlignLeft`.
+
+4. **Each row is one monolithic span.** Instead of emitting per-cell spans
+   (which would allow per-cell styling, alignment, and layout), each row is
+   emitted as a single `rich.Span` with the entire line as `Text`. This makes
+   it impossible for the layout engine to do cell-level formatting.
+
+#### Improvement Phase 1: Column Width Normalization + Alignment
+
+**Goal:** Tables render with uniform column widths and correct cell alignment.
+
+**Changes to `parseTableBlock()` in `markdown/parse.go`:**
+
+1. After collecting all table lines, parse every row into `[][]string` (cells).
+2. Call `calculateColumnWidths()` to get `[]int` max widths.
+3. Parse the separator row to get `[]rich.Alignment` per column.
+4. Rebuild each row's text by padding cells to their column width:
+   - `AlignLeft`: content + trailing spaces
+   - `AlignRight`: leading spaces + content
+   - `AlignCenter`: split padding on both sides
+5. Rebuild the separator row with dashes padded to column widths.
+6. Emit the rebuilt text as spans (still one span per row for now).
+
+```
+Before (raw passthrough):
+| Name | Age |
+|------|-----|
+| Alice | 30 |
+| Bob | 7 |
+
+After (normalized):
+| Name  | Age |
+|-------|-----|
+| Alice |  30 |
+| Bob   |   7 |
+```
+
+**Source mapping impact:** The source map function
+`parseTableBlockWithSourceMap()` must apply the same normalization. Padding
+spaces are synthetic (not in source), so source map entries skip them.
+
+**Tests:**
+- `TestParseTableNormalizedWidths` — verify cells padded to uniform widths
+- `TestParseTableRightAlign` — right-aligned column has leading spaces
+- `TestParseTableCenterAlign` — center-aligned column has balanced padding
+- `TestParseTableSourceMapWithPadding` — source map skips synthetic padding
+
+#### Improvement Phase 2: Box-Drawing Grid Lines
+
+**Goal:** Replace ASCII pipes and dashes with Unicode box-drawing characters
+for clean visual presentation.
+
+**Character mapping:**
+
+| Position | ASCII | Box-drawing |
+|----------|-------|-------------|
+| Top-left corner | (none) | `┌` U+250C |
+| Top-right corner | (none) | `┐` U+2510 |
+| Bottom-left corner | (none) | `└` U+2514 |
+| Bottom-right corner | (none) | `┘` U+2518 |
+| Horizontal rule | `-` | `─` U+2500 |
+| Vertical rule | `\|` | `│` U+2502 |
+| Top tee | (none) | `┬` U+252C |
+| Bottom tee | (none) | `┴` U+2534 |
+| Left tee | (none) | `├` U+251C |
+| Right tee | (none) | `┤` U+2524 |
+| Cross | (none) | `┼` U+253C |
+
+**Rendered output:**
+
+```
+┌───────┬─────┬──────┐
+│ Name  │ Age │ City │
+├───────┼─────┼──────┤
+│ Alice │  30 │ NYC  │
+│ Bob   │   7 │ LA   │
+└───────┴─────┴──────┘
+```
+
+**Changes to `parseTableBlock()`:**
+
+1. After normalization (Phase 1), generate three additional synthetic lines:
+   - **Top border:** `┌` + `─`×(width+2) joined by `┬` + `┐`
+   - **Header separator:** `├` + `─`×(width+2) joined by `┼` + `┤`
+     (replaces the raw `|---|` separator)
+   - **Bottom border:** `└` + `─`×(width+2) joined by `┴` + `┘`
+2. Replace `|` cell delimiters with `│` in header and data rows.
+3. Border/separator lines get `Style{Table: true, Code: true, Block: true}`
+   (no Bold, no TableHeader).
+
+**Helper function:**
+
+```go
+// buildGridLine builds a box-drawing horizontal line.
+// left/mid/right are corner/tee characters; fill is the horizontal rule char.
+func buildGridLine(widths []int, left, mid, right, fill rune) string {
+    var b strings.Builder
+    b.WriteRune(left)
+    for i, w := range widths {
+        for j := 0; j < w+2; j++ { // +2 for padding spaces
+            b.WriteRune(fill)
+        }
+        if i < len(widths)-1 {
+            b.WriteRune(mid)
+        }
+    }
+    b.WriteRune(right)
+    return b.String()
+}
+```
+
+**Source mapping impact:** Box-drawing characters are synthetic and do not
+appear in source. The source map must map cell content only, skipping border
+characters and padding. Grid border lines (top, separator, bottom) have no
+source mapping — they map to zero-length source ranges.
+
+**Tests:**
+- `TestParseTableBoxDrawing` — verify box-drawing characters in output
+- `TestParseTableTopBorder` — top border line present with correct corners
+- `TestParseTableBottomBorder` — bottom border line present
+- `TestParseTableHeaderSeparator` — header separator uses `├──┼──┤`
+- `TestParseTableVerticalRules` — `│` replaces `|` in cell rows
+- `TestParseTableSourceMapBoxDrawing` — source map ignores synthetic chars
+
+#### Improvement Phase 3: Per-Cell Spans (Future)
+
+**Goal:** Emit individual spans per cell for true grid layout support.
+
+This is a deeper structural change that would touch the layout engine. It is
+documented here for future reference but is **not planned for immediate
+implementation**.
+
+Each cell would become its own `rich.Span` with:
+- `TableAlign` set to the column's alignment
+- `TableHeader` set for header row cells
+- Column index and row index metadata for layout
+
+The layout engine would need to:
+- Recognize adjacent table cell spans and arrange them in a grid
+- Handle cell backgrounds, selection, and overflow per-cell
+- Support horizontal scrolling at the table level (existing `BlockTable`
+  region handling)
+
+This phase is deferred because Phases 1 and 2 achieve good visual quality
+using the existing one-span-per-row model, and the layout engine changes
+would be invasive.
+
+---
+
 ## Part 3: Images
 
 ### Markdown Image Syntax

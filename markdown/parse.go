@@ -1697,6 +1697,71 @@ func calculateColumnWidths(rows [][]string) []int {
 	return widths
 }
 
+// padCell pads a cell's content to the given width according to the alignment.
+// AlignLeft: content + trailing spaces
+// AlignRight: leading spaces + content
+// AlignCenter: balanced padding (extra space on right if odd)
+func padCell(content string, width int, align rich.Alignment) string {
+	padding := width - len(content)
+	if padding <= 0 {
+		return content
+	}
+	switch align {
+	case rich.AlignRight:
+		return strings.Repeat(" ", padding) + content
+	case rich.AlignCenter:
+		left := padding / 2
+		right := padding - left
+		return strings.Repeat(" ", left) + content + strings.Repeat(" ", right)
+	default: // AlignLeft
+		return content + strings.Repeat(" ", padding)
+	}
+}
+
+// rebuildTableRow rebuilds a table row line from cells, column widths, and alignments.
+func rebuildTableRow(cells []string, widths []int, aligns []rich.Alignment) string {
+	var b strings.Builder
+	b.WriteByte('|')
+	for j, cell := range cells {
+		w := 0
+		if j < len(widths) {
+			w = widths[j]
+		}
+		a := rich.AlignLeft
+		if j < len(aligns) {
+			a = aligns[j]
+		}
+		b.WriteString(" " + padCell(cell, w, a) + " |")
+	}
+	return b.String()
+}
+
+// rebuildSeparatorRow rebuilds the separator line with dashes padded to column widths.
+func rebuildSeparatorRow(widths []int, aligns []rich.Alignment) string {
+	var b strings.Builder
+	b.WriteByte('|')
+	for j, w := range widths {
+		a := rich.AlignLeft
+		if j < len(aligns) {
+			a = aligns[j]
+		}
+		b.WriteByte(' ')
+		switch a {
+		case rich.AlignCenter:
+			b.WriteByte(':')
+			b.WriteString(strings.Repeat("-", w-2))
+			b.WriteByte(':')
+		case rich.AlignRight:
+			b.WriteString(strings.Repeat("-", w-1))
+			b.WriteByte(':')
+		default: // AlignLeft (with or without leading colon)
+			b.WriteString(strings.Repeat("-", w))
+		}
+		b.WriteString(" |")
+	}
+	return b.String()
+}
+
 // parseTableBlock parses a table starting at the given line index.
 // Returns the spans for the table and the number of lines consumed.
 func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
@@ -1739,16 +1804,53 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 		return nil, 0
 	}
 
-	// Build spans for each table row
+	// Parse alignment from separator row (line index 1)
+	_, aligns := parseTableSeparator(tableLines[1])
+
+	// Parse all rows into cells (skip separator at index 1)
+	var allCells [][]string
+	for i, line := range tableLines {
+		if i == 1 {
+			// Separator row — skip for column width calculation
+			allCells = append(allCells, nil)
+			continue
+		}
+		_, cells := isTableRow(line)
+		allCells = append(allCells, cells)
+	}
+
+	// Collect non-nil rows for width calculation
+	var dataCells [][]string
+	for _, cells := range allCells {
+		if cells != nil {
+			dataCells = append(dataCells, cells)
+		}
+	}
+
+	// Calculate column widths
+	widths := calculateColumnWidths(dataCells)
+
+	// Ensure minimum width of 3 for separator dashes
+	for i, w := range widths {
+		if w < 3 {
+			widths[i] = 3
+		}
+	}
+
+	// Build spans for each table row with normalized widths
 	var spans []rich.Span
 
-	for i, line := range tableLines {
-		// Normalize line ending
-		lineText := strings.TrimSuffix(line, "\n")
-
-		// Determine if this is header row, separator row, or data row
+	for i := range tableLines {
+		var lineText string
 		isHeader := i == 0
-		isSeparator := i == 1 && isTableSeparatorRow(line)
+		isSeparator := i == 1
+
+		if isSeparator {
+			lineText = rebuildSeparatorRow(widths, aligns)
+		} else {
+			cells := allCells[i]
+			lineText = rebuildTableRow(cells, widths, aligns)
+		}
 
 		// Add newline unless it's the last line
 		if i < len(tableLines)-1 {
