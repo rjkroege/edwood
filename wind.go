@@ -75,6 +75,11 @@ type Window struct {
 	previewUpdateTimer *time.Timer         // debounce timer for preview updates
 	imageCache         *rich.ImageCache    // cache for loaded images in preview mode
 	selectionContext   *SelectionContext   // context metadata for the current preview selection
+
+	// Preview double-click state (mirrors clicktext/clickmsec in text.go)
+	previewClickPos  int        // rune position of last B1 null-click
+	previewClickMsec uint32     // timestamp of last B1 null-click
+	previewClickRT   *RichText  // which richtext received the last click
 }
 
 var (
@@ -970,16 +975,68 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 	// Handle button 1 in frame area for text selection and chording
 	frameRect := rt.Frame().Rect()
 	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
+		var p0, p1 int
 		var chordButtons int
-		if mc != nil {
-			// Use SelectWithChord for drag selection with chord detection.
-			// Detects B2/B3 pressed while B1 is held for Cut/Paste/Snarf.
-			var p0, p1 int
-			p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
+
+		selectq := rt.Frame().Charofpt(m.Point)
+		b := m.Buttons
+
+		// Check for double-click: same richtext, same position, within 500ms.
+		prevP0, prevP1 := rt.Selection()
+		if w.previewClickRT == rt &&
+			m.Msec-w.previewClickMsec < 500 &&
+			prevP0 == prevP1 && selectq == prevP0 {
+
+			// Double-click: expand selection
+			p0, p1 = rt.Frame().ExpandAtPos(selectq)
 			rt.SetSelection(p0, p1)
+			rt.Frame().Redraw()
+			if w.display != nil {
+				w.display.Flush()
+			}
+			w.previewClickRT = nil
+
+			// Wait for mouse state change (like acme: jitter tolerance)
+			if mc != nil {
+				x, y := m.Point.X, m.Point.Y
+				for {
+					me := <-mc.C
+					if !(me.Buttons == b &&
+						util.Abs(me.Point.X-x) < 3 &&
+						util.Abs(me.Point.Y-y) < 3) {
+						// If buttons still held, handle chords
+						if me.Buttons != 0 && me.Buttons != b {
+							chordButtons = me.Buttons
+						}
+						// Drain until all buttons released
+						for me.Buttons != 0 {
+							me = <-mc.C
+							if me.Buttons != 0 && me.Buttons != b && chordButtons == 0 {
+								chordButtons = me.Buttons
+							}
+						}
+						break
+					}
+				}
+			}
 		} else {
-			charPos := rt.Frame().Charofpt(m.Point)
-			rt.SetSelection(charPos, charPos)
+			// Normal click/drag selection
+			if mc != nil {
+				p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
+				rt.SetSelection(p0, p1)
+			} else {
+				p0, p1 = selectq, selectq
+				rt.SetSelection(p0, p1)
+			}
+
+			// Record double-click state
+			if p0 == p1 {
+				w.previewClickRT = rt
+				w.previewClickPos = p0
+				w.previewClickMsec = m.Msec
+			} else {
+				w.previewClickRT = nil
+			}
 		}
 
 		// Sync the preview selection to the source body buffer
@@ -1031,12 +1088,13 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			p0, p1 = charPos, charPos
 			rt.SetSelection(charPos, charPos)
 		}
-		// If null click (no sweep), expand to word under cursor
+		// If null click (no sweep), expand selection. In a code block,
+		// expands to the full block; otherwise expands to word.
 		if p0 == p1 {
-			_, wordStart, wordEnd := w.PreviewExpandWord(p0)
-			if wordStart != wordEnd {
-				rt.SetSelection(wordStart, wordEnd)
-				p0, p1 = wordStart, wordEnd
+			q0, q1 := rt.Frame().ExpandAtPos(p0)
+			if q0 != q1 {
+				rt.SetSelection(q0, q1)
+				p0, p1 = q0, q1
 			}
 		}
 		// Sync the preview selection to the source body buffer
@@ -1077,7 +1135,8 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		// Determine the character position for link/image checks
 		charPos := p0
 
-		// If null click (no sweep), check for existing selection or expand to word
+		// If null click (no sweep), check for existing selection or expand.
+		// In a code block, expands to the full block; otherwise expands to word.
 		if p0 == p1 {
 			// Check if click is inside an existing selection
 			q0, q1 := rt.Selection()
@@ -1086,11 +1145,10 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 				p0, p1 = q0, q1
 				rt.SetSelection(q0, q1)
 			} else {
-				// Expand to word under cursor
-				_, wordStart, wordEnd := w.PreviewExpandWord(p0)
-				if wordStart != wordEnd {
-					rt.SetSelection(wordStart, wordEnd)
-					p0, p1 = wordStart, wordEnd
+				q0, q1 := rt.Frame().ExpandAtPos(p0)
+				if q0 != q1 {
+					rt.SetSelection(q0, q1)
+					p0, p1 = q0, q1
 				}
 			}
 		}
