@@ -555,22 +555,278 @@ func TestSelectionManagerClampSelection(t *testing.T) {
 	}
 }
 
-// TestSelectionManagerExpandStubs tests that expand methods don't panic.
-// These are stubs for Phase 6B.
-func TestSelectionManagerExpandStubs(t *testing.T) {
-	sm := NewSelectionManager(nil)
-
-	// These should not panic and return reasonable values
-	wordRange := sm.ExpandToWord(10, nil)
-	if wordRange.Start != 10 || wordRange.End != 10 {
-		t.Errorf("ExpandToWord stub should return (pos, pos); got (%d, %d)",
-			wordRange.Start, wordRange.End)
+// TestSelectionManagerExpandToWord tests word expansion behavior.
+func TestSelectionManagerExpandToWord(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		pos      int
+		wantQ0   int
+		wantQ1   int
+	}{
+		{"middle of word", "hello world", 2, 0, 5},       // pos in "hello" -> select "hello"
+		{"start of word", "hello world", 0, 0, 5},        // pos at 'h' -> select "hello"
+		{"end of word", "hello world", 5, 5, 5},          // pos at space -> no word
+		{"second word", "hello world", 8, 6, 11},         // pos in "world" -> select "world"
+		{"single char word", "a b c", 2, 2, 3},           // pos at 'b' -> select "b"
+		{"numbers", "abc123def", 5, 0, 9},                // pos in "123" -> select "abc123def" (alnum)
+		{"underscore", "foo_bar", 4, 0, 7},               // underscore is not alnum, splits word
+		{"empty at start", "hello", 0, 0, 5},             // at start of only word
+		{"empty string", "", 0, 0, 0},                    // empty string
+		{"only spaces", "   ", 1, 1, 1},                  // only spaces, no word
+		{"word at end", "hello", 4, 0, 5},                // last char of word
 	}
 
-	lineRange := sm.ExpandToLine(10, nil)
-	if lineRange.Start != 10 || lineRange.End != 10 {
-		t.Errorf("ExpandToLine stub should return (pos, pos); got (%d, %d)",
-			lineRange.Start, lineRange.End)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			textRunes := []rune(tc.text)
+			reader := func(start, end int) []rune {
+				if start < 0 {
+					start = 0
+				}
+				if end > len(textRunes) {
+					end = len(textRunes)
+				}
+				if start >= end {
+					return nil
+				}
+				return textRunes[start:end]
+			}
+			result := sm.ExpandToWord(tc.pos, reader)
+			if result.Start != tc.wantQ0 || result.End != tc.wantQ1 {
+				t.Errorf("ExpandToWord(%d) in %q = (%d, %d); want (%d, %d)",
+					tc.pos, tc.text, result.Start, result.End, tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerExpandToLine tests line expansion behavior.
+func TestSelectionManagerExpandToLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		pos      int
+		wantQ0   int
+		wantQ1   int
+	}{
+		{"middle of line", "hello\nworld\n", 2, 0, 5},     // pos in "hello" -> select "hello" (not newline)
+		{"second line", "hello\nworld\n", 8, 6, 11},       // pos in "world" -> select "world"
+		{"at newline", "hello\nworld\n", 5, 0, 5},         // pos at '\n' -> select line before
+		{"start of line", "hello\nworld", 6, 6, 11},       // pos at 'w' -> select "world"
+		{"single line", "hello", 2, 0, 5},                 // no newlines
+		{"empty string", "", 0, 0, 0},                     // empty string
+		{"only newline", "\n", 0, 0, 0},                   // just a newline
+		{"empty lines", "\n\n\n", 1, 1, 1},                // between newlines
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			textRunes := []rune(tc.text)
+			reader := func(start, end int) []rune {
+				if start < 0 {
+					start = 0
+				}
+				if end > len(textRunes) {
+					end = len(textRunes)
+				}
+				if start >= end {
+					return nil
+				}
+				return textRunes[start:end]
+			}
+			result := sm.ExpandToLine(tc.pos, reader)
+			if result.Start != tc.wantQ0 || result.End != tc.wantQ1 {
+				t.Errorf("ExpandToLine(%d) in %q = (%d, %d); want (%d, %d)",
+					tc.pos, tc.text, result.Start, result.End, tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerExpandBrackets tests bracket matching expansion.
+func TestSelectionManagerExpandBrackets(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		pos      int
+		wantQ0   int
+		wantQ1   int
+	}{
+		{"parens", "(hello)", 1, 1, 6},           // inside parens -> content
+		{"nested parens", "((a))", 1, 1, 4},      // outer to inner closing
+		{"braces", "{hello}", 1, 1, 6},           // inside braces
+		{"brackets", "[hello]", 1, 1, 6},         // inside brackets
+		{"angle brackets", "<hello>", 1, 1, 6},   // inside angle brackets
+		{"quotes", "'hello'", 1, 1, 6},           // inside single quotes
+		{"double quotes", "\"hello\"", 1, 1, 6},  // inside double quotes
+		{"backticks", "`hello`", 1, 1, 6},        // inside backticks
+		{"guillemets", "«hello»", 1, 1, 6}, // inside « »
+		{"no match", "hello", 2, 0, 5},           // no brackets, fall back to word
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			textRunes := []rune(tc.text)
+			reader := func(start, end int) []rune {
+				if start < 0 {
+					start = 0
+				}
+				if end > len(textRunes) {
+					end = len(textRunes)
+				}
+				if start >= end {
+					return nil
+				}
+				return textRunes[start:end]
+			}
+			charReader := func(pos int) rune {
+				if pos < 0 || pos >= len(textRunes) {
+					return 0
+				}
+				return textRunes[pos]
+			}
+			result := sm.ExpandToBrackets(tc.pos, len(textRunes), reader, charReader)
+			if result.Start != tc.wantQ0 || result.End != tc.wantQ1 {
+				t.Errorf("ExpandToBrackets(%d) in %q = (%d, %d); want (%d, %d)",
+					tc.pos, tc.text, result.Start, result.End, tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerInSelection tests the InSelection method.
+func TestSelectionManagerInSelection(t *testing.T) {
+	tests := []struct {
+		name       string
+		q0, q1     int
+		pos        int
+		wantInSel  bool
+	}{
+		{"empty selection", 10, 10, 10, false},
+		{"before selection", 10, 20, 5, false},
+		{"at start", 10, 20, 10, true},
+		{"inside", 10, 20, 15, true},
+		{"at end", 10, 20, 20, true},
+		{"after selection", 10, 20, 25, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			sm.SetSelection(tc.q0, tc.q1)
+			result := sm.InSelection(tc.pos)
+			if result != tc.wantInSel {
+				t.Errorf("InSelection(%d) with selection (%d, %d) = %v; want %v",
+					tc.pos, tc.q0, tc.q1, result, tc.wantInSel)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerConstrain tests the Constrain method.
+func TestSelectionManagerConstrain(t *testing.T) {
+	tests := []struct {
+		name       string
+		q0, q1     int
+		maxLen     int
+		wantQ0     int
+		wantQ1     int
+	}{
+		{"within bounds", 10, 20, 100, 10, 20},
+		{"q0 beyond max", 150, 200, 100, 100, 100},
+		{"q1 beyond max", 50, 200, 100, 50, 100},
+		{"both beyond max", 150, 200, 100, 100, 100},
+		{"at boundary", 100, 100, 100, 100, 100},
+		{"zero max", 10, 20, 0, 0, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			sm.SetSelection(tc.q0, tc.q1)
+			p0, p1 := sm.Constrain(tc.maxLen)
+			if p0 != tc.wantQ0 || p1 != tc.wantQ1 {
+				t.Errorf("Constrain(%d) with selection (%d, %d) = (%d, %d); want (%d, %d)",
+					tc.maxLen, tc.q0, tc.q1, p0, p1, tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerAdjustForInsert tests selection adjustment after text insertion.
+// This matches the behavior in text.go's Inserted method:
+// - if insertPos < q1, adjust q1
+// - if insertPos < q0, adjust q0
+func TestSelectionManagerAdjustForInsert(t *testing.T) {
+	tests := []struct {
+		name       string
+		q0, q1     int
+		insertPos  int
+		insertLen  int
+		wantQ0     int
+		wantQ1     int
+	}{
+		{"insert before selection", 10, 20, 5, 3, 13, 23},   // 5 < 10 and 5 < 20, both adjust
+		{"insert at selection start", 10, 20, 10, 3, 10, 23}, // 10 < 20 (q1 adjusts), 10 < 10 false (q0 stays)
+		{"insert inside selection", 10, 20, 15, 3, 10, 23},   // 15 < 20 (q1 adjusts), 15 < 10 false (q0 stays)
+		{"insert at selection end", 10, 20, 20, 3, 10, 20},   // 20 < 20 false (q1 stays), 20 < 10 false (q0 stays)
+		{"insert after selection", 10, 20, 25, 3, 10, 20},    // nothing adjusts
+		{"insert at cursor (no selection)", 10, 10, 10, 3, 10, 10}, // nothing adjusts
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			sm.SetSelection(tc.q0, tc.q1)
+			sm.AdjustForInsert(tc.insertPos, tc.insertLen)
+			sel := sm.Selection()
+			if sel.Start != tc.wantQ0 || sel.End != tc.wantQ1 {
+				t.Errorf("AdjustForInsert(%d, %d) with selection (%d, %d) = (%d, %d); want (%d, %d)",
+					tc.insertPos, tc.insertLen, tc.q0, tc.q1,
+					sel.Start, sel.End, tc.wantQ0, tc.wantQ1)
+			}
+		})
+	}
+}
+
+// TestSelectionManagerAdjustForDelete tests selection adjustment after text deletion.
+// This matches the behavior in text.go's Deleted method:
+// - if delQ0 < q0, adjust q0 by min(n, q0-delQ0)
+// - if delQ0 < q1, adjust q1 by min(n, q1-delQ0)
+func TestSelectionManagerAdjustForDelete(t *testing.T) {
+	tests := []struct {
+		name       string
+		q0, q1     int
+		delQ0      int
+		delQ1      int
+		wantQ0     int
+		wantQ1     int
+	}{
+		{"delete before selection", 10, 20, 2, 5, 7, 17},           // n=3, q0-=3, q1-=3
+		{"delete overlapping start", 10, 20, 5, 15, 5, 10},         // n=10, q0-=min(10,5)=5, q1-=min(10,15)=10
+		{"delete inside selection", 10, 20, 12, 15, 10, 17},        // n=3, delQ0(12)<q0(10) false, q1-=min(3,8)=3
+		{"delete overlapping end", 10, 20, 15, 25, 10, 15},         // n=10, delQ0(15)<q0(10) false, q1-=min(10,5)=5
+		{"delete containing selection", 10, 20, 5, 25, 5, 5},       // n=20, q0-=min(20,5)=5, q1-=min(20,15)=15
+		{"delete after selection", 10, 20, 25, 30, 10, 20},         // delQ0(25)<10 false, delQ0<20 false
+		{"delete at cursor (no selection)", 10, 10, 5, 8, 7, 7},    // n=3, q0-=min(3,5)=3, q1-=min(3,5)=3
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := NewSelectionManager(nil)
+			sm.SetSelection(tc.q0, tc.q1)
+			sm.AdjustForDelete(tc.delQ0, tc.delQ1)
+			sel := sm.Selection()
+			if sel.Start != tc.wantQ0 || sel.End != tc.wantQ1 {
+				t.Errorf("AdjustForDelete(%d, %d) with selection (%d, %d) = (%d, %d); want (%d, %d)",
+					tc.delQ0, tc.delQ1, tc.q0, tc.q1,
+					sel.Start, sel.End, tc.wantQ0, tc.wantQ1)
+			}
+		})
 	}
 }
 
