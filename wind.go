@@ -13,6 +13,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/ui"
 	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/rich"
 	"github.com/rjkroege/edwood/util"
@@ -194,6 +195,12 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	if clone != nil {
 		w.body.SetSelect(clone.body.q0, clone.body.q1)
 	}
+}
+
+// Display returns the window's display as a ui.MouseMover.
+// This implements the ui.MouseWindow interface.
+func (w *Window) Display() ui.MouseMover {
+	return w.display
 }
 
 func (w *Window) DrawButton() {

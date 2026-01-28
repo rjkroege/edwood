@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"image"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,27 +11,20 @@ import (
 	"github.com/rjkroege/edwood/util"
 )
 
-var (
-	prevmouse image.Point
-	mousew    *Window
-)
-
+// clearmouse removes any saved mouse state.
 func clearmouse() {
-	mousew = nil
+	global.mousestate.Clear()
 }
 
+// savemouse stores the current mouse position and associated window.
 func savemouse(w *Window) {
-	prevmouse = global.mouse.Point
-	mousew = w
+	global.mousestate.Save(w, global.mouse.Point)
 }
 
+// restoremouse moves the mouse cursor to the saved position if the given window
+// matches the saved window. Returns true if the cursor was moved.
 func restoremouse(w *Window) bool {
-	defer func() { mousew = nil }()
-	if mousew != nil && mousew == w {
-		w.display.MoveTo(prevmouse)
-		return true
-	}
-	return false
+	return global.mousestate.Restore(w)
 }
 
 func bytetorune(s []byte) []rune {

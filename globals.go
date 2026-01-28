@@ -9,6 +9,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/ui"
 )
 
 // globals holds all global state for the Edwood editor.
@@ -56,6 +57,11 @@ type globals struct {
 
 	// keyboardctl provides keyboard event channel.
 	keyboardctl *draw.Keyboardctl
+
+	// mousestate tracks saved mouse position state for cursor restoration.
+	// Used by operations that temporarily move the cursor (like column resizing)
+	// to restore the cursor position after the operation completes.
+	mousestate *ui.MouseState
 
 	// ═══════════════════════════════════════════════════════════════════
 	// UI Button Images
@@ -280,6 +286,7 @@ func makeglobals() *globals {
 		cedit:      make(chan int),
 		cexit:      make(chan struct{}),
 		cwarn:      make(chan uint),
+		mousestate: ui.NewMouseState(),
 	}
 
 	if home, err := os.UserHomeDir(); err == nil {
