@@ -396,9 +396,7 @@ func (c *Column) Grow(w *Window, but int) {
 		for i := range nl {
 			nl[i] = 0
 		}
-		goto Pack
-	}
-	{ // Scope for nnl & dln
+	} else {
 		nnl := util.Min(onl+util.Max(util.Min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
 		if nnl < w.taglines-1+w.maxlines {
 			nnl = (w.taglines - 1 + w.maxlines + nnl) / 2
@@ -427,7 +425,12 @@ func (c *Column) Grow(w *Window, but int) {
 			}
 		}
 	}
-Pack:
+	c.packColumn(w, windex, cr, nl)
+}
+
+// packColumn resizes all windows in the column to accommodate the target window w at windex.
+// nl contains the target number of lines for each window.
+func (c *Column) packColumn(w *Window, windex int, cr image.Rectangle, nl []int) {
 	ny := make([]int, c.nw())
 	// pack everyone above
 	y1 := cr.Min.Y
