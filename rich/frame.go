@@ -1254,6 +1254,150 @@ func (f *frameImpl) boxHeight(box Box) int {
 	return f.fontForStyle(box.Style).Height()
 }
 
+// drawTickTo draws the cursor tick (insertion bar) on the target image when
+// the selection is a point (p0 == p1). It walks the layout to find the cursor
+// position, determines height from the tallest adjacent box, and draws the tick.
+func (f *frameImpl) drawTickTo(target edwooddraw.Image, offset image.Point) {
+	if f.display == nil || f.font == nil {
+		return
+	}
+
+	lines, originRune := f.layoutFromOrigin()
+	if len(lines) == 0 {
+		return
+	}
+
+	cursorPos := f.p0 - originRune
+	if cursorPos < 0 {
+		return
+	}
+
+	// Walk lines and boxes to find the cursor position, its X coordinate,
+	// and the heights of adjacent boxes.
+	runeCount := 0
+	for _, line := range lines {
+		for i, pb := range line.Boxes {
+			boxRunes := pb.Box.Nrune
+			if pb.Box.IsNewline() || pb.Box.IsTab() {
+				boxRunes = 1
+			}
+
+			// Check if cursor is at the start of this box
+			if runeCount == cursorPos {
+				x := pb.X
+
+				// Adjacent heights: prev box (if any) and this box
+				prevHeight := 0
+				if i > 0 {
+					prevHeight = f.boxHeight(line.Boxes[i-1].Box)
+				}
+				nextHeight := f.boxHeight(pb.Box)
+				tickH := prevHeight
+				if nextHeight > tickH {
+					tickH = nextHeight
+				}
+				if tickH == 0 {
+					tickH = f.font.Height()
+				}
+
+				f.initTick(tickH)
+				if f.tickImage == nil {
+					return
+				}
+
+				w := frtickw * f.tickScale
+				r := image.Rect(
+					offset.X+x, offset.Y+line.Y,
+					offset.X+x+w, offset.Y+line.Y+tickH,
+				)
+				target.Draw(r, f.display.Black(), f.tickImage, image.ZP)
+				return
+			}
+
+			// Check if cursor is within this box
+			if runeCount+boxRunes > cursorPos {
+				// Cursor is inside this box — compute X offset within the box
+				runeOffset := cursorPos - runeCount
+				var x int
+				if pb.Box.IsNewline() || pb.Box.IsTab() {
+					x = pb.X
+				} else {
+					byteOffset := 0
+					text := pb.Box.Text
+					for j := 0; j < runeOffset && byteOffset < len(text); j++ {
+						_, size := utf8.DecodeRune(text[byteOffset:])
+						byteOffset += size
+					}
+					x = pb.X + f.fontForStyle(pb.Box.Style).BytesWidth(text[:byteOffset])
+				}
+
+				// The cursor is within this box, so both adjacent boxes are this box
+				tickH := f.boxHeight(pb.Box)
+				if tickH == 0 {
+					tickH = f.font.Height()
+				}
+
+				f.initTick(tickH)
+				if f.tickImage == nil {
+					return
+				}
+
+				w := frtickw * f.tickScale
+				r := image.Rect(
+					offset.X+x, offset.Y+line.Y,
+					offset.X+x+w, offset.Y+line.Y+tickH,
+				)
+				target.Draw(r, f.display.Black(), f.tickImage, image.ZP)
+				return
+			}
+
+			runeCount += boxRunes
+		}
+	}
+
+	// Cursor is at end of content — use last box's height
+	if len(lines) > 0 {
+		lastLine := lines[len(lines)-1]
+		// Compute X at end of last line
+		endX := 0
+		for _, pb := range lastLine.Boxes {
+			if pb.Box.IsNewline() {
+				endX = 0 // after newline, cursor is at start of next line
+			} else {
+				endX = pb.X + pb.Box.Wid
+			}
+		}
+
+		tickH := f.font.Height()
+		if len(lastLine.Boxes) > 0 {
+			lastBox := lastLine.Boxes[len(lastLine.Boxes)-1].Box
+			h := f.boxHeight(lastBox)
+			if h > 0 {
+				tickH = h
+			}
+		}
+
+		f.initTick(tickH)
+		if f.tickImage == nil {
+			return
+		}
+
+		y := lastLine.Y
+		// If last box was a newline, cursor goes on next line
+		if len(lastLine.Boxes) > 0 && lastLine.Boxes[len(lastLine.Boxes)-1].Box.IsNewline() {
+			y = lastLine.Y + lastLine.Height
+			endX = 0
+		}
+
+		w := frtickw * f.tickScale
+		r := image.Rect(
+			offset.X+endX, offset.Y+y,
+			offset.X+endX+w, offset.Y+y+tickH,
+		)
+		target.Draw(r, f.display.Black(), f.tickImage, image.ZP)
+	}
+}
+
 // Full returns true if the frame is at capacity.
 // A frame is full when more content is visible than can fit in the frame.
 func (f *frameImpl) Full() bool {

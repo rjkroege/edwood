@@ -2573,3 +2573,193 @@ func TestBoxHeightImage(t *testing.T) {
 		t.Errorf("boxHeight for image = %d, want 100", h)
 	}
 }
+
+// TestDrawTickAtCursor verifies that drawTickTo draws a tick (cursor bar)
+// when the selection is a point (p0 == p1). The tick should be drawn using
+// display.Black() as the source and the tick image as mask, at the correct
+// cursor position.
+func TestDrawTickAtCursor(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Set content with a simple word and cursor at position 3 (between "hel" and "lo")
+	f.SetContent(Plain("hello"))
+	fi.p0 = 3
+	fi.p1 = 3
+
+	// Allocate scratch image to draw to (same as Redraw does)
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	// Clear draw ops
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call drawTickTo
+	fi.drawTickTo(scratch, image.ZP)
+
+	// Verify that a Draw call was made at the expected tick position.
+	// Cursor at position 3 in "hello" with font width 10 → X=30.
+	// Tick width = frtickw * scale = 3 * 1 = 3. So tick rect is (30,0)-(33,14).
+	// Note: the mock's Draw records ops as "fill" format which doesn't include
+	// the source name, so we verify by checking the tick rectangle coordinates.
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	foundTick := false
+	for _, op := range ops {
+		if strings.Contains(op, "(30,0)-(33,14)") {
+			foundTick = true
+			break
+		}
+	}
+	if !foundTick {
+		t.Errorf("drawTickTo() did not draw tick at expected position (30,0)-(33,14)\ngot ops: %v", ops)
+	}
+
+	// Verify the tick image was created
+	if fi.tickImage == nil {
+		t.Error("drawTickTo() should have created tickImage via initTick")
+	}
+}
+
+// TestNoTickWithSelection verifies that drawTickTo does NOT draw a tick
+// when there is a range selection (p0 != p1). The caller (Redraw) should
+// only call drawTickTo when p0 == p1, but we verify the method itself
+// also does nothing useful when called with a selection.
+func TestNoTickWithSelection(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+	selImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
+
+	f := NewFrame()
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithSelectionColor(selImage),
+	)
+
+	// Set content with a range selection (p0 != p1)
+	f.SetContent(Plain("hello world"))
+	f.SetSelection(2, 5)
+
+	// Clear draw ops
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call Redraw - it should NOT call drawTickTo because p0 != p1
+	f.Redraw()
+
+	// Since p0 != p1, Redraw should not call drawTickTo, so no tick image
+	// should be created.
+	fi := f.(*frameImpl)
+	if fi.tickImage != nil {
+		t.Error("Redraw() with range selection should not create tickImage")
+	}
+}
+
+// TestTickHeightScaling verifies that the tick height is determined by the
+// tallest adjacent box. When the cursor is between a heading box and a body
+// text box, the tick should use the heading height (the taller of the two).
+func TestTickHeightScaling(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+	h1Font := edwoodtest.NewFont(20, 28) // H1 heading font is taller
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+		WithScaledFont(2.0, h1Font),
+	)
+
+	// Content: "Hi" as H1 heading, newline, then "body" as body text.
+	// Cursor at position 2 = end of "Hi" on the heading line.
+	// Adjacent boxes: the heading text "Hi" (height 28) and the newline.
+	// The tick should be at least as tall as the heading font (28).
+	content := Content{
+		{Text: "Hi", Style: Style{Scale: 2.0, Bold: true}},
+		{Text: "\n", Style: DefaultStyle()},
+		{Text: "body", Style: DefaultStyle()},
+	}
+	f.SetContent(content)
+	fi.p0 = 2 // End of "Hi"
+	fi.p1 = 2
+
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawTickTo(scratch, image.ZP)
+
+	// The tick should have been created with the heading height (28)
+	if fi.tickImage == nil {
+		t.Fatal("drawTickTo should have created tickImage")
+	}
+	if fi.tickHeight != 28 {
+		t.Errorf("tick height = %d, want 28 (heading font height)", fi.tickHeight)
+	}
+}
+
+// TestTickHeightBodyText verifies that when the cursor is between two
+// body text boxes, the tick height equals the body font height.
+func TestTickHeightBodyText(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect,
+		WithDisplay(display),
+		WithBackground(bgImage),
+		WithFont(font),
+		WithTextColor(textImage),
+	)
+
+	// Plain text: "hello world" — two words separated by space.
+	// Cursor at position 5 (after "hello", before space/next word).
+	f.SetContent(Plain("hello world"))
+	fi.p0 = 5
+	fi.p1 = 5
+
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawTickTo(scratch, image.ZP)
+
+	// The tick should be body font height (14)
+	if fi.tickImage == nil {
+		t.Fatal("drawTickTo should have created tickImage")
+	}
+	if fi.tickHeight != 14 {
+		t.Errorf("tick height = %d, want 14 (body font height)", fi.tickHeight)
+	}
+}
