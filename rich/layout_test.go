@@ -1859,6 +1859,162 @@ func TestImageBoxDimensionsClampToFrame(t *testing.T) {
 	})
 }
 
+// =============================================================================
+// Phase 25B: Block Region Identification Tests
+// =============================================================================
+
+// TestFindBlockRegionsSingleCodeBlock tests that a single code block is
+// identified as one BlockRegion with the correct start/end lines and max width.
+func TestFindBlockRegionsSingleCodeBlock(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 200
+	maxtab := 80
+
+	// Three lines of block code
+	content := Content{
+		{Text: "line1", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "a_longer_line_two", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "ln3", Style: Style{Block: true, Code: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+
+	if len(regions) != 1 {
+		t.Fatalf("expected 1 block region, got %d", len(regions))
+	}
+
+	r := regions[0]
+	if r.Kind != BlockCode {
+		t.Errorf("Kind = %d, want BlockCode (%d)", r.Kind, BlockCode)
+	}
+	if r.StartLine != 0 {
+		t.Errorf("StartLine = %d, want 0", r.StartLine)
+	}
+	if r.EndLine != len(lines) {
+		t.Errorf("EndLine = %d, want %d", r.EndLine, len(lines))
+	}
+
+	// MaxContentWidth should be from the longest line ("a_longer_line_two" = 17 chars * 10 = 170 + 40 indent = 210)
+	codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
+	expectedMax := codeBlockIndent + 17*10
+	if r.MaxContentWidth != expectedMax {
+		t.Errorf("MaxContentWidth = %d, want %d", r.MaxContentWidth, expectedMax)
+	}
+}
+
+// TestFindBlockRegionsMultipleBlocks tests that multiple separate blocks
+// (e.g., two code blocks separated by normal text) produce separate regions.
+func TestFindBlockRegionsMultipleBlocks(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Code block, then normal text, then another code block
+	content := Content{
+		{Text: "code1", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "code1b", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "normal text paragraph", Style: Style{Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "code2", Style: Style{Block: true, Code: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+
+	if len(regions) != 2 {
+		t.Fatalf("expected 2 block regions, got %d", len(regions))
+	}
+
+	// First region should be code block
+	if regions[0].Kind != BlockCode {
+		t.Errorf("region 0 Kind = %d, want BlockCode", regions[0].Kind)
+	}
+	if regions[0].StartLine != 0 {
+		t.Errorf("region 0 StartLine = %d, want 0", regions[0].StartLine)
+	}
+
+	// Second region should also be code block, starting after the normal text
+	if regions[1].Kind != BlockCode {
+		t.Errorf("region 1 Kind = %d, want BlockCode", regions[1].Kind)
+	}
+	// The second code block should start after the normal text lines
+	if regions[1].StartLine <= regions[0].EndLine {
+		t.Errorf("region 1 StartLine (%d) should be > region 0 EndLine (%d)",
+			regions[1].StartLine, regions[0].EndLine)
+	}
+}
+
+// TestFindBlockRegionsNoBlocks tests that normal text produces no block regions.
+func TestFindBlockRegionsNoBlocks(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	content := Content{
+		{Text: "Just some normal text", Style: Style{Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "Another paragraph", Style: Style{Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+
+	if len(regions) != 0 {
+		t.Errorf("expected 0 block regions for normal text, got %d", len(regions))
+	}
+}
+
+// TestFindBlockRegionsMixedContent tests block region identification with
+// mixed content: code blocks, tables, and normal text interleaved.
+func TestFindBlockRegionsMixedContent(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Code block, then normal text, then table
+	content := Content{
+		// Code block (2 lines)
+		{Text: "func main()", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "  return", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		// Normal text
+		{Text: "Some explanation", Style: Style{Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		// Table (1 line)
+		{Text: "| col1 | col2 |", Style: Style{Table: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+
+	if len(regions) != 2 {
+		t.Fatalf("expected 2 block regions (code + table), got %d", len(regions))
+	}
+
+	if regions[0].Kind != BlockCode {
+		t.Errorf("region 0 Kind = %d, want BlockCode", regions[0].Kind)
+	}
+	if regions[1].Kind != BlockTable {
+		t.Errorf("region 1 Kind = %d, want BlockTable", regions[1].Kind)
+	}
+
+	// Regions should not overlap
+	if regions[1].StartLine < regions[0].EndLine {
+		t.Errorf("regions overlap: region 0 EndLine=%d, region 1 StartLine=%d",
+			regions[0].EndLine, regions[1].StartLine)
+	}
+}
+
 // Helper: testLayoutFont implements draw.Font for testing
 type testLayoutFont struct {
 	width  int

@@ -196,6 +196,85 @@ func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
 	return targetWidth, int(float64(imgHeight) * scale)
 }
 
+// BlockKind identifies the type of a non-wrapping block element.
+type BlockKind int
+
+const (
+	BlockCode  BlockKind = iota // Fenced code block (Block && Code)
+	BlockTable                  // Table block (Table)
+	BlockImage                  // Image wider than frame
+)
+
+// BlockRegion represents a contiguous run of lines sharing the same block kind.
+// A horizontal scrollbar is needed when MaxContentWidth > frameWidth.
+type BlockRegion struct {
+	StartLine       int       // Index into []Line (inclusive)
+	EndLine         int       // Index into []Line (exclusive)
+	MaxContentWidth int       // Widest line in this region
+	Kind            BlockKind // Type of block element
+}
+
+// findBlockRegions scans layout lines for contiguous runs where all boxes
+// share the same block kind (Block && Code, Table, or Image). Each region
+// records the start/end line indices, the maximum content width, and the kind.
+func findBlockRegions(lines []Line) []BlockRegion {
+	var regions []BlockRegion
+
+	i := 0
+	for i < len(lines) {
+		kind, ok := lineBlockKind(&lines[i])
+		if !ok {
+			i++
+			continue
+		}
+
+		// Start a new region
+		region := BlockRegion{
+			StartLine:       i,
+			MaxContentWidth: lines[i].ContentWidth,
+			Kind:            kind,
+		}
+
+		// Extend region while consecutive lines have the same block kind
+		i++
+		for i < len(lines) {
+			nextKind, nextOk := lineBlockKind(&lines[i])
+			if !nextOk || nextKind != kind {
+				break
+			}
+			if lines[i].ContentWidth > region.MaxContentWidth {
+				region.MaxContentWidth = lines[i].ContentWidth
+			}
+			i++
+		}
+
+		region.EndLine = i
+		regions = append(regions, region)
+	}
+
+	return regions
+}
+
+// lineBlockKind determines the block kind of a line based on its boxes.
+// Returns the kind and true if the line is a block element, or false if it's
+// normal text. A line is considered a block element if any of its non-newline
+// boxes have a block style.
+func lineBlockKind(line *Line) (BlockKind, bool) {
+	for _, pb := range line.Boxes {
+		if pb.Box.IsNewline() {
+			continue
+		}
+		if pb.Box.Style.Block && pb.Box.Style.Code {
+			return BlockCode, true
+		}
+		if pb.Box.Style.Table {
+			return BlockTable, true
+		}
+		// Image blocks could be added here in the future
+	}
+	return 0, false
+}
+
 // layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
 // It computes the Wid field for each box and assigns X/Y positions.
 // The returned Lines contain positioned boxes ready for rendering.
