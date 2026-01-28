@@ -1837,51 +1837,94 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 		}
 	}
 
-	// Build spans for each table row with normalized widths
+	// Build box-drawing grid lines
+	topBorder := buildGridLine(widths, '┌', '┬', '┐', '─')
+	headerSep := buildGridLine(widths, '├', '┼', '┤', '─')
+	bottomBorder := buildGridLine(widths, '└', '┴', '┘', '─')
+
+	// Style for border/separator lines (not header, not bold)
+	borderStyle := rich.Style{
+		Table: true,
+		Code:  true,
+		Block: true,
+		Bg:    rich.InlineCodeBg,
+		Scale: 1.0,
+	}
+
+	// Build spans: top border, then rows with box-drawing delimiters, then bottom border
 	var spans []rich.Span
 
+	// Top border
+	spans = append(spans, rich.Span{
+		Text:  topBorder + "\n",
+		Style: borderStyle,
+	})
+
 	for i := range tableLines {
-		var lineText string
 		isHeader := i == 0
 		isSeparator := i == 1
 
 		if isSeparator {
-			lineText = rebuildSeparatorRow(widths, aligns)
+			// Replace ASCII separator with box-drawing header separator
+			spans = append(spans, rich.Span{
+				Text:  headerSep + "\n",
+				Style: borderStyle,
+			})
 		} else {
 			cells := allCells[i]
-			lineText = rebuildTableRow(cells, widths, aligns)
-		}
+			lineText := replaceDelimiters(rebuildTableRow(cells, widths, aligns))
 
-		// Add newline unless it's the last line
-		if i < len(tableLines)-1 {
+			// Add newline (all rows get newline since bottom border follows)
 			lineText += "\n"
-		}
 
-		style := rich.Style{
-			Table:       true,
-			TableHeader: isHeader,
-			Code:        true, // Tables use code/monospace font
-			Block:       true, // Tables are block-level elements
-			Bg:          rich.InlineCodeBg,
-			Scale:       1.0,
-		}
+			style := rich.Style{
+				Table:       true,
+				TableHeader: isHeader,
+				Code:        true,
+				Block:       true,
+				Bg:          rich.InlineCodeBg,
+				Scale:       1.0,
+			}
+			if isHeader {
+				style.Bold = true
+			}
 
-		// Headers are also bold
-		if isHeader {
-			style.Bold = true
+			spans = append(spans, rich.Span{
+				Text:  lineText,
+				Style: style,
+			})
 		}
-
-		// Separator rows are styled same as data rows (not header, not bold)
-		if isSeparator {
-			style.TableHeader = false
-			style.Bold = false
-		}
-
-		spans = append(spans, rich.Span{
-			Text:  lineText,
-			Style: style,
-		})
 	}
 
+	// Bottom border (no trailing newline — it's the last element)
+	spans = append(spans, rich.Span{
+		Text:  bottomBorder,
+		Style: borderStyle,
+	})
+
 	return spans, consumed
+}
+
+// buildGridLine builds a box-drawing horizontal line from column widths.
+// left/mid/right are corner/tee characters; fill is the horizontal rule char.
+// Each column segment is fill×(width+2) to account for the padding spaces around cell content.
+func buildGridLine(widths []int, left, mid, right, fill rune) string {
+	var b strings.Builder
+	b.WriteRune(left)
+	for i, w := range widths {
+		for j := 0; j < w+2; j++ { // +2 for padding spaces
+			b.WriteRune(fill)
+		}
+		if i < len(widths)-1 {
+			b.WriteRune(mid)
+		}
+	}
+	b.WriteRune(right)
+	return b.String()
+}
+
+// replaceDelimiters replaces ASCII pipe '|' delimiters with box-drawing '│' (U+2502)
+// in a table row string built by rebuildTableRow.
+func replaceDelimiters(row string) string {
+	return strings.ReplaceAll(row, "|", "│")
 }

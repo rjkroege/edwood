@@ -1405,67 +1405,107 @@ func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, re
 		}
 	}
 
-	// Build spans and source map entries for each table row
+	// Build box-drawing grid lines
+	topBorder := buildGridLine(widths, '┌', '┬', '┐', '─')
+	headerSep := buildGridLine(widths, '├', '┼', '┤', '─')
+	bottomBorder := buildGridLine(widths, '└', '┴', '┘', '─')
+
+	borderStyle := rich.Style{
+		Table: true,
+		Code:  true,
+		Block: true,
+		Bg:    rich.InlineCodeBg,
+		Scale: 1.0,
+	}
+
 	var spans []rich.Span
 	var entries []SourceMapEntry
 	srcPos := sourceOffset
 	rendPos := renderedOffset
 
+	// Top border (synthetic — no source mapping, zero-length source range)
+	topText := topBorder + "\n"
+	topLen := len([]rune(topText))
+	spans = append(spans, rich.Span{
+		Text:  topText,
+		Style: borderStyle,
+	})
+	entries = append(entries, SourceMapEntry{
+		RenderedStart: rendPos,
+		RenderedEnd:   rendPos + topLen,
+		SourceStart:   srcPos,
+		SourceEnd:     srcPos, // zero-length: synthetic line
+	})
+	rendPos += topLen
+
 	for i, line := range tableLines {
-		var lineText string
 		isHeader := i == 0
 		isSeparator := i == 1
 
 		if isSeparator {
-			lineText = rebuildSeparatorRow(widths, aligns)
+			// Replace ASCII separator with box-drawing header separator
+			sepText := headerSep + "\n"
+			sepLen := len([]rune(sepText))
+			spans = append(spans, rich.Span{
+				Text:  sepText,
+				Style: borderStyle,
+			})
+			// Separator maps to the source separator line
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + sepLen,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + len(line),
+			})
+			rendPos += sepLen
+			srcPos += len(line)
 		} else {
 			cells := allCells[i]
-			lineText = rebuildTableRow(cells, widths, aligns)
+			lineText := replaceDelimiters(rebuildTableRow(cells, widths, aligns))
+			lineText += "\n" // all rows get newline since bottom border follows
+
+			style := rich.Style{
+				Table:       true,
+				TableHeader: isHeader,
+				Code:        true,
+				Block:       true,
+				Bg:          rich.InlineCodeBg,
+				Scale:       1.0,
+			}
+			if isHeader {
+				style.Bold = true
+			}
+
+			spans = append(spans, rich.Span{
+				Text:  lineText,
+				Style: style,
+			})
+
+			renderedLen := len([]rune(lineText))
+			entries = append(entries, SourceMapEntry{
+				RenderedStart: rendPos,
+				RenderedEnd:   rendPos + renderedLen,
+				SourceStart:   srcPos,
+				SourceEnd:     srcPos + len(line),
+			})
+			rendPos += renderedLen
+			srcPos += len(line)
 		}
-
-		// Add newline unless it's the last line
-		if i < len(tableLines)-1 {
-			lineText += "\n"
-		}
-
-		style := rich.Style{
-			Table:       true,
-			TableHeader: isHeader,
-			Code:        true, // Tables use code/monospace font
-			Block:       true, // Tables are block-level elements
-			Bg:          rich.InlineCodeBg,
-			Scale:       1.0,
-		}
-
-		// Headers are also bold
-		if isHeader {
-			style.Bold = true
-		}
-
-		// Separator rows are styled same as data rows (not header, not bold)
-		if isSeparator {
-			style.TableHeader = false
-			style.Bold = false
-		}
-
-		spans = append(spans, rich.Span{
-			Text:  lineText,
-			Style: style,
-		})
-
-		// Create source map entry for this line.
-		// The rendered text may differ from source due to padding,
-		// but we map the entire rendered line to the entire source line.
-		renderedLen := len([]rune(lineText))
-		entries = append(entries, SourceMapEntry{
-			RenderedStart: rendPos,
-			RenderedEnd:   rendPos + renderedLen,
-			SourceStart:   srcPos,
-			SourceEnd:     srcPos + len(line),
-		})
-		rendPos += renderedLen
-		srcPos += len(line)
 	}
+
+	// Bottom border (synthetic — no source mapping, zero-length source range)
+	bottomLen := len([]rune(bottomBorder))
+	spans = append(spans, rich.Span{
+		Text:  bottomBorder,
+		Style: borderStyle,
+	})
+	entries = append(entries, SourceMapEntry{
+		RenderedStart: rendPos,
+		RenderedEnd:   rendPos + bottomLen,
+		SourceStart:   srcPos,
+		SourceEnd:     srcPos, // zero-length: synthetic line
+	})
+	rendPos += bottomLen
 
 	return spans, entries, consumed
 }

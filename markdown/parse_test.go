@@ -2924,12 +2924,16 @@ func TestParseSimpleTable(t *testing.T) {
 				code        bool
 				block       bool
 			}{
-				// Header row (normalized: min col width 3)
-				{text: "| A   | B   |\n", table: true, tableHeader: true, code: true, block: true},
-				// Separator row
-				{text: "| --- | --- |\n", table: true, tableHeader: false, code: true, block: true},
+				// Top border
+				{text: "┌─────┬─────┐\n", table: true, tableHeader: false, code: true, block: true},
+				// Header row (normalized: min col width 3, box-drawing delimiters)
+				{text: "│ A   │ B   │\n", table: true, tableHeader: true, code: true, block: true},
+				// Header separator (box-drawing)
+				{text: "├─────┼─────┤\n", table: true, tableHeader: false, code: true, block: true},
 				// Data row
-				{text: "| 1   | 2   |", table: true, tableHeader: false, code: true, block: true},
+				{text: "│ 1   │ 2   │\n", table: true, tableHeader: false, code: true, block: true},
+				// Bottom border
+				{text: "└─────┴─────┘", table: true, tableHeader: false, code: true, block: true},
 			},
 		},
 		{
@@ -2945,10 +2949,17 @@ func TestParseSimpleTable(t *testing.T) {
 				code        bool
 				block       bool
 			}{
-				{text: "| Name | Value |\n", table: true, tableHeader: true, code: true, block: true},
-				{text: "| ---- | ----- |\n", table: true, tableHeader: false, code: true, block: true},
-				{text: "| foo  | 1     |\n", table: true, tableHeader: false, code: true, block: true},
-				{text: "| bar  | 2     |", table: true, tableHeader: false, code: true, block: true},
+				// Top border
+				{text: "┌──────┬───────┐\n", table: true, tableHeader: false, code: true, block: true},
+				// Header row
+				{text: "│ Name │ Value │\n", table: true, tableHeader: true, code: true, block: true},
+				// Header separator
+				{text: "├──────┼───────┤\n", table: true, tableHeader: false, code: true, block: true},
+				// Data rows
+				{text: "│ foo  │ 1     │\n", table: true, tableHeader: false, code: true, block: true},
+				{text: "│ bar  │ 2     │\n", table: true, tableHeader: false, code: true, block: true},
+				// Bottom border
+				{text: "└──────┴───────┘", table: true, tableHeader: false, code: true, block: true},
 			},
 		},
 	}
@@ -3311,20 +3322,23 @@ func TestParseTableNormalizedWidths(t *testing.T) {
 	}
 
 	// Parse cells from each line and check uniform raw widths (including padding).
-	// We split by "|" without trimming so that padding spaces are included in the width.
+	// After box-drawing conversion, data/header rows use │ (U+2502) as delimiters
+	// and border lines use ┌┐└┘├┤┬┴┼─ characters.
 	var cellWidths [][]int
 	for _, line := range lines {
 		trimmed := strings.TrimSuffix(line, "\n")
-		if isTableSeparatorRow(trimmed + "\n") {
+		// Skip border and separator lines (they start with ┌, └, ├)
+		if strings.HasPrefix(trimmed, "┌") || strings.HasPrefix(trimmed, "└") || strings.HasPrefix(trimmed, "├") {
 			continue
 		}
-		if !strings.HasPrefix(trimmed, "|") {
+		// Data/header rows start with │
+		if !strings.HasPrefix(trimmed, "│") {
 			continue
 		}
-		// Split by | to get raw cell contents (with padding spaces)
-		raw := strings.TrimPrefix(trimmed, "|")
-		raw = strings.TrimSuffix(raw, "|")
-		parts := strings.Split(raw, "|")
+		// Split by │ to get raw cell contents (with padding spaces)
+		raw := strings.TrimPrefix(trimmed, "│")
+		raw = strings.TrimSuffix(raw, "│")
+		parts := strings.Split(raw, "│")
 		if len(parts) == 0 {
 			continue
 		}
@@ -3504,14 +3518,284 @@ func TestParseTableSourceMapWithPadding(t *testing.T) {
 		text := span.Text
 		idx := strings.Index(text, "Name")
 		if idx >= 0 {
-			nameRendStart := rendPos + idx
-			nameRendEnd := nameRendStart + 4 // len("Name")
+			// Convert byte index to rune index for proper position calculation
+			// (box-drawing chars like │ are multi-byte)
+			runeIdx := len([]rune(text[:idx]))
+			nameRendStart := rendPos + runeIdx
+			nameRendEnd := nameRendStart + 4 // len("Name") in runes
 			ss, se := sourceMap.ToSource(nameRendStart, nameRendEnd)
 			// The source region should contain "Name"
 			if ss >= 0 && se <= len(input) && se > ss {
 				mapped := input[ss:se]
 				if !strings.Contains(mapped, "Name") {
 					t.Errorf("source map for 'Name': got source[%d:%d]=%q, want to contain 'Name'", ss, se, mapped)
+				}
+			}
+			break
+		}
+		rendPos += len([]rune(text))
+	}
+}
+
+// ============================================================================
+// Phase 24B: Box-Drawing Grid Lines Tests
+// ============================================================================
+
+func TestParseTableBoxDrawing(t *testing.T) {
+	// After box-drawing conversion, a simple table should have Unicode
+	// box-drawing characters instead of ASCII pipes and dashes.
+	input := "| A | B |\n|---|---|\n| 1 | 2 |"
+
+	got := Parse(input)
+
+	// Collect all table span text
+	var tableText string
+	for _, span := range got {
+		if span.Style.Table {
+			tableText += span.Text
+		}
+	}
+
+	if tableText == "" {
+		t.Fatal("no table spans found")
+	}
+
+	// Should contain box-drawing characters, not ASCII pipes/dashes
+	if !strings.Contains(tableText, "│") {
+		t.Errorf("expected vertical rule │ (U+2502) in table output, got:\n%s", tableText)
+	}
+	if !strings.Contains(tableText, "─") {
+		t.Errorf("expected horizontal rule ─ (U+2500) in table output, got:\n%s", tableText)
+	}
+	// Should NOT contain ASCII pipe delimiters in data/header rows
+	// (Box-drawing lines themselves won't have ASCII pipes either)
+	lines := splitLines(tableText)
+	for _, line := range lines {
+		trimmed := strings.TrimSuffix(line, "\n")
+		if strings.Contains(trimmed, "|") {
+			t.Errorf("expected no ASCII pipe '|' in box-drawn table, found in line: %q", trimmed)
+		}
+	}
+}
+
+func TestParseTableTopBorder(t *testing.T) {
+	// The first line of a box-drawn table should be a top border
+	// using ┌, ─, ┬, ┐ characters.
+	input := "| X | Y |\n|---|---|\n| a | b |"
+
+	got := Parse(input)
+
+	var tableText string
+	for _, span := range got {
+		if span.Style.Table {
+			tableText += span.Text
+		}
+	}
+
+	if tableText == "" {
+		t.Fatal("no table spans found")
+	}
+
+	lines := splitLines(tableText)
+	if len(lines) == 0 {
+		t.Fatal("no lines in table output")
+	}
+
+	topLine := strings.TrimSuffix(lines[0], "\n")
+
+	// Top border should start with ┌ and end with ┐
+	if !strings.HasPrefix(topLine, "┌") {
+		t.Errorf("top border should start with ┌, got: %q", topLine)
+	}
+	if !strings.HasSuffix(topLine, "┐") {
+		t.Errorf("top border should end with ┐, got: %q", topLine)
+	}
+	// Should contain ┬ for column junctions
+	if !strings.Contains(topLine, "┬") {
+		t.Errorf("top border should contain ┬ for column junctions, got: %q", topLine)
+	}
+	// Should contain ─ for horizontal fill
+	if !strings.Contains(topLine, "─") {
+		t.Errorf("top border should contain ─, got: %q", topLine)
+	}
+}
+
+func TestParseTableBottomBorder(t *testing.T) {
+	// The last line of a box-drawn table should be a bottom border
+	// using └, ─, ┴, ┘ characters.
+	input := "| X | Y |\n|---|---|\n| a | b |"
+
+	got := Parse(input)
+
+	var tableText string
+	for _, span := range got {
+		if span.Style.Table {
+			tableText += span.Text
+		}
+	}
+
+	if tableText == "" {
+		t.Fatal("no table spans found")
+	}
+
+	lines := splitLines(tableText)
+	if len(lines) == 0 {
+		t.Fatal("no lines in table output")
+	}
+
+	// Last line (bottom border) — may or may not have trailing \n
+	bottomLine := strings.TrimSuffix(lines[len(lines)-1], "\n")
+
+	// Bottom border should start with └ and end with ┘
+	if !strings.HasPrefix(bottomLine, "└") {
+		t.Errorf("bottom border should start with └, got: %q", bottomLine)
+	}
+	if !strings.HasSuffix(bottomLine, "┘") {
+		t.Errorf("bottom border should end with ┘, got: %q", bottomLine)
+	}
+	// Should contain ┴ for column junctions
+	if !strings.Contains(bottomLine, "┴") {
+		t.Errorf("bottom border should contain ┴ for column junctions, got: %q", bottomLine)
+	}
+}
+
+func TestParseTableHeaderSeparator(t *testing.T) {
+	// The header separator should use ├, ─, ┼, ┤ instead of |---|.
+	input := "| X | Y |\n|---|---|\n| a | b |"
+
+	got := Parse(input)
+
+	var tableText string
+	for _, span := range got {
+		if span.Style.Table {
+			tableText += span.Text
+		}
+	}
+
+	if tableText == "" {
+		t.Fatal("no table spans found")
+	}
+
+	// Find the separator line (between header and data rows).
+	// With box-drawing, the layout is: top border, header row, separator, data rows, bottom border.
+	// The separator should be the 3rd line (index 2).
+	lines := splitLines(tableText)
+	if len(lines) < 4 {
+		t.Fatalf("expected at least 4 lines (top, header, separator, data...), got %d:\n%s", len(lines), tableText)
+	}
+
+	sepLine := strings.TrimSuffix(lines[2], "\n")
+
+	if !strings.HasPrefix(sepLine, "├") {
+		t.Errorf("header separator should start with ├, got: %q", sepLine)
+	}
+	if !strings.HasSuffix(sepLine, "┤") {
+		t.Errorf("header separator should end with ┤, got: %q", sepLine)
+	}
+	if !strings.Contains(sepLine, "┼") {
+		t.Errorf("header separator should contain ┼ for column junctions, got: %q", sepLine)
+	}
+}
+
+func TestParseTableVerticalRules(t *testing.T) {
+	// Header and data rows should use │ (U+2502) instead of | for cell delimiters.
+	input := "| Name | Age |\n|------|-----|\n| Alice | 30 |"
+
+	got := Parse(input)
+
+	var tableText string
+	for _, span := range got {
+		if span.Style.Table {
+			tableText += span.Text
+		}
+	}
+
+	if tableText == "" {
+		t.Fatal("no table spans found")
+	}
+
+	lines := splitLines(tableText)
+
+	// Find header and data rows (skip border/separator lines that use ┌├└ etc.)
+	for _, line := range lines {
+		trimmed := strings.TrimSuffix(line, "\n")
+		if trimmed == "" {
+			continue
+		}
+		firstRune := []rune(trimmed)[0]
+		// Skip border/separator lines
+		if firstRune == '┌' || firstRune == '├' || firstRune == '└' {
+			continue
+		}
+		// This should be a header or data row
+		// It should start and end with │
+		if !strings.HasPrefix(trimmed, "│") {
+			t.Errorf("cell row should start with │, got: %q", trimmed)
+		}
+		if !strings.HasSuffix(trimmed, "│") {
+			t.Errorf("cell row should end with │, got: %q", trimmed)
+		}
+		// Should NOT contain ASCII pipe
+		if strings.Contains(trimmed, "|") {
+			t.Errorf("cell row should not contain ASCII pipe |, got: %q", trimmed)
+		}
+	}
+}
+
+func TestParseTableSourceMapBoxDrawing(t *testing.T) {
+	// Source map should work correctly with box-drawing output.
+	// Synthetic lines (borders) should map to zero-length source ranges or
+	// be otherwise handled gracefully.
+	input := "| A | B |\n|---|---|\n| 1 | 2 |"
+
+	content, sourceMap, _ := ParseWithSourceMap(input)
+
+	// Verify content was parsed
+	if len(content) == 0 {
+		t.Fatal("no content parsed")
+	}
+
+	// Verify source map exists
+	if sourceMap == nil {
+		t.Fatal("source map is nil")
+	}
+
+	// The total rendered length
+	totalRendered := 0
+	for _, span := range content {
+		totalRendered += len([]rune(span.Text))
+	}
+
+	if totalRendered == 0 {
+		t.Fatal("rendered content has zero length")
+	}
+
+	// Mapping should not panic for any position in rendered content
+	for pos := 0; pos <= totalRendered; pos++ {
+		srcStart, srcEnd := sourceMap.ToSource(pos, pos+1)
+		// Source positions should be non-negative
+		if srcStart < 0 {
+			t.Errorf("source map returned negative srcStart=%d for rendered pos %d", srcStart, pos)
+		}
+		if srcEnd < 0 {
+			t.Errorf("source map returned negative srcEnd=%d for rendered pos %d", srcEnd, pos)
+		}
+	}
+
+	// Find cell content "A" in rendered output and verify it maps to source
+	rendPos := 0
+	for _, span := range content {
+		text := span.Text
+		runeIdx := strings.IndexRune(text, 'A')
+		if runeIdx >= 0 {
+			// Convert byte index to rune index for correct position calculation
+			nameRendStart := rendPos + len([]rune(text[:runeIdx]))
+			nameRendEnd := nameRendStart + 1 // len("A")
+			ss, se := sourceMap.ToSource(nameRendStart, nameRendEnd)
+			if ss >= 0 && se <= len(input) && se > ss {
+				mapped := input[ss:se]
+				if !strings.Contains(mapped, "A") {
+					t.Errorf("source map for 'A': got source[%d:%d]=%q, want to contain 'A'", ss, se, mapped)
 				}
 			}
 			break
