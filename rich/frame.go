@@ -7,6 +7,7 @@ import (
 
 	"9fans.net/go/draw"
 	edwooddraw "github.com/rjkroege/edwood/draw"
+	xdraw "golang.org/x/image/draw"
 )
 
 const (
@@ -1516,12 +1517,38 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 		return
 	}
 
-	// Allocate an image to hold the pixel data
-	// Use RGBA32 format to match our ConvertToPlan9 output
-	srcRect := image.Rect(0, 0, cached.Width, cached.Height)
+	// Determine which Go image to convert to Plan 9 format.
+	// If the display size differs from the original, pre-scale the image
+	// using bilinear interpolation before conversion.
+	var goImg image.Image
+	var imgWidth, imgHeight int
+
+	if scaledWidth == cached.Width && scaledHeight == cached.Height {
+		// No scaling needed, use original
+		goImg = cached.Original
+		imgWidth = cached.Width
+		imgHeight = cached.Height
+	} else {
+		// Pre-scale the image in Go-land before converting to Plan 9 format
+		scaled := image.NewRGBA(image.Rect(0, 0, scaledWidth, scaledHeight))
+		xdraw.BiLinear.Scale(scaled, scaled.Bounds(), cached.Original, cached.Original.Bounds(), xdraw.Src, nil)
+		goImg = scaled
+		imgWidth = scaledWidth
+		imgHeight = scaledHeight
+	}
+
+	// Convert the (possibly scaled) image to Plan 9 pixel data
+	plan9Data, err := ConvertToPlan9(goImg)
+	if err != nil {
+		pt := image.Point{X: dstX, Y: dstY}
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
+		return
+	}
+
+	// Allocate a Plan 9 image at the (possibly scaled) dimensions
+	srcRect := image.Rect(0, 0, imgWidth, imgHeight)
 	srcImg, err := f.display.AllocImage(srcRect, edwooddraw.RGBA32, false, 0)
 	if err != nil {
-		// Fall back to error placeholder
 		pt := image.Point{X: dstX, Y: dstY}
 		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
 		return
@@ -1529,55 +1556,23 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	defer srcImg.Free()
 
 	// Load the pixel data into the source image
-	_, err = srcImg.Load(srcRect, cached.Data)
+	_, err = srcImg.Load(srcRect, plan9Data)
 	if err != nil {
-		// Fall back to error placeholder
 		pt := image.Point{X: dstX, Y: dstY}
 		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
 		return
 	}
 
 	// Calculate the source point for clipping
-	// If the destination was clipped, we need to adjust which part of the source we draw
 	srcPt := image.ZP
 	if dstRect.Min.X < clippedDst.Min.X {
-		// Left edge was clipped, adjust source X
-		srcPt.X = (clippedDst.Min.X - dstRect.Min.X) * cached.Width / scaledWidth
+		srcPt.X = clippedDst.Min.X - dstRect.Min.X
 	}
 	if dstRect.Min.Y < clippedDst.Min.Y {
-		// Top edge was clipped, adjust source Y
-		srcPt.Y = (clippedDst.Min.Y - dstRect.Min.Y) * cached.Height / scaledHeight
+		srcPt.Y = clippedDst.Min.Y - dstRect.Min.Y
 	}
 
-	// Draw the image (using the display's draw operation for scaling)
-	// Note: Plan 9's draw doesn't do automatic scaling, so for scaled images
-	// we would need to either:
-	// 1. Pre-scale the image data before loading
-	// 2. Use a draw operation that supports scaling
-	// For now, we draw at the original size and clip
-	//
-	// When image is scaled down (scaledWidth < cached.Width), we draw the original
-	// and it will be clipped. For proper scaling, we'd need to scale the pixel data.
-	if scaledWidth == cached.Width && scaledHeight == cached.Height {
-		// No scaling needed, direct draw
-		target.Draw(clippedDst, srcImg, nil, srcPt)
-	} else {
-		// Image needs scaling - for now, draw at original size (clipped)
-		// A more sophisticated implementation would scale the pixel data first
-		// This produces correct results for images that fit; larger images are clipped
-		actualDst := image.Rect(dstX, dstY, dstX+cached.Width, dstY+cached.Height)
-		actualDst = actualDst.Intersect(clipRect)
-		if !actualDst.Empty() {
-			actualSrcPt := image.ZP
-			if dstX < actualDst.Min.X {
-				actualSrcPt.X = actualDst.Min.X - dstX
-			}
-			if dstY < actualDst.Min.Y {
-				actualSrcPt.Y = actualDst.Min.Y - dstY
-			}
-			target.Draw(actualDst, srcImg, nil, actualSrcPt)
-		}
-	}
+	target.Draw(clippedDst, srcImg, nil, srcPt)
 }
 
 // drawImageErrorPlaceholder renders an error placeholder for failed image loads.

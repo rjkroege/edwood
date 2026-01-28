@@ -2855,3 +2855,104 @@ func TestRedrawNoTickWhenSelection(t *testing.T) {
 		t.Error("Redraw() with range selection (p0 != p1) should not create tickImage")
 	}
 }
+
+// TestDrawImageScaled verifies that drawImageTo pre-scales images when the
+// display size (from imageBoxDimensions) differs from the original image size.
+// When Style.ImageWidth is set, the image should be rendered at the scaled
+// dimensions rather than drawn at original size and clipped.
+func TestDrawImageScaled(t *testing.T) {
+	rect := image.Rect(0, 0, 400, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create a 200x100 original image
+	origImg := image.NewRGBA(image.Rect(0, 0, 200, 100))
+	// Fill with a solid color so pixel data is non-trivial
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 200; x++ {
+			origImg.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	plan9Data, err := ConvertToPlan9(origImg)
+	if err != nil {
+		t.Fatalf("ConvertToPlan9 failed: %v", err)
+	}
+
+	// Image box with explicit width=100px → should scale to 100x50
+	pb := PositionedBox{
+		X: 0,
+		Box: Box{
+			Style: Style{
+				Image:      true,
+				ImageURL:   "test.png",
+				ImageWidth: 100, // Explicit width causes scaling
+			},
+			Wid:   100,
+			Nrune: 1,
+			ImageData: &CachedImage{
+				Width:    200,
+				Height:   100,
+				Data:     plan9Data,
+				Original: origImg,
+			},
+		},
+	}
+
+	line := Line{Y: 0, Height: 50}
+
+	// Verify imageBoxDimensions returns the scaled size
+	scaledW, scaledH := imageBoxDimensions(&pb.Box, rect.Dx())
+	if scaledW != 100 || scaledH != 50 {
+		t.Fatalf("imageBoxDimensions = (%d, %d), want (100, 50)", scaledW, scaledH)
+	}
+
+	// Allocate scratch image
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	// Clear draw ops before drawImageTo
+	display.(edwoodtest.GettableDrawOps).Clear()
+
+	// Call drawImageTo — this should pre-scale the image
+	fi.drawImageTo(scratch, pb, line, image.ZP, rect.Dx(), rect.Dy())
+
+	// Verify draw operations were emitted
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+	if len(ops) == 0 {
+		t.Fatal("drawImageTo() produced no draw operations")
+	}
+
+	// The key assertion: the source image allocated for rendering should be
+	// at the scaled dimensions (100x50), not the original (200x100).
+	// When pre-scaling is implemented, AllocImage will be called with
+	// (0,0)-(100,50) for the source, and the Draw call will target (0,0)-(100,50).
+	// Look for a draw op that references the scaled destination rect.
+	foundScaledDraw := false
+	for _, op := range ops {
+		// The draw op should reference the scaled destination (0,0)-(100,50)
+		if strings.Contains(op, "(0,0)-(100,50)") {
+			foundScaledDraw = true
+			break
+		}
+	}
+	if !foundScaledDraw {
+		t.Errorf("drawImageTo() should draw at scaled dimensions (0,0)-(100,50), got ops:\n%s",
+			strings.Join(ops, "\n"))
+	}
+
+	// Negative check: the draw should NOT use the original 200x100 dimensions
+	for _, op := range ops {
+		if strings.Contains(op, "(0,0)-(200,100)") {
+			t.Errorf("drawImageTo() should NOT draw at original dimensions (0,0)-(200,100), got op: %s", op)
+		}
+	}
+}
