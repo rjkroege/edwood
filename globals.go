@@ -11,60 +11,247 @@ import (
 	"github.com/rjkroege/edwood/frame"
 )
 
-// TODO(rjk): Document what each of these are.
+// globals holds all global state for the Edwood editor.
+// This struct centralizes state that was originally scattered across
+// package-level variables, facilitating testing and eventual refactoring.
 type globals struct {
+	// ═══════════════════════════════════════════════════════════════════
+	// Undo/Redo State
+	// ═══════════════════════════════════════════════════════════════════
+
+	// globalincref indicates that file reference counts should be incremented
+	// globally during Edit X commands, preventing premature file cleanup while
+	// a multi-file edit operation is in progress.
 	globalincref bool
 
-	seq       int  // undo/redo sequence across all file.OEBs
-	maxtab    uint // size of a tab, in units of the '0' character
-	tabexpand bool // defines whether to expand tab to spaces
+	// seq is the global undo/redo sequence counter. It is incremented before
+	// marking a file with file.Mark(seq) to create undo checkpoints. All files
+	// share this counter to maintain consistent undo ordering across windows.
+	seq int
 
-	tagfont     string
-	mouse       *draw.Mouse
-	mousectl    *draw.Mousectl
+	// ═══════════════════════════════════════════════════════════════════
+	// Tab Settings
+	// ═══════════════════════════════════════════════════════════════════
+
+	// maxtab is the tab stop width in units of the '0' character width.
+	// Configured via the "tabstop" environment variable; defaults to 4.
+	maxtab uint
+
+	// tabexpand controls whether tabs are expanded to spaces on input.
+	// Configured via the "tabexpand" environment variable; defaults to false.
+	tabexpand bool
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Input Devices
+	// ═══════════════════════════════════════════════════════════════════
+
+	// tagfont is the font specification string used for window tags.
+	tagfont string
+
+	// mouse holds the current mouse position and button state.
+	mouse *draw.Mouse
+
+	// mousectl provides mouse event channel and cursor control.
+	mousectl *draw.Mousectl
+
+	// keyboardctl provides keyboard event channel.
 	keyboardctl *draw.Keyboardctl
 
-	modbutton draw.Image
-	colbutton draw.Image
-	button    draw.Image
-	but2col   draw.Image
-	but3col   draw.Image
+	// ═══════════════════════════════════════════════════════════════════
+	// UI Button Images
+	// ═══════════════════════════════════════════════════════════════════
 
-	//	boxcursor Cursor
+	// modbutton is the image displayed in the tag scroll area when a window
+	// has unsaved modifications (dirty state). Displays a filled blue box.
+	modbutton draw.Image
+
+	// colbutton is the image displayed in the column tag scroll area.
+	// Displays a solid purple-blue box to indicate column headers.
+	colbutton draw.Image
+
+	// button is the default image displayed in the tag scroll area for
+	// unmodified windows. Displays an unfilled bordered box.
+	button draw.Image
+
+	// but2col is the highlight color (red, 0xAA0000FF) used during mouse
+	// button 2 (middle button) text sweeps to indicate execute selection.
+	but2col draw.Image
+
+	// but3col is the highlight color (green, 0x006600FF) used during mouse
+	// button 3 (right button) text sweeps to indicate look/plumb selection.
+	but3col draw.Image
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Main UI Structure
+	// ═══════════════════════════════════════════════════════════════════
+
+	// row is the main Row containing all columns and windows. This is the
+	// root of the window hierarchy: Row -> Columns -> Windows -> Text.
 	row Row
 
-	seltext   *Text
-	argtext   *Text
-	mousetext *Text // global because Text.Close needs to clear it
-	typetext  *Text // global because Text.Close needs to clear it
-	barttext  *Text // shared between mousethread and keyboardthread
+	// ═══════════════════════════════════════════════════════════════════
+	// Text Selection State
+	// ═══════════════════════════════════════════════════════════════════
 
-	activewin  *Window
-	activecol  *Column
-	snarfbuf     []byte
+	// seltext is the Text where the most recent mouse click occurred.
+	// Used by execute commands to determine the selection context.
+	// Set in look.go when processing clicks.
+	seltext *Text
+
+	// argtext is the Text containing the argument for B2B3 chord commands.
+	// When a B2 sweep includes an argument, this points to the Text
+	// containing that argument for command execution.
+	argtext *Text
+
+	// mousetext tracks which Text the mouse is currently over.
+	// Global because Text.Close needs to clear it when a Text is destroyed.
+	mousetext *Text
+
+	// typetext tracks which Text is receiving keyboard input.
+	// Global because Text.Close needs to clear it when a Text is destroyed.
+	typetext *Text
+
+	// barttext is the Text that receives keyboard input from the keyboard
+	// thread. Shared between mousethread and keyboardthread to coordinate
+	// which Text receives typed characters. Set when focus changes.
+	barttext *Text
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Active Window/Column State
+	// ═══════════════════════════════════════════════════════════════════
+
+	// activewin is the currently focused Window. Used by external commands
+	// (via $winid) to determine which window to operate on. Set when a
+	// window gains focus; cleared when the window is closed.
+	activewin *Window
+
+	// activecol is the currently active Column. New windows are created
+	// in the active column by default. Set when clicking in a column;
+	// cleared when the column is deleted.
+	activecol *Column
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Clipboard (Snarf Buffer)
+	// ═══════════════════════════════════════════════════════════════════
+
+	// snarfbuf holds the internal clipboard contents as raw bytes.
+	// Synchronized with the system clipboard via display.WriteSnarf()
+	// after cut/copy operations.
+	snarfbuf []byte
+
+	// snarfContext stores rich text metadata (content type, formatting)
+	// associated with the snarfed selection. Used to preserve formatting
+	// when pasting within Edwood's rich text preview mode.
 	snarfContext *SelectionContext
-	home       string
-	acmeshell  string
-	tagcolors  [frame.NumColours]draw.Image
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Environment/Directory State
+	// ═══════════════════════════════════════════════════════════════════
+
+	// home is the user's home directory path, obtained from os.UserHomeDir().
+	// Used for ~ expansion in file paths and as fallback directory.
+	home string
+
+	// acmeshell is the shell to use for executing commands, from the
+	// "acmeshell" environment variable. If empty, defaults to the system shell.
+	acmeshell string
+
+	// wdir is the current working directory for the editor session.
+	// Used to resolve relative file paths. Persisted in dump files.
+	wdir string
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Color Schemes
+	// ═══════════════════════════════════════════════════════════════════
+
+	// tagcolors holds the color scheme for window tags (title bars).
+	// Indices are frame.ColBack, ColHigh, ColBord, ColText, ColHText.
+	// Defaults: pale blue-green background, pale grey-green highlight,
+	// purple-blue border, black text.
+	tagcolors [frame.NumColours]draw.Image
+
+	// textcolors holds the color scheme for window body text.
+	// Indices are frame.ColBack, ColHigh, ColBord, ColText, ColHText.
+	// Defaults: pale yellow background, dark yellow highlight,
+	// yellow-green border, black text.
 	textcolors [frame.NumColours]draw.Image
-	wdir       string
-	editing    int
 
-	cplumb     chan *plumb.Message
-	cwait      chan ProcessState
-	ccommand   chan *Command
-	ckill      chan string
+	// ═══════════════════════════════════════════════════════════════════
+	// Edit Command State
+	// ═══════════════════════════════════════════════════════════════════
+
+	// editing tracks the current state of Edit command processing:
+	//   Inactive (0)   - no edit command running
+	//   Inserting (1)  - edit command is inserting text
+	//   Collecting (2) - edit command is collecting input
+	// Used to coordinate between the Edit command parser and 9P file operations.
+	editing int
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Inter-goroutine Communication Channels
+	// ═══════════════════════════════════════════════════════════════════
+
+	// cplumb receives plumb messages from the Plan 9 plumber service.
+	// Plumb messages request opening files or performing lookups.
+	cplumb chan *plumb.Message
+
+	// cwait receives process exit status when external commands complete.
+	// Used by waitthread to track command execution results.
+	cwait chan ProcessState
+
+	// ccommand receives new Command structs when external commands are started.
+	// Used by waitthread to track running commands for the Kill menu.
+	ccommand chan *Command
+
+	// ckill receives command name patterns to terminate. When a name is
+	// sent, waitthread attempts to kill matching running commands.
+	ckill chan string
+
+	// cxfidalloc is used to request new Xfid allocations from the 9P server.
+	// Send nil to request an Xfid; receive the allocated Xfid back.
 	cxfidalloc chan *Xfid
-	cxfidfree  chan *Xfid
-	cnewwindow chan *Window
-	cexit      chan struct{}
-	csignal    chan os.Signal
-	cerr       chan error
-	cedit      chan int
-	cwarn      chan uint
 
+	// cxfidfree receives Xfids to be returned to the free pool.
+	cxfidfree chan *Xfid
+
+	// cnewwindow coordinates window creation from 9P requests.
+	// Send nil to request a new window; receive the created Window back.
+	cnewwindow chan *Window
+
+	// cexit signals editor shutdown. Closed when Exit command is executed.
+	cexit chan struct{}
+
+	// csignal receives OS signals (SIGINT, etc.) for graceful shutdown.
+	csignal chan os.Signal
+
+	// cerr receives error messages from background goroutines for display
+	// in the +Errors window.
+	cerr chan error
+
+	// cedit signals completion of Edit command execution. Used to synchronize
+	// between editthread and callers waiting for edit completion.
+	cedit chan int
+
+	// cwarn is used to signal warning conditions that need user attention.
+	// Sends trigger warning display in the UI.
+	cwarn chan uint
+
+	// ═══════════════════════════════════════════════════════════════════
+	// Edit Command Synchronization
+	// ═══════════════════════════════════════════════════════════════════
+
+	// editoutlk is a mutex channel (capacity 1) that serializes access to
+	// the edit command output. Used to prevent interleaved output from
+	// concurrent edit operations writing to the same window.
 	editoutlk chan bool
 
+	// ═══════════════════════════════════════════════════════════════════
+	// Window ID Generation
+	// ═══════════════════════════════════════════════════════════════════
+
+	// WinID is the counter for generating unique window IDs. Incremented
+	// each time a new Window is created. The ID is exposed to external
+	// programs via the $winid environment variable.
 	WinID int
 }
 
