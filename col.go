@@ -88,6 +88,17 @@ func (c *Column) findWindowContainingY(y int) (i int, v *Window) {
 	return len(c.w), v
 }
 
+// findWindowIndex returns the index of window w in the column,
+// or -1 if the window is not found.
+func (c *Column) findWindowIndex(w *Window) int {
+	for i, win := range c.w {
+		if win == w {
+			return i
+		}
+	}
+	return -1
+}
+
 // Add adds a window to the Column.
 // TODO(rjk): what are the args?
 func (c *Column) Add(w, clone *Window, y int) *Window {
@@ -505,11 +516,11 @@ func (c *Column) packColumn(w *Window, windex int, cr image.Rectangle, nl []int)
 
 func (c *Column) DragWin(w *Window, but int) {
 	var (
-		r      image.Rectangle
-		i, b   int
-		p, op  image.Point
-		v, win *Window
-		nc     *Column
+		r     image.Rectangle
+		b     int
+		p, op image.Point
+		v     *Window
+		nc    *Column
 	)
 	clearmouse()
 	c.display.SetCursor(&boxcursor)
@@ -526,15 +537,12 @@ func (c *Column) DragWin(w *Window, but int) {
 		return
 	}
 
-	// Make sure our window was in our column
-	for i, win = range c.w {
-		if win == w {
-			goto Found
-		}
+	// Find window w in our column
+	i := c.findWindowIndex(w)
+	if i < 0 {
+		util.AcmeError("can't find window", nil)
+		return
 	}
-	util.AcmeError("can't find window", nil)
-
-Found:
 	if w.tagexpand { // force recomputation of window tag size
 		w.taglines = 1
 	}
