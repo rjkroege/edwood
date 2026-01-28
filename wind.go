@@ -909,17 +909,22 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 	rt := w.richBody
 
-	// Handle scroll wheel (buttons 4 and 5)
-	if m.Buttons&8 != 0 { // Button 4 - scroll up
-		rt.ScrollWheel(true)
-		w.Draw()
-		if w.display != nil {
-			w.display.Flush()
+	// Handle scroll wheel (buttons 4 and 5).
+	// When the cursor is over a horizontally-scrollable block region,
+	// redirect vertical scroll to horizontal scrolling.
+	if m.Buttons&8 != 0 || m.Buttons&16 != 0 {
+		if regionIndex, ok := rt.Frame().PointInBlockRegion(m.Point); ok {
+			// Horizontal scroll: button 4 = left, button 5 = right.
+			delta := 40 // pixels per scroll tick
+			if m.Buttons&8 != 0 {
+				delta = -delta
+			}
+			rt.Frame().HScrollWheel(delta, regionIndex)
+		} else {
+			// Normal vertical scroll.
+			up := m.Buttons&8 != 0
+			rt.ScrollWheel(up)
 		}
-		return true
-	}
-	if m.Buttons&16 != 0 { // Button 5 - scroll down
-		rt.ScrollWheel(false)
 		w.Draw()
 		if w.display != nil {
 			w.display.Flush()

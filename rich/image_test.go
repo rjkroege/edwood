@@ -1315,9 +1315,10 @@ func TestDrawImageClipBottom(t *testing.T) {
 	// This test verifies the image dimensions are preserved before clipping.
 }
 
-// TestDrawImageClipRight verifies that images wider than the frame are scaled down.
-// Unlike clipping at the bottom, wide images are scaled to fit the frame width.
-func TestDrawImageClipRight(t *testing.T) {
+// TestDrawImageOverflowForHScroll verifies that images wider than the frame
+// are NOT scaled down. They keep their native width and overflow, relying on
+// horizontal scrollbar support for viewing.
+func TestDrawImageOverflowForHScroll(t *testing.T) {
 	// Create a temporary PNG file
 	tmpDir := t.TempDir()
 	pngPath := filepath.Join(tmpDir, "clip_right.png")
@@ -1363,19 +1364,18 @@ func TestDrawImageClipRight(t *testing.T) {
 		ImageData: cached,
 	}
 
-	// Test scaling when image is wider than frame
+	// Image wider than frame should NOT be scaled down
 	frameWidth := 100 // Narrower than image width (200)
 	width, height := imageBoxDimensions(&box, frameWidth)
 
-	// Image should be scaled to fit frame width
-	if width != 100 {
-		t.Errorf("scaled image width = %d, want 100", width)
+	// Image should keep its native width (200), not be scaled to 100
+	if width != 200 {
+		t.Errorf("image width = %d, want 200 (native width, not clamped)", width)
 	}
 
-	// Height should be proportionally scaled: 50 * (100/200) = 25
-	expectedHeight := 25
-	if height != expectedHeight {
-		t.Errorf("scaled image height = %d, want %d", height, expectedHeight)
+	// Height should remain at native height since width is unchanged
+	if height != 50 {
+		t.Errorf("image height = %d, want 50 (native height)", height)
 	}
 }
 

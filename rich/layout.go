@@ -1,7 +1,9 @@
 package rich
 
 import (
+	"bytes"
 	"path/filepath"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/rjkroege/edwood/draw"
@@ -165,10 +167,11 @@ const CodeBlockIndentChars = 4
 // The actual indentation may vary based on the code font at runtime.
 const CodeBlockIndent = 40
 
-// imageBoxDimensions calculates the width and height for an image box,
-// scaling down if the image is wider than maxWidth.
-// If box.Style.ImageWidth > 0, uses that as the target width (clamped to maxWidth),
+// imageBoxDimensions calculates the width and height for an image box.
+// If box.Style.ImageWidth > 0, uses that as the target width,
 // computing height proportionally from the original image dimensions.
+// The image is NOT clamped to maxWidth; overflowing images get a horizontal
+// scrollbar via block region detection.
 // Returns (0, 0) if the box is not an image with ImageData.
 func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
 	if !box.IsImage() {
@@ -181,11 +184,6 @@ func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
 	targetWidth := imgWidth
 	if box.Style.ImageWidth > 0 {
 		targetWidth = box.Style.ImageWidth
-	}
-
-	// Clamp to frame width
-	if targetWidth > maxWidth {
-		targetWidth = maxWidth
 	}
 
 	// Scale height proportionally
@@ -220,6 +218,7 @@ type AdjustedBlockRegion struct {
 	BlockRegion
 	HasScrollbar bool // True if this region overflows and needs a horizontal scrollbar
 	ScrollbarY   int  // Y position of the scrollbar (bottom of the block region, after adjustment)
+	RegionTopY   int  // Y position of the top of the block region (first line's Y)
 }
 
 // adjustLayoutForScrollbars performs pass 2 of the two-pass layout.
@@ -258,6 +257,13 @@ func adjustLayoutForScrollbars(lines []Line, regions []BlockRegion, frameWidth, 
 				yShift += scrollbarHeight
 			}
 			regionIdx++
+		}
+	}
+
+	// Record the top Y of each region from the adjusted line positions.
+	for i := range adjusted {
+		if adjusted[i].StartLine < len(lines) {
+			adjusted[i].RegionTopY = lines[adjusted[i].StartLine].Y
 		}
 	}
 
@@ -320,7 +326,9 @@ func lineBlockKind(line *Line) (BlockKind, bool) {
 		if pb.Box.Style.Table {
 			return BlockTable, true
 		}
-		// Image blocks could be added here in the future
+		if pb.Box.IsImage() {
+			return BlockImage, true
+		}
 	}
 	return 0, false
 }
@@ -447,8 +455,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
 
-		// For block-level code, don't wrap - allow horizontal overflow
-		if box.Style.Block && box.Style.Code {
+		// For block-level code or images, don't wrap - allow horizontal overflow
+		if (box.Style.Block && box.Style.Code) || box.IsImage() {
 			box.Wid = width
 			currentLine.Boxes = append(currentLine.Boxes, PositionedBox{Box: *box, X: xPos})
 			xPos += width
@@ -515,23 +523,23 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		lines = append(lines, currentLine)
 	}
 
-	// Compute ContentWidth for block code lines.
-	// For lines containing Block && Code boxes, ContentWidth is the rightmost
-	// box extent (X + Wid). For normal text lines, ContentWidth stays 0.
+	// Compute ContentWidth for non-wrapping lines.
+	// For lines containing Block && Code boxes or images, ContentWidth is the
+	// rightmost box extent (X + Wid). For normal text lines, ContentWidth stays 0.
 	for i := range lines {
 		line := &lines[i]
-		isBlockCode := false
+		isNonWrap := false
 		maxExtent := 0
 		for _, pb := range line.Boxes {
-			if pb.Box.Style.Block && pb.Box.Style.Code {
-				isBlockCode = true
+			if (pb.Box.Style.Block && pb.Box.Style.Code) || pb.Box.IsImage() {
+				isNonWrap = true
 			}
 			extent := pb.X + pb.Box.Wid
 			if extent > maxExtent {
 				maxExtent = extent
 			}
 		}
-		if isBlockCode {
+		if isNonWrap {
 			line.ContentWidth = maxExtent
 		}
 	}
@@ -694,6 +702,16 @@ func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab 
 			cached, _ := cache.Load(imgPath)
 			if cached != nil {
 				box.ImageData = cached
+				// If the image failed with an unsupported format, append
+				// a suffix to the placeholder text so the content rune count
+				// matches what would be rendered (needed for hit-testing).
+				if cached.Err != nil && strings.Contains(cached.Err.Error(), "unknown format") {
+					suffix := []byte(" <unsupported format>")
+					if !bytes.HasSuffix(box.Text, suffix) {
+						box.Text = append(box.Text, suffix...)
+						box.Nrune = utf8.RuneCount(box.Text)
+					}
+				}
 			}
 		}
 	}

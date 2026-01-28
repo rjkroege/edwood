@@ -972,8 +972,8 @@ func TestLayoutImageWidth(t *testing.T) {
 	})
 }
 
-// TestLayoutImageScale tests that images wider than frame are scaled down.
-// Large images should be scaled to fit within the frame width.
+// TestLayoutImageScale tests that images wider than frame are NOT scaled down.
+// Wide images overflow and get horizontal scrollbars instead.
 func TestLayoutImageScale(t *testing.T) {
 	font := edwoodtest.NewFont(10, 14)
 	frameWidth := 300 // Narrow frame
@@ -986,7 +986,7 @@ func TestLayoutImageScale(t *testing.T) {
 		Path:   "wide.png",
 	}
 
-	t.Run("wide image scaled to fit frame", func(t *testing.T) {
+	t.Run("wide image overflows frame for horizontal scroll", func(t *testing.T) {
 		boxes := []Box{
 			{
 				Text:      nil,
@@ -1006,14 +1006,15 @@ func TestLayoutImageScale(t *testing.T) {
 			t.Fatalf("expected 1 box, got %d", len(lines[0].Boxes))
 		}
 
-		// The image should be scaled to fit within frameWidth (300)
+		// The image should keep its natural width (600), overflowing the frame.
+		// A horizontal scrollbar will be added by block region detection.
 		gotWidth := lines[0].Boxes[0].Box.Wid
-		if gotWidth > frameWidth {
-			t.Errorf("image box width = %d, should be <= frame width %d", gotWidth, frameWidth)
+		if gotWidth != 600 {
+			t.Errorf("image box width = %d, want 600 (native width, not clamped)", gotWidth)
 		}
-		// After scaling 600 -> 300, the width should be exactly frameWidth
-		if gotWidth != frameWidth {
-			t.Errorf("image box width = %d, want %d (scaled to fit)", gotWidth, frameWidth)
+		// ContentWidth should be set for horizontal scrollbar detection
+		if lines[0].ContentWidth != 600 {
+			t.Errorf("ContentWidth = %d, want 600", lines[0].ContentWidth)
 		}
 	})
 
@@ -1816,9 +1817,9 @@ func TestImageBoxDimensionsExplicitWidth(t *testing.T) {
 	})
 }
 
-// TestImageBoxDimensionsClampToFrame tests that explicit ImageWidth is
-// clamped to the frame width when it exceeds it.
-func TestImageBoxDimensionsClampToFrame(t *testing.T) {
+// TestImageBoxDimensionsNoClamp tests that images are NOT clamped to frame
+// width. They overflow and get horizontal scrollbars instead.
+func TestImageBoxDimensionsNoClamp(t *testing.T) {
 	// Image is 400x200 (2:1 aspect ratio)
 	mockImage := &CachedImage{
 		Width:  400,
@@ -1826,35 +1827,33 @@ func TestImageBoxDimensionsClampToFrame(t *testing.T) {
 		Path:   "photo.png",
 	}
 
-	t.Run("explicit width clamped to frame", func(t *testing.T) {
+	t.Run("explicit width exceeding frame is not clamped", func(t *testing.T) {
 		box := Box{
 			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 500, Scale: 1.0},
 			ImageData: mockImage,
 		}
-		// Frame is only 300 wide, so 500 should be clamped to 300
+		// Frame is only 300 wide, but image should use explicit width 500
 		w, h := imageBoxDimensions(&box, 300)
-		if w != 300 {
-			t.Errorf("width = %d, want 300 (clamped to frame)", w)
+		if w != 500 {
+			t.Errorf("width = %d, want 500 (explicit width, not clamped)", w)
 		}
-		// Height should scale proportionally from original: 200 * (300/400) = 150
-		if h != 150 {
-			t.Errorf("height = %d, want 150", h)
+		// Height should scale proportionally from original: 200 * (500/400) = 250
+		if h != 250 {
+			t.Errorf("height = %d, want 250", h)
 		}
 	})
 
-	t.Run("natural size wider than frame still clamped", func(t *testing.T) {
-		// Even without explicit width, images wider than frame are clamped
+	t.Run("natural size wider than frame is not clamped", func(t *testing.T) {
 		box := Box{
 			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 0, Scale: 1.0},
 			ImageData: mockImage,
 		}
 		w, h := imageBoxDimensions(&box, 200)
-		if w != 200 {
-			t.Errorf("width = %d, want 200 (clamped to frame)", w)
+		if w != 400 {
+			t.Errorf("width = %d, want 400 (natural width, not clamped)", w)
 		}
-		// 200 * (200/400) = 100
-		if h != 100 {
-			t.Errorf("height = %d, want 100", h)
+		if h != 200 {
+			t.Errorf("height = %d, want 200 (natural height)", h)
 		}
 	})
 }

@@ -3989,3 +3989,118 @@ func TestHScrollClickClampsToRange(t *testing.T) {
 		t.Errorf("offset should not be negative: got %d", offset)
 	}
 }
+
+// TestHScrollWheelAdjustsOffset verifies that HScrollWheel adjusts the
+// horizontal scroll offset by the given delta. A positive delta scrolls right
+// (increases offset), and a negative delta scrolls left (decreases offset).
+func TestHScrollWheelAdjustsOffset(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+
+	// Start at offset 0.
+	fi.SetHScrollOrigin(0, 0)
+
+	// Scroll right by 50 pixels.
+	f.HScrollWheel(50, 0)
+	offset := fi.GetHScrollOrigin(0)
+	if offset != 50 {
+		t.Errorf("HScrollWheel(50) should set offset to 50, got %d", offset)
+	}
+
+	// Scroll left by 20 pixels (delta = -20).
+	f.HScrollWheel(-20, 0)
+	offset = fi.GetHScrollOrigin(0)
+	if offset != 30 {
+		t.Errorf("HScrollWheel(-20) from 50 should set offset to 30, got %d", offset)
+	}
+}
+
+// TestHScrollWheelClampsToRange verifies that HScrollWheel clamps the resulting
+// offset to [0, maxScrollable] regardless of the delta value.
+func TestHScrollWheelClampsToRange(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+	maxScrollable := ar.MaxContentWidth - rect.Dx()
+
+	// Test clamping to 0: large negative delta from offset 0.
+	fi.SetHScrollOrigin(0, 0)
+	f.HScrollWheel(-1000, 0)
+	offset := fi.GetHScrollOrigin(0)
+	if offset != 0 {
+		t.Errorf("HScrollWheel(-1000) from 0 should clamp to 0, got %d", offset)
+	}
+
+	// Test clamping to maxScrollable: large positive delta from maxScrollable.
+	fi.SetHScrollOrigin(0, maxScrollable)
+	f.HScrollWheel(1000, 0)
+	offset = fi.GetHScrollOrigin(0)
+	if offset != maxScrollable {
+		t.Errorf("HScrollWheel(1000) from maxScrollable should clamp to %d, got %d", maxScrollable, offset)
+	}
+
+	// Test clamping to 0 from a small offset with large negative delta.
+	fi.SetHScrollOrigin(0, 10)
+	f.HScrollWheel(-100, 0)
+	offset = fi.GetHScrollOrigin(0)
+	if offset != 0 {
+		t.Errorf("HScrollWheel(-100) from 10 should clamp to 0, got %d", offset)
+	}
+
+	// Test clamping to maxScrollable from near-max offset with positive delta.
+	fi.SetHScrollOrigin(0, maxScrollable-5)
+	f.HScrollWheel(100, 0)
+	offset = fi.GetHScrollOrigin(0)
+	if offset != maxScrollable {
+		t.Errorf("HScrollWheel(100) from %d should clamp to %d, got %d", maxScrollable-5, maxScrollable, offset)
+	}
+}

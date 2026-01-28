@@ -3,7 +3,6 @@ package rich
 import (
 	"image"
 	"image/color"
-	"strings"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -65,6 +64,16 @@ type Frame interface {
 
 	// Horizontal scrollbar click handling (acme three-button semantics)
 	HScrollClick(button int, pt image.Point, regionIndex int)
+
+	// PointInBlockRegion checks if a screen point falls within any
+	// horizontally-scrollable block region (the content area, not just
+	// the scrollbar). Returns the region index and true if hit.
+	PointInBlockRegion(pt image.Point) (regionIndex int, ok bool)
+
+	// HScrollWheel adjusts the horizontal scroll offset for the given
+	// block region by delta pixels (positive = scroll right, negative = left).
+	// The resulting offset is clamped to [0, maxScrollable].
+	HScrollWheel(delta int, regionIndex int)
 
 	// Status
 	Full() bool // True if frame is at capacity
@@ -925,13 +934,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 
 			// Check for error placeholder case
 			if pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil {
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path, pb.Box.Style.ImageAlt, pb.Box.ImageData.Err)
+				f.drawImageErrorPlaceholder(target, pt, string(pb.Box.Text))
 				continue
 			}
 
 			// Check if we have valid image data to render
 			if !pb.Box.IsImage() {
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL, pb.Box.Style.ImageAlt, nil)
+				f.drawImageErrorPlaceholder(target, pt, string(pb.Box.Text))
 				continue
 			}
 
@@ -1629,6 +1638,63 @@ func (f *frameImpl) HScrollClick(button int, pt image.Point, regionIndex int) {
 	f.SetHScrollOrigin(regionIndex, newOffset)
 }
 
+// PointInBlockRegion checks if the given screen point falls within any
+// horizontally-scrollable block region (the content area, including the
+// scrollbar area). Returns the region index and true if hit, or (0, false)
+// if the point is not within any scrollable block region.
+func (f *frameImpl) PointInBlockRegion(pt image.Point) (regionIndex int, ok bool) {
+	frameWidth := f.rect.Dx()
+
+	// Convert screen point to frame-relative coordinates.
+	relX := pt.X - f.rect.Min.X
+	relY := pt.Y - f.rect.Min.Y
+
+	for i, ar := range f.hscrollRegions {
+		if !ar.HasScrollbar {
+			continue
+		}
+		// Block region spans [0, frameWidth) x [RegionTopY, ScrollbarY + scrollbarHeight).
+		// The scrollbar is at the bottom; include it in the region.
+		scrollbarHeight := 12 // Scrollwid
+		if relX >= 0 && relX < frameWidth &&
+			relY >= ar.RegionTopY && relY < ar.ScrollbarY+scrollbarHeight {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// HScrollWheel adjusts the horizontal scroll offset for the given block region
+// by delta pixels. Positive delta scrolls right, negative scrolls left.
+// The resulting offset is clamped to [0, maxScrollable].
+func (f *frameImpl) HScrollWheel(delta int, regionIndex int) {
+	if regionIndex < 0 || regionIndex >= len(f.hscrollRegions) {
+		return
+	}
+	ar := f.hscrollRegions[regionIndex]
+	if !ar.HasScrollbar {
+		return
+	}
+
+	frameWidth := f.rect.Dx()
+	maxScrollable := ar.MaxContentWidth - frameWidth
+	if maxScrollable <= 0 {
+		return
+	}
+
+	newOffset := f.GetHScrollOrigin(regionIndex) + delta
+
+	// Clamp to [0, maxScrollable].
+	if newOffset < 0 {
+		newOffset = 0
+	}
+	if newOffset > maxScrollable {
+		newOffset = maxScrollable
+	}
+
+	f.SetHScrollOrigin(regionIndex, newOffset)
+}
+
 // HScrollBgColor is the background color of horizontal scrollbars.
 var HScrollBgColor = color.RGBA{R: 153, G: 153, B: 76, A: 255} // dark yellow-green, similar to acme scrollbar
 
@@ -1821,7 +1887,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	plan9Data, err := ConvertToPlan9(goImg)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
+		f.drawImageErrorPlaceholder(target, pt, string(pb.Box.Text))
 		return
 	}
 
@@ -1830,7 +1896,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	srcImg, err := f.display.AllocImage(srcRect, edwooddraw.RGBA32, false, 0)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
+		f.drawImageErrorPlaceholder(target, pt, string(pb.Box.Text))
 		return
 	}
 	defer srcImg.Free()
@@ -1839,7 +1905,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	_, err = srcImg.Load(srcRect, plan9Data)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
+		f.drawImageErrorPlaceholder(target, pt, string(pb.Box.Text))
 		return
 	}
 
@@ -1856,26 +1922,14 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 }
 
 // drawImageErrorPlaceholder renders an error placeholder for failed image loads.
-// It displays "[Image: alt]" in blue (like a link) so it can be clicked to open the image path.
-// If loadErr describes an unsupported format, an annotation is appended.
-func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string, alt string, loadErr error) {
+// It displays the box's text (e.g. "[Image: alt]" or "[Image: alt <unsupported format>]")
+// in blue (like a link) so it can be clicked to open the image path.
+func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, boxText string) {
 	if f.font == nil || f.textColor == nil {
 		return
 	}
 
-	// Create placeholder text with alt text
-	placeholder := "[Image: " + alt + "]"
-	if alt == "" {
-		placeholder = "[Image]"
-	}
-
-	// Annotate unsupported formats (e.g. SVG)
-	if loadErr != nil {
-		msg := loadErr.Error()
-		if strings.Contains(msg, "unknown format") {
-			placeholder += " <unsupported format>"
-		}
-	}
+	placeholder := boxText
 
 	// Use blue (like links) so users know it's clickable
 	blueColor := f.allocColorImage(LinkBlue)
