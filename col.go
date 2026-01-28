@@ -7,6 +7,7 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/internal/ui"
 	"github.com/rjkroege/edwood/util"
 )
 
@@ -391,26 +392,34 @@ func (c *Column) Grow(w *Window, but int) {
 
 	// Observation: before I can support lines of arbitrary height, I need to change
 	// Frame to paint partial lines of text.
-	// TODO(rjk): Rewrite this logic for computing heights when font heights vary.
-	// store old #lines for each window
+	// store old #lines for each window, converting tag lines to body-line equivalents
+	// using LayoutMetrics to account for different font heights.
 	onl := w.body.fr.GetFrameFillStatus().Maxlines
 	nl := make([]int, c.nw())
 	tot := 0
 	for j := 0; j < c.nw(); j++ {
-		l := c.w[j].taglines - 1 + c.w[j].body.fr.GetFrameFillStatus().Maxlines // TODO(flux): This taglines subtraction (for scrolling tags) assumes tags take the same number of pixels height as the body lines.  This is clearly false.
+		wj := c.w[j]
+		// Use LayoutMetrics to properly convert tag lines to body-line equivalents.
+		// The taglines-1 accounts for scrolling tags (the first tag line is always shown).
+		lm := ui.NewLayoutMetrics(wj.tag.fr.DefaultFontHeight(), wj.body.fr.DefaultFontHeight())
+		bodyLines := wj.body.fr.GetFrameFillStatus().Maxlines
+		l := lm.TotalLinesEquivalent(wj.taglines-1, bodyLines)
 		nl[j] = l
 		tot += l
 	}
 
 	// approximate new #lines for this window
+	// Use LayoutMetrics to properly convert tag lines to body-line equivalents
+	wlm := ui.NewLayoutMetrics(w.tag.fr.DefaultFontHeight(), w.body.fr.DefaultFontHeight())
+	wTagEquiv := wlm.TotalLinesEquivalent(w.taglines-1, w.maxlines)
 	if but == 2 { // as big as can be
 		for i := range nl {
 			nl[i] = 0
 		}
 	} else {
-		nnl := util.Min(onl+util.Max(util.Min(5, w.taglines-1+w.maxlines), onl/2), tot) // TODO(flux) more bad taglines use
-		if nnl < w.taglines-1+w.maxlines {
-			nnl = (w.taglines - 1 + w.maxlines + nnl) / 2
+		nnl := util.Min(onl+util.Max(util.Min(5, wTagEquiv), onl/2), tot)
+		if nnl < wTagEquiv {
+			nnl = (wTagEquiv + nnl) / 2
 		}
 		if nnl == 0 {
 			nnl = 2

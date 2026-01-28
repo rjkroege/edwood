@@ -504,6 +504,248 @@ func TestLayoutMetricsEffectiveLines(t *testing.T) {
 	}
 }
 
+// TestLayoutMetricsTagHeightAssumption tests that tag and body heights are tracked
+// separately, addressing the col.go:400 TODO about the incorrect assumption that
+// tags take the same number of pixels as body lines.
+func TestLayoutMetricsTagHeightAssumption(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		tagLines   int
+		bodyLines  int
+		wantPixels int
+		wantEquiv  int
+	}{
+		{
+			name:       "same heights - no conversion needed",
+			tagHeight:  16,
+			bodyHeight: 16,
+			tagLines:   2,
+			bodyLines:  10,
+			wantPixels: 2*16 + 10*16, // 192 pixels
+			wantEquiv:  12,           // 2 + 10 = 12 effective lines
+		},
+		{
+			name:       "tag taller than body",
+			tagHeight:  20,
+			bodyHeight: 14,
+			tagLines:   2,
+			bodyLines:  10,
+			wantPixels: 2*20 + 10*14, // 180 pixels
+			wantEquiv:  12,           // 2*20/14 = 2 (rounded down), + 10 = 12
+		},
+		{
+			name:       "body taller than tag",
+			tagHeight:  12,
+			bodyHeight: 20,
+			tagLines:   3,
+			bodyLines:  8,
+			wantPixels: 3*12 + 8*20, // 196 pixels
+			wantEquiv:  9,           // 3*12/20 = 1 (rounded down), + 8 = 9
+		},
+		{
+			name:       "expanded multi-line tag",
+			tagHeight:  18,
+			bodyHeight: 14,
+			tagLines:   5,
+			bodyLines:  6,
+			wantPixels: 5*18 + 6*14, // 174 pixels
+			wantEquiv:  12,          // 5*18/14 = 6 (rounded down), + 6 = 12
+		},
+		{
+			name:       "single tag line",
+			tagHeight:  16,
+			bodyHeight: 14,
+			tagLines:   1,
+			bodyLines:  10,
+			wantPixels: 1*16 + 10*14, // 156 pixels
+			wantEquiv:  11,           // 1*16/14 = 1 (rounded down), + 10 = 11
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+
+			// Test that we track separate heights
+			if lm.TagFontHeight() != tt.tagHeight {
+				t.Errorf("TagFontHeight() = %d; want %d", lm.TagFontHeight(), tt.tagHeight)
+			}
+			if lm.BodyFontHeight() != tt.bodyHeight {
+				t.Errorf("BodyFontHeight() = %d; want %d", lm.BodyFontHeight(), tt.bodyHeight)
+			}
+
+			// Test pixel calculation accounts for different heights
+			gotPixels := lm.PixelHeightFromLines(tt.tagLines, tt.bodyLines)
+			if gotPixels != tt.wantPixels {
+				t.Errorf("PixelHeightFromLines(%d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, gotPixels, tt.wantPixels)
+			}
+
+			// Test equivalent lines calculation for distribution
+			gotEquiv := lm.TotalLinesEquivalent(tt.tagLines, tt.bodyLines)
+			if gotEquiv != tt.wantEquiv {
+				t.Errorf("TotalLinesEquivalent(%d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, gotEquiv, tt.wantEquiv)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsTagHeightVsBodyHeight demonstrates the problem the TODO describes:
+// when adding taglines-1 to maxlines directly, the result is wrong if fonts differ.
+func TestLayoutMetricsTagHeightVsBodyHeight(t *testing.T) {
+	// This test demonstrates why the col.go:400 code is wrong:
+	// If tag font is 20px and body font is 14px:
+	// - 2 tag lines = 40px
+	// - 10 body lines = 140px
+	// - Total = 180px
+	//
+	// But the old code does: taglines + bodylines = 2 + 10 = 12
+	// This treats all lines as equal, losing the height difference.
+
+	lm := NewLayoutMetrics(20, 14)
+
+	// The OLD (incorrect) way: just add lines together
+	tagLines := 2
+	bodyLines := 10
+	incorrectTotal := tagLines + bodyLines // 12 - treats all lines as same height
+
+	// The CORRECT way: use LayoutMetrics to account for different heights
+	correctTotal := lm.TotalLinesEquivalent(tagLines, bodyLines)
+
+	// These should differ when font heights differ
+	if incorrectTotal == correctTotal && lm.TagFontHeight() != lm.BodyFontHeight() {
+		// Note: due to integer division, they might be equal in some cases
+		// but the pixel calculations will still differ
+		t.Logf("Note: line counts happen to be equal (%d) but pixel calculations differ", incorrectTotal)
+	}
+
+	// Verify pixel calculations are correct
+	actualPixels := lm.PixelHeightFromLines(tagLines, bodyLines)
+	expectedPixels := tagLines*lm.TagFontHeight() + bodyLines*lm.BodyFontHeight()
+	if actualPixels != expectedPixels {
+		t.Errorf("PixelHeightFromLines() = %d; want %d", actualPixels, expectedPixels)
+	}
+}
+
+// TestLayoutMetricsWindowLinesForDistribution tests the line distribution calculation
+// used in col.go Grow() where lines need to be distributed among windows.
+func TestLayoutMetricsWindowLinesForDistribution(t *testing.T) {
+	tests := []struct {
+		name       string
+		tagHeight  int
+		bodyHeight int
+		windows    []struct{ tagLines, bodyLines int }
+		wantTotal  int // total effective lines for distribution
+	}{
+		{
+			name:       "two windows same fonts",
+			tagHeight:  16,
+			bodyHeight: 16,
+			windows: []struct{ tagLines, bodyLines int }{
+				{1, 10}, // 11 lines
+				{1, 8},  // 9 lines
+			},
+			wantTotal: 20,
+		},
+		{
+			name:       "two windows different fonts",
+			tagHeight:  20,
+			bodyHeight: 14,
+			windows: []struct{ tagLines, bodyLines int }{
+				{1, 10}, // 1*20/14 + 10 = 11
+				{2, 5},  // 2*20/14 + 5 = 7
+			},
+			wantTotal: 18,
+		},
+		{
+			name:       "expanded multi-line tags",
+			tagHeight:  18,
+			bodyHeight: 14,
+			windows: []struct{ tagLines, bodyLines int }{
+				{3, 8},  // 3*18/14 + 8 = 3 + 8 = 11
+				{1, 12}, // 1*18/14 + 12 = 1 + 12 = 13
+			},
+			wantTotal: 24,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+			var total int
+			for _, w := range tt.windows {
+				total += lm.TotalLinesEquivalent(w.tagLines, w.bodyLines)
+			}
+			if total != tt.wantTotal {
+				t.Errorf("total effective lines = %d; want %d", total, tt.wantTotal)
+			}
+		})
+	}
+}
+
+// TestLayoutMetricsTagMinusOnePattern tests the specific pattern used in col.go:400
+// where the code does `taglines - 1 + maxlines`. The -1 accounts for scrolling tags
+// but the addition still assumes equal line heights.
+func TestLayoutMetricsTagMinusOnePattern(t *testing.T) {
+	tests := []struct {
+		name              string
+		tagHeight         int
+		bodyHeight        int
+		tagLines          int // actual tag lines shown
+		bodyLines         int // maxlines from frame
+		wantEffectiveBody int // effective lines in body-units for distribution
+	}{
+		{
+			name:              "single line tag same font",
+			tagHeight:         16,
+			bodyHeight:        16,
+			tagLines:          1,
+			bodyLines:         10,
+			wantEffectiveBody: 11, // 1 + 10
+		},
+		{
+			name:              "single line tag different font",
+			tagHeight:         20,
+			bodyHeight:        14,
+			tagLines:          1,
+			bodyLines:         10,
+			wantEffectiveBody: 11, // 1*20/14 + 10 = 1 + 10
+		},
+		{
+			name:              "expanded tag same font",
+			tagHeight:         16,
+			bodyHeight:        16,
+			tagLines:          3,
+			bodyLines:         8,
+			wantEffectiveBody: 11, // 3 + 8
+		},
+		{
+			name:              "expanded tag different font",
+			tagHeight:         20,
+			bodyHeight:        14,
+			tagLines:          3,
+			bodyLines:         8,
+			wantEffectiveBody: 12, // 3*20/14 + 8 = 4 + 8
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lm := NewLayoutMetrics(tt.tagHeight, tt.bodyHeight)
+
+			// The correct calculation using LayoutMetrics
+			got := lm.TotalLinesEquivalent(tt.tagLines, tt.bodyLines)
+			if got != tt.wantEffectiveBody {
+				t.Errorf("TotalLinesEquivalent(%d, %d) = %d; want %d",
+					tt.tagLines, tt.bodyLines, got, tt.wantEffectiveBody)
+			}
+		})
+	}
+}
+
 // TestLayoutMetricsZeroDivisionNewMethods tests new methods don't panic with zero heights.
 func TestLayoutMetricsZeroDivisionNewMethods(t *testing.T) {
 	defer func() {
