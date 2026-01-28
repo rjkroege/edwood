@@ -647,9 +647,9 @@ forloop:
 			w.col.Close(w, true)
 			w = nil
 		case "get": // get file
-			get(&w.body, nil, nil, false, XXX, "")
+			get(&w.body, nil, nil, false, false, "")
 		case "put": // put file
-			put(&w.body, nil, nil, XXX, XXX, "")
+			put(&w.body, nil, nil, false, false, "")
 		case "dot=addr": // set dot
 			w.body.Commit()
 			w.ClampAddr()
@@ -699,7 +699,7 @@ forloop:
 				err = fmt.Errorf("nulls in font name")
 				break forloop
 			}
-			fontx(&w.body, nil, nil, XXX, XXX, string(r))
+			fontx(&w.body, nil, nil, false, false, string(r))
 		default:
 			err = ErrBadCtl
 			break forloop

@@ -40,8 +40,6 @@ const (
 	QMAX
 )
 
-const XXX = false
-
 const (
 	NRange = 10 // TODO(flux): No reason for this static limit anymore; should we remove?
 	//	Infinity  = 0x7FFFFFFF
