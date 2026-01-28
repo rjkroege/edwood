@@ -104,6 +104,15 @@ type frameImpl struct {
 	tickImage  edwooddraw.Image // pre-rendered tick mask (transparent + opaque pattern)
 	tickScale  int              // display.ScaleSize(1)
 	tickHeight int              // height of current tickImage (re-init when changed)
+
+	// Horizontal scroll state per non-wrapping block element.
+	// Index is the ordinal of the block region (0th code block, 1st, etc.).
+	// Value is the pixel offset from the left edge.
+	hscrollOrigins []int
+
+	// Number of non-wrapping blocks seen on the last layout pass.
+	// Used to detect when blocks are added or removed.
+	hscrollBlockCount int
 }
 
 // NewFrame creates a new Frame.
@@ -999,7 +1008,11 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 
 	// If origin is 0, just return the normal layout (using cache if available)
 	if f.origin == 0 {
-		return f.layoutBoxes(boxes, frameWidth, maxtab), 0
+		lines := f.layoutBoxes(boxes, frameWidth, maxtab)
+		// Sync horizontal scroll state with current block regions
+		regions := findBlockRegions(lines)
+		f.syncHScrollState(len(regions))
+		return lines, 0
 	}
 
 	// Layout all boxes first (using cache if available)
@@ -1007,6 +1020,10 @@ func (f *frameImpl) layoutFromOrigin() ([]Line, int) {
 	if len(allLines) == 0 {
 		return nil, 0
 	}
+
+	// Sync horizontal scroll state with current block regions
+	regions := findBlockRegions(allLines)
+	f.syncHScrollState(len(regions))
 
 	// Find which line contains the origin position
 	runeCount := 0
@@ -1426,6 +1443,34 @@ func (f *frameImpl) drawTickTo(target edwooddraw.Image, offset image.Point) {
 		)
 		target.Draw(r, f.display.Black(), f.tickImage, image.ZP)
 	}
+}
+
+// syncHScrollState updates the horizontal scroll origins slice after layout.
+// If the block region count changed, the slice is reset to zero values.
+// If the count is unchanged, existing scroll positions are preserved.
+func (f *frameImpl) syncHScrollState(regionCount int) {
+	if regionCount != f.hscrollBlockCount {
+		f.hscrollOrigins = make([]int, regionCount)
+		f.hscrollBlockCount = regionCount
+	}
+}
+
+// SetHScrollOrigin sets the horizontal scroll offset for a block region by index.
+// Out-of-range indices are ignored.
+func (f *frameImpl) SetHScrollOrigin(regionIndex, pixelOffset int) {
+	if regionIndex < 0 || regionIndex >= len(f.hscrollOrigins) {
+		return
+	}
+	f.hscrollOrigins[regionIndex] = pixelOffset
+}
+
+// GetHScrollOrigin returns the horizontal scroll offset for a block region by index.
+// Out-of-range indices return 0.
+func (f *frameImpl) GetHScrollOrigin(regionIndex int) int {
+	if regionIndex < 0 || regionIndex >= len(f.hscrollOrigins) {
+		return 0
+	}
+	return f.hscrollOrigins[regionIndex]
 }
 
 // Full returns true if the frame is at capacity.

@@ -2956,3 +2956,127 @@ func TestDrawImageScaled(t *testing.T) {
 		}
 	}
 }
+
+// TestHScrollOriginsPreservedOnStableCount verifies that when the block region
+// count does not change across syncHScrollState calls, existing scroll offsets
+// are preserved.
+func TestHScrollOriginsPreservedOnStableCount(t *testing.T) {
+	f := NewFrame()
+	fi := f.(*frameImpl)
+
+	// Simulate initial layout with 2 block regions
+	fi.syncHScrollState(2)
+	if len(fi.hscrollOrigins) != 2 {
+		t.Fatalf("hscrollOrigins length = %d, want 2", len(fi.hscrollOrigins))
+	}
+	if fi.hscrollBlockCount != 2 {
+		t.Fatalf("hscrollBlockCount = %d, want 2", fi.hscrollBlockCount)
+	}
+
+	// Set some scroll offsets
+	fi.SetHScrollOrigin(0, 50)
+	fi.SetHScrollOrigin(1, 120)
+
+	// Simulate re-layout with the same block count
+	fi.syncHScrollState(2)
+
+	// Offsets should be preserved
+	if got := fi.GetHScrollOrigin(0); got != 50 {
+		t.Errorf("after stable re-layout, GetHScrollOrigin(0) = %d, want 50", got)
+	}
+	if got := fi.GetHScrollOrigin(1); got != 120 {
+		t.Errorf("after stable re-layout, GetHScrollOrigin(1) = %d, want 120", got)
+	}
+}
+
+// TestHScrollOriginsResetOnCountChange verifies that when the block region
+// count changes, all scroll offsets are reset to zero.
+func TestHScrollOriginsResetOnCountChange(t *testing.T) {
+	f := NewFrame()
+	fi := f.(*frameImpl)
+
+	// Start with 2 block regions and set offsets
+	fi.syncHScrollState(2)
+	fi.SetHScrollOrigin(0, 50)
+	fi.SetHScrollOrigin(1, 120)
+
+	// Re-layout produces 3 block regions (count changed)
+	fi.syncHScrollState(3)
+
+	if len(fi.hscrollOrigins) != 3 {
+		t.Fatalf("hscrollOrigins length = %d, want 3", len(fi.hscrollOrigins))
+	}
+	if fi.hscrollBlockCount != 3 {
+		t.Fatalf("hscrollBlockCount = %d, want 3", fi.hscrollBlockCount)
+	}
+
+	// All offsets should be zero
+	for i := 0; i < 3; i++ {
+		if got := fi.GetHScrollOrigin(i); got != 0 {
+			t.Errorf("after count change, GetHScrollOrigin(%d) = %d, want 0", i, got)
+		}
+	}
+
+	// Also verify decreasing count resets
+	fi.syncHScrollState(3) // same count
+	fi.SetHScrollOrigin(0, 42)
+	fi.syncHScrollState(1) // count decreased
+
+	if len(fi.hscrollOrigins) != 1 {
+		t.Fatalf("hscrollOrigins length = %d, want 1", len(fi.hscrollOrigins))
+	}
+	if got := fi.GetHScrollOrigin(0); got != 0 {
+		t.Errorf("after decrease, GetHScrollOrigin(0) = %d, want 0", got)
+	}
+}
+
+// TestSetGetHScrollOrigin verifies the getter/setter methods for horizontal
+// scroll origins, including out-of-range handling.
+func TestSetGetHScrollOrigin(t *testing.T) {
+	f := NewFrame()
+	fi := f.(*frameImpl)
+
+	// Before any sync, get should return 0 for any index
+	if got := fi.GetHScrollOrigin(0); got != 0 {
+		t.Errorf("before sync, GetHScrollOrigin(0) = %d, want 0", got)
+	}
+	if got := fi.GetHScrollOrigin(-1); got != 0 {
+		t.Errorf("GetHScrollOrigin(-1) = %d, want 0", got)
+	}
+
+	// Set up 3 regions
+	fi.syncHScrollState(3)
+
+	// Set and get each
+	fi.SetHScrollOrigin(0, 10)
+	fi.SetHScrollOrigin(1, 200)
+	fi.SetHScrollOrigin(2, 0)
+
+	if got := fi.GetHScrollOrigin(0); got != 10 {
+		t.Errorf("GetHScrollOrigin(0) = %d, want 10", got)
+	}
+	if got := fi.GetHScrollOrigin(1); got != 200 {
+		t.Errorf("GetHScrollOrigin(1) = %d, want 200", got)
+	}
+	if got := fi.GetHScrollOrigin(2); got != 0 {
+		t.Errorf("GetHScrollOrigin(2) = %d, want 0", got)
+	}
+
+	// Out-of-range set should be ignored (no panic)
+	fi.SetHScrollOrigin(3, 999)
+	fi.SetHScrollOrigin(-1, 999)
+
+	// Out-of-range get returns 0
+	if got := fi.GetHScrollOrigin(3); got != 0 {
+		t.Errorf("GetHScrollOrigin(3) = %d, want 0", got)
+	}
+	if got := fi.GetHScrollOrigin(-1); got != 0 {
+		t.Errorf("GetHScrollOrigin(-1) = %d, want 0", got)
+	}
+
+	// Overwrite an existing value
+	fi.SetHScrollOrigin(1, 300)
+	if got := fi.GetHScrollOrigin(1); got != 300 {
+		t.Errorf("after overwrite, GetHScrollOrigin(1) = %d, want 300", got)
+	}
+}
