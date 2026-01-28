@@ -166,6 +166,8 @@ const CodeBlockIndent = 40
 
 // imageBoxDimensions calculates the width and height for an image box,
 // scaling down if the image is wider than maxWidth.
+// If box.Style.ImageWidth > 0, uses that as the target width (clamped to maxWidth),
+// computing height proportionally from the original image dimensions.
 // Returns (0, 0) if the box is not an image with ImageData.
 func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
 	if !box.IsImage() {
@@ -175,14 +177,22 @@ func imageBoxDimensions(box *Box, maxWidth int) (width, height int) {
 	imgWidth := box.ImageData.Width
 	imgHeight := box.ImageData.Height
 
-	// If image fits within maxWidth, use original dimensions
-	if imgWidth <= maxWidth {
-		return imgWidth, imgHeight
+	targetWidth := imgWidth
+	if box.Style.ImageWidth > 0 {
+		targetWidth = box.Style.ImageWidth
 	}
 
-	// Scale down proportionally to fit within maxWidth
-	scale := float64(maxWidth) / float64(imgWidth)
-	return maxWidth, int(float64(imgHeight) * scale)
+	// Clamp to frame width
+	if targetWidth > maxWidth {
+		targetWidth = maxWidth
+	}
+
+	// Scale height proportionally
+	if targetWidth == imgWidth {
+		return imgWidth, imgHeight
+	}
+	scale := float64(targetWidth) / float64(imgWidth)
+	return targetWidth, int(float64(imgHeight) * scale)
 }
 
 // layout positions boxes into lines, handling wrapping when boxes exceed frameWidth.
@@ -538,6 +548,11 @@ func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab 
 // If basePath is empty, imgPath is returned unchanged.
 // Otherwise, imgPath is resolved relative to the directory containing basePath.
 func resolveImagePath(basePath, imgPath string) string {
+	// URLs are returned as-is (not resolved against basePath)
+	if isImageURL(imgPath) {
+		return imgPath
+	}
+
 	// Absolute paths are returned as-is
 	if filepath.IsAbs(imgPath) {
 		return imgPath

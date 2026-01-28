@@ -1755,6 +1755,109 @@ func TestLayoutEmptyBasePathFallsBack(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Phase 24D: Explicit Image Width Tests
+// =============================================================================
+
+// TestImageBoxDimensionsExplicitWidth tests that imageBoxDimensions uses
+// Style.ImageWidth when set, scaling height proportionally.
+func TestImageBoxDimensionsExplicitWidth(t *testing.T) {
+	// Image is 400x200 (2:1 aspect ratio)
+	mockImage := &CachedImage{
+		Width:  400,
+		Height: 200,
+		Path:   "photo.png",
+	}
+
+	t.Run("explicit width smaller than natural", func(t *testing.T) {
+		box := Box{
+			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 200, Scale: 1.0},
+			ImageData: mockImage,
+		}
+		w, h := imageBoxDimensions(&box, 500)
+		if w != 200 {
+			t.Errorf("width = %d, want 200", w)
+		}
+		// Height should scale proportionally: 200 * (200/400) = 100
+		if h != 100 {
+			t.Errorf("height = %d, want 100", h)
+		}
+	})
+
+	t.Run("explicit width larger than natural", func(t *testing.T) {
+		box := Box{
+			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 600, Scale: 1.0},
+			ImageData: mockImage,
+		}
+		// ImageWidth=600 exceeds frame width 800, but is within frame
+		w, h := imageBoxDimensions(&box, 800)
+		if w != 600 {
+			t.Errorf("width = %d, want 600", w)
+		}
+		// Height should scale proportionally: 200 * (600/400) = 300
+		if h != 300 {
+			t.Errorf("height = %d, want 300", h)
+		}
+	})
+
+	t.Run("zero ImageWidth uses natural size", func(t *testing.T) {
+		box := Box{
+			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 0, Scale: 1.0},
+			ImageData: mockImage,
+		}
+		w, h := imageBoxDimensions(&box, 500)
+		if w != 400 {
+			t.Errorf("width = %d, want 400 (natural)", w)
+		}
+		if h != 200 {
+			t.Errorf("height = %d, want 200 (natural)", h)
+		}
+	})
+}
+
+// TestImageBoxDimensionsClampToFrame tests that explicit ImageWidth is
+// clamped to the frame width when it exceeds it.
+func TestImageBoxDimensionsClampToFrame(t *testing.T) {
+	// Image is 400x200 (2:1 aspect ratio)
+	mockImage := &CachedImage{
+		Width:  400,
+		Height: 200,
+		Path:   "photo.png",
+	}
+
+	t.Run("explicit width clamped to frame", func(t *testing.T) {
+		box := Box{
+			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 500, Scale: 1.0},
+			ImageData: mockImage,
+		}
+		// Frame is only 300 wide, so 500 should be clamped to 300
+		w, h := imageBoxDimensions(&box, 300)
+		if w != 300 {
+			t.Errorf("width = %d, want 300 (clamped to frame)", w)
+		}
+		// Height should scale proportionally from original: 200 * (300/400) = 150
+		if h != 150 {
+			t.Errorf("height = %d, want 150", h)
+		}
+	})
+
+	t.Run("natural size wider than frame still clamped", func(t *testing.T) {
+		// Even without explicit width, images wider than frame are clamped
+		box := Box{
+			Style:     Style{Image: true, ImageURL: "photo.png", ImageWidth: 0, Scale: 1.0},
+			ImageData: mockImage,
+		}
+		w, h := imageBoxDimensions(&box, 200)
+		if w != 200 {
+			t.Errorf("width = %d, want 200 (clamped to frame)", w)
+		}
+		// 200 * (200/400) = 100
+		if h != 100 {
+			t.Errorf("height = %d, want 100", h)
+		}
+	})
+}
+
 // Helper: testLayoutFont implements draw.Font for testing
 type testLayoutFont struct {
 	width  int
