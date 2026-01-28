@@ -214,6 +214,56 @@ type BlockRegion struct {
 	Kind            BlockKind // Type of block element
 }
 
+// AdjustedBlockRegion extends BlockRegion with scrollbar display information
+// computed during the two-pass layout adjustment.
+type AdjustedBlockRegion struct {
+	BlockRegion
+	HasScrollbar bool // True if this region overflows and needs a horizontal scrollbar
+	ScrollbarY   int  // Y position of the scrollbar (bottom of the block region, after adjustment)
+}
+
+// adjustLayoutForScrollbars performs pass 2 of the two-pass layout.
+// For each block region where MaxContentWidth > frameWidth, it inserts
+// scrollbarHeight pixels of additional Y space after the last line of that
+// region. All subsequent line Y positions are shifted down by the accumulated
+// scrollbar heights. Returns AdjustedBlockRegion slices with scrollbar metadata.
+func adjustLayoutForScrollbars(lines []Line, regions []BlockRegion, frameWidth, scrollbarHeight int) []AdjustedBlockRegion {
+	adjusted := make([]AdjustedBlockRegion, len(regions))
+
+	// Determine which regions overflow and need scrollbars.
+	for i, r := range regions {
+		adjusted[i] = AdjustedBlockRegion{BlockRegion: r}
+		if r.MaxContentWidth > frameWidth {
+			adjusted[i].HasScrollbar = true
+		}
+	}
+
+	// Walk lines forward, maintaining a cumulative Y shift. When we reach
+	// the EndLine of an overflowing region, record the scrollbar Y position
+	// and increase the cumulative shift.
+	yShift := 0
+	regionIdx := 0
+
+	for i := range lines {
+		lines[i].Y += yShift
+
+		// Process any regions that end at or before this line index.
+		// A region ending at EndLine means lines [StartLine, EndLine) belong
+		// to it, so the scrollbar is inserted right after line EndLine-1.
+		// We check when i == EndLine-1 (the last line of the region).
+		for regionIdx < len(adjusted) && i == regions[regionIdx].EndLine-1 {
+			if adjusted[regionIdx].HasScrollbar {
+				// Scrollbar Y is at the bottom of this last line of the region
+				adjusted[regionIdx].ScrollbarY = lines[i].Y + lines[i].Height
+				yShift += scrollbarHeight
+			}
+			regionIdx++
+		}
+	}
+
+	return adjusted
+}
+
 // findBlockRegions scans layout lines for contiguous runs where all boxes
 // share the same block kind (Block && Code, Table, or Image). Each region
 // records the start/end line indices, the maximum content width, and the kind.

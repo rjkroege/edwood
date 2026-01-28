@@ -2202,3 +2202,238 @@ func TestContentWidthComputed(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// Phase 25D: Two-Pass Layout for Scrollbar Height
+// =============================================================================
+
+// TestTwoPassLayoutAddsScrollbarHeight tests that an overflowing block region
+// causes subsequent lines to be shifted down by scrollbarHeight pixels.
+// After pass 1 layout and block region identification, pass 2 should insert
+// Scrollwid pixels of additional Y space after the last line of each overflowing
+// block region.
+func TestTwoPassLayoutAddsScrollbarHeight(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 200
+	maxtab := 80
+	scrollbarHeight := 12 // Matches Scrollwid
+
+	// Code block with long content (overflows frameWidth), followed by normal text.
+	// Code block indent = 4 * 10 = 40px.
+	// "a_very_long_code_line_xxxxx" = 27 chars * 10px = 270px + 40px indent = 310px > 200px
+	content := Content{
+		{Text: "a_very_long_code_line_xxxxx", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "short", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "normal text after code block", Style: Style{Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+	if len(regions) != 1 {
+		t.Fatalf("expected 1 block region, got %d", len(regions))
+	}
+
+	// The block region should overflow (MaxContentWidth > frameWidth)
+	if regions[0].MaxContentWidth <= frameWidth {
+		t.Fatalf("block region MaxContentWidth = %d, should exceed frameWidth %d",
+			regions[0].MaxContentWidth, frameWidth)
+	}
+
+	// Record the Y position of the normal text line before adjustment
+	// The code block has 2 lines (indices 0 and 1), newline creates line at index 2,
+	// then normal text is on the line after the newline.
+	normalTextLineIdx := -1
+	for i, line := range lines {
+		for _, pb := range line.Boxes {
+			if string(pb.Box.Text) == "normal" {
+				normalTextLineIdx = i
+				break
+			}
+		}
+		if normalTextLineIdx >= 0 {
+			break
+		}
+	}
+	if normalTextLineIdx < 0 {
+		t.Fatal("could not find normal text line")
+	}
+	yBefore := lines[normalTextLineIdx].Y
+
+	// Apply the two-pass adjustment
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// After adjustment, the normal text line should be shifted down by scrollbarHeight
+	yAfter := lines[normalTextLineIdx].Y
+	if yAfter != yBefore+scrollbarHeight {
+		t.Errorf("normal text Y after adjustment = %d, want %d (shifted by scrollbarHeight %d from %d)",
+			yAfter, yBefore+scrollbarHeight, scrollbarHeight, yBefore)
+	}
+
+	// The adjusted regions should indicate which regions have scrollbars
+	if len(adjustedRegions) != 1 {
+		t.Fatalf("expected 1 adjusted region, got %d", len(adjustedRegions))
+	}
+	if !adjustedRegions[0].HasScrollbar {
+		t.Error("overflowing region should have HasScrollbar = true")
+	}
+	if adjustedRegions[0].ScrollbarY <= 0 {
+		t.Errorf("ScrollbarY = %d, should be > 0 for overflowing region", adjustedRegions[0].ScrollbarY)
+	}
+}
+
+// TestTwoPassLayoutNoShiftWhenFits tests that a block region that fits within
+// frameWidth does not add any extra height or shift subsequent lines.
+func TestTwoPassLayoutNoShiftWhenFits(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500 // Wide enough to fit everything
+	maxtab := 80
+	scrollbarHeight := 12
+
+	// Code block that fits within frameWidth, followed by normal text.
+	// "short" = 5 chars * 10px = 50px + 40px indent = 90px < 500px
+	content := Content{
+		{Text: "short", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "normal text", Style: Style{Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+	if len(regions) != 1 {
+		t.Fatalf("expected 1 block region, got %d", len(regions))
+	}
+
+	// The block region should NOT overflow
+	if regions[0].MaxContentWidth > frameWidth {
+		t.Fatalf("block region MaxContentWidth = %d, should be <= frameWidth %d",
+			regions[0].MaxContentWidth, frameWidth)
+	}
+
+	// Record the Y position of the normal text line before adjustment
+	normalTextLineIdx := len(lines) - 1
+	yBefore := lines[normalTextLineIdx].Y
+
+	// Apply the two-pass adjustment
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// Y position should be unchanged (no scrollbar needed)
+	yAfter := lines[normalTextLineIdx].Y
+	if yAfter != yBefore {
+		t.Errorf("normal text Y after adjustment = %d, want %d (should be unchanged for non-overflowing block)",
+			yAfter, yBefore)
+	}
+
+	// The adjusted region should NOT have a scrollbar
+	if len(adjustedRegions) != 1 {
+		t.Fatalf("expected 1 adjusted region, got %d", len(adjustedRegions))
+	}
+	if adjustedRegions[0].HasScrollbar {
+		t.Error("non-overflowing region should not have HasScrollbar = true")
+	}
+}
+
+// TestMultipleOverflowingBlocks tests that multiple overflowing block regions
+// produce cumulative Y shifts. Each overflowing block adds scrollbarHeight
+// to subsequent line positions.
+func TestMultipleOverflowingBlocks(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 200
+	maxtab := 80
+	scrollbarHeight := 12
+
+	// Two overflowing code blocks separated by normal text, then trailing normal text.
+	// Code block indent = 40px.
+	// "overflowing_code_block_one!" = 27 chars * 10px = 270px + 40px = 310px > 200px
+	// "overflowing_code_block_two!" = 27 chars * 10px = 270px + 40px = 310px > 200px
+	content := Content{
+		{Text: "overflowing_code_block_one!", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "middle text", Style: Style{Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "overflowing_code_block_two!", Style: Style{Block: true, Code: true, Scale: 1.0}},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "trailing text", Style: Style{Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	regions := findBlockRegions(lines)
+	if len(regions) != 2 {
+		t.Fatalf("expected 2 block regions, got %d", len(regions))
+	}
+
+	// Both regions should overflow
+	for i, r := range regions {
+		if r.MaxContentWidth <= frameWidth {
+			t.Fatalf("region %d MaxContentWidth = %d, should exceed frameWidth %d",
+				i, r.MaxContentWidth, frameWidth)
+		}
+	}
+
+	// Find the trailing text line
+	trailingTextLineIdx := -1
+	for i, line := range lines {
+		for _, pb := range line.Boxes {
+			if string(pb.Box.Text) == "trailing" {
+				trailingTextLineIdx = i
+				break
+			}
+		}
+		if trailingTextLineIdx >= 0 {
+			break
+		}
+	}
+	if trailingTextLineIdx < 0 {
+		t.Fatal("could not find trailing text line")
+	}
+	yBefore := lines[trailingTextLineIdx].Y
+
+	// Also find middle text line
+	middleTextLineIdx := -1
+	for i, line := range lines {
+		for _, pb := range line.Boxes {
+			if string(pb.Box.Text) == "middle" {
+				middleTextLineIdx = i
+				break
+			}
+		}
+		if middleTextLineIdx >= 0 {
+			break
+		}
+	}
+	if middleTextLineIdx < 0 {
+		t.Fatal("could not find middle text line")
+	}
+	middleYBefore := lines[middleTextLineIdx].Y
+
+	// Apply the two-pass adjustment
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// Middle text is after the first overflowing block: shifted by 1 * scrollbarHeight
+	middleYAfter := lines[middleTextLineIdx].Y
+	if middleYAfter != middleYBefore+scrollbarHeight {
+		t.Errorf("middle text Y after adjustment = %d, want %d (shifted by 1 * scrollbarHeight from %d)",
+			middleYAfter, middleYBefore+scrollbarHeight, middleYBefore)
+	}
+
+	// Trailing text is after both overflowing blocks: shifted by 2 * scrollbarHeight
+	yAfter := lines[trailingTextLineIdx].Y
+	if yAfter != yBefore+2*scrollbarHeight {
+		t.Errorf("trailing text Y after adjustment = %d, want %d (shifted by 2 * scrollbarHeight from %d)",
+			yAfter, yBefore+2*scrollbarHeight, yBefore)
+	}
+
+	// Both adjusted regions should have scrollbars
+	if len(adjustedRegions) != 2 {
+		t.Fatalf("expected 2 adjusted regions, got %d", len(adjustedRegions))
+	}
+	for i, r := range adjustedRegions {
+		if !r.HasScrollbar {
+			t.Errorf("adjusted region %d should have HasScrollbar = true", i)
+		}
+	}
+}
