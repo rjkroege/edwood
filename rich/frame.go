@@ -747,9 +747,41 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	frameHeight := f.rect.Dy()
 	frameWidth := f.rect.Dx()
 
+	// Compute block regions and apply two-pass scrollbar height adjustment.
+	regions := findBlockRegions(lines)
+	scrollbarHeight := 12 // Scrollwid
+	adjustedRegions := adjustLayoutForScrollbars(lines, regions, frameWidth, scrollbarHeight)
+
+	// Build per-line region lookup: lineRegion[i] is the index into adjustedRegions,
+	// or -1 if the line is not in a block region.
+	lineRegion := make([]int, len(lines))
+	for i := range lineRegion {
+		lineRegion[i] = -1
+	}
+	for ri, ar := range adjustedRegions {
+		for li := ar.StartLine; li < ar.EndLine; li++ {
+			if li < len(lineRegion) {
+				lineRegion[li] = ri
+			}
+		}
+	}
+
+	// hOffsetForLine returns the horizontal scroll offset for a given line index.
+	// Lines not in a block region return 0.
+	hOffsetForLine := func(lineIdx int) int {
+		if lineIdx < 0 || lineIdx >= len(lineRegion) {
+			return 0
+		}
+		ri := lineRegion[lineIdx]
+		if ri < 0 {
+			return 0
+		}
+		return f.GetHScrollOrigin(ri)
+	}
 
 	// Phase 1: Draw block-level backgrounds (full line width for fenced code blocks)
-	// This must happen first so text appears on top
+	// This must happen first so text appears on top.
+	// Block backgrounds remain full-width and unshifted by horizontal scroll.
 	for _, line := range lines {
 		// Skip lines that start at or below the frame bottom
 		if line.Y >= frameHeight {
@@ -765,12 +797,14 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	}
 
 	// Phase 2: Draw box backgrounds (for inline code, etc.)
-	// This must happen before text rendering so backgrounds appear behind text
-	for _, line := range lines {
+	// This must happen before text rendering so backgrounds appear behind text.
+	// Box backgrounds within a scrollable block region are shifted by -hOffset.
+	for lineIdx, line := range lines {
 		// Skip lines that start at or below the frame bottom
 		if line.Y >= frameHeight {
 			break
 		}
+		hOff := hOffsetForLine(lineIdx)
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't have backgrounds
 			if pb.Box.IsNewline() || pb.Box.IsTab() {
@@ -783,7 +817,9 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 			// Draw background if style has Bg color set, but NOT for block-level styles
 			// (those are handled in Phase 1 with full-width backgrounds)
 			if pb.Box.Style.Bg != nil && !pb.Box.Style.Block {
-				f.drawBoxBackgroundTo(target, pb, line, offset, frameWidth, frameHeight)
+				shiftedPB := pb
+				shiftedPB.X -= hOff
+				f.drawBoxBackgroundTo(target, shiftedPB, line, offset, frameWidth, frameHeight)
 			}
 		}
 	}
@@ -805,11 +841,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	// Phase 4: Render text on top of backgrounds
 	// Note: Text is now clipped by the scratch image bounds, so we can render
 	// partial lines without worrying about overflow into adjacent windows.
-	for _, line := range lines {
+	// Text within a scrollable block region is shifted by -hOffset.
+	for lineIdx, line := range lines {
 		// Skip lines that start at or below the frame bottom
 		if line.Y >= frameHeight {
 			break
 		}
+		hOff := hOffsetForLine(lineIdx)
 		for _, pb := range line.Boxes {
 			// Skip newlines and tabs - they don't render visible text
 			if pb.Box.IsNewline() || pb.Box.IsTab() {
@@ -827,9 +865,9 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 				continue
 			}
 
-			// Calculate position in target image
+			// Calculate position in target image, applying horizontal scroll offset
 			pt := image.Point{
-				X: offset.X + pb.X,
+				X: offset.X + pb.X - hOff,
 				Y: offset.Y + line.Y,
 			}
 
@@ -852,20 +890,22 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 	}
 
 	// Phase 5: Render images
-	for _, line := range lines {
+	// Images within a scrollable block region are shifted by -hOffset.
+	for lineIdx, line := range lines {
 		// Skip lines that start at or below the frame bottom
 		if line.Y >= frameHeight {
 			break
 		}
+		hOff := hOffsetForLine(lineIdx)
 		for _, pb := range line.Boxes {
 			// Check if this is an image box
 			if !pb.Box.Style.Image {
 				continue
 			}
 
-			// Calculate position in target image
+			// Calculate position in target image, applying horizontal scroll offset
 			pt := image.Point{
-				X: offset.X + pb.X,
+				X: offset.X + pb.X - hOff,
 				Y: offset.Y + line.Y,
 			}
 
@@ -881,8 +921,10 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 				continue
 			}
 
-			// Render the actual image
-			f.drawImageTo(target, pb, line, offset, frameWidth, frameHeight)
+			// Render the actual image (with shifted X for scrollable blocks)
+			shiftedPB := pb
+			shiftedPB.X -= hOff
+			f.drawImageTo(target, shiftedPB, line, offset, frameWidth, frameHeight)
 		}
 	}
 }

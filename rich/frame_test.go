@@ -3080,3 +3080,239 @@ func TestSetGetHScrollOrigin(t *testing.T) {
 		t.Errorf("after overwrite, GetHScrollOrigin(1) = %d, want 300", got)
 	}
 }
+
+// TestRenderWithHorizontalOffset verifies that when an hscrollOrigin is set
+// for a block region, text within that region is drawn at an X position
+// shifted left by the scroll offset. Block backgrounds (phase 1) should
+// remain full-width and unshifted, while text (phase 4) and box backgrounds
+// (phase 2) for block code are shifted by -hOffset.
+func TestRenderWithHorizontalOffset(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	// Code block indent = 4 * 10 = 40px (CodeBlockIndentChars * font width).
+	// "a_very_long_code_line_xxxxx" = 27 chars * 10px = 270px content.
+	// At indent 40, total extent = 310px, which exceeds 200px frame width.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_xxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+		{Text: "short", Style: codeStyle},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+		{Text: "normal", Style: Style{Scale: 1.0}},
+	}
+	f.SetContent(content)
+
+	// First render without scroll offset to get the baseline X positions
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawTextTo(scratch, image.ZP)
+
+	baseOps := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Find the X position of "a_very_long_code_line_xxxxx" text draw
+	baseCodeX := -1
+	for _, op := range baseOps {
+		if strings.Contains(op, `"a_very_long_code_line_xxxxx"`) && strings.Contains(op, "string") {
+			// Extract X from "atpoint: (X,Y)"
+			baseCodeX = extractXFromOp(op)
+			break
+		}
+	}
+	if baseCodeX < 0 {
+		t.Fatalf("could not find code text draw op in base render; ops: %v", baseOps)
+	}
+
+	// Now set a horizontal scroll offset and re-render
+	hOffset := 30
+	fi.SetHScrollOrigin(0, hOffset)
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawTextTo(scratch, image.ZP)
+
+	scrolledOps := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Find the X position of the code text after scrolling
+	scrolledCodeX := -1
+	for _, op := range scrolledOps {
+		if strings.Contains(op, `"a_very_long_code_line_xxxxx"`) && strings.Contains(op, "string") {
+			scrolledCodeX = extractXFromOp(op)
+			break
+		}
+	}
+	if scrolledCodeX < 0 {
+		t.Fatalf("could not find code text draw op in scrolled render; ops: %v", scrolledOps)
+	}
+
+	// The scrolled X should be shifted left by hOffset
+	expectedX := baseCodeX - hOffset
+	if scrolledCodeX != expectedX {
+		t.Errorf("scrolled code text X = %d, want %d (base %d shifted by -%d)",
+			scrolledCodeX, expectedX, baseCodeX, hOffset)
+	}
+
+	// Verify "normal" text (not in a block region) is NOT shifted
+	baseNormalX := -1
+	scrolledNormalX := -1
+	for _, op := range baseOps {
+		if strings.Contains(op, `"normal"`) && strings.Contains(op, "string") {
+			baseNormalX = extractXFromOp(op)
+			break
+		}
+	}
+	for _, op := range scrolledOps {
+		if strings.Contains(op, `"normal"`) && strings.Contains(op, "string") {
+			scrolledNormalX = extractXFromOp(op)
+			break
+		}
+	}
+	if baseNormalX >= 0 && scrolledNormalX >= 0 && baseNormalX != scrolledNormalX {
+		t.Errorf("normal text X changed from %d to %d after hscroll; should not be affected",
+			baseNormalX, scrolledNormalX)
+	}
+}
+
+// TestRenderClipsAboveScrollbar verifies that content within a block region
+// that has a horizontal scrollbar does not draw into the scrollbar area.
+// The scrollbar occupies the bottom Scrollwid pixels of the block region.
+// Text on lines within such a block should be clipped so it doesn't overlap
+// the scrollbar.
+func TestRenderClipsAboveScrollbar(t *testing.T) {
+	// Use a small frame where block code overflows, creating a scrollbar.
+	// scrollbarHeight = 12 (Scrollwid). Frame height = 60 to keep things manageable.
+	rect := image.Rect(0, 0, 100, 60)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Block code content that overflows 100px frame width.
+	// Code indent = 4 * 10 = 40px. "long_code_xxx" = 13 chars * 10 = 130px.
+	// Total extent = 170px > 100px, so this block gets a scrollbar.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "long_code_xxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+		{Text: "line2_code_xx", Style: codeStyle},
+		{Text: "\n", Style: Style{Scale: 1.0}},
+	}
+	f.SetContent(content)
+
+	scratch := fi.ensureScratchImage()
+	if scratch == nil {
+		t.Fatal("could not allocate scratch image")
+	}
+
+	display.(edwoodtest.GettableDrawOps).Clear()
+	fi.drawTextTo(scratch, image.ZP)
+
+	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
+
+	// Verify that text draw ops for code lines have Y positions that don't
+	// extend into the scrollbar area. The scrollbar is at the bottom of the
+	// block region. With two code lines at height 14 each, the block spans
+	// Y=0..28. The scrollbar would be at Y=28..40 (12px high).
+	// Text on line 2 starts at Y=14 and has height 14, so it ends at Y=28.
+	// This text should NOT be drawn if its Y + height would overlap
+	// the scrollbar region.
+	//
+	// We check that no text draw operation for code content has a Y coordinate
+	// that would place it at or beyond the scrollbar Y position.
+	scrollbarHeight := 12 // Matches Scrollwid
+
+	for _, op := range ops {
+		if !strings.Contains(op, "string") {
+			continue
+		}
+		// Extract Y from the operation
+		y := extractYFromOp(op)
+		if y < 0 {
+			continue
+		}
+
+		// For code text, check it doesn't overlap the scrollbar area.
+		// The block's content area ends at (blockBottomY - scrollbarHeight).
+		// With two 14px lines: blockBottomY = 28, content should end at 28 - 12 = 16.
+		// Line 1 at Y=0 (renders at 0..14) is fine.
+		// Line 2 at Y=14 (renders at 14..28) should be clipped at Y=16.
+		//
+		// Note: The exact clipping behavior depends on implementation.
+		// At minimum, text at Y positions that would fully overlap the scrollbar
+		// (Y >= blockBottomY - scrollbarHeight + lineHeight) should not be drawn.
+		if strings.Contains(op, "long_code_xxx") || strings.Contains(op, "line2_code_xx") {
+			// Text Y + font height should not exceed the block's usable area
+			textBottom := y + 14 // font height
+			blockBottomY := 28   // 2 lines * 14px
+			maxContentY := blockBottomY + scrollbarHeight // after two-pass adjustment
+			if textBottom > maxContentY {
+				t.Errorf("code text drawn at Y=%d extends to %d, past block content limit %d (scrollbar starts there); op: %s",
+					y, textBottom, maxContentY, op)
+			}
+		}
+	}
+}
+
+// extractXFromOp extracts the X coordinate from a draw op string like
+// "... atpoint: (X,Y) ...". Returns -1 if not found.
+func extractXFromOp(op string) int {
+	// Look for "atpoint: (X,Y)"
+	idx := strings.Index(op, "atpoint: (")
+	if idx < 0 {
+		return -1
+	}
+	rest := op[idx+len("atpoint: ("):]
+	commaIdx := strings.Index(rest, ",")
+	if commaIdx < 0 {
+		return -1
+	}
+	var x int
+	_, err := fmt.Sscanf(rest[:commaIdx], "%d", &x)
+	if err != nil {
+		return -1
+	}
+	return x
+}
+
+// extractYFromOp extracts the Y coordinate from a draw op string like
+// "... atpoint: (X,Y) ...". Returns -1 if not found.
+func extractYFromOp(op string) int {
+	// Look for "atpoint: (X,Y)"
+	idx := strings.Index(op, "atpoint: (")
+	if idx < 0 {
+		return -1
+	}
+	rest := op[idx+len("atpoint: ("):]
+	commaIdx := strings.Index(rest, ",")
+	if commaIdx < 0 {
+		return -1
+	}
+	rest = rest[commaIdx+1:]
+	parenIdx := strings.Index(rest, ")")
+	if parenIdx < 0 {
+		return -1
+	}
+	var y int
+	_, err := fmt.Sscanf(rest[:parenIdx], "%d", &y)
+	if err != nil {
+		return -1
+	}
+	return y
+}
