@@ -101,6 +101,9 @@ func (rt *RichText) Init(display draw.Display, font draw.Font, opts ...RichTextO
 	if rt.selectionColor != nil {
 		frameOpts = append(frameOpts, rich.WithSelectionColor(rt.selectionColor))
 	}
+	if rt.scrollBg != nil && rt.scrollThumb != nil {
+		frameOpts = append(frameOpts, rich.WithHScrollColors(rt.scrollBg, rt.scrollThumb))
+	}
 
 	// Initialize frame with empty rectangle - will be set on first Render() call
 	rt.frame.Init(image.Rectangle{}, frameOpts...)

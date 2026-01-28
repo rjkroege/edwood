@@ -97,3 +97,12 @@ func WithBasePath(path string) Option {
 		fi.basePath = path
 	}
 }
+
+// WithHScrollColors is an Option that sets the horizontal scrollbar colors.
+// These should match the vertical scrollbar colors for visual consistency.
+func WithHScrollColors(bg, thumb draw.Image) Option {
+	return func(fi *frameImpl) {
+		fi.hscrollBg = bg
+		fi.hscrollThumb = thumb
+	}
+}

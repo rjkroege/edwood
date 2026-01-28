@@ -143,6 +143,10 @@ type frameImpl struct {
 	// Cached adjusted block regions from the last layout pass.
 	// Used for hit-testing horizontal scrollbar clicks.
 	hscrollRegions []AdjustedBlockRegion
+
+	// Horizontal scrollbar colors (passed from RichText to match vertical scrollbar)
+	hscrollBg    edwooddraw.Image
+	hscrollThumb edwooddraw.Image
 }
 
 // NewFrame creates a new Frame.
@@ -1883,7 +1887,7 @@ func (f *frameImpl) HScrollWheel(delta int, regionIndex int) {
 var HScrollBgColor = color.RGBA{R: 153, G: 153, B: 76, A: 255} // dark yellow-green, similar to acme scrollbar
 
 // HScrollThumbColor is the thumb color of horizontal scrollbars.
-var HScrollThumbColor = color.RGBA{R: 153, G: 153, B: 0, A: 255} // darker yellow, similar to acme scrollbar thumb
+var HScrollThumbColor = color.RGBA{R: 255, G: 255, B: 170, A: 255} // pale yellow (Paleyellow), matching acme scrollbar thumb
 
 // drawHScrollbarsTo draws horizontal scrollbars for overflowing block regions.
 // For each block region where MaxContentWidth > frameWidth, it draws a scrollbar
@@ -1913,9 +1917,13 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 		}
 
 		// Draw scrollbar background at ScrollbarY
-		bgImg := f.allocColorImage(HScrollBgColor)
+		// Use configured colors if available, otherwise fall back to defaults
+		bgImg := f.hscrollBg
 		if bgImg == nil {
-			continue
+			bgImg = f.allocColorImage(HScrollBgColor)
+			if bgImg == nil {
+				continue
+			}
 		}
 		bgRect := image.Rect(
 			offset.X+scrollbarLeft,
@@ -1923,7 +1931,7 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			offset.X+frameWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
-		target.Draw(bgRect, bgImg, nil, image.ZP)
+		target.Draw(bgRect, bgImg, bgImg, image.ZP)
 
 		// Compute thumb dimensions within the scrollbar width
 		thumbWidth := (scrollbarWidth * scrollbarWidth) / maxContentWidth
@@ -1949,9 +1957,13 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 		}
 
 		// Draw thumb
-		thumbImg := f.allocColorImage(HScrollThumbColor)
+		// Use configured colors if available, otherwise fall back to defaults
+		thumbImg := f.hscrollThumb
 		if thumbImg == nil {
-			continue
+			thumbImg = f.allocColorImage(HScrollThumbColor)
+			if thumbImg == nil {
+				continue
+			}
 		}
 		thumbRect := image.Rect(
 			offset.X+scrollbarLeft+thumbLeft,
@@ -1959,7 +1971,7 @@ func (f *frameImpl) drawHScrollbarsTo(target edwooddraw.Image, offset image.Poin
 			offset.X+scrollbarLeft+thumbLeft+thumbWidth,
 			offset.Y+ar.ScrollbarY+scrollbarHeight,
 		)
-		target.Draw(thumbRect, thumbImg, nil, image.ZP)
+		target.Draw(thumbRect, thumbImg, thumbImg, image.ZP)
 	}
 }
 
