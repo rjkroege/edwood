@@ -473,13 +473,19 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 	return false, nil // file not found
 }
 
+// denyAccess responds to an Xfid with a permission denied error.
+func (fs *fileServer) denyAccess(x *Xfid) *Xfid {
+	var t plan9.Fcall
+	return fs.respond(x, &t, ErrPermission)
+}
+
 func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
 	var m plan9.Perm
 	// can't truncate anything, so just disregard
 	x.fcall.Mode &= ^uint8(plan9.OTRUNC | plan9.OCEXEC)
 	// can't execute or remove anything
 	if x.fcall.Mode == plan9.OEXEC || (x.fcall.Mode&plan9.ORCLOSE) != 0 {
-		goto Deny
+		return fs.denyAccess(x)
 	}
 	switch x.fcall.Mode {
 	case plan9.OREAD:
@@ -489,17 +495,13 @@ func (fs *fileServer) open(x *Xfid, f *Fid) *Xfid {
 	case plan9.ORDWR:
 		m = 0600
 	default:
-		goto Deny
+		return fs.denyAccess(x)
 	}
 	if ((f.dir.perm &^ (plan9.DMDIR | plan9.DMAPPEND)) & m) != m {
-		goto Deny
+		return fs.denyAccess(x)
 	}
 	x.c <- xfidopen
 	return nil
-
-Deny:
-	var t plan9.Fcall
-	return fs.respond(x, &t, ErrPermission)
 }
 
 func (fs *fileServer) create(x *Xfid, f *Fid) *Xfid {
