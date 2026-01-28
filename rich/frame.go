@@ -3,6 +3,7 @@ package rich
 import (
 	"image"
 	"image/color"
+	"strings"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -61,6 +62,9 @@ type Frame interface {
 
 	// Horizontal scrollbar hit testing
 	HScrollBarAt(pt image.Point) (regionIndex int, ok bool)
+
+	// Horizontal scrollbar click handling (acme three-button semantics)
+	HScrollClick(button int, pt image.Point, regionIndex int)
 
 	// Status
 	Full() bool // True if frame is at capacity
@@ -921,13 +925,13 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 
 			// Check for error placeholder case
 			if pb.Box.ImageData != nil && pb.Box.ImageData.Err != nil {
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path, pb.Box.Style.ImageAlt)
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.ImageData.Path, pb.Box.Style.ImageAlt, pb.Box.ImageData.Err)
 				continue
 			}
 
 			// Check if we have valid image data to render
 			if !pb.Box.IsImage() {
-				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL, pb.Box.Style.ImageAlt)
+				f.drawImageErrorPlaceholder(target, pt, pb.Box.Style.ImageURL, pb.Box.Style.ImageAlt, nil)
 				continue
 			}
 
@@ -1552,6 +1556,79 @@ func (f *frameImpl) HScrollBarAt(pt image.Point) (regionIndex int, ok bool) {
 	return 0, false
 }
 
+// HScrollClick handles a mouse click on a horizontal scrollbar with acme
+// three-button semantics. button is 1, 2, or 3. pt is the screen-coordinate
+// click point. regionIndex identifies which block region's scrollbar was clicked.
+// B1 scrolls left (amount proportional to click X within scrollbar).
+// B2 jumps to an absolute horizontal position.
+// B3 scrolls right (amount proportional to click X within scrollbar).
+// The resulting offset is clamped to [0, maxScrollable].
+func (f *frameImpl) HScrollClick(button int, pt image.Point, regionIndex int) {
+	if regionIndex < 0 || regionIndex >= len(f.hscrollRegions) {
+		return
+	}
+	ar := f.hscrollRegions[regionIndex]
+	if !ar.HasScrollbar {
+		return
+	}
+
+	frameWidth := f.rect.Dx()
+	maxScrollable := ar.MaxContentWidth - frameWidth
+	if maxScrollable <= 0 {
+		return
+	}
+
+	// Compute click X proportion within the scrollbar (0.0 = left edge, 1.0 = right edge).
+	relX := pt.X - f.rect.Min.X
+	if relX < 0 {
+		relX = 0
+	}
+	if relX > frameWidth {
+		relX = frameWidth
+	}
+	clickProportion := float64(relX) / float64(frameWidth)
+
+	currentOffset := f.GetHScrollOrigin(regionIndex)
+	var newOffset int
+
+	switch button {
+	case 1:
+		// B1: scroll left by frameWidth scaled by (1 - clickProportion).
+		// Clicking near the left edge scrolls more, near the right edge less.
+		pixelsToMove := int(float64(frameWidth) * (1.0 - clickProportion))
+		if pixelsToMove < 1 {
+			pixelsToMove = 1
+		}
+		newOffset = currentOffset - pixelsToMove
+
+	case 2:
+		// B2: jump to absolute position proportional to click X.
+		newOffset = int(float64(maxScrollable) * clickProportion)
+
+	case 3:
+		// B3: scroll right by frameWidth scaled by clickProportion.
+		// Clicking near the right edge scrolls more, near the left edge less.
+		pixelsToMove := int(float64(frameWidth) * clickProportion)
+		if pixelsToMove < 1 {
+			pixelsToMove = 1
+		}
+		newOffset = currentOffset + pixelsToMove
+
+	default:
+		return
+	}
+
+	// Clamp to [0, maxScrollable]
+	if newOffset < 0 {
+		newOffset = 0
+	}
+	if newOffset > maxScrollable {
+		newOffset = maxScrollable
+	}
+
+	f.SetHScrollOrigin(regionIndex, newOffset)
+}
+
 // HScrollBgColor is the background color of horizontal scrollbars.
 var HScrollBgColor = color.RGBA{R: 153, G: 153, B: 76, A: 255} // dark yellow-green, similar to acme scrollbar
 
@@ -1744,7 +1821,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	plan9Data, err := ConvertToPlan9(goImg)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
 		return
 	}
 
@@ -1753,7 +1830,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	srcImg, err := f.display.AllocImage(srcRect, edwooddraw.RGBA32, false, 0)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
 		return
 	}
 	defer srcImg.Free()
@@ -1762,7 +1839,7 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	_, err = srcImg.Load(srcRect, plan9Data)
 	if err != nil {
 		pt := image.Point{X: dstX, Y: dstY}
-		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt)
+		f.drawImageErrorPlaceholder(target, pt, cached.Path, pb.Box.Style.ImageAlt, nil)
 		return
 	}
 
@@ -1780,7 +1857,8 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 
 // drawImageErrorPlaceholder renders an error placeholder for failed image loads.
 // It displays "[Image: alt]" in blue (like a link) so it can be clicked to open the image path.
-func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string, alt string) {
+// If loadErr describes an unsupported format, an annotation is appended.
+func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.Point, path string, alt string, loadErr error) {
 	if f.font == nil || f.textColor == nil {
 		return
 	}
@@ -1789,6 +1867,14 @@ func (f *frameImpl) drawImageErrorPlaceholder(target edwooddraw.Image, pt image.
 	placeholder := "[Image: " + alt + "]"
 	if alt == "" {
 		placeholder = "[Image]"
+	}
+
+	// Annotate unsupported formats (e.g. SVG)
+	if loadErr != nil {
+		msg := loadErr.Error()
+		if strings.Contains(msg, "unknown format") {
+			placeholder += " <unsupported format>"
+		}
 	}
 
 	// Use blue (like links) so users know it's clickable

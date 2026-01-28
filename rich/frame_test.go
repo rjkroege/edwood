@@ -3749,3 +3749,243 @@ func TestHScrollBarAtNoOverflow(t *testing.T) {
 		t.Errorf("HScrollBarAt(%v) returned ok=true, expected false (no scrollbar for non-overflowing block)", testPt)
 	}
 }
+
+// TestHScrollClickB1ScrollsLeft verifies that clicking B1 on a horizontal
+// scrollbar scrolls the block region to the left (decreases the scroll offset).
+// The amount scrolled is proportional to the click X position within the
+// scrollbar: clicking near the left edge scrolls more, near the right edge less.
+func TestHScrollClickB1ScrollsLeft(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+
+	// Set an initial scroll offset (scrolled to the right).
+	maxScrollable := ar.MaxContentWidth - rect.Dx()
+	initialOffset := maxScrollable / 2
+	fi.SetHScrollOrigin(0, initialOffset)
+
+	// Click B1 near the middle of the scrollbar (should scroll left by a moderate amount).
+	scrollbarHeight := 12
+	clickPt := image.Point{
+		X: rect.Min.X + rect.Dx()/2, // middle of scrollbar
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(1, clickPt, 0)
+
+	newOffset := fi.GetHScrollOrigin(0)
+	if newOffset >= initialOffset {
+		t.Errorf("B1 click should scroll left (decrease offset): got %d, initial was %d", newOffset, initialOffset)
+	}
+	if newOffset < 0 {
+		t.Errorf("B1 click should not produce negative offset: got %d", newOffset)
+	}
+}
+
+// TestHScrollClickB2JumpsToPosition verifies that clicking B2 on a horizontal
+// scrollbar jumps to an absolute position proportional to the click X location.
+func TestHScrollClickB2JumpsToPosition(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+
+	maxScrollable := ar.MaxContentWidth - rect.Dx()
+
+	// Click B2 at the midpoint of the scrollbar — should jump to ~50% of maxScrollable.
+	scrollbarHeight := 12
+	clickPt := image.Point{
+		X: rect.Min.X + rect.Dx()/2,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(2, clickPt, 0)
+
+	newOffset := fi.GetHScrollOrigin(0)
+	expectedApprox := maxScrollable / 2
+	tolerance := maxScrollable / 5 // 20% tolerance
+	if newOffset < expectedApprox-tolerance || newOffset > expectedApprox+tolerance {
+		t.Errorf("B2 click at midpoint should jump to ~%d, got %d (tolerance ±%d)", expectedApprox, newOffset, tolerance)
+	}
+
+	// Click B2 at the left edge — should jump to ~0.
+	clickPtLeft := image.Point{
+		X: rect.Min.X,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(2, clickPtLeft, 0)
+
+	newOffsetLeft := fi.GetHScrollOrigin(0)
+	if newOffsetLeft > tolerance {
+		t.Errorf("B2 click at left edge should jump to ~0, got %d", newOffsetLeft)
+	}
+
+	// Click B2 at the right edge — should jump to ~maxScrollable.
+	clickPtRight := image.Point{
+		X: rect.Min.X + rect.Dx() - 1,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(2, clickPtRight, 0)
+
+	newOffsetRight := fi.GetHScrollOrigin(0)
+	if newOffsetRight < maxScrollable-tolerance {
+		t.Errorf("B2 click at right edge should jump to ~%d, got %d", maxScrollable, newOffsetRight)
+	}
+}
+
+// TestHScrollClickB3ScrollsRight verifies that clicking B3 on a horizontal
+// scrollbar scrolls the block region to the right (increases the scroll offset).
+// The amount scrolled is proportional to the click X position within the scrollbar.
+func TestHScrollClickB3ScrollsRight(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+
+	// Start with offset at 0 (scrolled all the way left).
+	fi.SetHScrollOrigin(0, 0)
+
+	// Click B3 near the middle of the scrollbar (should scroll right).
+	scrollbarHeight := 12
+	clickPt := image.Point{
+		X: rect.Min.X + rect.Dx()/2,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(3, clickPt, 0)
+
+	newOffset := fi.GetHScrollOrigin(0)
+	if newOffset <= 0 {
+		t.Errorf("B3 click should scroll right (increase offset): got %d", newOffset)
+	}
+
+	maxScrollable := ar.MaxContentWidth - rect.Dx()
+	if newOffset > maxScrollable {
+		t.Errorf("B3 click should not exceed maxScrollable (%d): got %d", maxScrollable, newOffset)
+	}
+}
+
+// TestHScrollClickClampsToRange verifies that HScrollClick clamps the resulting
+// offset to [0, maxScrollable] regardless of button or click position.
+func TestHScrollClickClampsToRange(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 300)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.White)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Black)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create block code content that overflows frameWidth (200px).
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	content := Content{
+		{Text: "a_very_long_code_line_that_is_wider_than_two_hundred_pixels_xxxxxxxxxx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+	f.Redraw()
+
+	if len(fi.hscrollRegions) == 0 {
+		t.Fatal("expected at least one hscroll region after Redraw")
+	}
+	ar := fi.hscrollRegions[0]
+	if !ar.HasScrollbar {
+		t.Fatal("expected region to have scrollbar (content overflows)")
+	}
+	maxScrollable := ar.MaxContentWidth - rect.Dx()
+
+	scrollbarHeight := 12
+
+	// Test clamping to 0: B1 click when already at offset 0 should stay at 0.
+	fi.SetHScrollOrigin(0, 0)
+	clickPt := image.Point{
+		X: rect.Min.X + rect.Dx()/2,
+		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
+	}
+	f.HScrollClick(1, clickPt, 0)
+	offset := fi.GetHScrollOrigin(0)
+	if offset < 0 {
+		t.Errorf("B1 click at offset=0 should clamp to >= 0: got %d", offset)
+	}
+
+	// Test clamping to maxScrollable: B3 click when already at maxScrollable.
+	fi.SetHScrollOrigin(0, maxScrollable)
+	f.HScrollClick(3, clickPt, 0)
+	offset = fi.GetHScrollOrigin(0)
+	if offset > maxScrollable {
+		t.Errorf("B3 click at maxScrollable should clamp to <= %d: got %d", maxScrollable, offset)
+	}
+	if offset < 0 {
+		t.Errorf("offset should not be negative: got %d", offset)
+	}
+}

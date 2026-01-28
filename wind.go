@@ -847,19 +847,15 @@ func (w *Window) IsPreviewMode() bool {
 }
 
 // SetPreviewMode enables or disables preview mode.
-// When disabling preview mode, clears the image cache and triggers a full redraw of the body.
+// When disabling preview mode, triggers a full redraw of the body.
+// The image cache is kept alive so re-entering preview is fast.
 func (w *Window) SetPreviewMode(enabled bool) {
 	wasPreview := w.previewMode
 	w.previewMode = enabled
 
-	// When exiting preview mode, clean up resources and refresh the body
+	// When exiting preview mode, refresh the body.
+	// Keep the image cache alive so re-entering preview is fast.
 	if wasPreview && !enabled {
-		// Clean up image cache to free memory
-		if w.imageCache != nil {
-			w.imageCache.Clear()
-			w.imageCache = nil
-		}
-
 		// Force a full redraw of the body by resizing it
 		if w.display != nil {
 			w.body.Resize(w.body.all, true, false)
@@ -952,6 +948,26 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		}
 		if m.Buttons&4 != 0 { // Button 3
 			rt.ScrollClick(3, m.Point)
+			w.Draw()
+			if w.display != nil {
+				w.display.Flush()
+			}
+			return true
+		}
+	}
+
+	// Handle horizontal scrollbar clicks (buttons 1, 2, 3 on h-scrollbar)
+	if regionIndex, ok := rt.Frame().HScrollBarAt(m.Point); ok {
+		button := 0
+		if m.Buttons&1 != 0 {
+			button = 1
+		} else if m.Buttons&2 != 0 {
+			button = 2
+		} else if m.Buttons&4 != 0 {
+			button = 3
+		}
+		if button != 0 {
+			rt.Frame().HScrollClick(button, m.Point, regionIndex)
 			w.Draw()
 			if w.display != nil {
 				w.display.Flush()
