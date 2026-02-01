@@ -190,17 +190,17 @@ func expandRuneOffsetsToWord(t *Text, q0 int, q1 int) (int, int) {
 // using the event file to control the operation of Edwood via the
 // filesystem.
 func delegateExecution(t *Text, e *Exectab, aq0, aq1, q0, q1 int, argt *Text) {
-	var r []rune
-
 	f := 0
 	if e != nil {
 		f |= 1
 	}
 	if q0 != aq0 || q1 != aq1 {
-		r = make([]rune, aq1-aq0)
-		t.file.Read(aq0, r)
 		f |= 2
 	}
+	// Always read the text for the event - we need to send the actual text
+	// regardless of whether word expansion occurred.
+	r := make([]rune, aq1-aq0)
+	t.file.Read(aq0, r)
 	a, aa := getarg(argt, true, true)
 	if a != "" {
 		if len(a) > EVENTSIZE { // too big; too bad
@@ -730,19 +730,43 @@ func run(win *Window, s string, rdir string, newns bool, argaddr string, xarg st
 }
 
 // sendx appends selected text or snarf buffer to end of body.
-func sendx(et, _, _ *Text, _, _ bool, _ string) {
+// If argt has a selection (from B2-B1 chord), that text is used.
+// Otherwise, if the body has a selection, it's cut and pasted at end.
+// Otherwise, the snarf buffer is pasted at end.
+func sendx(et *Text, _ *Text, argt *Text, _, _ bool, _ string) {
 	if et.w == nil {
 		return
 	}
 	t := &et.w.body
-	if t.q0 != t.q1 {
-		cut(t, t, nil, true, false, "")
+
+	// If argt is nil (e.g., from external client write-back), fall back to global.argtext
+	if argt == nil {
+		argt = global.argtext
 	}
-	t.SetSelect(t.file.Nr(), t.file.Nr())
-	paste(t, t, nil, true, true, "")
-	if t.ReadC(t.file.Nr()-1) != '\n' {
-		t.Insert(t.file.Nr(), []rune("\n"), true)
+
+	// If we have an argument from B2-B1 chord, use it
+	if argt != nil && argt.q0 != argt.q1 {
+		n := argt.q1 - argt.q0
+		r := make([]rune, n)
+		argt.file.Read(argt.q0, r)
 		t.SetSelect(t.file.Nr(), t.file.Nr())
+		t.Insert(t.file.Nr(), r, true)
+		t.SetSelect(t.file.Nr(), t.file.Nr())
+		if len(r) == 0 || r[len(r)-1] != '\n' {
+			t.Insert(t.file.Nr(), []rune("\n"), true)
+			t.SetSelect(t.file.Nr(), t.file.Nr())
+		}
+	} else {
+		// Original behavior: use body selection or snarf buffer
+		if t.q0 != t.q1 {
+			cut(t, t, nil, true, false, "")
+		}
+		t.SetSelect(t.file.Nr(), t.file.Nr())
+		paste(t, t, nil, true, true, "")
+		if t.ReadC(t.file.Nr()-1) != '\n' {
+			t.Insert(t.file.Nr(), []rune("\n"), true)
+			t.SetSelect(t.file.Nr(), t.file.Nr())
+		}
 	}
 	t.iq1 = t.q1
 	t.Show(t.q1, t.q1, true)

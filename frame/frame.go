@@ -199,9 +199,7 @@ func (f *frameimpl) TextOccupiedHeight(r image.Rectangle) int {
 }
 
 func (f *frameimpl) textoccupiedheightimpl(r image.Rectangle) int {
-	f.lk.Lock()
-	defer f.lk.Unlock()
-
+	// NOTE: This is an internal *impl function - it must be called with f.lk already held.
 	// TODO(rjk): To support multiple different fonts at once in a Frame,
 	// this will have to be extended to be the sum of the height of the boxes
 	// less than r.Dy

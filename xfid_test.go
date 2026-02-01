@@ -1037,6 +1037,8 @@ func TestXfidwriteQWeventExecuteSend(t *testing.T) {
 	global.row = Row{
 		display: d,
 	}
+	// Clear argtext to ensure no stale chord argument interferes
+	global.argtext = nil
 	w := NewWindow().initHeadless(nil)
 	w.col = new(Column)
 	w.nopen[QWevent]++
