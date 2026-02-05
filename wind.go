@@ -1560,13 +1560,7 @@ func (w *Window) PreviewSnarf() []byte {
 	srcStart, srcEnd := w.previewSourceMap.ToSource(p0, p1)
 
 	// Clamp to body buffer bounds
-	bodyLen := w.body.file.Nr()
-	if srcStart < 0 {
-		srcStart = 0
-	}
-	if srcEnd > bodyLen {
-		srcEnd = bodyLen
-	}
+	srcStart, srcEnd = clampToBuffer(srcStart, srcEnd, w.body.file.Nr())
 	if srcStart >= srcEnd {
 		return nil
 	}
@@ -1599,7 +1593,7 @@ func (w *Window) PreviewLookText() string {
 	}
 
 	plainText := content.Plain()
-	if p0 < 0 || p1 > len(plainText) {
+	if p0 < 0 || p1 < 0 || p0 > p1 || p1 > len(plainText) {
 		return ""
 	}
 
@@ -1658,6 +1652,27 @@ func isWordChar(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
 }
 
+// clampToBuffer clamps start and end positions to [0, bufLen].
+// If clamping causes start > end, start is set to end.
+func clampToBuffer(start, end, bufLen int) (int, int) {
+	if start < 0 {
+		start = 0
+	}
+	if end < 0 {
+		end = 0
+	}
+	if start > bufLen {
+		start = bufLen
+	}
+	if end > bufLen {
+		end = bufLen
+	}
+	if start > end {
+		start = end
+	}
+	return start, end
+}
+
 // syncSourceSelection maps the current preview selection to the corresponding
 // positions in the source body buffer. This keeps body.q0 and body.q1 in sync
 // with the rendered preview selection, enabling Snarf and other Acme operations
@@ -1674,19 +1689,7 @@ func (w *Window) syncSourceSelection() {
 	srcStart, srcEnd := w.previewSourceMap.ToSource(p0, p1)
 
 	// Clamp to body buffer bounds
-	bodyLen := w.body.file.Nr()
-	if srcStart < 0 {
-		srcStart = 0
-	}
-	if srcEnd < 0 {
-		srcEnd = 0
-	}
-	if srcStart > bodyLen {
-		srcStart = bodyLen
-	}
-	if srcEnd > bodyLen {
-		srcEnd = bodyLen
-	}
+	srcStart, srcEnd = clampToBuffer(srcStart, srcEnd, w.body.file.Nr())
 
 	// Update the body's selection to match
 	w.body.q0 = srcStart
