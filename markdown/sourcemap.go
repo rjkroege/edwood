@@ -45,16 +45,27 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	}
 
 	if startEntry == nil {
-		srcStart = renderedStart
+		// Position falls in a gap between entries — find nearest entry after.
+		for i := range sm.entries {
+			e := &sm.entries[i]
+			if e.RenderedStart >= renderedStart {
+				srcStart = e.SourceRuneStart
+				break
+			}
+		}
+		if srcStart == -1 {
+			srcStart = renderedStart
+		}
 	} else {
-		// If the selection starts at the beginning of a formatted element,
-		// include the opening marker. Use SourceRuneStart for rune positions.
-		if renderedStart == startEntry.RenderedStart {
+		// Use the unified formula: map rendered position to source content
+		// position past the opening marker, then apply boundary expansion.
+		offset := renderedStart - startEntry.RenderedStart
+		srcStart = startEntry.SourceRuneStart + entryOpeningLen(startEntry) + offset
+
+		// Boundary expansion: if selection starts at entry start (range selection),
+		// include opening markup.
+		if renderedStart == startEntry.RenderedStart && renderedStart != renderedEnd {
 			srcStart = startEntry.SourceRuneStart
-		} else {
-			// Calculate offset within this entry (runes, not bytes)
-			offset := renderedStart - startEntry.RenderedStart
-			srcStart = startEntry.SourceRuneStart + offset
 		}
 	}
 
@@ -74,29 +85,59 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	}
 
 	if endEntry == nil {
-		srcEnd = renderedEnd
+		// Position falls in a gap — find nearest entry before renderedEnd.
+		// Map through the gap using 1:1 offset from the entry's source end,
+		// which handles unmapped characters like synthetic paragraph-break newlines.
+		for i := len(sm.entries) - 1; i >= 0; i-- {
+			if sm.entries[i].RenderedEnd <= renderedEnd {
+				endEntry = &sm.entries[i]
+				break
+			}
+		}
+		if endEntry != nil {
+			srcEnd = endEntry.SourceRuneEnd + (renderedEnd - endEntry.RenderedEnd)
+		} else {
+			srcEnd = renderedEnd
+		}
 	} else {
-		// If the selection ends at the end of a formatted element,
-		// include the closing marker. Use SourceRuneEnd for rune positions.
+		// Boundary expansion: if selection ends at entry end (range selection),
+		// include closing markup.
 		if renderedEnd == endEntry.RenderedEnd {
 			srcEnd = endEntry.SourceRuneEnd
 		} else {
-			// Calculate offset within this entry, accounting for any prefix (runes, not bytes)
+			// Use the unified formula: opening marker length + content offset
 			offset := renderedEnd - endEntry.RenderedStart
-			srcEnd = endEntry.SourceRuneStart + endEntry.PrefixLen + offset
+			srcEnd = endEntry.SourceRuneStart + entryOpeningLen(endEntry) + offset
 		}
 	}
 
 	// A point selection in rendered content must map to a point in source.
-	// The srcStart and srcEnd formulas diverge for entries with PrefixLen > 0
-	// (e.g., headings where "## " is stripped): srcEnd accounts for PrefixLen
-	// but srcStart does not at entry boundaries. Normalize to srcEnd which
-	// correctly maps to the content position past the prefix.
+	// With the unified formula, start and end should agree for point selections.
+	// Keep as safety normalization.
 	if renderedStart == renderedEnd && srcStart != srcEnd {
 		srcStart = srcEnd
 	}
 
 	return srcStart, srcEnd
+}
+
+// entryOpeningLen computes the rune length of the opening marker for a source
+// map entry. For heading-style entries (PrefixLen > 0), this is PrefixLen.
+// For symmetric markers (bold, italic, code), it is half the extra source runes.
+// For 1:1 entries (plain text) or synthetic entries (table borders with zero-length
+// source), returns 0.
+func entryOpeningLen(e *SourceMapEntry) int {
+	if e.PrefixLen > 0 {
+		return e.PrefixLen
+	}
+	renderedLen := e.RenderedEnd - e.RenderedStart
+	sourceRuneLen := e.SourceRuneEnd - e.SourceRuneStart
+	if sourceRuneLen <= renderedLen {
+		// 1:1 mapping (plain text) or synthetic entry (source shorter than rendered)
+		return 0
+	}
+	extra := sourceRuneLen - renderedLen
+	return extra / 2
 }
 
 // ToRendered maps a range in source markdown (srcRuneStart, srcRuneEnd as rune positions)
