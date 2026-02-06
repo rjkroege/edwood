@@ -829,6 +829,438 @@ func TestCorrectnessInvariantR3Comprehensive(t *testing.T) {
 	}
 }
 
+// ---------- Category H: Markup-boundary selection heuristics ----------
+// Phase 1.4: When a selection boundary aligns with an entry boundary,
+// expand the source position to include the corresponding markup delimiter.
+//
+// Design doc rule: "If q0 is at the start of a markup operation (ie, first
+// text after bold, italic, code block, image, table, etc) the source q0
+// should include the markup; likewise if on the last character, the trailing
+// markup should be included."
+//
+// This means boundary expansion is INDEPENDENT at each end:
+// - renderedStart == entry.RenderedStart → srcStart includes opening markup
+// - renderedEnd == entry.RenderedEnd → srcEnd includes closing markup
+// Both, either, or neither can apply in a given selection.
+
+func TestMarkupBoundaryBoldFullSelection(t *testing.T) {
+	// Selecting all of "bold" in "**bold**" should include both ** delimiters.
+	// Source: "**bold**" = 8 runes. Rendered: "bold" = 4 runes.
+	input := "**bold**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 4) // full "bold"
+	if srcStart != 0 || srcEnd != 8 {
+		t.Errorf("Bold full selection: ToSource(0,4) = (%d,%d), want (0,8)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldPartialFromStart(t *testing.T) {
+	// Selecting "bol" from start of "**bold**": rendered [0,3).
+	// Start aligns with entry → include opening **. End does NOT align → no closing **.
+	// Source: opening ** included → srcStart=0. "bol" content → srcEnd=5.
+	input := "**bold**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3) // "bol" from start
+	if srcStart != 0 {
+		t.Errorf("Bold partial 'bol': srcStart=%d, want 0 (include opening **)", srcStart)
+	}
+	if srcEnd != 5 {
+		t.Errorf("Bold partial 'bol': srcEnd=%d, want 5 (no closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldPartialFromEnd(t *testing.T) {
+	// Selecting "old" at end of "**bold**": rendered [1,4).
+	// Start does NOT align → no opening **. End aligns → include closing **.
+	// srcStart: offset 1 within content → source 2 + 1 = 3.
+	// srcEnd: end aligns with entry end → include closing ** → source 8.
+	input := "**bold**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(1, 4) // "old"
+	if srcStart != 3 {
+		t.Errorf("Bold partial 'old': srcStart=%d, want 3 (no opening **)", srcStart)
+	}
+	if srcEnd != 8 {
+		t.Errorf("Bold partial 'old': srcEnd=%d, want 8 (include closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldInteriorPartial(t *testing.T) {
+	// Selecting "ol" from middle of "**bold**": rendered [1,3).
+	// Neither boundary aligns → no delimiters included.
+	// srcStart: offset 1 → source 3. srcEnd: offset 3 → source 5.
+	input := "**bold**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(1, 3) // "ol"
+	if srcStart != 3 {
+		t.Errorf("Bold interior 'ol': srcStart=%d, want 3", srcStart)
+	}
+	if srcEnd != 5 {
+		t.Errorf("Bold interior 'ol': srcEnd=%d, want 5", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryItalicFullSelection(t *testing.T) {
+	// Selecting all of "italic" in "*italic*" should include * delimiters.
+	// Source: "*italic*" = 8 runes. Rendered: "italic" = 6 runes.
+	input := "*italic*"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 6) // full "italic"
+	if srcStart != 0 || srcEnd != 8 {
+		t.Errorf("Italic full selection: ToSource(0,6) = (%d,%d), want (0,8)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryItalicPartialFromStart(t *testing.T) {
+	// Selecting "ita" from start of "*italic*": rendered [0,3).
+	// Start aligns → include opening *. End doesn't align → no closing *.
+	// srcStart=0 (include *), srcEnd=4 (content only).
+	input := "*italic*"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3) // "ita" from start
+	if srcStart != 0 {
+		t.Errorf("Italic partial 'ita': srcStart=%d, want 0 (include opening *)", srcStart)
+	}
+	if srcEnd != 4 {
+		t.Errorf("Italic partial 'ita': srcEnd=%d, want 4 (no closing *)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryItalicPartialFromEnd(t *testing.T) {
+	// Selecting "lic" at end of "*italic*": rendered [3,6).
+	// Start doesn't align → no opening *. End aligns → include closing *.
+	// srcStart = 1 + 3 = 4. srcEnd = 8 (include closing *).
+	input := "*italic*"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(3, 6) // "lic"
+	if srcStart != 4 {
+		t.Errorf("Italic partial 'lic': srcStart=%d, want 4 (no opening *)", srcStart)
+	}
+	if srcEnd != 8 {
+		t.Errorf("Italic partial 'lic': srcEnd=%d, want 8 (include closing *)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryCodeFullSelection(t *testing.T) {
+	// Selecting all of "code" in "`code`" should include ` delimiters.
+	// Source: "`code`" = 6 runes. Rendered: "code" = 4 runes.
+	input := "`code`"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 4) // full "code"
+	if srcStart != 0 || srcEnd != 6 {
+		t.Errorf("Code full selection: ToSource(0,4) = (%d,%d), want (0,6)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryCodePartialFromStart(t *testing.T) {
+	// Selecting "cod" from start of "`code`": rendered [0,3).
+	// Start aligns → include opening `. End doesn't → no closing `.
+	// srcStart=0, srcEnd=4.
+	input := "`code`"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3) // "cod" from start
+	if srcStart != 0 {
+		t.Errorf("Code partial 'cod': srcStart=%d, want 0 (include opening `)", srcStart)
+	}
+	if srcEnd != 4 {
+		t.Errorf("Code partial 'cod': srcEnd=%d, want 4 (no closing `)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryHeadingFullSelection(t *testing.T) {
+	// Selecting all of "heading" in "# heading" should include # prefix.
+	// Source: "# heading" = 9 runes. Rendered: "heading" = 7 runes.
+	input := "# heading"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 7) // full "heading"
+	if srcStart != 0 || srcEnd != 9 {
+		t.Errorf("Heading full selection: ToSource(0,7) = (%d,%d), want (0,9)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryHeadingPartialFromStart(t *testing.T) {
+	// Selecting "hea" from start of "# heading": rendered [0,3).
+	// Start aligns → include # prefix in source. End doesn't → content only.
+	// srcStart=0 (include "# "), srcEnd=5.
+	input := "# heading"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3) // "hea" from start
+	if srcStart != 0 {
+		t.Errorf("Heading partial 'hea': srcStart=%d, want 0 (include '# ' prefix)", srcStart)
+	}
+	if srcEnd != 5 {
+		t.Errorf("Heading partial 'hea': srcEnd=%d, want 5", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryHeadingPartialFromEnd(t *testing.T) {
+	// Selecting "ing" at end of "# heading": rendered [4,7).
+	// Start doesn't align → no prefix. End aligns → include trailing content.
+	// For headings, there is no closing markup, so srcEnd = entry.SourceRuneEnd = 9.
+	// srcStart: offset 4 in rendered → source 2 + 4 = 6.
+	input := "# heading"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(4, 7) // "ing" at end
+	if srcStart != 6 {
+		t.Errorf("Heading partial 'ing': srcStart=%d, want 6 (no prefix)", srcStart)
+	}
+	if srcEnd != 9 {
+		t.Errorf("Heading partial 'ing': srcEnd=%d, want 9 (entry end)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryLinkFullSelection(t *testing.T) {
+	// Selecting all of "link" in "[link](url)" should include full markup.
+	// Source: "[link](url)" = 11 runes. Rendered: "link" = 4 runes.
+	// The link creates per-character entries for the text ("l","i","n","k"),
+	// each mapping 1:1 to source positions within "[link]" (source 1-5).
+	// With boundary expansion:
+	// - Start: renderedStart=0 == first entry.RenderedStart → srcStart = entry.SourceRuneStart = 1
+	//   (source position of "l", not of "["). Links need special handling since
+	//   the "[" and "](url)" are not part of any entry.
+	// - End: renderedEnd=4 == last entry.RenderedEnd → srcEnd = entry.SourceRuneEnd = 5
+	//   (source position past "k", not past ")").
+	// The per-character entries don't know about the surrounding link syntax.
+	// This test documents the current limitation: link delimiters are NOT included
+	// because the entries only cover the link text, not the full markup.
+	input := "[link](url)"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 4) // full "link"
+	if srcStart > 1 {
+		t.Errorf("Link full selection: srcStart=%d, want <=1", srcStart)
+	}
+	if srcEnd < 5 {
+		t.Errorf("Link full selection: srcEnd=%d, want >=5 (at least covering 'link')", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldInMiddleFullEntry(t *testing.T) {
+	// Bold in middle of text: "text **bold** end"
+	// Source: 17 runes. Rendered: "text bold end" = 13 runes.
+	// Bold "bold" at rendered [5,9), source entry for "**bold**" at source [5,13).
+	input := "text **bold** end"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// Full bold: rendered [5,9) — both boundaries align with entry.
+	// Should include ** delimiters → source [5,13).
+	srcStart, srcEnd := sm.ToSource(5, 9)
+	if srcStart != 5 || srcEnd != 13 {
+		t.Errorf("Bold in middle full: ToSource(5,9) = (%d,%d), want (5,13)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldInMiddlePartialFromStart(t *testing.T) {
+	// "text **bold** end" — select "bol" from start of bold entry: rendered [5,8).
+	// Start aligns → include opening **. End doesn't → no closing **.
+	// srcStart = entry.SourceRuneStart = 5 (include **). srcEnd = 5 + 2 + 3 = 10.
+	input := "text **bold** end"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(5, 8) // "bol" from start of bold
+	if srcStart != 5 {
+		t.Errorf("Bold middle partial 'bol': srcStart=%d, want 5 (include opening **)", srcStart)
+	}
+	if srcEnd != 10 {
+		t.Errorf("Bold middle partial 'bol': srcEnd=%d, want 10 (no closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldInMiddlePartialFromEnd(t *testing.T) {
+	// "text **bold** end" — select "old" at end of bold entry: rendered [6,9).
+	// Start doesn't align → no opening **. End aligns → include closing **.
+	// srcStart: offset 1 in content → source 7 + 1 = 8. srcEnd: entry.SourceRuneEnd = 13.
+	input := "text **bold** end"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(6, 9) // "old" ending at bold boundary
+	if srcStart != 8 {
+		t.Errorf("Bold middle partial 'old': srcStart=%d, want 8 (no opening **)", srcStart)
+	}
+	if srcEnd != 13 {
+		t.Errorf("Bold middle partial 'old': srcEnd=%d, want 13 (include closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldItalicFullSelection(t *testing.T) {
+	// "***bi***" — bold+italic with 3-char delimiters.
+	// Source: "***bi***" = 8 runes. Rendered: "bi" = 2 runes.
+	input := "***bi***"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// Full selection: rendered [0,2) → source [0,8)
+	srcStart, srcEnd := sm.ToSource(0, 2)
+	if srcStart != 0 || srcEnd != 8 {
+		t.Errorf("BoldItalic full: ToSource(0,2) = (%d,%d), want (0,8)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryBoldItalicPartialFromStart(t *testing.T) {
+	// "***bi***" — select just "b": rendered [0,1).
+	// Start aligns → include opening ***. End doesn't → no closing ***.
+	// srcStart=0 (include ***), srcEnd=4.
+	input := "***bi***"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 1) // just "b"
+	if srcStart != 0 {
+		t.Errorf("BoldItalic partial 'b': srcStart=%d, want 0 (include opening ***)", srcStart)
+	}
+	if srcEnd != 4 {
+		t.Errorf("BoldItalic partial 'b': srcEnd=%d, want 4 (no closing ***)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryH2FullSelection(t *testing.T) {
+	// "## Title" — heading level 2.
+	// Source: "## Title" = 8 runes. Prefix "## " = 3 runes. Rendered: "Title" = 5 runes.
+	input := "## Title"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 5) // full "Title"
+	if srcStart != 0 || srcEnd != 8 {
+		t.Errorf("H2 full selection: ToSource(0,5) = (%d,%d), want (0,8)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryH2PartialFromStart(t *testing.T) {
+	// "## Title" — partial "Tit": rendered [0,3).
+	// Start aligns → include "## " prefix. End doesn't → content only.
+	// srcStart=0, srcEnd=6.
+	input := "## Title"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3) // "Tit" from start
+	if srcStart != 0 {
+		t.Errorf("H2 partial 'Tit': srcStart=%d, want 0 (include '## ' prefix)", srcStart)
+	}
+	if srcEnd != 6 {
+		t.Errorf("H2 partial 'Tit': srcEnd=%d, want 6", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryCrossBoundaryNoExpansion(t *testing.T) {
+	// When a selection spans from inside one entry into another, neither
+	// entry is fully selected at the selection boundary, so no markup
+	// expansion should occur for either.
+	// "**aa** **bb**": rendered "aa bb" (5 runes).
+	// First bold: rendered [0,2), source [0,6) "**aa**"
+	// Space: rendered [2,3), source [6,7) " "
+	// Second bold: rendered [3,5), source [7,13) "**bb**"
+	input := "**aa** **bb**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// Select from middle of first bold to middle of second: rendered [1,4) = "a b"
+	srcStart, srcEnd := sm.ToSource(1, 4)
+	// srcStart in first bold content: offset 1 → source 2 + 1 = 3 (no opening **)
+	if srcStart != 3 {
+		t.Errorf("Cross-boundary no expand: srcStart=%d, want 3", srcStart)
+	}
+	// srcEnd in second bold content: offset 1 → source 7 + 2 + 1 = 10 (no closing **)
+	if srcEnd != 10 {
+		t.Errorf("Cross-boundary no expand: srcEnd=%d, want 10", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryCrossBoundaryStartExpands(t *testing.T) {
+	// Selection starts at entry start of first bold but ends mid-second bold.
+	// "**aa** **bb**": rendered "aa bb" (5 runes).
+	// Select rendered [0,4) = "aa b" — start aligns with first bold entry.
+	input := "**aa** **bb**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 4)
+	// Start aligns with first bold entry → include opening ** → srcStart=0
+	if srcStart != 0 {
+		t.Errorf("Cross-boundary start expands: srcStart=%d, want 0 (include opening **)", srcStart)
+	}
+	// End doesn't align with second bold entry end → no closing **
+	if srcEnd != 10 {
+		t.Errorf("Cross-boundary start expands: srcEnd=%d, want 10 (no closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryCrossBoundaryEndExpands(t *testing.T) {
+	// Selection starts mid-first bold but ends at entry end of second bold.
+	// "**aa** **bb**": rendered "aa bb" (5 runes).
+	// Select rendered [1,5) = "a bb" — end aligns with second bold entry.
+	input := "**aa** **bb**"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(1, 5)
+	// Start doesn't align with first bold entry start → no opening **
+	if srcStart != 3 {
+		t.Errorf("Cross-boundary end expands: srcStart=%d, want 3 (no opening **)", srcStart)
+	}
+	// End aligns with second bold entry end → include closing ** → srcEnd=13
+	if srcEnd != 13 {
+		t.Errorf("Cross-boundary end expands: srcEnd=%d, want 13 (include closing **)", srcEnd)
+	}
+}
+
+func TestMarkupBoundaryFullEntryAmongPlainText(t *testing.T) {
+	// "before **bold** after" — select exactly "bold" (full entry).
+	// Source: "before **bold** after" = 21 runes.
+	// Rendered: "before bold after" = 17 runes.
+	// Bold "bold" at rendered [7,11), source entry for "**bold**" at [7,15).
+	input := "before **bold** after"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(7, 11) // exactly "bold"
+	if srcStart != 7 || srcEnd != 15 {
+		t.Errorf("Full bold among text: ToSource(7,11) = (%d,%d), want (7,15)", srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryImageFullSelection(t *testing.T) {
+	// "![alt](image.png)" — image with alt text.
+	// Rendered: "[Image: alt]" = 12 runes. Source: "![alt](image.png)" = 17 runes.
+	input := "![alt](image.png)"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	rendered := plainText(input)
+	rendLen := runeLen(rendered)
+
+	// Full selection of the image placeholder — both boundaries align.
+	srcStart, srcEnd := sm.ToSource(0, rendLen)
+	if srcStart != 0 || srcEnd != 17 {
+		t.Errorf("Image full selection: ToSource(0,%d) = (%d,%d), want (0,17)", rendLen, srcStart, srcEnd)
+	}
+}
+
+func TestMarkupBoundaryImagePartialSelection(t *testing.T) {
+	// "![alt](image.png)" — partial selection of image placeholder text.
+	// Rendered: "[Image: alt]" = 12 runes.
+	// Partial: rendered [0,3) = "[Im" — start aligns, end doesn't.
+	// Since this is a single entry, start expansion includes opening markup
+	// but end does NOT include closing markup.
+	input := "![alt](image.png)"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	srcStart, srcEnd := sm.ToSource(0, 3)
+	// Start aligns → include opening markup. srcStart = entry.SourceRuneStart = 0.
+	if srcStart != 0 {
+		t.Errorf("Image partial: srcStart=%d, want 0 (include opening markup)", srcStart)
+	}
+	// End doesn't align → no full closing markup.
+	// Source 17 would mean full markup; partial should be less.
+	if srcEnd >= 17 {
+		t.Errorf("Image partial: srcEnd=%d, want <17 (no closing markup)", srcEnd)
+	}
+}
+
 func TestCorrectnessInvariantR4Comprehensive(t *testing.T) {
 	// Test R4 (monotonicity) across every consecutive pair of positions.
 	tests := []struct {
