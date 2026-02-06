@@ -2757,3 +2757,223 @@ func TestGutterIndentConsistentAcrossBlockTypes(t *testing.T) {
 			codeX, tableX, imgX)
 	}
 }
+
+// =============================================================================
+// Phase 7.3: Blockquote Layout Tests
+// =============================================================================
+
+// TestLayoutBlockquoteIndent tests that blockquote content is indented by
+// BlockquoteDepth * ListIndentWidth pixels per nesting level.
+func TestLayoutBlockquoteIndent(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	t.Run("depth 1 blockquote indented by 20px", func(t *testing.T) {
+		content := Content{
+			{Text: "quoted text", Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		expectedIndent := 1 * ListIndentWidth // 20px
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("depth 1 blockquote X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+
+	t.Run("depth 2 blockquote indented by 40px", func(t *testing.T) {
+		content := Content{
+			{Text: "nested quote", Style: Style{Blockquote: true, BlockquoteDepth: 2, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		expectedIndent := 2 * ListIndentWidth // 40px
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("depth 2 blockquote X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+
+	t.Run("depth 3 blockquote indented by 60px", func(t *testing.T) {
+		content := Content{
+			{Text: "deep quote", Style: Style{Blockquote: true, BlockquoteDepth: 3, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		expectedIndent := 3 * ListIndentWidth // 60px
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("depth 3 blockquote X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+}
+
+// TestLayoutBlockquoteWrapping tests that blockquote content wraps within
+// the reduced width (frameWidth - blockquoteIndent).
+func TestLayoutBlockquoteWrapping(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	maxtab := 80
+
+	t.Run("blockquote text wraps within reduced width", func(t *testing.T) {
+		// Frame width 200px, depth 1 indent = 20px → effective width = 180px
+		// Each char is 10px, so 18 chars fit per line.
+		// "this is a long blockquote text" is 30 chars + spaces → must wrap.
+		frameWidth := 200
+		content := Content{
+			{Text: "this is a long blockquote text that wraps", Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) < 2 {
+			t.Fatalf("expected at least 2 lines for wrapped blockquote, got %d", len(lines))
+		}
+
+		// First line should be indented by depth*ListIndentWidth
+		expectedIndent := 1 * ListIndentWidth
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("first line X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+
+		// Wrapped lines should maintain the same indentation
+		for i := 1; i < len(lines); i++ {
+			if len(lines[i].Boxes) > 0 && lines[i].Boxes[0].X < expectedIndent {
+				t.Errorf("wrapped line %d X = %d, want >= %d", i, lines[i].Boxes[0].X, expectedIndent)
+			}
+		}
+	})
+
+	t.Run("deeper blockquote has less space for text", func(t *testing.T) {
+		// Frame width 200px, depth 2 indent = 40px → effective width = 160px
+		// Same text should require more lines at depth 2 than depth 1.
+		frameWidth := 200
+		text := "words that should wrap differently at different depths of quote"
+
+		depth1Content := Content{
+			{Text: text, Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+		}
+		depth2Content := Content{
+			{Text: text, Style: Style{Blockquote: true, BlockquoteDepth: 2, Scale: 1.0}},
+		}
+
+		boxes1 := contentToBoxes(depth1Content)
+		lines1 := layout(boxes1, font, frameWidth, maxtab, nil, nil)
+
+		boxes2 := contentToBoxes(depth2Content)
+		lines2 := layout(boxes2, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines2) <= len(lines1) {
+			t.Errorf("depth 2 (%d lines) should need more lines than depth 1 (%d lines) for same text",
+				len(lines2), len(lines1))
+		}
+	})
+}
+
+// TestLayoutBlockquoteWithListStacking tests that a list inside a blockquote
+// has combined indentation (blockquote indent + list indent).
+func TestLayoutBlockquoteWithListStacking(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	t.Run("list item inside blockquote has combined indent", func(t *testing.T) {
+		// A list item at indent 1 inside a depth 1 blockquote.
+		// Expected: blockquoteIndent(20) + listIndent(20) = 40px
+		content := Content{
+			{Text: "•", Style: Style{
+				Blockquote: true, BlockquoteDepth: 1,
+				ListBullet: true, ListIndent: 1,
+				Scale: 1.0,
+			}},
+			{Text: " Item", Style: Style{
+				Blockquote: true, BlockquoteDepth: 1,
+				ListItem: true, ListIndent: 1,
+				Scale: 1.0,
+			}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Blockquote depth 1 = 20px, list indent 1 = 20px → combined = 40px
+		expectedIndent := 1*ListIndentWidth + 1*ListIndentWidth // 40px
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("blockquote+list bullet X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+
+	t.Run("deeper blockquote with list", func(t *testing.T) {
+		// List item at indent 0 inside a depth 2 blockquote.
+		// Expected: blockquoteIndent(40) + listIndent(0) = 40px
+		content := Content{
+			{Text: "•", Style: Style{
+				Blockquote: true, BlockquoteDepth: 2,
+				ListBullet: true, ListIndent: 0,
+				Scale: 1.0,
+			}},
+			{Text: " Item", Style: Style{
+				Blockquote: true, BlockquoteDepth: 2,
+				ListItem: true, ListIndent: 0,
+				Scale: 1.0,
+			}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// Blockquote depth 2 = 40px, list indent 0 = 0px → combined = 40px
+		expectedIndent := 2 * ListIndentWidth // 40px
+		if lines[0].Boxes[0].X != expectedIndent {
+			t.Errorf("depth 2 blockquote + list bullet X = %d, want %d", lines[0].Boxes[0].X, expectedIndent)
+		}
+	})
+}
+
+// TestLayoutBlockquoteMultiLine tests that multi-line blockquotes maintain
+// consistent indentation across lines.
+func TestLayoutBlockquoteMultiLine(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	content := Content{
+		{Text: "line one", Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+		{Text: "\n", Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+		{Text: "line two", Style: Style{Blockquote: true, BlockquoteDepth: 1, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(lines))
+	}
+
+	expectedIndent := 1 * ListIndentWidth
+	for i, line := range lines {
+		if len(line.Boxes) == 0 {
+			continue
+		}
+		if line.Boxes[0].X != expectedIndent {
+			t.Errorf("line %d: first box X = %d, want %d", i, line.Boxes[0].X, expectedIndent)
+		}
+	}
+}

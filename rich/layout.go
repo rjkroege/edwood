@@ -493,8 +493,11 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 
 		// Calculate indentation for this box
 		indentPixels := 0
+		if box.Style.Blockquote {
+			indentPixels += box.Style.BlockquoteDepth * ListIndentWidth
+		}
 		if box.Style.ListBullet || box.Style.ListItem {
-			indentPixels = box.Style.ListIndent * ListIndentWidth
+			indentPixels += box.Style.ListIndent * ListIndentWidth
 			currentListIndent = box.Style.ListIndent // Track for wrapped lines
 		} else if (box.Style.Block && box.Style.Code) || box.Style.Table || box.Style.Image {
 			// All scrollable block elements get gutter indentation
@@ -530,6 +533,9 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 
 		// Determine the current indent for wrapped lines
 		currentIndent := currentListIndent * ListIndentWidth
+		if box.Style.Blockquote {
+			currentIndent += box.Style.BlockquoteDepth * ListIndentWidth
+		}
 		if (box.Style.Block && box.Style.Code) || box.Style.Table || box.Style.Image {
 			currentIndent = gutterIndent
 		}

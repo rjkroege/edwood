@@ -966,6 +966,14 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 		}
 	}
 
+	// Phase 3a: Draw blockquote left border bars
+	for _, line := range lines {
+		if line.Y >= frameHeight {
+			break
+		}
+		f.drawBlockquoteBorders(target, line, offset, frameWidth, frameHeight)
+	}
+
 	// Phase 4: Render text on top of backgrounds
 	// Note: Text is now clipped by the scratch image bounds, so we can render
 	// partial lines without worrying about overflow into adjacent windows.
@@ -1180,6 +1188,12 @@ func (f *frameImpl) drawBoxBackgroundTo(target edwooddraw.Image, pb PositionedBo
 // HRuleColor is the gray color used for horizontal rule lines.
 var HRuleColor = color.RGBA{R: 180, G: 180, B: 180, A: 255}
 
+// BlockquoteBorderColor is the color of the blockquote vertical border bar.
+var BlockquoteBorderColor = color.RGBA{R: 200, G: 200, B: 200, A: 255}
+
+// BlockquoteBorderWidth is the width in pixels of the blockquote vertical bar.
+const BlockquoteBorderWidth = 2
+
 // drawHorizontalRuleTo draws a horizontal rule line across the full frame width.
 // The line is drawn vertically centered within the line height.
 func (f *frameImpl) drawHorizontalRuleTo(target edwooddraw.Image, line Line, offset image.Point, frameWidth, frameHeight int) {
@@ -1209,6 +1223,44 @@ func (f *frameImpl) drawHorizontalRuleTo(target edwooddraw.Image, line Line, off
 	}
 
 	target.Draw(ruleRect, ruleImg, nil, image.ZP)
+}
+
+// drawBlockquoteBorders draws vertical left border bars for blockquote lines.
+// Each nesting level gets a 2px vertical bar at the left edge of its indent zone.
+func (f *frameImpl) drawBlockquoteBorders(target edwooddraw.Image, line Line, offset image.Point, frameWidth, frameHeight int) {
+	// Find max blockquote depth from boxes on this line
+	depth := 0
+	for _, pb := range line.Boxes {
+		if pb.Box.Style.Blockquote && pb.Box.Style.BlockquoteDepth > depth {
+			depth = pb.Box.Style.BlockquoteDepth
+		}
+	}
+	if depth == 0 {
+		return
+	}
+
+	borderImg := f.allocColorImage(BlockquoteBorderColor)
+	if borderImg == nil {
+		return
+	}
+
+	clipRect := image.Rect(offset.X, offset.Y, offset.X+frameWidth, offset.Y+frameHeight)
+
+	// Draw a 2px vertical bar for each depth level
+	for level := 1; level <= depth; level++ {
+		barX := offset.X + (level-1)*ListIndentWidth + 2 // small offset from left edge of indent zone
+		barRect := image.Rect(
+			barX,
+			offset.Y+line.Y,
+			barX+BlockquoteBorderWidth,
+			offset.Y+line.Y+line.Height,
+		)
+		barRect = barRect.Intersect(clipRect)
+		if barRect.Empty() {
+			continue
+		}
+		target.Draw(barRect, borderImg, nil, image.ZP)
+	}
 }
 
 // layoutFromOrigin returns the layout lines starting from the origin position.
