@@ -194,6 +194,9 @@ func (rt *RichText) Redraw() {
 // allowing the rectangle to be provided dynamically (e.g., from body.all).
 func (rt *RichText) Render(r image.Rectangle) {
 	rt.lastRect = r
+	if r.Dx() <= 0 || r.Dy() <= 0 {
+		return
+	}
 
 	// Compute scrollbar rectangle (left side)
 	scrollWid := rt.display.ScaleSize(Scrollwid)

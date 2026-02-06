@@ -142,7 +142,7 @@ func (bi *BlockIndex) AffectedRange(edits []EditRecord) (int, int) {
 		}
 		closeStart := b.SourceRuneEnd
 		closeEnd := b.SourceRuneEnd
-		if b.SourceLineEnd > b.SourceLineStart+1 {
+		if b.SourceLineEnd > b.SourceLineStart+1 && b.SourceLineEnd-1 < len(bi.lineRuneStarts) {
 			closeStart = bi.lineRuneStarts[b.SourceLineEnd-1]
 			closeEnd = b.SourceRuneEnd
 		}
@@ -814,8 +814,18 @@ func IncrementalUpdate(old StitchResult, newSource string, edits []EditRecord) (
 
 	result := Stitch(old, newRegion, startBlock, endBlock, sourceDelta, sourceBytesDelta)
 
-	// Update the SourceByteLen on the result block index.
+	// Update the SourceByteLen and lineRuneStarts on the result block index.
+	// Stitch() doesn't populate lineRuneStarts, but AffectedRange needs it
+	// for fence-delimiter checks on the next incremental update.
 	result.BlockIdx.SourceByteLen = len(newSource)
+	lrs := make([]int, len(newLines)+1)
+	rp := 0
+	for i, line := range newLines {
+		lrs[i] = rp
+		rp += utf8.RuneCountInString(line)
+	}
+	lrs[len(newLines)] = rp
+	result.BlockIdx.lineRuneStarts = lrs
 
 	// Re-populate rune positions from globally-correct byte positions.
 	result.SM.PopulateRunePositions(newSource)

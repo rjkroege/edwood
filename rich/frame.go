@@ -764,6 +764,9 @@ func (f *frameImpl) Redraw() {
 	if f.display == nil || f.background == nil {
 		return
 	}
+	if f.rect.Dx() <= 0 || f.rect.Dy() <= 0 {
+		return
+	}
 
 	screen := f.display.ScreenImage()
 
@@ -813,8 +816,11 @@ func (f *frameImpl) Redraw() {
 }
 
 // ensureScratchImage allocates or resizes the scratch image to match frame dimensions.
-// Returns nil if allocation fails.
+// Returns nil if allocation fails or dimensions are zero.
 func (f *frameImpl) ensureScratchImage() edwooddraw.Image {
+	if f.rect.Dx() <= 0 || f.rect.Dy() <= 0 {
+		return nil
+	}
 	frameSize := image.Rect(0, 0, f.rect.Dx(), f.rect.Dy())
 
 	// Check if we already have a correctly-sized scratch image
