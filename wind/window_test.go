@@ -6,6 +6,9 @@ package wind
 import (
 	"image"
 	"testing"
+
+	"github.com/rjkroege/edwood/markdown"
+	"github.com/rjkroege/edwood/rich"
 )
 
 // TestWindowStateNew tests that a new WindowState is properly initialized.
@@ -114,7 +117,7 @@ func TestPreviewStateSetPreviewMode(t *testing.T) {
 	}
 }
 
-// TestPreviewStateSourceMap tests source map management.
+// TestPreviewStateSourceMap tests source map management with typed fields.
 func TestPreviewStateSourceMap(t *testing.T) {
 	ps := NewPreviewState()
 
@@ -123,10 +126,26 @@ func TestPreviewStateSourceMap(t *testing.T) {
 		t.Error("new PreviewState should have nil SourceMap")
 	}
 
-	// This test will be expanded when SourceMap type is integrated
+	// Set a real SourceMap produced by ParseWithSourceMap
+	_, sm, _ := markdown.ParseWithSourceMap("# Hello\nworld\n")
+	ps.SetSourceMap(sm)
+
+	got := ps.SourceMap()
+	if got == nil {
+		t.Fatal("SourceMap should not be nil after SetSourceMap")
+	}
+	if got != sm {
+		t.Error("SourceMap getter should return the same pointer that was set")
+	}
+
+	// Setting nil should work
+	ps.SetSourceMap(nil)
+	if ps.SourceMap() != nil {
+		t.Error("SourceMap should be nil after SetSourceMap(nil)")
+	}
 }
 
-// TestPreviewStateLinkMap tests link map management.
+// TestPreviewStateLinkMap tests link map management with typed fields.
 func TestPreviewStateLinkMap(t *testing.T) {
 	ps := NewPreviewState()
 
@@ -135,10 +154,26 @@ func TestPreviewStateLinkMap(t *testing.T) {
 		t.Error("new PreviewState should have nil LinkMap")
 	}
 
-	// This test will be expanded when LinkMap type is integrated
+	// Set a real LinkMap
+	lm := markdown.NewLinkMap()
+	ps.SetLinkMap(lm)
+
+	got := ps.LinkMap()
+	if got == nil {
+		t.Fatal("LinkMap should not be nil after SetLinkMap")
+	}
+	if got != lm {
+		t.Error("LinkMap getter should return the same pointer that was set")
+	}
+
+	// Setting nil should work
+	ps.SetLinkMap(nil)
+	if ps.LinkMap() != nil {
+		t.Error("LinkMap should be nil after SetLinkMap(nil)")
+	}
 }
 
-// TestPreviewStateImageCache tests image cache management.
+// TestPreviewStateImageCache tests image cache management with typed fields.
 func TestPreviewStateImageCache(t *testing.T) {
 	ps := NewPreviewState()
 
@@ -147,10 +182,26 @@ func TestPreviewStateImageCache(t *testing.T) {
 		t.Error("new PreviewState should have nil ImageCache")
 	}
 
-	// This test will be expanded when ImageCache type is integrated
+	// Set a real ImageCache
+	ic := rich.NewImageCache(10)
+	ps.SetImageCache(ic)
+
+	got := ps.ImageCache()
+	if got == nil {
+		t.Fatal("ImageCache should not be nil after SetImageCache")
+	}
+	if got != ic {
+		t.Error("ImageCache getter should return the same pointer that was set")
+	}
+
+	// Setting nil should work
+	ps.SetImageCache(nil)
+	if ps.ImageCache() != nil {
+		t.Error("ImageCache should be nil after SetImageCache(nil)")
+	}
 }
 
-// TestPreviewStateClearCache tests clearing the preview state cache.
+// TestPreviewStateClearCache tests clearing the preview state cache with typed fields.
 func TestPreviewStateClearCache(t *testing.T) {
 	ps := NewPreviewState()
 	ps.SetPreviewMode(true)
@@ -159,6 +210,41 @@ func TestPreviewStateClearCache(t *testing.T) {
 	ps.ClearCache()
 
 	// After clear, should still be in preview mode (only cache is cleared)
+	if !ps.IsPreviewMode() {
+		t.Error("ClearCache should not affect preview mode state")
+	}
+
+	// Set real typed values
+	_, sm, lm := markdown.ParseWithSourceMap("**bold** text\n")
+	ic := rich.NewImageCache(10)
+	ps.SetSourceMap(sm)
+	ps.SetLinkMap(lm)
+	ps.SetImageCache(ic)
+
+	// Verify they are set
+	if ps.SourceMap() == nil {
+		t.Fatal("SourceMap should be set")
+	}
+	if ps.LinkMap() == nil {
+		t.Fatal("LinkMap should be set")
+	}
+	if ps.ImageCache() == nil {
+		t.Fatal("ImageCache should be set")
+	}
+
+	// Clear and verify all are nil
+	ps.ClearCache()
+	if ps.SourceMap() != nil {
+		t.Error("SourceMap should be nil after ClearCache")
+	}
+	if ps.LinkMap() != nil {
+		t.Error("LinkMap should be nil after ClearCache")
+	}
+	if ps.ImageCache() != nil {
+		t.Error("ImageCache should be nil after ClearCache")
+	}
+
+	// Preview mode should still be active
 	if !ps.IsPreviewMode() {
 		t.Error("ClearCache should not affect preview mode state")
 	}
@@ -764,7 +850,7 @@ func TestWindowBaseRedraw(t *testing.T) {
 	}
 }
 
-// TestWindowBaseClearPreviewCache tests clearing preview cache.
+// TestWindowBaseClearPreviewCache tests clearing preview cache with typed fields.
 func TestWindowBaseClearPreviewCache(t *testing.T) {
 	wb := NewWindowBase()
 
@@ -775,6 +861,41 @@ func TestWindowBaseClearPreviewCache(t *testing.T) {
 	wb.ClearPreviewCache()
 	if !wb.IsPreviewMode() {
 		t.Error("clearing cache should not affect preview mode")
+	}
+
+	// Set real typed values via Preview state
+	_, sm, lm := markdown.ParseWithSourceMap("# Test\n")
+	ic := rich.NewImageCache(10)
+	wb.Preview.SetSourceMap(sm)
+	wb.Preview.SetLinkMap(lm)
+	wb.Preview.SetImageCache(ic)
+
+	// Verify they are set
+	if wb.Preview.SourceMap() == nil {
+		t.Fatal("SourceMap should be set")
+	}
+	if wb.Preview.LinkMap() == nil {
+		t.Fatal("LinkMap should be set")
+	}
+	if wb.Preview.ImageCache() == nil {
+		t.Fatal("ImageCache should be set")
+	}
+
+	// ClearPreviewCache should clear all via delegation
+	wb.ClearPreviewCache()
+	if wb.Preview.SourceMap() != nil {
+		t.Error("SourceMap should be nil after ClearPreviewCache")
+	}
+	if wb.Preview.LinkMap() != nil {
+		t.Error("LinkMap should be nil after ClearPreviewCache")
+	}
+	if wb.Preview.ImageCache() != nil {
+		t.Error("ImageCache should be nil after ClearPreviewCache")
+	}
+
+	// Preview mode should still be active
+	if !wb.IsPreviewMode() {
+		t.Error("ClearPreviewCache should not affect preview mode")
 	}
 }
 
