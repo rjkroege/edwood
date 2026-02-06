@@ -1136,8 +1136,8 @@ func (f *frameImpl) drawBlockBackgroundTo(target edwooddraw.Image, line Line, of
 	target.Draw(bgRect, bgImg, nil, image.ZP)
 }
 
-// computeCodeBlockIndent returns the expected left indent for code blocks,
-// computed from font metrics (CodeBlockIndentChars * M-width of code font).
+// computeCodeBlockIndent returns the expected left indent for block elements,
+// computed from font metrics (GutterIndentChars * M-width of the font).
 func (f *frameImpl) computeCodeBlockIndent() int {
 	font := f.font
 	if f.codeFont != nil {

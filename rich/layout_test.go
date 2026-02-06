@@ -643,10 +643,10 @@ func TestLayoutCodeBlockIndent(t *testing.T) {
 	maxtab := 80
 
 	// Expected indent is CodeBlockIndentChars * M-width
-	// With mock font width of 10, that's 4 * 10 = 40 pixels
+	// With mock font width of 10, that's 8 * 10 = 80 pixels
 	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
 
-	t.Run("code block is indented by 4 M-widths", func(t *testing.T) {
+	t.Run("code block is indented by 8 M-widths", func(t *testing.T) {
 		// A code block line: "print('hello')" with Block=true and Code=true
 		content := Content{
 			{Text: "print('hello')", Style: Style{Block: true, Code: true, Scale: 1.0}},
@@ -658,9 +658,9 @@ func TestLayoutCodeBlockIndent(t *testing.T) {
 			t.Fatalf("expected 1 line, got %d", len(lines))
 		}
 
-		// Code blocks should be indented by 4 * M-width
+		// Code blocks should be indented by 8 * M-width (gutter indent)
 		if lines[0].Boxes[0].X != expectedIndent {
-			t.Errorf("code block X = %d, want %d (4 * M-width)", lines[0].Boxes[0].X, expectedIndent)
+			t.Errorf("code block X = %d, want %d (8 * M-width)", lines[0].Boxes[0].X, expectedIndent)
 		}
 	})
 
@@ -681,7 +681,7 @@ func TestLayoutCodeBlockIndent(t *testing.T) {
 
 		// The line should start at the code block indent
 		if lines[0].Boxes[0].X != expectedIndent {
-			t.Errorf("code block X = %d, want %d (4 * M-width)", lines[0].Boxes[0].X, expectedIndent)
+			t.Errorf("code block X = %d, want %d (8 * M-width)", lines[0].Boxes[0].X, expectedIndent)
 		}
 
 		// ContentWidth should exceed frameWidth
@@ -1012,9 +1012,12 @@ func TestLayoutImageScale(t *testing.T) {
 		if gotWidth != 600 {
 			t.Errorf("image box width = %d, want 600 (native width, not clamped)", gotWidth)
 		}
-		// ContentWidth should be set for horizontal scrollbar detection
-		if lines[0].ContentWidth != 600 {
-			t.Errorf("ContentWidth = %d, want 600", lines[0].ContentWidth)
+		// ContentWidth should be set for horizontal scrollbar detection.
+		// It includes the gutter indent: 80 (indent) + 600 (image width) = 680.
+		gutterIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
+		expectedCW := gutterIndent + 600
+		if lines[0].ContentWidth != expectedCW {
+			t.Errorf("ContentWidth = %d, want %d (indent %d + image 600)", lines[0].ContentWidth, expectedCW, gutterIndent)
 		}
 	})
 
@@ -2060,13 +2063,12 @@ func TestLayoutBlockCodeNoWrap(t *testing.T) {
 	frameWidth := 200
 	maxtab := 80
 
-	// Code block indent = 4 * 10 = 40 pixels
+	// Code block indent = 8 * 10 = 80 pixels
 	codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
 
-	// Create a long block code line: 30 chars * 10px = 300px of text content
-	// Plus 40px indent = 340px total, which exceeds frameWidth of 200.
+	// Create a long block code line: 29 chars * 10px = 290px of text content
+	// Plus 80px indent = 370px total, which exceeds frameWidth of 200.
 	longCode := "this_is_a_very_long_code_line!"
-	// 29 chars * 10 = 290 pixels of text, plus 40px indent = 330px total
 	content := Content{
 		{Text: longCode, Style: Style{Block: true, Code: true, Scale: 1.0}},
 	}
@@ -2121,7 +2123,7 @@ func TestContentWidthComputed(t *testing.T) {
 
 	t.Run("block code line has ContentWidth equal to rightmost box extent", func(t *testing.T) {
 		frameWidth := 500 // Wide enough that content fits
-		// "hello" = 5 chars * 10px = 50px text, plus 40px indent = 90px total
+		// "hello" = 5 chars * 10px = 50px text, plus 80px indent = 130px total
 		content := Content{
 			{Text: "hello", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		}
@@ -2157,7 +2159,7 @@ func TestContentWidthComputed(t *testing.T) {
 
 	t.Run("block code wider than frame has ContentWidth exceeding frame", func(t *testing.T) {
 		frameWidth := 100
-		// 20 chars * 10px = 200px + 40px indent = 240px
+		// 20 chars * 10px = 200px + 80px indent = 280px
 		content := Content{
 			{Text: "a_long_code_line_xxxx", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		}
@@ -2218,8 +2220,8 @@ func TestTwoPassLayoutAddsScrollbarHeight(t *testing.T) {
 	scrollbarHeight := 12 // Matches Scrollwid
 
 	// Code block with long content (overflows frameWidth), followed by normal text.
-	// Code block indent = 4 * 10 = 40px.
-	// "a_very_long_code_line_xxxxx" = 27 chars * 10px = 270px + 40px indent = 310px > 200px
+	// Code block indent = 8 * 10 = 80px.
+	// "a_very_long_code_line_xxxxx" = 27 chars * 10px = 270px + 80px indent = 350px > 200px
 	content := Content{
 		{Text: "a_very_long_code_line_xxxxx", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		{Text: "\n", Style: Style{Block: true, Code: true, Scale: 1.0}},
@@ -2292,7 +2294,7 @@ func TestTwoPassLayoutNoShiftWhenFits(t *testing.T) {
 	scrollbarHeight := 12
 
 	// Code block that fits within frameWidth, followed by normal text.
-	// "short" = 5 chars * 10px = 50px + 40px indent = 90px < 500px
+	// "short" = 5 chars * 10px = 50px + 80px indent = 130px < 500px
 	content := Content{
 		{Text: "short", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		{Text: "\n", Style: Style{Scale: 1.0}},
@@ -2345,9 +2347,9 @@ func TestMultipleOverflowingBlocks(t *testing.T) {
 	scrollbarHeight := 12
 
 	// Two overflowing code blocks separated by normal text, then trailing normal text.
-	// Code block indent = 40px.
-	// "overflowing_code_block_one!" = 27 chars * 10px = 270px + 40px = 310px > 200px
-	// "overflowing_code_block_two!" = 27 chars * 10px = 270px + 40px = 310px > 200px
+	// Code block indent = 80px.
+	// "overflowing_code_block_one!" = 27 chars * 10px = 270px + 80px = 350px > 200px
+	// "overflowing_code_block_two!" = 27 chars * 10px = 270px + 80px = 350px > 200px
 	content := Content{
 		{Text: "overflowing_code_block_one!", Style: Style{Block: true, Code: true, Scale: 1.0}},
 		{Text: "\n", Style: Style{Scale: 1.0}},
@@ -2434,5 +2436,324 @@ func TestMultipleOverflowingBlocks(t *testing.T) {
 		if !r.HasScrollbar {
 			t.Errorf("adjusted region %d should have HasScrollbar = true", i)
 		}
+	}
+}
+
+// =============================================================================
+// Phase 6: Scrollable Block Gutter
+// =============================================================================
+
+// TestGutterIndentCodeBlock verifies that code blocks have an 8em gutter indent
+// (GutterIndentChars * M-width of the base font).
+func TestGutterIndentCodeBlock(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Expected indent: GutterIndentChars (8) * M-width (10) = 80 pixels
+	expectedIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
+
+	content := Content{
+		{Text: "fmt.Println()", Style: Style{Block: true, Code: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+	if len(lines[0].Boxes) < 1 {
+		t.Fatal("expected at least 1 box on line")
+	}
+
+	gotX := lines[0].Boxes[0].X
+	if gotX != expectedIndent {
+		t.Errorf("code block X = %d, want %d (GutterIndentChars=%d * M-width=%d)",
+			gotX, expectedIndent, GutterIndentChars, font.BytesWidth([]byte("M")))
+	}
+}
+
+// TestGutterIndentTable verifies that table boxes are indented by 8em.
+func TestGutterIndentTable(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Expected indent: GutterIndentChars (8) * M-width (10) = 80 pixels
+	expectedIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
+
+	t.Run("single table line is indented", func(t *testing.T) {
+		content := Content{
+			{Text: "| col1 | col2 |", Style: Style{Table: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) < 1 {
+			t.Fatal("expected at least 1 line")
+		}
+		if len(lines[0].Boxes) < 1 {
+			t.Fatal("expected at least 1 box on first line")
+		}
+
+		// Find the first table-styled box on the line
+		gotX := -1
+		for _, pb := range lines[0].Boxes {
+			if pb.Box.Style.Table {
+				gotX = pb.X
+				break
+			}
+		}
+		if gotX < 0 {
+			t.Fatal("no table-styled box found")
+		}
+		if gotX != expectedIndent {
+			t.Errorf("table box X = %d, want %d (8em gutter)", gotX, expectedIndent)
+		}
+	})
+
+	t.Run("multi-line table all lines indented", func(t *testing.T) {
+		content := Content{
+			{Text: "| header1 | header2 |", Style: Style{Table: true, TableHeader: true, Scale: 1.0}},
+			{Text: "\n", Style: Style{Table: true, Scale: 1.0}},
+			{Text: "| cell1   | cell2   |", Style: Style{Table: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) < 2 {
+			t.Fatalf("expected at least 2 lines, got %d", len(lines))
+		}
+
+		for i, line := range lines {
+			for _, pb := range line.Boxes {
+				if pb.Box.Style.Table && !pb.Box.IsNewline() {
+					if pb.X != expectedIndent {
+						t.Errorf("line %d: table box X = %d, want %d", i, pb.X, expectedIndent)
+					}
+					break // Only check first content box per line
+				}
+			}
+		}
+	})
+}
+
+// TestGutterIndentImage verifies that image boxes are indented by 8em.
+func TestGutterIndentImage(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	// Expected indent: GutterIndentChars (8) * M-width (10) = 80 pixels
+	expectedIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
+
+	mockImage := &CachedImage{
+		Width:  200,
+		Height: 100,
+		Path:   "test.png",
+	}
+
+	boxes := []Box{
+		{
+			Text:      nil,
+			Nrune:     0,
+			Bc:        0,
+			Style:     Style{Image: true, ImageURL: "test.png", ImageAlt: "test", Scale: 1.0},
+			ImageData: mockImage,
+		},
+	}
+
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+	if len(lines[0].Boxes) < 1 {
+		t.Fatal("expected at least 1 box on line")
+	}
+
+	gotX := lines[0].Boxes[0].X
+	if gotX != expectedIndent {
+		t.Errorf("image box X = %d, want %d (8em gutter)", gotX, expectedIndent)
+	}
+}
+
+// TestTableNoWrap verifies that table content does not word-wrap. Instead it
+// overflows horizontally (like code blocks) for horizontal scrolling.
+func TestTableNoWrap(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	maxtab := 80
+	frameWidth := 200 // Narrow frame
+
+	// Table line that is wider than the frame:
+	// "| a very long column | another long column |" = 45 chars * 10 = 450px
+	// Plus 80px gutter = 530px total, well beyond 200px frame.
+	content := Content{
+		{Text: "| a very long column | another long column |", Style: Style{Table: true, Scale: 1.0}},
+	}
+	boxes := contentToBoxes(content)
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+	// Table should produce exactly 1 line — no wrapping
+	if len(lines) != 1 {
+		t.Errorf("table should not wrap: got %d lines, want 1", len(lines))
+	}
+}
+
+// TestTableContentWidth verifies that ContentWidth is computed for table lines,
+// enabling horizontal scrollbar detection for wide tables.
+func TestTableContentWidth(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	maxtab := 80
+
+	t.Run("table line has ContentWidth set", func(t *testing.T) {
+		frameWidth := 500
+		// "| col1 | col2 |" = 16 chars * 10 = 160px text
+		content := Content{
+			{Text: "| col1 | col2 |", Style: Style{Table: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 line, got %d", len(lines))
+		}
+
+		// ContentWidth should be > 0 for table lines
+		if lines[0].ContentWidth == 0 {
+			t.Error("table line ContentWidth = 0, want > 0 (should be computed for scrollbar detection)")
+		}
+	})
+
+	t.Run("wide table ContentWidth exceeds frame", func(t *testing.T) {
+		frameWidth := 200
+		// Wide table: 45 chars * 10 = 450px + gutter = 530px
+		content := Content{
+			{Text: "| a very long column | another long column |", Style: Style{Table: true, Scale: 1.0}},
+		}
+		boxes := contentToBoxes(content)
+		lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+
+		if len(lines) < 1 {
+			t.Fatal("expected at least 1 line")
+		}
+
+		if lines[0].ContentWidth <= frameWidth {
+			t.Errorf("wide table ContentWidth = %d, should exceed frameWidth %d",
+				lines[0].ContentWidth, frameWidth)
+		}
+	})
+}
+
+// TestBlockRegionsWithGutter verifies that findBlockRegions still correctly
+// identifies code, table, and image block regions after the gutter changes.
+func TestBlockRegionsWithGutter(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	mockImage := &CachedImage{
+		Width:  150,
+		Height: 75,
+		Path:   "test.png",
+	}
+
+	// Interleave: code block, normal text, table, normal text, image
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0}
+	tableStyle := Style{Table: true, Scale: 1.0}
+	imgStyle := Style{Image: true, ImageURL: "test.png", ImageAlt: "test", Scale: 1.0}
+	normalStyle := Style{Scale: 1.0}
+
+	boxes := []Box{
+		// Code block line
+		{Text: []byte("code_line"), Nrune: 9, Style: codeStyle},
+		{Nrune: -1, Bc: '\n', Style: codeStyle},
+		// Normal text
+		{Text: []byte("normal"), Nrune: 6, Style: normalStyle},
+		{Nrune: -1, Bc: '\n', Style: normalStyle},
+		// Table line
+		{Text: []byte("| col |"), Nrune: 7, Style: tableStyle},
+		{Nrune: -1, Bc: '\n', Style: tableStyle},
+		// Normal text
+		{Text: []byte("more"), Nrune: 4, Style: normalStyle},
+		{Nrune: -1, Bc: '\n', Style: normalStyle},
+		// Image
+		{Text: nil, Nrune: 0, Style: imgStyle, ImageData: mockImage},
+	}
+
+	lines := layout(boxes, font, frameWidth, maxtab, nil, nil)
+	regions := findBlockRegions(lines)
+
+	if len(regions) != 3 {
+		t.Fatalf("expected 3 block regions (code, table, image), got %d", len(regions))
+	}
+
+	// Verify kinds
+	wantKinds := []BlockKind{BlockCode, BlockTable, BlockImage}
+	for i, r := range regions {
+		if r.Kind != wantKinds[i] {
+			t.Errorf("region %d Kind = %d, want %d", i, r.Kind, wantKinds[i])
+		}
+	}
+
+	// Verify no region overlap
+	for i := 1; i < len(regions); i++ {
+		if regions[i].StartLine < regions[i-1].EndLine {
+			t.Errorf("region %d (StartLine=%d) overlaps region %d (EndLine=%d)",
+				i, regions[i].StartLine, i-1, regions[i-1].EndLine)
+		}
+	}
+}
+
+// TestGutterIndentConsistentAcrossBlockTypes verifies that code blocks, tables,
+// and images all receive the same gutter indent width.
+func TestGutterIndentConsistentAcrossBlockTypes(t *testing.T) {
+	font := edwoodtest.NewFont(10, 14)
+	frameWidth := 500
+	maxtab := 80
+
+	expectedIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
+
+	mockImage := &CachedImage{
+		Width:  100,
+		Height: 50,
+		Path:   "test.png",
+	}
+
+	// Code block
+	codeBoxes := contentToBoxes(Content{
+		{Text: "code_line", Style: Style{Block: true, Code: true, Scale: 1.0}},
+	})
+	codeLines := layout(codeBoxes, font, frameWidth, maxtab, nil, nil)
+
+	// Table
+	tableBoxes := contentToBoxes(Content{
+		{Text: "| cell |", Style: Style{Table: true, Scale: 1.0}},
+	})
+	tableLines := layout(tableBoxes, font, frameWidth, maxtab, nil, nil)
+
+	// Image
+	imgBoxes := []Box{
+		{Style: Style{Image: true, ImageURL: "test.png", Scale: 1.0}, ImageData: mockImage},
+	}
+	imgLines := layout(imgBoxes, font, frameWidth, maxtab, nil, nil)
+
+	// All three should have the same X offset for first content box
+	codeX := codeLines[0].Boxes[0].X
+	tableX := tableLines[0].Boxes[0].X
+	imgX := imgLines[0].Boxes[0].X
+
+	if codeX != expectedIndent {
+		t.Errorf("code block X = %d, want %d", codeX, expectedIndent)
+	}
+	if tableX != expectedIndent {
+		t.Errorf("table X = %d, want %d", tableX, expectedIndent)
+	}
+	if imgX != expectedIndent {
+		t.Errorf("image X = %d, want %d", imgX, expectedIndent)
+	}
+	if codeX != tableX || tableX != imgX {
+		t.Errorf("inconsistent gutter indents: code=%d, table=%d, image=%d",
+			codeX, tableX, imgX)
 	}
 }

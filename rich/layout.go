@@ -159,13 +159,18 @@ type FontForStyleFunc func(style Style) draw.Font
 // This is approximately 2 characters wide.
 const ListIndentWidth = 20
 
-// CodeBlockIndentChars is the number of 'M' characters to indent code blocks.
-const CodeBlockIndentChars = 4
+// GutterIndentChars is the number of 'M' characters to indent all scrollable
+// block elements (code blocks, tables, images). This provides a non-scrolling
+// gutter on the left for vertical scroll pass-through.
+const GutterIndentChars = 8
+
+// CodeBlockIndentChars is an alias for GutterIndentChars for backward compatibility.
+const CodeBlockIndentChars = GutterIndentChars
 
 // CodeBlockIndent is the default code block indentation in pixels.
-// This assumes a typical M-width of 10 pixels (CodeBlockIndentChars * 10 = 40).
-// The actual indentation may vary based on the code font at runtime.
-const CodeBlockIndent = 40
+// This assumes a typical M-width of 10 pixels (GutterIndentChars * 10 = 80).
+// The actual indentation may vary based on the font at runtime.
+const CodeBlockIndent = 80
 
 // imageBoxDimensions calculates the width and height for an image box.
 // If box.Style.ImageWidth > 0, uses that as the target width,
@@ -399,12 +404,9 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		return font
 	}
 
-	// Calculate code block indent based on code font's M-width
-	codeBlockIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M"))
-	if fontForStyleFn != nil {
-		codeFont := fontForStyleFn(Style{Code: true, Scale: 1.0})
-		codeBlockIndent = CodeBlockIndentChars * codeFont.BytesWidth([]byte("M"))
-	}
+	// Calculate gutter indent for all scrollable block elements (code, table, image)
+	// based on the base font's M-width for visual consistency across block types.
+	gutterIndent := GutterIndentChars * font.BytesWidth([]byte("M"))
 
 	var lines []Line
 	var currentLine Line
@@ -494,9 +496,9 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		if box.Style.ListBullet || box.Style.ListItem {
 			indentPixels = box.Style.ListIndent * ListIndentWidth
 			currentListIndent = box.Style.ListIndent // Track for wrapped lines
-		} else if box.Style.Block && box.Style.Code {
-			// Code blocks get indentation based on code font M-width
-			indentPixels = codeBlockIndent
+		} else if (box.Style.Block && box.Style.Code) || box.Style.Table || box.Style.Image {
+			// All scrollable block elements get gutter indentation
+			indentPixels = gutterIndent
 		}
 
 		// Apply indentation at the start of a line
@@ -515,8 +517,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 			width = boxWidth(box, getFontForStyle(box.Style))
 		}
 
-		// For block-level code or images, don't wrap - allow horizontal overflow
-		if (box.Style.Block && box.Style.Code) || box.IsImage() {
+		// For block-level code, tables, or images, don't wrap - allow horizontal overflow
+		if (box.Style.Block && box.Style.Code) || box.Style.Table || box.IsImage() {
 			box.Wid = width
 			currentLine.Boxes = append(currentLine.Boxes, PositionedBox{Box: *box, X: xPos})
 			xPos += width
@@ -528,8 +530,8 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 
 		// Determine the current indent for wrapped lines
 		currentIndent := currentListIndent * ListIndentWidth
-		if box.Style.Block && box.Style.Code {
-			currentIndent = codeBlockIndent
+		if (box.Style.Block && box.Style.Code) || box.Style.Table || box.Style.Image {
+			currentIndent = gutterIndent
 		}
 
 		// Check if we need to wrap
@@ -596,7 +598,7 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		isNonWrap := false
 		maxExtent := 0
 		for _, pb := range line.Boxes {
-			if (pb.Box.Style.Block && pb.Box.Style.Code) || pb.Box.IsImage() {
+			if (pb.Box.Style.Block && pb.Box.Style.Code) || pb.Box.Style.Table || pb.Box.IsImage() {
 				isNonWrap = true
 			}
 			extent := pb.X + pb.Box.Wid

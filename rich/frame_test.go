@@ -2002,11 +2002,11 @@ func TestDrawBlockBackground(t *testing.T) {
 
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 
-	// Code blocks are indented by CodeBlockIndentChars * M-width = 4 * 10 = 40 pixels
-	// Background should start at x=40 and extend to frame width (400px)
+	// Code blocks are indented by CodeBlockIndentChars * M-width = 8 * 10 = 80 pixels
+	// Background should start at x=80 and extend to frame width (400px)
 	foundBlockFill := false
 	frameBackgroundRect := "(0,0)-(400,300)"
-	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 40 pixels
+	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 80 pixels
 
 	for _, op := range ops {
 		// Look for fill operations that are NOT the frame background
@@ -2067,8 +2067,8 @@ func TestDrawBlockBackgroundMultiLine(t *testing.T) {
 	ops := display.(edwoodtest.GettableDrawOps).DrawOps()
 	frameBackgroundRect := "(0,0)-(400,300)"
 
-	// Code blocks are indented by CodeBlockIndentChars * M-width = 4 * 10 = 40 pixels
-	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 40 pixels
+	// Code blocks are indented by CodeBlockIndentChars * M-width = 8 * 10 = 80 pixels
+	expectedIndent := CodeBlockIndentChars * font.BytesWidth([]byte("M")) // 80 pixels
 
 	// Count indented fill operations (excluding frame background)
 	// Each line should have its own background fill starting at the indent
@@ -3099,9 +3099,9 @@ func TestRenderWithHorizontalOffset(t *testing.T) {
 	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
 
 	// Create block code content that overflows frameWidth (200px).
-	// Code block indent = 4 * 10 = 40px (CodeBlockIndentChars * font width).
+	// Code block indent = 8 * 10 = 80px (CodeBlockIndentChars * font width).
 	// "a_very_long_code_line_xxxxx" = 27 chars * 10px = 270px content.
-	// At indent 40, total extent = 310px, which exceeds 200px frame width.
+	// At indent 80, total extent = 350px, which exceeds 200px frame width.
 	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
 	content := Content{
 		{Text: "a_very_long_code_line_xxxxx", Style: codeStyle},
@@ -3841,9 +3841,11 @@ func TestHScrollClickB2JumpsToPosition(t *testing.T) {
 	maxScrollable := ar.MaxContentWidth - rect.Dx()
 
 	// Click B2 at the midpoint of the scrollbar — should jump to ~50% of maxScrollable.
+	// The scrollbar starts at LeftIndent, so midpoint is at LeftIndent + (frameWidth - LeftIndent)/2.
 	scrollbarHeight := 12
+	scrollbarMidX := rect.Min.X + ar.LeftIndent + (rect.Dx()-ar.LeftIndent)/2
 	clickPt := image.Point{
-		X: rect.Min.X + rect.Dx()/2,
+		X: scrollbarMidX,
 		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
 	}
 	f.HScrollClick(2, clickPt, 0)
@@ -3855,9 +3857,9 @@ func TestHScrollClickB2JumpsToPosition(t *testing.T) {
 		t.Errorf("B2 click at midpoint should jump to ~%d, got %d (tolerance ±%d)", expectedApprox, newOffset, tolerance)
 	}
 
-	// Click B2 at the left edge — should jump to ~0.
+	// Click B2 at the left edge of the scrollbar — should jump to ~0.
 	clickPtLeft := image.Point{
-		X: rect.Min.X,
+		X: rect.Min.X + ar.LeftIndent,
 		Y: rect.Min.Y + ar.ScrollbarY + scrollbarHeight/2,
 	}
 	f.HScrollClick(2, clickPtLeft, 0)
