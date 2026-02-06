@@ -198,6 +198,8 @@ type Warning struct {
 var warnings = []*Warning{}
 var warningsMu sync.Mutex
 
+// flushwarnings processes pending warnings by writing them to +Errors windows.
+// Must be called with global.row.lk held (called from mousethread).
 func flushwarnings() {
 	// Lock warningsMu to safely swap out the warnings list.
 	// We make a local copy and clear the global list while holding the lock,
@@ -214,7 +216,22 @@ func flushwarnings() {
 		owner int
 	)
 	for _, warn := range localWarnings {
-		w = errorwin(warn.md, 'E', nil)
+		// Inline the errorwin logic here because the caller already holds
+		// global.row.lk.  Calling errorwin() would deadlock: it tries to
+		// acquire global.row.lk again (a non-reentrant sync.Mutex).
+		var dir string
+		var incl []string
+		if warn.md != nil {
+			dir = warn.md.dir
+			incl = warn.md.incl
+		}
+		w = errorwin1(dir, incl)
+		w.Lock('E')
+		if w.col == nil {
+			w.Unlock()
+			continue
+		}
+
 		t = &w.body
 		owner = w.owner
 		if owner == 0 {
