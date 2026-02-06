@@ -1303,6 +1303,24 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 	w.imageCache = rich.NewImageCache(0) // 0 means use default size
 	rtOpts = append(rtOpts, WithRichTextImageCache(w.imageCache))
 
+	// Wire async image load completion callback. When a cache-miss image
+	// finishes loading in the background, re-render the preview to replace
+	// the placeholder with the actual image. This is lightweight — no
+	// markdown re-parse, just a layout+draw pass with the now-cached image.
+	rtOpts = append(rtOpts, WithRichTextOnImageLoaded(func(path string) {
+		go func() {
+			global.row.lk.Lock()
+			defer global.row.lk.Unlock()
+			if !w.previewMode || w.richBody == nil {
+				return
+			}
+			w.richBody.Render(w.body.all)
+			if w.display != nil {
+				w.display.Flush()
+			}
+		}()
+	}))
+
 	// Set the base path for resolving relative image paths
 	// The name variable contains the file path from the window tag
 	// Convert to absolute path for proper image resolution regardless of working directory

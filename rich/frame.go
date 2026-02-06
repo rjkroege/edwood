@@ -122,6 +122,11 @@ type frameImpl struct {
 	// Base path for resolving relative image paths (e.g., the markdown file path)
 	basePath string
 
+	// Callback invoked when an async image load completes. Runs on an
+	// unspecified goroutine; callers that need main-goroutine execution
+	// must marshal through the row lock or a channel.
+	onImageLoaded func(path string)
+
 	// Temporary sweep color override for colored selection during B2/B3 drags.
 	// When non-nil, drawSelectionTo uses this instead of selectionColor.
 	// Cleared after each SelectWithColor/SelectWithChordAndColor call.
@@ -2086,7 +2091,7 @@ func (f *frameImpl) fontForStyle(style Style) edwooddraw.Font {
 // images and populate their ImageData. Otherwise, it uses the regular layout.
 func (f *frameImpl) layoutBoxes(boxes []Box, frameWidth, maxtab int) []Line {
 	if f.imageCache != nil {
-		return layoutWithCacheAndBasePath(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle, f.imageCache, f.basePath)
+		return layoutWithCacheAndBasePath(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle, f.imageCache, f.basePath, f.onImageLoaded)
 	}
 	return layout(boxes, f.font, frameWidth, maxtab, f.fontHeightForStyle, f.fontForStyle)
 }

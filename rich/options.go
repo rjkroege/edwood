@@ -98,6 +98,16 @@ func WithBasePath(path string) Option {
 	}
 }
 
+// WithOnImageLoaded is an Option that sets a callback invoked when an
+// asynchronous image load completes. The callback runs on an unspecified
+// goroutine; callers that need main-goroutine execution must marshal
+// through the row lock or a channel.
+func WithOnImageLoaded(fn func(path string)) Option {
+	return func(fi *frameImpl) {
+		fi.onImageLoaded = fn
+	}
+}
+
 // WithHScrollColors is an Option that sets the horizontal scrollbar colors.
 // These should match the vertical scrollbar colors for visual consistency.
 func WithHScrollColors(bg, thumb draw.Image) Option {

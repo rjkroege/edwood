@@ -1255,22 +1255,21 @@ func TestLayoutWithCacheLoadsImages(t *testing.T) {
 		},
 	}
 
-	// Create a fresh cache
+	// Create a fresh cache and pre-load the image so layoutWithCache gets
+	// a synchronous cache hit (LoadAsync returns immediately for cache hits).
 	cache := NewImageCache(10)
-
-	// Verify image is NOT in cache before layout
-	if _, ok := cache.Get(pngPath); ok {
-		t.Error("image should NOT be in cache before layoutWithCache")
+	if _, err := cache.Load(pngPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
 	}
 
-	// Call layoutWithCache - this should trigger image loading
+	// Call layoutWithCache - this should use the cached image
 	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
 
 	if len(lines) == 0 {
 		t.Fatal("layoutWithCache returned no lines")
 	}
 
-	// Verify image IS now in cache after layout
+	// Verify image IS in cache after layout
 	cached, ok := cache.Get(pngPath)
 	if !ok {
 		t.Error("image should be in cache after layoutWithCache")
@@ -1327,8 +1326,11 @@ func TestLayoutWithCachePopulatesImageData(t *testing.T) {
 		},
 	}
 
-	// Create cache
+	// Create cache and pre-load image so layout gets a synchronous cache hit.
 	cache := NewImageCache(10)
+	if _, err := cache.Load(pngPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
 	// Call layoutWithCache
 	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
@@ -1389,6 +1391,8 @@ func TestLayoutWithCacheHandlesLoadError(t *testing.T) {
 	}
 
 	cache := NewImageCache(10)
+	// Pre-load the error entry so layout gets a synchronous cache hit.
+	cache.Load("/nonexistent/path/to/image.png")
 
 	// Should not panic
 	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
@@ -1464,9 +1468,16 @@ func TestLayoutWithCacheMultipleImages(t *testing.T) {
 	}
 
 	cache := NewImageCache(10)
+	// Pre-load both images so layout gets synchronous cache hits.
+	if _, err := cache.Load(pngPath1); err != nil {
+		t.Fatalf("failed to pre-load image 1: %v", err)
+	}
+	if _, err := cache.Load(pngPath2); err != nil {
+		t.Fatalf("failed to pre-load image 2: %v", err)
+	}
 	lines := layoutWithCache(boxes, font, frameWidth, maxtab, nil, nil, cache)
 
-	// Should have loaded both images
+	// Should have both images in cache
 	cached1, ok1 := cache.Get(pngPath1)
 	cached2, ok2 := cache.Get(pngPath2)
 
@@ -1542,12 +1553,18 @@ func TestLayoutResolvesRelativePaths(t *testing.T) {
 		},
 	}
 
-	// Create a fresh cache
+	// Create a fresh cache and pre-load the image at its resolved absolute path
+	// so the layout gets a synchronous cache hit. This test verifies that layout
+	// resolves the relative path to the correct absolute path for the cache lookup.
 	cache := NewImageCache(10)
+	resolvedPath := filepath.Join(docsDir, relativeImagePath)
+	if _, err := cache.Load(resolvedPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
 	// Call layoutWithCache WITH a basePath
 	// The basePath should be the markdown file's path
-	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath)
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath, nil)
 
 	if len(lines) == 0 {
 		t.Fatal("layoutWithCacheAndBasePath returned no lines")
@@ -1555,7 +1572,6 @@ func TestLayoutResolvesRelativePaths(t *testing.T) {
 
 	// Verify the image was loaded using the resolved path
 	// The cache should contain the ABSOLUTE path (resolved from relative)
-	resolvedPath := filepath.Join(docsDir, relativeImagePath)
 	cached, ok := cache.Get(resolvedPath)
 	if !ok {
 		// Also check if it was cached with the relative path (wrong behavior)
@@ -1635,8 +1651,12 @@ func TestLayoutResolvesRelativePathsWithParentDir(t *testing.T) {
 	}
 
 	cache := NewImageCache(10)
+	// Pre-load so layout gets a synchronous cache hit.
+	if _, err := cache.Load(imgPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
-	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath)
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, mdPath, nil)
 
 	if len(lines) == 0 {
 		t.Fatal("layoutWithCacheAndBasePath returned no lines")
@@ -1688,8 +1708,12 @@ func TestLayoutAbsolutePathIgnoresBasePath(t *testing.T) {
 	}
 
 	cache := NewImageCache(10)
+	// Pre-load so layout gets a synchronous cache hit.
+	if _, err := cache.Load(imgPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
-	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, basePath)
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, basePath, nil)
 
 	if len(lines) == 0 {
 		t.Fatal("layoutWithCacheAndBasePath returned no lines")
@@ -1738,9 +1762,10 @@ func TestLayoutEmptyBasePathFallsBack(t *testing.T) {
 	}
 
 	cache := NewImageCache(10)
+	// Pre-load the error entry so layout gets a synchronous cache hit.
+	cache.Load("nonexistent/image.png")
 
-	// Empty basePath - relative path should fail to load (expected)
-	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, "")
+	lines := layoutWithCacheAndBasePath(boxes, font, frameWidth, maxtab, nil, nil, cache, "", nil)
 
 	if len(lines) == 0 {
 		t.Fatal("layoutWithCacheAndBasePath returned no lines")

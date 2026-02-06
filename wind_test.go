@@ -3612,8 +3612,11 @@ func TestPreviewCmdPassesImageCache(t *testing.T) {
 	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
 	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
 
-	// Create the image cache BEFORE creating RichText (this is what previewcmd should do)
+	// Create the image cache BEFORE creating RichText (this is what previewcmd should do).
+	// Pre-load "test.png" as an error entry so layout gets a synchronous cache hit
+	// instead of launching an async goroutine that races with the test.
 	cache := rich.NewImageCache(10)
+	cache.Load("test.png")
 	w.imageCache = cache
 
 	// Create RichText with the image cache option

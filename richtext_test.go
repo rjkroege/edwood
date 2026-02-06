@@ -1645,9 +1645,9 @@ func TestRichTextWithImageCachePassedToFrame(t *testing.T) {
 		WithRichTextImageCache(cache),
 	)
 
-	// Create content with an image span pointing to a path that we'll verify
-	// gets looked up in the cache
+	// Pre-load the error entry so layout gets a synchronous cache hit.
 	testImagePath := "/nonexistent/test_image.png"
+	cache.Load(testImagePath)
 	content := rich.Content{
 		rich.Span{
 			Text: "[Image: test]",
@@ -1734,6 +1734,10 @@ func TestImageWidthEndToEnd(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	cache := rich.NewImageCache(10)
+	// Pre-load so layout gets a synchronous cache hit.
+	if _, err := cache.Load(imgPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
 	rt := NewRichText()
 	rt.Init(display, font,
@@ -1748,10 +1752,10 @@ func TestImageWidthEndToEnd(t *testing.T) {
 	renderRect := image.Rect(0, 0, 600, 400)
 	rt.Render(renderRect)
 
-	// Step 3: Verify the image was loaded into the cache
+	// Step 3: Verify the image is in the cache
 	cached, ok := cache.Get(imgPath)
 	if !ok {
-		t.Fatal("image was not loaded into cache during layout")
+		t.Fatal("image should be in cache")
 	}
 	if cached.Err != nil {
 		t.Fatalf("image cache error: %v", cached.Err)
@@ -1822,6 +1826,10 @@ func TestImageWidthEndToEndNoWidthTag(t *testing.T) {
 	scrThumb, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
 
 	cache := rich.NewImageCache(10)
+	// Pre-load so layout gets a synchronous cache hit.
+	if _, err := cache.Load(imgPath); err != nil {
+		t.Fatalf("failed to pre-load image: %v", err)
+	}
 
 	rt := NewRichText()
 	rt.Init(display, font,
@@ -1836,10 +1844,10 @@ func TestImageWidthEndToEndNoWidthTag(t *testing.T) {
 	renderRect := image.Rect(0, 0, 600, 400)
 	rt.Render(renderRect)
 
-	// Verify image loaded at natural size
+	// Verify image is in cache at natural size
 	cached, ok := cache.Get(imgPath)
 	if !ok {
-		t.Fatal("image was not loaded into cache during layout")
+		t.Fatal("image should be in cache")
 	}
 	if cached.Err != nil {
 		t.Fatalf("image cache error: %v", cached.Err)

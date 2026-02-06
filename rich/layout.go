@@ -741,8 +741,9 @@ func layoutWithCache(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHe
 	for i := range boxes {
 		box := &boxes[i]
 		if box.Style.Image && box.Style.ImageURL != "" {
-			// Load image from cache (this will cache it for future use)
-			cached, _ := cache.Load(box.Style.ImageURL)
+			// Use LoadAsync for non-blocking image loading; nil callback
+			// since this path doesn't have an onImageLoaded handler.
+			cached, _ := cache.LoadAsync(box.Style.ImageURL, nil)
 			if cached != nil {
 				box.ImageData = cached
 			}
@@ -763,7 +764,10 @@ func layoutWithCache(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHe
 //
 // Absolute paths (starting with /) are used as-is.
 // If basePath is empty, relative paths are used as-is (likely failing to load).
-func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc, fontForStyleFn FontForStyleFunc, cache *ImageCache, basePath string) []Line {
+//
+// The onImageLoaded callback, if non-nil, is passed to LoadAsync and will be
+// called (on an unspecified goroutine) when a cache-miss image finishes loading.
+func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn FontHeightFunc, fontForStyleFn FontForStyleFunc, cache *ImageCache, basePath string, onImageLoaded func(string)) []Line {
 	// If no cache, fall back to regular layout
 	if cache == nil {
 		return layout(boxes, font, frameWidth, maxtab, fontHeightFn, fontForStyleFn)
@@ -776,14 +780,18 @@ func layoutWithCacheAndBasePath(boxes []Box, font draw.Font, frameWidth, maxtab 
 			// Resolve relative paths using basePath
 			imgPath := resolveImagePath(basePath, box.Style.ImageURL)
 
-			// Load image from cache (this will cache it for future use)
-			cached, _ := cache.Load(imgPath)
+			// Use LoadAsync for non-blocking image loading. On cache miss,
+			// returns a placeholder immediately and loads in the background.
+			cached, loadErr := cache.LoadAsync(imgPath, onImageLoaded)
 			if cached != nil {
 				box.ImageData = cached
 				// If the image failed with an unsupported format, append
 				// a suffix to the placeholder text so the content rune count
 				// matches what would be rendered (needed for hit-testing).
-				if cached.Err != nil && strings.Contains(cached.Err.Error(), "unknown format") {
+				// Only check the error for cache hits (loadErr != nil);
+				// for cache misses, LoadAsync returns nil error and the
+				// entry is being populated by a background goroutine.
+				if loadErr != nil && strings.Contains(loadErr.Error(), "unknown format") {
 					suffix := []byte(" <unsupported format>")
 					if !bytes.HasSuffix(box.Text, suffix) {
 						box.Text = append(box.Text, suffix...)
