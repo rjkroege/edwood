@@ -8561,3 +8561,465 @@ func TestPreviewLookWarpIntegration(t *testing.T) {
 		t.Logf("Charofpt at warp point %v = %d (expected ~%d, may differ due to +4 offset)", actualPt, charAtWarp, rendStart)
 	}
 }
+
+// setupPreviewTypeTestWindow creates a Window in preview mode for typing tests.
+// It sets up markdown content with a source map, positions the cursor, and
+// returns the window and body Text for verification.
+func setupPreviewTypeTestWindow(t *testing.T, sourceMarkdown string) *Window {
+	t.Helper()
+
+	rect := image.Rect(0, 0, 800, 600)
+	display := edwoodtest.NewDisplay(rect)
+	global.configureGlobals(display)
+
+	sourceRunes := []rune(sourceMarkdown)
+
+	w := NewWindow().initHeadless(nil)
+	w.display = display
+	w.body = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+	}
+	w.body.all = image.Rect(0, 20, 800, 600)
+	w.tag = Text{
+		display: display,
+		fr:      &MockFrame{},
+		file:    file.MakeObservableEditableBuffer("", nil),
+	}
+	w.col = &Column{safe: true}
+	w.r = rect
+	w.body.w = w
+
+	global.row = Row{display: display}
+	t.Cleanup(func() { global.row = Row{} })
+
+	font := edwoodtest.NewFont(10, 14)
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	rt := NewRichText()
+	bodyRect := image.Rect(12, 20, 800, 600)
+	rt.Init(display, font,
+		WithRichTextBackground(bgImage),
+		WithRichTextColor(textImage),
+	)
+	rt.Render(bodyRect)
+
+	content, sourceMap, _ := markdown.ParseWithSourceMap(sourceMarkdown)
+	rt.SetContent(content)
+
+	w.richBody = rt
+	w.SetPreviewSourceMap(sourceMap)
+	w.SetPreviewMode(true)
+
+	return w
+}
+
+// TestPreviewTypePrintable tests that printable characters typed in preview
+// mode are inserted into the source buffer at the cursor position.
+func TestPreviewTypePrintable(t *testing.T) {
+	w := setupPreviewTypeTestWindow(t, "Hello world")
+
+	// Position cursor at source position 5 (between "Hello" and " world")
+	w.body.q0 = 5
+	w.body.q1 = 5
+	if w.previewSourceMap != nil {
+		rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+		if rp0 >= 0 {
+			w.richBody.SetSelection(rp0, rp1)
+		}
+	}
+
+	// Type 'X'
+	w.HandlePreviewType(&w.body, 'X')
+
+	got := w.body.file.String()
+	want := "HelloX world"
+	if got != want {
+		t.Errorf("after typing 'X': got %q, want %q", got, want)
+	}
+
+	// Cursor should have advanced past the inserted character
+	if w.body.q0 != 6 || w.body.q1 != 6 {
+		t.Errorf("cursor should be at (6,6), got (%d,%d)", w.body.q0, w.body.q1)
+	}
+}
+
+// TestPreviewTypeMultipleChars tests typing several characters in sequence.
+func TestPreviewTypeMultipleChars(t *testing.T) {
+	w := setupPreviewTypeTestWindow(t, "ab")
+
+	// Position cursor at end of content.
+	w.body.q0 = 2
+	w.body.q1 = 2
+	contentLen := w.richBody.Content().Len()
+	w.richBody.SetSelection(contentLen, contentLen)
+
+	// Type "cd"
+	w.HandlePreviewType(&w.body, 'c')
+	w.HandlePreviewType(&w.body, 'd')
+
+	got := w.body.file.String()
+	want := "abcd"
+	if got != want {
+		t.Errorf("after typing 'cd': got %q, want %q", got, want)
+	}
+
+	if w.body.q0 != 4 || w.body.q1 != 4 {
+		t.Errorf("cursor should be at (4,4), got (%d,%d)", w.body.q0, w.body.q1)
+	}
+}
+
+// TestPreviewTypeBackspace tests backspace deletion in preview mode.
+func TestPreviewTypeBackspace(t *testing.T) {
+	t.Run("AtCursor", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello world")
+
+		// Position cursor at 5 (after "Hello")
+		w.body.q0 = 5
+		w.body.q1 = 5
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// Backspace should delete 'o'
+		w.HandlePreviewType(&w.body, 0x08)
+
+		got := w.body.file.String()
+		want := "Hell world"
+		if got != want {
+			t.Errorf("after backspace: got %q, want %q", got, want)
+		}
+
+		if w.body.q0 != 4 || w.body.q1 != 4 {
+			t.Errorf("cursor should be at (4,4), got (%d,%d)", w.body.q0, w.body.q1)
+		}
+	})
+
+	t.Run("AtBeginning", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello")
+
+		// Position cursor at 0
+		w.body.q0 = 0
+		w.body.q1 = 0
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(0, 0)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// Backspace at start should be a no-op
+		w.HandlePreviewType(&w.body, 0x08)
+
+		got := w.body.file.String()
+		want := "Hello"
+		if got != want {
+			t.Errorf("backspace at start should be no-op: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("WithSelection", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello world")
+
+		// Select "Hello" (0-5)
+		w.body.q0 = 0
+		w.body.q1 = 5
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(0, 5)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// Backspace with selection should delete the selection
+		w.HandlePreviewType(&w.body, 0x08)
+
+		got := w.body.file.String()
+		want := " world"
+		if got != want {
+			t.Errorf("backspace with selection: got %q, want %q", got, want)
+		}
+	})
+}
+
+// TestPreviewTypeEnter tests newline insertion in preview mode.
+func TestPreviewTypeEnter(t *testing.T) {
+	w := setupPreviewTypeTestWindow(t, "Hello world")
+
+	// Position cursor at 5
+	w.body.q0 = 5
+	w.body.q1 = 5
+	if w.previewSourceMap != nil {
+		rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+		if rp0 >= 0 {
+			w.richBody.SetSelection(rp0, rp1)
+		}
+	}
+
+	w.HandlePreviewType(&w.body, '\n')
+
+	got := w.body.file.String()
+	want := "Hello\n world"
+	if got != want {
+		t.Errorf("after Enter: got %q, want %q", got, want)
+	}
+
+	if w.body.q0 != 6 || w.body.q1 != 6 {
+		t.Errorf("cursor should be at (6,6), got (%d,%d)", w.body.q0, w.body.q1)
+	}
+}
+
+// TestPreviewTypeIntoFormattedText tests typing inside markdown-formatted text.
+// The source buffer should receive the raw character; the preview re-renders
+// to show it in the formatted context.
+func TestPreviewTypeIntoFormattedText(t *testing.T) {
+	t.Run("InsideBold", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "**bold**")
+
+		// Position cursor inside the bold text in source: between 'b' and 'o'
+		// Source: **bold** — position 3 is between 'b' and 'o' in source
+		w.body.q0 = 3
+		w.body.q1 = 3
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(3, 3)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		w.HandlePreviewType(&w.body, 'X')
+
+		got := w.body.file.String()
+		want := "**bXold**"
+		if got != want {
+			t.Errorf("typing in bold: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("InsideHeading", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "# Heading")
+
+		// Position cursor after "# H" (source pos 3)
+		w.body.q0 = 3
+		w.body.q1 = 3
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(3, 3)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		w.HandlePreviewType(&w.body, 'X')
+
+		got := w.body.file.String()
+		want := "# HXeading"
+		if got != want {
+			t.Errorf("typing in heading: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("InsideCode", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "`code`")
+
+		// Position cursor inside code: after "`c" (source pos 2)
+		w.body.q0 = 2
+		w.body.q1 = 2
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(2, 2)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		w.HandlePreviewType(&w.body, 'X')
+
+		got := w.body.file.String()
+		want := "`cXode`"
+		if got != want {
+			t.Errorf("typing in code: got %q, want %q", got, want)
+		}
+	})
+}
+
+// TestPreviewTypeDeleteOps tests delete-right (Del), kill-word (^W),
+// and kill-line (^U) in preview mode.
+func TestPreviewTypeDeleteOps(t *testing.T) {
+	t.Run("DeleteRight", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello world")
+
+		// Position cursor at 5 (before " world")
+		w.body.q0 = 5
+		w.body.q1 = 5
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// Del should delete the space
+		w.HandlePreviewType(&w.body, 0x7F)
+
+		got := w.body.file.String()
+		want := "Helloworld"
+		if got != want {
+			t.Errorf("after Del: got %q, want %q", got, want)
+		}
+
+		if w.body.q0 != 5 || w.body.q1 != 5 {
+			t.Errorf("cursor should stay at (5,5), got (%d,%d)", w.body.q0, w.body.q1)
+		}
+	})
+
+	t.Run("DeleteRightAtEnd", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hi")
+
+		// Position cursor at end of content.
+		// ToRendered may return -1 for end-of-content, so set rendered
+		// selection directly to the content length.
+		w.body.q0 = 2
+		w.body.q1 = 2
+		contentLen := w.richBody.Content().Len()
+		w.richBody.SetSelection(contentLen, contentLen)
+
+		// Del at end should be a no-op
+		w.HandlePreviewType(&w.body, 0x7F)
+
+		got := w.body.file.String()
+		want := "Hi"
+		if got != want {
+			t.Errorf("Del at end should be no-op: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("KillWord", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello world")
+
+		// Position cursor at 5 (end of "Hello")
+		w.body.q0 = 5
+		w.body.q1 = 5
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// ^W should delete "Hello"
+		w.HandlePreviewType(&w.body, 0x17)
+
+		got := w.body.file.String()
+		want := " world"
+		if got != want {
+			t.Errorf("after ^W: got %q, want %q", got, want)
+		}
+
+		if w.body.q0 != 0 || w.body.q1 != 0 {
+			t.Errorf("cursor should be at (0,0), got (%d,%d)", w.body.q0, w.body.q1)
+		}
+	})
+
+	t.Run("KillLine", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello world")
+
+		// Position cursor at 5
+		w.body.q0 = 5
+		w.body.q1 = 5
+		if w.previewSourceMap != nil {
+			rp0, rp1 := w.previewSourceMap.ToRendered(5, 5)
+			if rp0 >= 0 {
+				w.richBody.SetSelection(rp0, rp1)
+			}
+		}
+
+		// ^U should delete from start of line to cursor ("Hello")
+		w.HandlePreviewType(&w.body, 0x15)
+
+		got := w.body.file.String()
+		want := " world"
+		if got != want {
+			t.Errorf("after ^U: got %q, want %q", got, want)
+		}
+
+		if w.body.q0 != 0 || w.body.q1 != 0 {
+			t.Errorf("cursor should be at (0,0), got (%d,%d)", w.body.q0, w.body.q1)
+		}
+	})
+}
+
+// TestPreviewTypeReplacesSelection tests that typing a character when text is
+// selected replaces the selection (cut then insert).
+func TestPreviewTypeReplacesSelection(t *testing.T) {
+	w := setupPreviewTypeTestWindow(t, "Hello world")
+
+	// Select "Hello" (0-5)
+	w.body.q0 = 0
+	w.body.q1 = 5
+	if w.previewSourceMap != nil {
+		rp0, rp1 := w.previewSourceMap.ToRendered(0, 5)
+		if rp0 >= 0 {
+			w.richBody.SetSelection(rp0, rp1)
+		}
+	}
+
+	// Type 'X' — should replace "Hello" with "X"
+	w.HandlePreviewType(&w.body, 'X')
+
+	got := w.body.file.String()
+	want := "X world"
+	if got != want {
+		t.Errorf("typing with selection: got %q, want %q", got, want)
+	}
+
+	if w.body.q0 != 1 || w.body.q1 != 1 {
+		t.Errorf("cursor should be at (1,1), got (%d,%d)", w.body.q0, w.body.q1)
+	}
+}
+
+// TestPreviewTypeIgnoresSpecialKeys verifies that draw key constants
+// (KeyInsert, KeyLeft, KeyRight, Cmd+key, scroll keys) in the 0xF000+
+// private unicode range are NOT treated as printable characters.
+func TestPreviewTypeIgnoresSpecialKeys(t *testing.T) {
+	specialKeys := []struct {
+		name string
+		key  rune
+	}{
+		{"KeyInsert", draw.KeyInsert},
+		{"KeyLeft", draw.KeyLeft},
+		{"KeyRight", draw.KeyRight},
+		{"Cmd+c", draw.KeyCmd + 'c'},
+		{"Cmd+v", draw.KeyCmd + 'v'},
+		{"Cmd+x", draw.KeyCmd + 'x'},
+		{"Cmd+z", draw.KeyCmd + 'z'},
+		{"Kscrolloneup", Kscrolloneup},
+		{"Kscrollonedown", Kscrollonedown},
+		{"CtrlF", 0x06},
+	}
+
+	for _, sk := range specialKeys {
+		t.Run(sk.name, func(t *testing.T) {
+			w := setupPreviewTypeTestWindow(t, "Hello")
+
+			w.body.q0 = 3
+			w.body.q1 = 3
+			if w.previewSourceMap != nil {
+				rp0, rp1 := w.previewSourceMap.ToRendered(3, 3)
+				if rp0 >= 0 {
+					w.richBody.SetSelection(rp0, rp1)
+				}
+			}
+
+			w.HandlePreviewType(&w.body, sk.key)
+
+			got := w.body.file.String()
+			if got != "Hello" {
+				t.Errorf("key %s (0x%X) should be ignored, but buffer changed to %q", sk.name, sk.key, got)
+			}
+		})
+	}
+}

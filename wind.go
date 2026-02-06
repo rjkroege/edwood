@@ -465,7 +465,7 @@ func (w *Window) Type(t *Text, r rune) {
 		if w.HandlePreviewKey(r) {
 			return
 		}
-		// Key was not handled by preview mode (e.g., typing keys are ignored)
+		w.HandlePreviewType(t, r)
 		return
 	}
 	t.Type(r)
@@ -1977,6 +1977,130 @@ func (w *Window) HandlePreviewKey(key rune) bool {
 	default:
 		// Typing keys and other keys are not handled in preview mode
 		return false
+	}
+}
+
+// HandlePreviewType handles text editing keys in preview mode, inserting or
+// deleting characters in the source buffer and immediately re-rendering the
+// preview. It follows the same sync→edit→render→remap cycle used by the
+// chord cut/paste handlers.
+func (w *Window) HandlePreviewType(t *Text, r rune) {
+	if !w.previewMode || w.richBody == nil || w.previewSourceMap == nil {
+		return
+	}
+
+	// Only accept printable characters, newline, tab, and editing keys.
+	switch {
+	case r == '\n', r == '\t':
+		// accepted
+	case r == 0x08: // ^H: backspace
+	case r == 0x7F: // Del: delete right
+	case r == 0x15: // ^U: kill line
+	case r == 0x17: // ^W: kill word
+	case r >= 0x20 && r < KF: // printable, excluding draw key constants (0xF0xx, 0xF1xx)
+		// accepted
+	default:
+		return
+	}
+
+	// 1. Map rendered cursor/selection to source positions.
+	w.syncSourceSelection()
+
+	// 2. Create an undo point.
+	t.TypeCommit()
+	global.seq++
+	t.file.Mark(global.seq)
+
+	// 3. Handle deletion keys.
+	switch r {
+	case 0x08: // ^H: backspace
+		if t.q0 != t.q1 {
+			// Range selected: delete it.
+			cut(t, t, nil, false, true, "")
+		} else if t.q0 > 0 {
+			t.q0--
+			cut(t, t, nil, false, true, "")
+		}
+		w.previewTypeFinish(t)
+		return
+
+	case 0x7F: // Del: delete right
+		if t.q0 != t.q1 {
+			cut(t, t, nil, false, true, "")
+		} else if t.q1 < t.file.Nr() {
+			t.q1++
+			cut(t, t, nil, false, true, "")
+		}
+		w.previewTypeFinish(t)
+		return
+
+	case 0x15: // ^U: kill line
+		if t.q0 != t.q1 {
+			cut(t, t, nil, false, true, "")
+		} else if t.q0 > 0 {
+			nnb := t.BsWidth(0x15)
+			if nnb > 0 {
+				t.q0 -= nnb
+				cut(t, t, nil, false, true, "")
+			}
+		}
+		w.previewTypeFinish(t)
+		return
+
+	case 0x17: // ^W: kill word
+		if t.q0 != t.q1 {
+			cut(t, t, nil, false, true, "")
+		} else if t.q0 > 0 {
+			nnb := t.BsWidth(0x17)
+			if nnb > 0 {
+				t.q0 -= nnb
+				cut(t, t, nil, false, true, "")
+			}
+		}
+		w.previewTypeFinish(t)
+		return
+	}
+
+	// 4. If range selected, cut it first (like Text.Type).
+	if t.q1 > t.q0 {
+		cut(t, t, nil, false, true, "")
+	}
+
+	// 5. Insert the character into the source buffer.
+	t.file.InsertAt(t.q0, []rune{r})
+	t.q0++
+	t.q1 = t.q0
+
+	w.previewTypeFinish(t)
+}
+
+// previewTypeFinish completes a preview-mode edit by cancelling the debounce
+// timer, doing an immediate re-render, and remapping the cursor position.
+func (w *Window) previewTypeFinish(t *Text) {
+	// Cancel the debounce timer that the observer scheduled.
+	if w.previewUpdateTimer != nil {
+		w.previewUpdateTimer.Stop()
+	}
+
+	// Immediate re-render (uses incremental path via pendingEdits).
+	w.UpdatePreview()
+
+	// Remap source cursor to rendered position and update selection.
+	if w.previewSourceMap != nil {
+		rendStart, rendEnd := w.previewSourceMap.ToRendered(t.q0, t.q1)
+		if rendStart >= 0 {
+			w.richBody.SetSelection(rendStart, rendEnd)
+		} else if t.q0 == t.q1 {
+			// Cursor at end of content or in a gap between source map entries.
+			// Fall back to the end of the rendered content.
+			contentLen := w.richBody.Content().Len()
+			w.richBody.SetSelection(contentLen, contentLen)
+		}
+	}
+
+	w.Draw()
+	if w.display != nil {
+		w.display.Flush()
 	}
 }
 
