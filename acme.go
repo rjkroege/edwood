@@ -406,9 +406,10 @@ func findattr(attr *plumb.Attribute, s string) string {
 }
 
 func MovedMouse(g *globals, m draw.Mouse) {
+	// Hold row lock only for the initial dispatch: finding the target
+	// text and updating mousetext. Release before entering any handler
+	// that may block on mouse events or create/destroy windows.
 	g.row.lk.Lock()
-	defer g.row.lk.Unlock()
-
 	t := g.row.Which(m.Point)
 
 	if t != g.mousetext && t != nil && t.w != nil &&
@@ -423,10 +424,15 @@ func MovedMouse(g *globals, m draw.Mouse) {
 		g.mousetext.w.Unlock()
 	}
 	g.mousetext = t
+	w := (*Window)(nil)
+	if t != nil {
+		w = t.w
+	}
+	g.row.lk.Unlock()
+
 	if t == nil {
 		return
 	}
-	w := t.w
 	if m.Buttons == 0 {
 		return
 	}
@@ -711,7 +717,6 @@ func newwindowthread(g *globals) {
 		// only fsysproc is talking to us, so synchronization is trivial
 		<-g.cnewwindow
 
-		// TODO(rjk): Should this be in a row lock?
 		w = makenewwindow(nil)
 		xfidlog(w, "new")
 		g.cnewwindow <- w
