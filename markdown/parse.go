@@ -88,10 +88,28 @@ func Parse(text string) rich.Content {
 		inListCodeBlock = false
 	}
 
+	// Track blockquote-within-list state
+	inListBlockquote := false
+	listBlockquoteDepth := 0
+	listBlockquoteHadNewline := false
+
+	// Helper to end a blockquote within a list item
+	endListBlockquote := func() {
+		if inListBlockquote && len(result) > 0 && listBlockquoteHadNewline {
+			result[len(result)-1].Text += "\n"
+		}
+		inListBlockquote = false
+		listBlockquoteDepth = 0
+		listBlockquoteHadNewline = false
+	}
+
 	// Helper to end the active list context
 	endListContext := func() {
 		if inListCodeBlock {
 			emitListCodeBlock()
+		}
+		if inListBlockquote {
+			endListBlockquote()
 		}
 		activeList = nil
 	}
@@ -184,9 +202,59 @@ func Parse(text string) rich.Content {
 					result = append(result, codeSpan)
 					continue
 				}
-				// Other continuation content (plain text, blockquote, etc.)
-				// For now, treat as paragraph continuation within the list item
-				// (Phase 8.3 will handle blockquotes here)
+				// Check for blockquote within list item
+				if isBQ, depth, bqContentStart := isBlockquoteLine(stripped); isBQ {
+					lineHadNewline := strings.HasSuffix(stripped, "\n")
+					content := strings.TrimSuffix(stripped[bqContentStart:], "\n")
+
+					// End any active top-level blockquote
+					if inBlockquote {
+						endBlockquote()
+					}
+
+					if content == "" {
+						// Empty blockquote line within list item — skip
+						continue
+					}
+
+					// Continuation of same-depth list blockquote — join with space
+					if inListBlockquote && depth == listBlockquoteDepth {
+						if len(result) > 0 {
+							lastSpan := &result[len(result)-1]
+							if !strings.HasSuffix(lastSpan.Text, " ") {
+								lastSpan.Text += " "
+							}
+						}
+					} else if inListBlockquote && depth != listBlockquoteDepth {
+						// Depth changed — end previous list blockquote
+						endListBlockquote()
+					}
+
+					// Parse inner content with inline formatting
+					bqBaseStyle := rich.Style{
+						Blockquote:      true,
+						BlockquoteDepth: depth,
+						ListItem:        true,
+						ListIndent:      activeList.indentLvl,
+						Scale:           1.0,
+					}
+					spans := parseInline(content, bqBaseStyle, InlineOpts{})
+
+					// Merge consecutive spans with the same style
+					for _, span := range spans {
+						if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
+							result[len(result)-1].Text += span.Text
+						} else {
+							result = append(result, span)
+						}
+					}
+
+					inListBlockquote = true
+					listBlockquoteDepth = depth
+					listBlockquoteHadNewline = lineHadNewline
+					continue
+				}
+				// Other continuation content (plain text, etc.)
 				endListContext()
 				goto normalDispatch
 			}

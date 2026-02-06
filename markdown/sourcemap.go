@@ -304,10 +304,29 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		inListCodeBlock = false
 	}
 
+	// Track blockquote-within-list state
+	inListBlockquote := false
+	listBlockquoteDepth := 0
+	listBlockquoteHadNewline := false
+
+	// Helper to end a blockquote within a list item
+	endListBlockquote := func() {
+		if inListBlockquote && len(result) > 0 && listBlockquoteHadNewline {
+			result[len(result)-1].Text += "\n"
+			renderedPos++
+		}
+		inListBlockquote = false
+		listBlockquoteDepth = 0
+		listBlockquoteHadNewline = false
+	}
+
 	// Helper to end the active list context
 	endListContext := func() {
 		if inListCodeBlock {
 			emitListCodeBlock()
+		}
+		if inListBlockquote {
+			endListBlockquote()
 		}
 		activeList = nil
 	}
@@ -447,6 +466,87 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 
 					result = append(result, codeSpan)
 					sourcePos += len(line)
+					continue
+				}
+				// Check for blockquote within list item
+				if isBQ, depth, bqContentStart := isBlockquoteLine(stripped); isBQ {
+					lineHadNewline := strings.HasSuffix(stripped, "\n")
+					content := strings.TrimSuffix(stripped[bqContentStart:], "\n")
+
+					// End any active top-level blockquote
+					if inBlockquote {
+						endBlockquote()
+					}
+
+					if content == "" {
+						// Empty blockquote line within list item — skip
+						sourcePos += len(line)
+						continue
+					}
+
+					// Continuation of same-depth list blockquote — join with space
+					if inListBlockquote && depth == listBlockquoteDepth {
+						if len(result) > 0 {
+							lastSpan := &result[len(result)-1]
+							if !strings.HasSuffix(lastSpan.Text, " ") {
+								lastSpan.Text += " "
+								renderedPos++
+							}
+						}
+					} else if inListBlockquote && depth != listBlockquoteDepth {
+						// Depth changed — end previous list blockquote
+						endListBlockquote()
+					}
+
+					// Parse inner content with inline formatting and source mapping
+					bqBaseStyle := rich.Style{
+						Blockquote:      true,
+						BlockquoteDepth: depth,
+						ListItem:        true,
+						ListIndent:      activeList.indentLvl,
+						Scale:           1.0,
+					}
+					var bqEntries []SourceMapEntry
+					var bqLinkEntries []LinkEntry
+					// Source offset: list indent bytes + blockquote prefix bytes
+					listIndentBytes := len(line) - len(stripped)
+					contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
+						SourceMap:      &bqEntries,
+						LinkMap:        &bqLinkEntries,
+						SourceOffset:   sourcePos + listIndentBytes + bqContentStart,
+						RenderedOffset: renderedPos,
+					})
+
+					// Post-process: adjust the first entry to include list indent + `> ` prefix
+					if len(bqEntries) > 0 {
+						bqEntries[0].SourceStart = sourcePos
+						bqEntries[0].PrefixLen = listIndentBytes + bqContentStart
+					}
+
+					sm.entries = append(sm.entries, bqEntries...)
+					for _, le := range bqLinkEntries {
+						lm.Add(le.Start, le.End, le.URL)
+					}
+
+					// Update rendered position based on spans
+					for _, span := range contentSpans {
+						renderedPos += len([]rune(span.Text))
+					}
+
+					sourcePos += len(line)
+
+					// Merge consecutive spans with the same style
+					for _, span := range contentSpans {
+						if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
+							result[len(result)-1].Text += span.Text
+						} else {
+							result = append(result, span)
+						}
+					}
+
+					inListBlockquote = true
+					listBlockquoteDepth = depth
+					listBlockquoteHadNewline = lineHadNewline
 					continue
 				}
 				// Other continuation content — end list context, fall through
