@@ -357,3 +357,295 @@ func buildBlockIndex(text string) *BlockIndex {
 
 	return bi
 }
+
+// StitchResult holds the merged output of an incremental update.
+type StitchResult struct {
+	Content  rich.Content
+	SM       *SourceMap
+	LM       *LinkMap
+	BlockIdx *BlockIndex
+}
+
+// ParseRegion parses a contiguous range of source lines and returns
+// the content, source map, and link map for that region.
+// sourceRuneOffset is the rune position of the first line in the full source.
+// sourceByteOffset is the byte position of the first line in the full source.
+// Both offsets are applied to source map entries so they reference positions
+// in the full document.
+// Rendered positions in the returned source map and link map are relative
+// to the region (starting from 0); the caller (Stitch) handles global
+// rendered positioning.
+func ParseRegion(lines []string, sourceRuneOffset int, sourceByteOffset ...int) (rich.Content, *SourceMap, *LinkMap) {
+	if len(lines) == 0 {
+		return nil, &SourceMap{}, NewLinkMap()
+	}
+
+	text := strings.Join(lines, "")
+	content, sm, lm := ParseWithSourceMap(text)
+
+	// Compute the byte offset. If provided explicitly, use it.
+	// Otherwise, compute from the region text: for all-ASCII text,
+	// rune offset == byte offset. For non-ASCII, the caller should
+	// provide the byte offset explicitly.
+	byteOff := sourceRuneOffset // default: assume ASCII
+	if len(sourceByteOffset) > 0 {
+		byteOff = sourceByteOffset[0]
+	}
+
+	// Shift source byte positions to be absolute in the full document.
+	// Rune positions (SourceRuneStart/End) are NOT shifted here because
+	// populateRunePositions produces incorrect values for mid-character
+	// byte offsets. After stitching, the caller must call
+	// sm.PopulateRunePositions(fullSource) to derive rune positions from
+	// the globally-correct byte positions.
+	for i := range sm.entries {
+		sm.entries[i].SourceStart += byteOff
+		sm.entries[i].SourceEnd += byteOff
+	}
+
+	return content, sm, lm
+}
+
+// Stitch merges newly parsed content for blocks [startBlock, endBlock)
+// into the existing parse result, adjusting positions in the suffix.
+// sourceDelta is the change in source rune count (newLen - oldLen).
+// sourceBytesDelta is the change in source byte count.
+// renderedDelta is computed internally from the old/new region sizes.
+func Stitch(
+	old StitchResult,
+	newRegion StitchResult,
+	startBlock, endBlock int,
+	sourceDelta int,
+	sourceBytesDelta int,
+) StitchResult {
+	if old.BlockIdx == nil || len(old.BlockIdx.Blocks) == 0 {
+		return newRegion
+	}
+
+	blocks := old.BlockIdx.Blocks
+
+	// Clamp block indices.
+	if startBlock < 0 {
+		startBlock = 0
+	}
+	if endBlock > len(blocks) {
+		endBlock = len(blocks)
+	}
+
+	// Compute prefix/suffix boundaries from block info.
+	// Prefix: content and entries from blocks [0, startBlock).
+	// Suffix: content and entries from blocks [endBlock, len(blocks)).
+
+	// We need to find the content, SM, and LM ranges for prefix and suffix.
+	// Since BlockInfo doesn't always have ContentStart/End populated,
+	// we compute these boundaries from source rune positions by scanning
+	// the content and source map entries.
+
+	var prefixContentEnd int   // number of content spans in prefix
+	var prefixSMEnd int        // number of SM entries in prefix
+	var prefixLMEnd int        // number of LM entries in prefix
+	var prefixRenderedEnd int  // rendered rune position at end of prefix
+
+	var suffixContentStart int  // first content span index in suffix
+	var suffixSMStart int       // first SM entry index in suffix
+	var suffixLMStart int       // first LM entry index in suffix
+	var suffixRenderedStart int // rendered rune position at start of suffix
+
+	if startBlock > 0 {
+		// The prefix ends where startBlock begins.
+		prefixSourceEnd := blocks[startBlock].SourceRuneStart
+
+		// Find the content span boundary: count spans whose text
+		// comes entirely before prefixSourceEnd.
+		prefixContentEnd, prefixRenderedEnd = findContentBoundary(old.Content, old.SM, prefixSourceEnd)
+
+		// Find SM entry boundary.
+		prefixSMEnd = findSMBoundary(old.SM, prefixSourceEnd)
+
+		// Find LM entry boundary.
+		prefixLMEnd = findLMBoundary(old.LM, prefixRenderedEnd)
+	}
+
+	if endBlock < len(blocks) {
+		// The suffix starts where endBlock begins (in OLD positions).
+		suffixSourceStart := blocks[endBlock].SourceRuneStart
+
+		suffixContentStart, suffixRenderedStart = findContentBoundary(old.Content, old.SM, suffixSourceStart)
+		suffixSMStart = findSMBoundary(old.SM, suffixSourceStart)
+		suffixLMStart = findLMBoundary(old.LM, suffixRenderedStart)
+	} else {
+		suffixContentStart = len(old.Content)
+		if old.SM != nil {
+			suffixSMStart = len(old.SM.entries)
+		}
+		if old.LM != nil {
+			suffixLMStart = len(old.LM.entries)
+		}
+		suffixRenderedStart = old.Content.Len()
+	}
+
+	// Compute the rendered delta: the change in rendered rune count for
+	// the affected region.
+	regionRenderedLen := newRegion.Content.Len()
+	oldRegionRenderedLen := suffixRenderedStart - prefixRenderedEnd
+	renderedDelta := regionRenderedLen - oldRegionRenderedLen
+
+	// Build result content: prefix + shifted region + shifted suffix.
+	var resultContent rich.Content
+	resultContent = append(resultContent, old.Content[:prefixContentEnd]...)
+	resultContent = append(resultContent, newRegion.Content...)
+	resultContent = append(resultContent, old.Content[suffixContentStart:]...)
+
+	// Build result source map: prefix entries + shifted region entries + shifted suffix entries.
+	resultSM := &SourceMap{}
+	if old.SM != nil {
+		resultSM.entries = append(resultSM.entries, old.SM.entries[:prefixSMEnd]...)
+	}
+
+	// Shift new region SM entries: rendered positions need to be shifted
+	// by prefixRenderedEnd (region positions start from 0).
+	if newRegion.SM != nil {
+		for _, e := range newRegion.SM.entries {
+			e.RenderedStart += prefixRenderedEnd
+			e.RenderedEnd += prefixRenderedEnd
+			resultSM.entries = append(resultSM.entries, e)
+		}
+	}
+
+	// Shift suffix SM entries: source byte positions shift by sourceBytesDelta,
+	// rendered positions shift by renderedDelta.
+	// Note: SourceRuneStart/End are NOT shifted here. The caller must call
+	// PopulateRunePositions(fullSource) after stitching to derive correct
+	// rune positions from the globally-shifted byte positions.
+	if old.SM != nil {
+		for _, e := range old.SM.entries[suffixSMStart:] {
+			e.SourceStart += sourceBytesDelta
+			e.SourceEnd += sourceBytesDelta
+			e.RenderedStart += renderedDelta
+			e.RenderedEnd += renderedDelta
+			resultSM.entries = append(resultSM.entries, e)
+		}
+	}
+
+	// Build result link map: prefix entries + shifted region entries + shifted suffix entries.
+	resultLM := NewLinkMap()
+	if old.LM != nil {
+		resultLM.entries = append(resultLM.entries, old.LM.entries[:prefixLMEnd]...)
+	}
+
+	// Shift new region LM entries by prefixRenderedEnd.
+	if newRegion.LM != nil {
+		for _, e := range newRegion.LM.entries {
+			e.Start += prefixRenderedEnd
+			e.End += prefixRenderedEnd
+			resultLM.entries = append(resultLM.entries, e)
+		}
+	}
+
+	// Shift suffix LM entries by renderedDelta.
+	if old.LM != nil {
+		for _, e := range old.LM.entries[suffixLMStart:] {
+			e.Start += renderedDelta
+			e.End += renderedDelta
+			resultLM.entries = append(resultLM.entries, e)
+		}
+	}
+
+	// Build result block index: prefix blocks + region blocks + shifted suffix blocks.
+	resultBI := &BlockIndex{}
+	if old.BlockIdx != nil {
+		resultBI.Blocks = append(resultBI.Blocks, blocks[:startBlock]...)
+	}
+	if newRegion.BlockIdx != nil {
+		resultBI.Blocks = append(resultBI.Blocks, newRegion.BlockIdx.Blocks...)
+	}
+	if old.BlockIdx != nil {
+		for _, b := range blocks[endBlock:] {
+			b.SourceRuneStart += sourceDelta
+			b.SourceRuneEnd += sourceDelta
+			b.SourceLineStart += 0 // line indices are not shifted here
+			b.SourceLineEnd += 0
+			resultBI.Blocks = append(resultBI.Blocks, b)
+		}
+	}
+
+	return StitchResult{
+		Content:  resultContent,
+		SM:       resultSM,
+		LM:       resultLM,
+		BlockIdx: resultBI,
+	}
+}
+
+// findContentBoundary finds the index into content and the rendered rune
+// position at which a given source rune position falls. It returns the
+// number of complete content spans before sourceRunePos and the total
+// rendered rune count of those spans.
+func findContentBoundary(content rich.Content, sm *SourceMap, sourceRunePos int) (spanIdx, renderedPos int) {
+	if sm == nil || len(sm.entries) == 0 {
+		return 0, 0
+	}
+
+	// Find the rendered position corresponding to sourceRunePos by scanning
+	// source map entries. The rendered position at sourceRunePos is the
+	// RenderedStart of the first entry whose SourceRuneStart >= sourceRunePos.
+	targetRendered := 0
+	found := false
+	for _, e := range sm.entries {
+		if e.SourceRuneStart >= sourceRunePos {
+			targetRendered = e.RenderedStart
+			found = true
+			break
+		}
+	}
+	if !found {
+		// sourceRunePos is beyond all entries — everything is prefix.
+		return len(content), content.Len()
+	}
+
+	// Now find which content span boundary corresponds to targetRendered.
+	rp := 0
+	for i, s := range content {
+		spanLen := len([]rune(s.Text))
+		if rp+spanLen > targetRendered {
+			// This span contains or starts at the target rendered position.
+			// If the span starts exactly at targetRendered, the boundary is here.
+			if rp == targetRendered {
+				return i, rp
+			}
+			// The span straddles the boundary — include it in prefix.
+			// (This can happen when block boundaries don't align with span boundaries.)
+			return i, rp
+		}
+		rp += spanLen
+	}
+	return len(content), rp
+}
+
+// findSMBoundary finds the index of the first source map entry whose
+// SourceRuneStart >= sourceRunePos.
+func findSMBoundary(sm *SourceMap, sourceRunePos int) int {
+	if sm == nil {
+		return 0
+	}
+	for i, e := range sm.entries {
+		if e.SourceRuneStart >= sourceRunePos {
+			return i
+		}
+	}
+	return len(sm.entries)
+}
+
+// findLMBoundary finds the index of the first link map entry whose
+// Start >= renderedPos.
+func findLMBoundary(lm *LinkMap, renderedPos int) int {
+	if lm == nil {
+		return 0
+	}
+	for i, e := range lm.entries {
+		if e.Start >= renderedPos {
+			return i
+		}
+	}
+	return len(lm.entries)
+}

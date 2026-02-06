@@ -542,6 +542,14 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	return result, sm, lm
 }
 
+// PopulateRunePositions fills in SourceRuneStart/SourceRuneEnd for all entries
+// by converting byte positions (SourceStart/SourceEnd) to rune positions using
+// the provided source text. This should be called after Stitch to ensure rune
+// positions are derived from the full document's byte-to-rune mapping.
+func (sm *SourceMap) PopulateRunePositions(source string) {
+	sm.populateRunePositions(source)
+}
+
 // populateRunePositions fills in SourceRuneStart/SourceRuneEnd for all entries
 // by converting byte positions to rune positions using the source text.
 func (sm *SourceMap) populateRunePositions(source string) {
