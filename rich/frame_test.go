@@ -4230,3 +4230,105 @@ func TestScrollbarHeightAfterVerticalScroll(t *testing.T) {
 			yNoScroll)
 	}
 }
+
+// TestHScrollRegionOffsetWithOrigin verifies that when the viewport is scrolled
+// past some code blocks, the horizontal scroll positions of visible blocks are
+// correctly mapped to the global hscrollOrigins slice. Without the offset fix,
+// visible block 0 would incorrectly read the scroll position of the first
+// (off-screen) block instead of its own.
+func TestHScrollRegionOffsetWithOrigin(t *testing.T) {
+	rect := image.Rect(0, 0, 200, 600)
+	display := edwoodtest.NewDisplay(rect)
+	font := edwoodtest.NewFont(10, 14)
+
+	bgImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xFFFFFFFF)
+	textImage, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x000000FF)
+
+	f := NewFrame()
+	fi := f.(*frameImpl)
+	f.Init(rect, WithDisplay(display), WithBackground(bgImage), WithFont(font), WithTextColor(textImage))
+
+	// Create content with 3 code blocks, each overflowing the 200px frame width.
+	// Each block is separated by a normal text line.
+	codeStyle := Style{Block: true, Code: true, Scale: 1.0, Bg: color.RGBA{R: 240, G: 240, B: 240, A: 255}}
+	normalStyle := Style{Scale: 1.0}
+	content := Content{
+		// Block A
+		{Text: "AAAA_long_code_line_overflow_xx", Style: codeStyle}, // 30 chars * 10px = 300px > 200px
+		{Text: "\n", Style: codeStyle},
+		// Separator
+		{Text: "sep1", Style: normalStyle},
+		{Text: "\n", Style: normalStyle},
+		// Block B
+		{Text: "BBBB_long_code_line_overflow_xx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+		// Separator
+		{Text: "sep2", Style: normalStyle},
+		{Text: "\n", Style: normalStyle},
+		// Block C
+		{Text: "CCCC_long_code_line_overflow_xx", Style: codeStyle},
+		{Text: "\n", Style: codeStyle},
+	}
+	f.SetContent(content)
+
+	// Step 1: Layout with origin=0 to initialize all 3 block regions.
+	fi.origin = 0
+	lines0, _ := fi.layoutFromOrigin()
+	if len(lines0) == 0 {
+		t.Fatal("layoutFromOrigin with origin=0 produced no lines")
+	}
+
+	// We should have 3 block regions.
+	if fi.hscrollBlockCount != 3 {
+		t.Fatalf("expected 3 block regions, got %d", fi.hscrollBlockCount)
+	}
+
+	// Set distinct scroll positions: A=100, B=200, C=300.
+	// With origin=0, hscrollRegionOffset should be 0 so these go directly
+	// into the global slots.
+	if fi.hscrollRegionOffset != 0 {
+		t.Fatalf("with origin=0, hscrollRegionOffset = %d, want 0", fi.hscrollRegionOffset)
+	}
+	fi.hscrollOrigins[0] = 100 // Block A (direct access to avoid offset)
+	fi.hscrollOrigins[1] = 200 // Block B
+	fi.hscrollOrigins[2] = 300 // Block C
+
+	// Step 2: Find the rune offset past block A (after "AAAA...\nsep1\n").
+	// Block A line: "AAAA_long_code_line_overflow_xx\n" = 31 runes
+	// sep1 line: "sep1\n" = 5 runes
+	// Total: 36 runes. Setting origin to 36 should start at block B.
+	fi.origin = 36
+
+	// Step 3: Layout from the new origin.
+	lines, _ := fi.layoutFromOrigin()
+	if len(lines) == 0 {
+		t.Fatal("layoutFromOrigin with origin past block A produced no lines")
+	}
+
+	// hscrollRegionOffset should be 1 (block A is above the viewport).
+	if fi.hscrollRegionOffset != 1 {
+		t.Errorf("hscrollRegionOffset = %d, want 1", fi.hscrollRegionOffset)
+	}
+
+	// Step 4: Verify GetHScrollOrigin(0) returns block B's position (200),
+	// not block A's position (100).
+	got := fi.GetHScrollOrigin(0)
+	if got != 200 {
+		t.Errorf("GetHScrollOrigin(0) with origin past block A = %d, want 200 (block B)", got)
+	}
+
+	// GetHScrollOrigin(1) should return block C's position (300).
+	got = fi.GetHScrollOrigin(1)
+	if got != 300 {
+		t.Errorf("GetHScrollOrigin(1) with origin past block A = %d, want 300 (block C)", got)
+	}
+
+	// Step 5: Verify SetHScrollOrigin(0, newVal) updates block B, not block A.
+	fi.SetHScrollOrigin(0, 999)
+	if fi.hscrollOrigins[1] != 999 {
+		t.Errorf("SetHScrollOrigin(0, 999) should update global index 1 (block B), got hscrollOrigins[1] = %d", fi.hscrollOrigins[1])
+	}
+	if fi.hscrollOrigins[0] != 100 {
+		t.Errorf("SetHScrollOrigin(0, 999) should not affect global index 0 (block A), got hscrollOrigins[0] = %d", fi.hscrollOrigins[0])
+	}
+}
