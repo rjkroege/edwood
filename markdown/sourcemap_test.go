@@ -1048,6 +1048,391 @@ func TestSourceMapPointSelectionHeading(t *testing.T) {
 	}
 }
 
+// TestBlockquoteSourceMapToSource tests that ToSource correctly maps rendered
+// positions back to source positions for blockquote content. The `> ` prefix
+// is stripped from rendered output, so source map entries must account for it.
+// This tests the "heading model" approach where PrefixLen records the prefix.
+func TestBlockquoteSourceMapToSource(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		renderedPos  int
+		renderedEnd  int
+		wantSrcStart int
+		wantSrcEnd   int
+	}{
+		{
+			name: "simple blockquote - select all content",
+			// Source: "> hello" (7 bytes/runes)
+			// Prefix: "> " (2 runes), content: "hello" (5 runes)
+			// Rendered: "hello" (5 runes, positions 0-4)
+			// Selecting all rendered content should expand to include "> " prefix
+			input:        "> hello",
+			renderedPos:  0,
+			renderedEnd:  5, // "hello"
+			wantSrcStart: 0,
+			wantSrcEnd:   7, // "> hello"
+		},
+		{
+			name: "simple blockquote - partial selection",
+			// Source: "> hello" (7 runes)
+			// Rendered: "hello" (5 runes)
+			// Selecting "hel" (positions 0-3) — partial, so no prefix expansion
+			// Maps to source runes 2-5 ("hel" after "> " prefix)
+			input:        "> hello",
+			renderedPos:  0,
+			renderedEnd:  3, // "hel"
+			wantSrcStart: 0,
+			wantSrcEnd:   5, // "> hel" - boundary expansion includes prefix at start
+		},
+		{
+			name: "simple blockquote - middle selection",
+			// Source: "> hello" (7 runes)
+			// Rendered: "hello" (5 runes)
+			// Selecting "ell" (rendered positions 1-4)
+			input:        "> hello",
+			renderedPos:  1,
+			renderedEnd:  4, // "ell"
+			wantSrcStart: 3,
+			wantSrcEnd:   6, // "ell" in source (past "> h")
+		},
+		{
+			name: "simple blockquote - point selection at start",
+			// Source: "> hello" (7 runes)
+			// Rendered: "hello"
+			// Point click at rendered position 0 → should map to point in source
+			input:        "> hello",
+			renderedPos:  0,
+			renderedEnd:  0, // point selection
+			wantSrcStart: 2,
+			wantSrcEnd:   2, // point at content start (after "> ")
+		},
+		{
+			name: "nested blockquote depth 2 - select all",
+			// Source: "> > inner" (9 runes)
+			// Prefix: "> > " (4 runes), content: "inner" (5 runes)
+			// Rendered: "inner" (5 runes)
+			input:        "> > inner",
+			renderedPos:  0,
+			renderedEnd:  5, // "inner"
+			wantSrcStart: 0,
+			wantSrcEnd:   9, // "> > inner"
+		},
+		{
+			name: "nested blockquote depth 3 - select all",
+			// Source: "> > > deep" (10 runes)
+			// Prefix: "> > > " (6 runes), content: "deep" (4 runes)
+			// Rendered: "deep" (4 runes)
+			input:        "> > > deep",
+			renderedPos:  0,
+			renderedEnd:  4, // "deep"
+			wantSrcStart: 0,
+			wantSrcEnd:   10, // "> > > deep"
+		},
+		{
+			name: "blockquote with trailing newline",
+			// Source: "> hello\n" (8 bytes)
+			// Rendered: "hello\n" (6 runes)
+			input:        "> hello\n",
+			renderedPos:  0,
+			renderedEnd:  6, // "hello\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   8, // "> hello\n"
+		},
+		{
+			name: "blockquote followed by paragraph",
+			// Source: "> quote\n\nparagraph" (18 bytes)
+			// Rendered: "quote\n" + "\n" (parabreak) + "paragraph"
+			//          = runes 0-5 "quote\n", 6 "\n", 7-15 "paragraph"
+			// Select the blockquote content "quote\n"
+			input:        "> quote\n\nparagraph",
+			renderedPos:  0,
+			renderedEnd:  6, // "quote\n"
+			wantSrcStart: 0,
+			wantSrcEnd:   8, // "> quote\n"
+		},
+		{
+			name: "blockquote followed by paragraph - select paragraph",
+			// Source: "> quote\n\nparagraph"
+			// Rendered: "quote\n" + "\n" + "paragraph"
+			// Select "paragraph" (rendered positions 7-16)
+			input:        "> quote\n\nparagraph",
+			renderedPos:  7,
+			renderedEnd:  16, // "paragraph"
+			wantSrcStart: 9,
+			wantSrcEnd:   18, // "paragraph"
+		},
+		{
+			name: "blockquote with bold - select bold text",
+			// Source: "> **bold** text" (15 runes)
+			// Prefix: "> " (2 runes), content: "**bold** text" (13 runes)
+			// Rendered: "bold text" (9 runes)
+			// "bold" is at rendered positions 0-3, " text" at 4-8
+			input:        "> **bold** text",
+			renderedPos:  0,
+			renderedEnd:  4, // "bold"
+			wantSrcStart: 0,
+			wantSrcEnd:   10, // "> **bold**" - boundary expands to include prefix + markers
+		},
+		{
+			name: "blockquote with bold - select plain text after bold",
+			// Source: "> **bold** text" (15 runes)
+			// Rendered: "bold text" (9 runes)
+			// " text" at rendered positions 4-8
+			input:        "> **bold** text",
+			renderedPos:  4,
+			renderedEnd:  9, // " text"
+			wantSrcStart: 10,
+			wantSrcEnd:   15, // " text" in source
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+					tt.wantSrcStart, tt.wantSrcEnd)
+			}
+		})
+	}
+}
+
+// TestBlockquoteSourceMapToRendered tests that ToRendered correctly maps source
+// rune positions to rendered positions for blockquote content.
+func TestBlockquoteSourceMapToRendered(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		srcRuneStart  int
+		srcRuneEnd    int
+		wantRendStart int
+		wantRendEnd   int
+	}{
+		{
+			name: "blockquote - full source range",
+			// Source: "> hello" (7 runes), rendered: "hello" (5 runes)
+			input:         "> hello",
+			srcRuneStart:  0,
+			srcRuneEnd:    7,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name: "blockquote - content only (after prefix)",
+			// Source rune 2 is 'h' (first char after "> "), rune 7 is end
+			input:         "> hello",
+			srcRuneStart:  2,
+			srcRuneEnd:    7,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name: "blockquote - within prefix maps to rendered start",
+			// Source rune 0 is '>', rune 1 is ' ' — both within prefix
+			// Should map to rendered start
+			input:         "> hello",
+			srcRuneStart:  0,
+			srcRuneEnd:    2, // Just the "> " prefix
+			wantRendStart: 0,
+			wantRendEnd:   0, // Prefix maps to rendered start (no rendered content)
+		},
+		{
+			name: "nested blockquote depth 2 - full source",
+			// Source: "> > inner" (9 runes), rendered: "inner" (5 runes)
+			input:         "> > inner",
+			srcRuneStart:  0,
+			srcRuneEnd:    9,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name: "nested blockquote depth 2 - content only",
+			// "> > " is 4 runes, content "inner" starts at rune 4
+			input:         "> > inner",
+			srcRuneStart:  4,
+			srcRuneEnd:    9,
+			wantRendStart: 0,
+			wantRendEnd:   5,
+		},
+		{
+			name: "blockquote with bold - source bold markers",
+			// Source: "> **bold** text" (15 runes)
+			// Content starts at rune 2: "**bold** text"
+			// "**bold**" = source runes 2-10
+			// Rendered: "bold text" (9 runes), "bold" at 0-3
+			input:         "> **bold** text",
+			srcRuneStart:  2,
+			srcRuneEnd:    10, // "**bold**"
+			wantRendStart: 0,
+			wantRendEnd:   4, // "bold"
+		},
+		{
+			name: "blockquote with bold - source text after bold",
+			// Source: "> **bold** text" (15 runes)
+			// " text" = source runes 10-15
+			// Rendered: "bold text", " text" at 4-8
+			input:         "> **bold** text",
+			srcRuneStart:  10,
+			srcRuneEnd:    15,
+			wantRendStart: 4,
+			wantRendEnd:   9,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			rendStart, rendEnd := sm.ToRendered(tt.srcRuneStart, tt.srcRuneEnd)
+			if rendStart != tt.wantRendStart || rendEnd != tt.wantRendEnd {
+				t.Errorf("ToRendered(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.srcRuneStart, tt.srcRuneEnd, rendStart, rendEnd,
+					tt.wantRendStart, tt.wantRendEnd)
+			}
+		})
+	}
+}
+
+// TestBlockquoteSourceMapRoundTrip tests that rendered→source→rendered produces
+// positions that contain the original selection for blockquote content.
+func TestBlockquoteSourceMapRoundTrip(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		renderedStart int
+		renderedEnd   int
+	}{
+		{
+			name:          "simple blockquote round trip",
+			input:         "> hello",
+			renderedStart: 0,
+			renderedEnd:   5, // "hello"
+		},
+		{
+			name:          "nested blockquote round trip",
+			input:         "> > inner",
+			renderedStart: 0,
+			renderedEnd:   5, // "inner"
+		},
+		{
+			name:          "blockquote with bold round trip",
+			input:         "> **bold** text",
+			renderedStart: 0,
+			renderedEnd:   4, // "bold"
+		},
+		{
+			name:          "blockquote plain text after bold round trip",
+			input:         "> **bold** text",
+			renderedStart: 4,
+			renderedEnd:   9, // " text"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+
+			// Step 1: rendered → source
+			srcStart, srcEnd := sm.ToSource(tt.renderedStart, tt.renderedEnd)
+
+			// Step 2: convert byte positions to rune positions for ToRendered
+			srcRuneStart := byteToRunePos(tt.input, srcStart)
+			srcRuneEnd := byteToRunePos(tt.input, srcEnd)
+
+			// Step 3: source → rendered (round trip)
+			rendStart, rendEnd := sm.ToRendered(srcRuneStart, srcRuneEnd)
+
+			// The round trip should produce positions that contain the original selection
+			if rendStart > tt.renderedStart || rendEnd < tt.renderedEnd {
+				t.Errorf("round trip failed: rendered(%d,%d) → source(%d,%d) [runes: %d,%d] → rendered(%d,%d); want rendered to contain [%d,%d]",
+					tt.renderedStart, tt.renderedEnd,
+					srcStart, srcEnd,
+					srcRuneStart, srcRuneEnd,
+					rendStart, rendEnd,
+					tt.renderedStart, tt.renderedEnd)
+			}
+		})
+	}
+}
+
+// TestBlockquoteSourceMapPointSelection verifies that point selections (clicks)
+// in blockquote rendered content produce point selections in source.
+func TestBlockquoteSourceMapPointSelection(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		renderedPos int
+	}{
+		{"blockquote start", "> hello", 0},
+		{"blockquote middle", "> hello", 2},
+		{"blockquote end", "> hello", 4},
+		{"nested blockquote start", "> > inner", 0},
+		{"nested blockquote middle", "> > inner", 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedPos)
+			if srcStart != srcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection (srcStart == srcEnd)",
+					tt.renderedPos, tt.renderedPos, srcStart, srcEnd)
+			}
+		})
+	}
+}
+
+// TestBlockquoteSourceMapContentProduction verifies that ParseWithSourceMap
+// produces the correct rendered content (spans) for blockquotes, with
+// blockquote styling applied and the `> ` prefix stripped.
+func TestBlockquoteSourceMapContentProduction(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantTexts []string // expected span texts
+	}{
+		{
+			name:      "simple blockquote",
+			input:     "> hello",
+			wantTexts: []string{"hello"},
+		},
+		{
+			name:      "nested blockquote",
+			input:     "> > inner",
+			wantTexts: []string{"inner"},
+		},
+		{
+			name:      "blockquote with bold",
+			input:     "> **bold** text",
+			wantTexts: []string{"bold", " text"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, _, _ := ParseWithSourceMap(tt.input)
+			if len(content) != len(tt.wantTexts) {
+				var gotTexts []string
+				for _, s := range content {
+					gotTexts = append(gotTexts, s.Text)
+				}
+				t.Fatalf("got %d spans %v, want %d spans %v",
+					len(content), gotTexts, len(tt.wantTexts), tt.wantTexts)
+			}
+			for i, want := range tt.wantTexts {
+				if content[i].Text != want {
+					t.Errorf("span[%d].Text = %q, want %q", i, content[i].Text, want)
+				}
+				if !content[i].Style.Blockquote {
+					t.Errorf("span[%d].Style.Blockquote = false, want true", i)
+				}
+			}
+		})
+	}
+}
+
 // byteToRunePos converts a byte position in a string to a rune position.
 func byteToRunePos(s string, bytePos int) int {
 	if bytePos <= 0 {

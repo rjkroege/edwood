@@ -259,6 +259,22 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	var indentedBlockContent strings.Builder
 	indentedBlockSourceStart := 0
 
+	// Track blockquote state
+	inBlockquote := false
+	blockquoteDepth := 0
+	blockquoteLineHadNewline := false
+
+	// Helper to end the current blockquote by appending \n to the last span
+	endBlockquote := func() {
+		if inBlockquote && len(result) > 0 && blockquoteLineHadNewline {
+			result[len(result)-1].Text += "\n"
+			renderedPos++
+		}
+		inBlockquote = false
+		blockquoteDepth = 0
+		blockquoteLineHadNewline = false
+	}
+
 	// Track paragraph state for joining lines
 	inParagraph := false
 
@@ -305,6 +321,10 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			// If we were in an indented block, emit it first
 			if inIndentedBlock {
 				emitIndentedBlock()
+			}
+			// End blockquote before code block
+			if inBlockquote {
+				endBlockquote()
 			}
 			// End paragraph with newline before code block
 			if inParagraph && len(result) > 0 {
@@ -376,6 +396,10 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		// Check for indented code block (4 spaces or 1 tab)
 		// But NOT if it's a list item - list items take precedence
 		if isIndentedCodeLine(line) && !isListItemEarly {
+			// End blockquote before code block
+			if inBlockquote {
+				endBlockquote()
+			}
 			// End paragraph with newline before code block
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
@@ -402,14 +426,21 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		// Check for blank line (paragraph break)
 		trimmedLine := strings.TrimRight(line, "\n")
 		if trimmedLine == "" {
+			// End blockquote before paragraph break
+			wasInBlockquote := inBlockquote
+			if inBlockquote {
+				endBlockquote()
+			}
 			// Blank line = paragraph break
-			if inParagraph && len(result) > 0 {
-				// End the paragraph with a newline (with ParaBreak for extra spacing)
-				result = append(result, rich.Span{
-					Text:  "\n",
-					Style: rich.Style{ParaBreak: true, Scale: 1.0},
-				})
-				renderedPos++
+			if inParagraph || wasInBlockquote {
+				if len(result) > 0 {
+					// End the paragraph with a newline (with ParaBreak for extra spacing)
+					result = append(result, rich.Span{
+						Text:  "\n",
+						Style: rich.Style{ParaBreak: true, Scale: 1.0},
+					})
+					renderedPos++
+				}
 			}
 			inParagraph = false
 			sourcePos += len(line)
@@ -419,6 +450,10 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		// Check for table (must have header row followed by separator row)
 		isRow, _ := isTableRow(line)
 		if isRow && i+1 < len(lines) && isTableSeparatorRow(lines[i+1]) {
+			// End blockquote before table
+			if inBlockquote {
+				endBlockquote()
+			}
 			// End paragraph before table
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
@@ -440,6 +475,110 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 			}
 			i += consumed - 1 // -1 because loop will increment
 			continue
+		}
+
+		// Check for blockquote
+		if isBQ, depth, contentStart := isBlockquoteLine(line); isBQ {
+			// End paragraph before blockquote
+			if inParagraph && len(result) > 0 {
+				result[len(result)-1].Text += "\n"
+				renderedPos++
+			}
+			inParagraph = false
+
+			lineHadNewline := strings.HasSuffix(line, "\n")
+
+			// Get the inner content after stripping the prefix and trailing newline
+			content := strings.TrimSuffix(line[contentStart:], "\n")
+
+			// Empty blockquote line (just ">" or "> " with no content)
+			if content == "" {
+				if inBlockquote {
+					// Paragraph break within blockquote
+					endBlockquote()
+					result = append(result, rich.Span{
+						Text: "\n",
+						Style: rich.Style{
+							ParaBreak:       true,
+							Blockquote:      true,
+							BlockquoteDepth: depth,
+							Scale:           1.0,
+						},
+					})
+					renderedPos++
+				}
+				sourcePos += len(line)
+				continue
+			}
+
+			// Depth changed — end previous blockquote
+			if inBlockquote && depth != blockquoteDepth {
+				endBlockquote()
+			}
+
+			// Continuation of same-depth blockquote — join with space
+			if inBlockquote && depth == blockquoteDepth {
+				if len(result) > 0 {
+					lastSpan := &result[len(result)-1]
+					if !strings.HasSuffix(lastSpan.Text, " ") {
+						lastSpan.Text += " "
+						renderedPos++
+					}
+				}
+			}
+
+			// Parse inner content with inline formatting and source mapping
+			bqBaseStyle := rich.Style{
+				Blockquote:      true,
+				BlockquoteDepth: depth,
+				Scale:           1.0,
+			}
+			var bqEntries []SourceMapEntry
+			var bqLinkEntries []LinkEntry
+			contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
+				SourceMap:      &bqEntries,
+				LinkMap:        &bqLinkEntries,
+				SourceOffset:   sourcePos + contentStart,
+				RenderedOffset: renderedPos,
+			})
+
+			// Post-process: adjust the first entry to include the `> ` prefix
+			// using PrefixLen, matching the heading model.
+			if len(bqEntries) > 0 {
+				bqEntries[0].SourceStart = sourcePos
+				bqEntries[0].PrefixLen = contentStart
+			}
+
+			sm.entries = append(sm.entries, bqEntries...)
+			for _, le := range bqLinkEntries {
+				lm.Add(le.Start, le.End, le.URL)
+			}
+
+			// Update rendered position based on spans
+			for _, span := range contentSpans {
+				renderedPos += len([]rune(span.Text))
+			}
+
+			sourcePos += len(line)
+
+			// Merge consecutive spans with the same style
+			for _, span := range contentSpans {
+				if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
+					result[len(result)-1].Text += span.Text
+				} else {
+					result = append(result, span)
+				}
+			}
+
+			inBlockquote = true
+			blockquoteDepth = depth
+			blockquoteLineHadNewline = lineHadNewline
+			continue
+		}
+
+		// Non-blockquote line — end any active blockquote
+		if inBlockquote {
+			endBlockquote()
 		}
 
 		// Check if this is a block-level element (heading, hrule, list item)
@@ -528,6 +667,11 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 
 			result = append(result, codeSpan)
 		}
+	}
+
+	// Handle trailing blockquote
+	if inBlockquote {
+		endBlockquote()
 	}
 
 	// Handle trailing indented code block
