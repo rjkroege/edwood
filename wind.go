@@ -81,6 +81,10 @@ type Window struct {
 	previewClickPos  int        // rune position of last B1 null-click
 	previewClickMsec uint32     // timestamp of last B1 null-click
 	previewClickRT   *RichText  // which richtext received the last click
+
+	// Incremental preview update state
+	prevBlockIndex *markdown.BlockIndex  // block boundaries from last parse
+	pendingEdits   []markdown.EditRecord // edits since last UpdatePreview
 }
 
 var (
@@ -1487,9 +1491,17 @@ func (w *Window) PreviewLookLinkURL(pos int) string {
 	return w.previewLinkMap.URLAt(pos)
 }
 
+// recordEdit accumulates an edit record for the incremental preview path.
+func (w *Window) recordEdit(e markdown.EditRecord) {
+	w.pendingEdits = append(w.pendingEdits, e)
+}
+
 // UpdatePreview updates the preview content from the body buffer.
 // This should be called when the body buffer changes and the window is in preview mode.
 // It re-parses the markdown and updates the richBody, preserving the scroll position.
+// When edit position information is available (from pendingEdits), it attempts an
+// incremental re-parse of only the affected blocks. Falls back to full re-parse
+// when the incremental path cannot determine the affected region.
 func (w *Window) UpdatePreview() {
 	if !w.previewMode || w.richBody == nil {
 		return
@@ -1501,13 +1513,41 @@ func (w *Window) UpdatePreview() {
 	// Read the current body content
 	bodyContent := w.body.file.String()
 
-	// Parse the markdown with source map and link map
-	content, sourceMap, linkMap := markdown.ParseWithSourceMap(bodyContent)
+	var content rich.Content
+	var sourceMap *markdown.SourceMap
+	var linkMap *markdown.LinkMap
+	var blockIdx *markdown.BlockIndex
+
+	// Try incremental path when we have a previous block index and pending edits.
+	if w.prevBlockIndex != nil && len(w.pendingEdits) > 0 {
+		old := markdown.StitchResult{
+			Content:  w.richBody.Content(),
+			SM:       w.previewSourceMap,
+			LM:       w.previewLinkMap,
+			BlockIdx: w.prevBlockIndex,
+		}
+		result, ok := markdown.IncrementalUpdate(old, bodyContent, w.pendingEdits)
+		if ok {
+			content = result.Content
+			sourceMap = result.SM
+			linkMap = result.LM
+			blockIdx = result.BlockIdx
+		}
+	}
+
+	// Full re-parse fallback.
+	if content == nil {
+		content, sourceMap, linkMap, blockIdx = markdown.ParseWithSourceMapAndIndex(bodyContent)
+	}
+
+	// Clear pending edits.
+	w.pendingEdits = w.pendingEdits[:0]
 
 	// Update the rich body content
 	w.richBody.SetContent(content)
 	w.previewSourceMap = sourceMap
 	w.previewLinkMap = linkMap
+	w.prevBlockIndex = blockIdx
 
 	// Try to restore the scroll position
 	// Clamp to the new content length if necessary

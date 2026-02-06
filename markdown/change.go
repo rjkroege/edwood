@@ -47,6 +47,7 @@ type BlockInfo struct {
 // BlockIndex maps source positions to block extents.
 type BlockIndex struct {
 	Blocks         []BlockInfo
+	SourceByteLen  int   // byte length of the source text that produced this index
 	lineRuneStarts []int // rune offset for each line start (internal, for fence checking)
 }
 
@@ -186,7 +187,7 @@ func buildBlockIndex(text string) *BlockIndex {
 	}
 	lineRuneStarts[len(lines)] = runePos
 
-	bi := &BlockIndex{lineRuneStarts: lineRuneStarts}
+	bi := &BlockIndex{SourceByteLen: len(text), lineRuneStarts: lineRuneStarts}
 
 	inFencedBlock := false
 	fencedBlockStart := 0
@@ -648,4 +649,112 @@ func findLMBoundary(lm *LinkMap, renderedPos int) int {
 		}
 	}
 	return len(lm.entries)
+}
+
+// IncrementalUpdate attempts an incremental re-parse of the changed region.
+// It takes the previous parse result, the new (post-edit) full source text,
+// and the accumulated edits since the last update.
+// Returns the updated StitchResult and true on success, or a zero StitchResult
+// and false if a full re-parse is required (e.g., fence delimiter edits).
+func IncrementalUpdate(old StitchResult, newSource string, edits []EditRecord) (StitchResult, bool) {
+	if old.BlockIdx == nil || len(old.BlockIdx.Blocks) == 0 || len(edits) == 0 {
+		return StitchResult{}, false
+	}
+
+	startBlock, endBlock := old.BlockIdx.AffectedRange(edits)
+	if startBlock == -1 || endBlock == -1 {
+		return StitchResult{}, false
+	}
+
+	// Compute source rune delta from the coalesced edits.
+	sourceDelta := 0
+	for _, e := range edits {
+		sourceDelta += e.NewLen - e.OldLen
+	}
+
+	// Compute byte delta from stored old source byte length.
+	sourceBytesDelta := len(newSource) - old.BlockIdx.SourceByteLen
+
+	newLines := splitLines(newSource)
+
+	// Compute the source rune range of affected blocks in old source.
+	oldBlockStart := old.BlockIdx.Blocks[startBlock].SourceRuneStart
+	lastBlock := endBlock - 1
+	oldBlockEnd := old.BlockIdx.Blocks[lastBlock].SourceRuneEnd
+
+	// Find new block boundaries: affected region in the new source.
+	newBlockEnd := oldBlockEnd + sourceDelta
+	if newBlockEnd < oldBlockStart {
+		newBlockEnd = oldBlockStart
+	}
+
+	// Find line range in the new source covering [oldBlockStart, newBlockEnd).
+	newLineStart := 0
+	newLineEnd := len(newLines)
+	runePos := 0
+	for i, l := range newLines {
+		lineEnd := runePos + utf8.RuneCountInString(l)
+		if runePos <= oldBlockStart && lineEnd > oldBlockStart {
+			newLineStart = i
+		}
+		if lineEnd >= newBlockEnd && newLineEnd == len(newLines) {
+			newLineEnd = i + 1
+			break
+		}
+		runePos = lineEnd
+	}
+
+	// Extend the region to include any trailing blank lines at the boundary.
+	// This ensures paragraph separators are included in the region, producing
+	// the correct paragraph break in the parsed output.
+	for newLineEnd < len(newLines) {
+		line := strings.TrimRight(newLines[newLineEnd], "\n")
+		if line != "" {
+			break
+		}
+		newLineEnd++
+	}
+
+	// Compute source rune offset and byte offset for the region.
+	sourceRuneOffset := 0
+	sourceByteOffset := 0
+	for _, l := range newLines[:newLineStart] {
+		sourceRuneOffset += utf8.RuneCountInString(l)
+		sourceByteOffset += len(l)
+	}
+
+	// Parse the affected region.
+	regionLines := newLines[newLineStart:newLineEnd]
+	regionContent, regionSM, regionLM := ParseRegion(
+		regionLines,
+		sourceRuneOffset,
+		sourceByteOffset,
+	)
+
+	// Build the region block index.
+	regionText := strings.Join(regionLines, "")
+	regionBI := buildBlockIndex(regionText)
+
+	// Shift region block index rune positions by sourceRuneOffset.
+	for i := range regionBI.Blocks {
+		regionBI.Blocks[i].SourceRuneStart += sourceRuneOffset
+		regionBI.Blocks[i].SourceRuneEnd += sourceRuneOffset
+	}
+
+	newRegion := StitchResult{
+		Content:  regionContent,
+		SM:       regionSM,
+		LM:       regionLM,
+		BlockIdx: regionBI,
+	}
+
+	result := Stitch(old, newRegion, startBlock, endBlock, sourceDelta, sourceBytesDelta)
+
+	// Update the SourceByteLen on the result block index.
+	result.BlockIdx.SourceByteLen = len(newSource)
+
+	// Re-populate rune positions from globally-correct byte positions.
+	result.SM.PopulateRunePositions(newSource)
+
+	return result, true
 }

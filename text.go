@@ -17,6 +17,7 @@ import (
 	"github.com/rjkroege/edwood/draw/drawutil"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
+	"github.com/rjkroege/edwood/markdown"
 	"github.com/rjkroege/edwood/runes"
 	"github.com/rjkroege/edwood/util"
 )
@@ -449,6 +450,7 @@ func (t *Text) Inserted(oq0 file.OffsetTuple, b []byte, nr int) {
 	// Instead, schedule a debounced re-render of the Markdeep view.
 	if t.what == Body && t.w != nil && t.w.IsPreviewMode() {
 		t.logInsert(oq0, b, nr)
+		t.w.recordEdit(markdown.EditRecord{Pos: q0, OldLen: 0, NewLen: nr})
 		t.w.SchedulePreviewUpdate()
 		return
 	}
@@ -601,6 +603,7 @@ func (t *Text) Deleted(oq0, oq1 file.OffsetTuple) {
 	// Instead, schedule a debounced re-render of the Markdeep view.
 	if t.what == Body && t.w != nil && t.w.IsPreviewMode() {
 		t.logInsertDelete(q0, q1)
+		t.w.recordEdit(markdown.EditRecord{Pos: q0, OldLen: q1 - q0, NewLen: 0})
 		t.w.SchedulePreviewUpdate()
 		return
 	}
