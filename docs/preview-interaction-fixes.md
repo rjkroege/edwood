@@ -174,3 +174,33 @@ This is the highest priority — it's a correctness bug that makes the frame unu
 2. Test colored sweep color override
 3. Test cursor warp coordinates after Look
 4. Test round-trip: scroll → click → correct character position
+
+## Bug 4: External Look Doesn't Update Preview
+
+### Problem
+
+When in preview mode, a Look (B3) from **outside** the preview frame (e.g., the tag bar, or another window) correctly updates `body.q0/q1` in the source buffer, but:
+1. The preview doesn't show the new selection — it remains unchanged
+2. The mouse warps to the source text-frame location instead of the preview location
+
+This differs from Bug 1 (which was about Look *within* the preview). Here the Look originates externally and the target window happens to be in preview mode.
+
+### Root Cause
+
+Two gaps:
+
+1. **`Text.Show()` (`text.go:1260-1266`)**: The preview-mode branch sets `q0/q1` and returns early. It correctly suppresses source-frame drawing, but does nothing to update the preview selection, scroll, or redraw.
+
+2. **Cursor warp in `look3()` (`look.go:164-165`) and `openfile()` (`look.go:473-474`)**: Both compute the warp point from `ct.fr.Ptofchar()` — the source text frame, which is hidden in preview mode. They should use the rich text frame's `Ptofchar()` instead.
+
+### Fix
+
+**Step 1**: Add `Window.ShowInPreview(q0, q1 int) int` — maps source positions to rendered via `ToRendered()`, sets preview selection, scrolls to match, redraws. Returns rendered start position for cursor warp, or -1 on failure.
+
+**Step 2**: Call `ShowInPreview` from `Text.Show()`'s preview-mode branch. This fixes all callers that go through `Show()`: `search()`, `openfile()`, `look()` (exec.go), `ecmd.go`, `xfid.go`, `Undo()`, etc.
+
+**Step 3**: Fix cursor warp in `look3()` and `openfile()` to use `richBody.Frame().Ptofchar(rendStart)` when the target window is in preview mode.
+
+### Lock Safety
+
+`Show()` holds `t.lk`. `ShowInPreview` only touches `richBody` and the display — no `t.lk` reacquisition, so no deadlock risk.

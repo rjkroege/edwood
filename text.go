@@ -1254,14 +1254,15 @@ func (t *Text) Show(q0, q1 int, doselect bool) {
 		}
 		return
 	}
-	// In preview mode, update the logical selection (q0/q1) but suppress
-	// DrawSel() and scroll operations on the source body frame. This prevents
-	// the source frame from bleeding through the preview rendering.
+	// In preview mode, update the logical selection (q0/q1) and sync the
+	// preview display. Suppress DrawSel() and scroll operations on the
+	// source body frame to prevent it from bleeding through the preview.
 	if t.w != nil && t.w.IsPreviewMode() {
 		if doselect {
 			t.q0 = q0
 			t.q1 = q1
 		}
+		t.w.ShowInPreview(q0, q1)
 		return
 	}
 	if t.w != nil && t.fr.GetFrameFillStatus().Maxlines == 0 {

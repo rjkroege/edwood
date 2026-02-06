@@ -162,7 +162,16 @@ func look3(t *Text, q0 int, q1 int, external bool) {
 		r = make([]rune, n)
 		t.file.Read(e.q0, r)
 		if search(ct, r[:n]) && e.jump {
-			global.row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
+			if ct.w != nil && ct.w.IsPreviewMode() && ct.w.richBody != nil && ct.w.previewSourceMap != nil {
+				rendStart, _ := ct.w.previewSourceMap.ToRendered(ct.q0, ct.q1)
+				if rendStart >= 0 {
+					warpPt := ct.w.richBody.Frame().Ptofchar(rendStart).Add(
+						image.Pt(4, ct.w.richBody.Frame().DefaultFontHeight()-4))
+					global.row.display.MoveTo(warpPt)
+				}
+			} else {
+				global.row.display.MoveTo(ct.fr.Ptofchar(getP0(ct.fr)).Add(image.Pt(4, ct.fr.DefaultFontHeight()-4)))
+			}
 		}
 	}
 }
@@ -471,7 +480,16 @@ func openfile(t *Text, e *Expand) *Window {
 	t.Show(r.q0, r.q1, true)
 	global.seltext = t
 	if e.jump {
-		global.row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(global.tagfont, global.row.display).Height()-4)))
+		if t.w != nil && t.w.IsPreviewMode() && t.w.richBody != nil && t.w.previewSourceMap != nil {
+			rendStart, _ := t.w.previewSourceMap.ToRendered(r.q0, r.q1)
+			if rendStart >= 0 {
+				warpPt := t.w.richBody.Frame().Ptofchar(rendStart).Add(
+					image.Pt(4, t.w.richBody.Frame().DefaultFontHeight()-4))
+				global.row.display.MoveTo(warpPt)
+			}
+		} else {
+			global.row.display.MoveTo(t.fr.Ptofchar(getP0(t.fr)).Add(image.Pt(4, fontget(global.tagfont, global.row.display).Height()-4)))
+		}
 	} else {
 		debug.PrintStack()
 	}

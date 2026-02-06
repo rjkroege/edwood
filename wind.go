@@ -1457,6 +1457,28 @@ func (w *Window) previewHScrollLatch(rt *RichText, mc *draw.Mousectl, button int
 	}
 }
 
+// ShowInPreview maps source positions [q0, q1) to rendered positions,
+// updates the preview selection, scrolls to make it visible, and redraws.
+// Returns the rendered start position (for cursor warping), or -1 if
+// mapping failed.
+func (w *Window) ShowInPreview(q0, q1 int) int {
+	if !w.previewMode || w.richBody == nil || w.previewSourceMap == nil {
+		return -1
+	}
+	rt := w.richBody
+	rendStart, rendEnd := w.previewSourceMap.ToRendered(q0, q1)
+	if rendStart < 0 || rendEnd < 0 {
+		return -1
+	}
+	rt.SetSelection(rendStart, rendEnd)
+	w.scrollPreviewToMatch(rt, rendStart)
+	w.Draw()
+	if w.display != nil {
+		w.display.Flush()
+	}
+	return rendStart
+}
+
 // scrollPreviewToMatch scrolls the preview so that the match at rendStart
 // is visible, placing it roughly 1/3 from the top of the frame (matching
 // Acme's Show() scroll behavior). If the match is already visible, no
