@@ -4976,10 +4976,11 @@ func TestPreviewChordDetection(t *testing.T) {
 			t.Error("HandlePreviewMouse should handle B1 click in frame area")
 		}
 
-		// After chord detection, a selection should exist
+		// After a B1+B2 chord cut, the selected text is deleted and
+		// the selection should collapse to a cursor (p0 == p1).
 		p0, p1 := rt.Selection()
-		if p0 == p1 {
-			t.Error("Expected non-empty selection after B1 sweep for chord")
+		if p0 != p1 {
+			t.Errorf("Expected collapsed selection after B1+B2 cut chord, got p0=%d p1=%d", p0, p1)
 		}
 	})
 

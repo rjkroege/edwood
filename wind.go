@@ -991,14 +991,18 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 		}
 	}
 
-	// Handle button 1 in frame area for text selection and chording
+	// Handle button 1 in frame area for text selection and chording.
+	// Chord processing follows the same pattern as text.go: chords are
+	// handled inline in a loop while B1 is held, so that sequential
+	// B1+B2 (cut) then B1+B3 (paste) works correctly.
 	frameRect := rt.Frame().Rect()
-	if m.Point.In(frameRect) && m.Buttons&1 != 0 {
+	if m.Point.In(frameRect) && m.Buttons&1 != 0 && mc != nil {
 		var p0, p1 int
-		var chordButtons int
+		var lastButtons int // track button state for chord loop
 
 		selectq := rt.Frame().Charofpt(m.Point)
 		b := m.Buttons
+		fr := rt.Frame()
 
 		// Check for double-click: same richtext, same position, within 500ms.
 		prevP0, prevP1 := rt.Selection()
@@ -1007,45 +1011,48 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 			prevP0 == prevP1 && selectq == prevP0 {
 
 			// Double-click: expand selection
-			p0, p1 = rt.Frame().ExpandAtPos(selectq)
+			p0, p1 = fr.ExpandAtPos(selectq)
 			rt.SetSelection(p0, p1)
-			rt.Frame().Redraw()
+			fr.Redraw()
 			if w.display != nil {
 				w.display.Flush()
 			}
 			w.previewClickRT = nil
 
-			// Wait for mouse state change (like acme: jitter tolerance)
-			if mc != nil {
-				x, y := m.Point.X, m.Point.Y
-				for {
-					me := <-mc.C
-					if !(me.Buttons == b &&
-						util.Abs(me.Point.X-x) < 3 &&
-						util.Abs(me.Point.Y-y) < 3) {
-						// If buttons still held, handle chords
-						if me.Buttons != 0 && me.Buttons != b {
-							chordButtons = me.Buttons
-						}
-						// Drain until all buttons released
-						for me.Buttons != 0 {
-							me = <-mc.C
-							if me.Buttons != 0 && me.Buttons != b && chordButtons == 0 {
-								chordButtons = me.Buttons
-							}
-						}
-						break
-					}
+			// Wait for mouse state change (jitter tolerance), then
+			// fall through to the chord processing loop below.
+			x, y := m.Point.X, m.Point.Y
+			for {
+				me := <-mc.C
+				lastButtons = me.Buttons
+				if !(me.Buttons == b &&
+					util.Abs(me.Point.X-x) < 3 &&
+					util.Abs(me.Point.Y-y) < 3) {
+					break
 				}
 			}
 		} else {
-			// Normal click/drag selection
-			if mc != nil {
-				p0, p1, chordButtons = rt.Frame().SelectWithChord(mc, m)
+			// Normal click/drag selection: track drag until a chord
+			// is detected or all buttons are released.
+			anchor := selectq
+			for {
+				me := <-mc.C
+				lastButtons = me.Buttons
+				current := fr.Charofpt(me.Point)
+				if anchor <= current {
+					p0, p1 = anchor, current
+				} else {
+					p0, p1 = current, anchor
+				}
 				rt.SetSelection(p0, p1)
-			} else {
-				p0, p1 = selectq, selectq
-				rt.SetSelection(p0, p1)
+				fr.Redraw()
+				if w.display != nil {
+					w.display.Flush()
+				}
+				// Chord detected or all buttons released: exit drag.
+				if me.Buttons != b || me.Buttons == 0 {
+					break
+				}
 			}
 
 			// Record double-click state
@@ -1060,27 +1067,72 @@ func (w *Window) HandlePreviewMouse(m *draw.Mouse, mc *draw.Mousectl) bool {
 
 		// Sync the preview selection to the source body buffer
 		w.syncSourceSelection()
+		q0 := w.body.q0
 
-		// Process chords
-		switch {
-		case chordButtons == 7: // B1+B2+B3: Snarf (copy, no delete)
-			cut(&w.body, &w.body, nil, true, false, "")
-			global.snarfContext = w.selectionContext
-
-		case chordButtons&2 != 0: // B1+B2: Cut (copy + delete)
-			w.body.TypeCommit()
-			global.seq++
-			w.body.file.Mark(global.seq)
-			cut(&w.body, &w.body, nil, true, true, "")
-			global.snarfContext = w.selectionContext
-			w.UpdatePreview()
-
-		case chordButtons&4 != 0: // B1+B3: Paste (replace selection with snarf)
-			w.body.TypeCommit()
-			global.seq++
-			w.body.file.Mark(global.seq)
-			paste(&w.body, &w.body, nil, true, false, "")
-			w.UpdatePreview()
+		// Chord processing loop: handle B2/B3 chords while B1 is held,
+		// matching the text.go pattern with undo/redo toggle semantics.
+		const (
+			chordNone = iota
+			chordCut
+			chordPaste
+			chordSnarf
+		)
+		state := chordNone
+		for lastButtons != 0 {
+			if lastButtons == 7 && state == chordNone {
+				// B1+B2+B3 simultaneous: snarf only (copy, no delete)
+				cut(&w.body, &w.body, nil, true, false, "")
+				global.snarfContext = w.selectionContext
+				state = chordSnarf
+			} else if (lastButtons&1) != 0 && (lastButtons&6) != 0 && state != chordSnarf {
+				if state == chordNone {
+					w.body.TypeCommit()
+					global.seq++
+					w.body.file.Mark(global.seq)
+				}
+				if lastButtons&2 != 0 {
+					// B2 chord: cut (or undo a previous paste)
+					if state == chordPaste {
+						w.Undo(true)
+						w.body.SetSelect(q0, w.body.q1)
+						state = chordNone
+					} else if state != chordCut {
+						cut(&w.body, &w.body, nil, true, true, "")
+						global.snarfContext = w.selectionContext
+						state = chordCut
+					}
+				} else {
+					// B3 chord: paste (or undo a previous cut)
+					if state == chordCut {
+						w.Undo(true)
+						w.body.SetSelect(q0, w.body.q1)
+						state = chordNone
+					} else if state != chordPaste {
+						paste(&w.body, &w.body, nil, true, false, "")
+						state = chordPaste
+					}
+				}
+				// Collapse the rich frame's selection before re-rendering
+				// so UpdatePreview doesn't draw a stale highlight.
+				mq0, mq1 := w.previewSourceMap.ToRendered(w.body.q0, w.body.q1)
+				rt.SetSelection(mq0, mq1)
+				w.UpdatePreview()
+				// Now use the new source map to set the correct selection.
+				if w.previewSourceMap != nil {
+					rendStart, rendEnd := w.previewSourceMap.ToRendered(w.body.q0, w.body.q1)
+					if rendStart >= 0 {
+						rt.SetSelection(rendStart, rendEnd)
+					}
+				}
+				clearmouse()
+			}
+			// Wait for button state to change
+			prev := lastButtons
+			for lastButtons == prev {
+				me := <-mc.C
+				lastButtons = me.Buttons
+			}
+			w.previewClickRT = nil
 		}
 
 		w.Draw()
