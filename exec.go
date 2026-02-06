@@ -1223,9 +1223,9 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 			w.imageCache = nil
 		}
 		w.SetPreviewMode(false)
-		// Redraw to show the original body text
-		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
-		w.body.SetSelect(w.body.q0, w.body.q1)
+		// Scroll the source view to make the current selection visible.
+		// Show() handles ScrDraw + SetSelect + scrolling if off-screen.
+		w.body.Show(w.body.q0, w.body.q1, true)
 		if w.display != nil {
 			w.display.Flush()
 		}
@@ -1352,14 +1352,15 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 		rt.SetSelection(rendStart, rendEnd)
 	}
 
-	// Set the scroll origin to match the text body's current position
-	rt.SetOrigin(w.body.org)
-
 	// Enter preview mode
 	w.SetPreviewMode(true)
 
-	// Redraw the preview - Render() with body rectangle
+	// Render the preview, then scroll to make the selection visible.
+	// Must render first so the frame has layout data for scrollPreviewToMatch.
 	rt.Render(bodyRect)
+	if rendStart >= 0 {
+		w.scrollPreviewToMatch(rt, rendStart)
+	}
 	w.Draw()
 	if display != nil {
 		display.Flush()
