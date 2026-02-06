@@ -333,7 +333,71 @@ func buildBlockIndex(text string) *BlockIndex {
 			if inParagraph {
 				emitParagraph(i)
 			}
-			emitBlock(BlockListItem, i, i+1)
+			// Determine contentCol for list continuation detection
+			var contentCol int
+			if isUL {
+				_, _, cs := isUnorderedListItem(line)
+				contentCol = cs
+			} else {
+				_, _, cs, _ := isOrderedListItem(line)
+				contentCol = cs
+			}
+			_, indentLvl, _ := isUnorderedListItem(line)
+			if isOL {
+				_, indentLvl, _, _ = isOrderedListItem(line)
+			}
+
+			// Scan ahead for continuation lines (multi-line list items)
+			listItemEnd := i + 1
+			inListFenced := false
+			for j := i + 1; j < len(lines); j++ {
+				contLine := lines[j]
+
+				if inListFenced {
+					stripped, ok := stripListIndent(contLine, contentCol)
+					if ok && isFenceDelimiter(stripped) {
+						inListFenced = false
+						listItemEnd = j + 1
+						continue
+					}
+					// Inside list fenced block — accumulate
+					listItemEnd = j + 1
+					continue
+				}
+
+				// Check if this is another list item at same or lower indent
+				isULC, ci, _ := isUnorderedListItem(contLine)
+				isOLC, oi, _, _ := isOrderedListItem(contLine)
+				if isULC && ci <= indentLvl {
+					break
+				}
+				if isOLC && oi <= indentLvl {
+					break
+				}
+
+				stripped, ok := stripListIndent(contLine, contentCol)
+				if ok {
+					if isFenceDelimiter(stripped) {
+						inListFenced = true
+						listItemEnd = j + 1
+						continue
+					}
+					// Other continuation (indented code, text, etc.)
+					listItemEnd = j + 1
+					continue
+				}
+
+				// Blank line — end list item
+				trimmedCont := strings.TrimRight(contLine, "\n")
+				if trimmedCont == "" {
+					break
+				}
+				// Not indented enough — end list item
+				break
+			}
+
+			emitBlock(BlockListItem, i, listItemEnd)
+			i = listItemEnd - 1 // -1 because loop increments
 			continue
 		}
 

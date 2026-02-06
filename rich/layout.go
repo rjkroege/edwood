@@ -499,6 +499,11 @@ func layout(boxes []Box, font draw.Font, frameWidth, maxtab int, fontHeightFn Fo
 		if box.Style.ListBullet || box.Style.ListItem {
 			indentPixels += box.Style.ListIndent * ListIndentWidth
 			currentListIndent = box.Style.ListIndent // Track for wrapped lines
+			if (box.Style.Block && box.Style.Code) || box.Style.Table {
+				// Code block or table inside a list item: add extra indent
+				// instead of using the full gutter
+				indentPixels += ListIndentWidth
+			}
 		} else if (box.Style.Block && box.Style.Code) || box.Style.Table || box.Style.Image {
 			// All scrollable block elements get gutter indentation
 			indentPixels = gutterIndent

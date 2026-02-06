@@ -259,6 +259,59 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 	var indentedBlockContent strings.Builder
 	indentedBlockSourceStart := 0
 
+	// Track list context for nested blocks
+	type listCtxSM struct {
+		contentCol int
+		indentLvl  int
+		ordered    bool
+		itemNumber int
+	}
+	var activeList *listCtxSM
+	inListCodeBlock := false
+	var listCodeContent strings.Builder
+	listCodeSourceStart := 0
+
+	// Helper to emit a code block accumulated within a list item
+	emitListCodeBlock := func() {
+		if listCodeContent.Len() > 0 {
+			codeContent := listCodeContent.String()
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:         rich.InlineCodeBg,
+					Code:       true,
+					Block:      true,
+					ListItem:   true,
+					ListIndent: activeList.indentLvl,
+					Scale:      1.0,
+				},
+			}
+
+			// Create source map entry
+			codeLen := len([]rune(codeContent))
+			entry := SourceMapEntry{
+				RenderedStart: renderedPos,
+				RenderedEnd:   renderedPos + codeLen,
+				SourceStart:   listCodeSourceStart,
+				SourceEnd:     sourcePos,
+			}
+			sm.entries = append(sm.entries, entry)
+			renderedPos += codeLen
+
+			result = append(result, codeSpan)
+			listCodeContent.Reset()
+		}
+		inListCodeBlock = false
+	}
+
+	// Helper to end the active list context
+	endListContext := func() {
+		if inListCodeBlock {
+			emitListCodeBlock()
+		}
+		activeList = nil
+	}
+
 	// Track blockquote state
 	inBlockquote := false
 	blockquoteDepth := 0
@@ -316,6 +369,102 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
+
+		// --- List context: handle continuation lines within a list item ---
+		if activeList != nil {
+			// Inside a list code block: accumulate or close
+			if inListCodeBlock {
+				stripped, ok := stripListIndent(line, activeList.contentCol)
+				if ok && isFenceDelimiter(stripped) {
+					// Closing fence — emit the code block
+					emitListCodeBlock()
+					sourcePos += len(line)
+					continue
+				}
+				if ok {
+					listCodeContent.WriteString(stripped)
+				} else {
+					trimmed := strings.TrimRight(line, "\n")
+					if trimmed == "" {
+						listCodeContent.WriteString(line)
+					} else {
+						emitListCodeBlock()
+						endListContext()
+						goto normalDispatchSM
+					}
+				}
+				sourcePos += len(line)
+				continue
+			}
+
+			// Not in a list code block — check if this is a continuation line
+			isULCont, contIndent, _ := isUnorderedListItem(line)
+			isOLCont, contOLIndent, _, _ := isOrderedListItem(line)
+			if isULCont && contIndent <= activeList.indentLvl {
+				endListContext()
+				goto normalDispatchSM
+			}
+			if isOLCont && contOLIndent <= activeList.indentLvl {
+				endListContext()
+				goto normalDispatchSM
+			}
+
+			stripped, ok := stripListIndent(line, activeList.contentCol)
+			if ok {
+				if isFenceDelimiter(stripped) {
+					// Opening fence within list item
+					inListCodeBlock = true
+					listCodeContent.Reset()
+					// Source position: skip past the opening fence line
+					sourcePos += len(line)
+					listCodeSourceStart = sourcePos
+					continue
+				}
+				if isIndentedCodeLine(stripped) {
+					codeContent := stripIndent(stripped)
+					codeSpan := rich.Span{
+						Text: codeContent,
+						Style: rich.Style{
+							Bg:         rich.InlineCodeBg,
+							Code:       true,
+							Block:      true,
+							ListItem:   true,
+							ListIndent: activeList.indentLvl,
+							Scale:      1.0,
+						},
+					}
+
+					// Create source map entry for indented code in list
+					codeLen := len([]rune(codeContent))
+					entry := SourceMapEntry{
+						RenderedStart: renderedPos,
+						RenderedEnd:   renderedPos + codeLen,
+						SourceStart:   sourcePos,
+						SourceEnd:     sourcePos + len(line),
+					}
+					sm.entries = append(sm.entries, entry)
+					renderedPos += codeLen
+
+					result = append(result, codeSpan)
+					sourcePos += len(line)
+					continue
+				}
+				// Other continuation content — end list context, fall through
+				endListContext()
+				goto normalDispatchSM
+			}
+
+			trimmedCont := strings.TrimRight(line, "\n")
+			if trimmedCont == "" {
+				endListContext()
+				goto normalDispatchSM
+			}
+
+			endListContext()
+			goto normalDispatchSM
+		}
+
+	normalDispatchSM:
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
 			// If we were in an indented block, emit it first
@@ -582,8 +731,8 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 		}
 
 		// Check if this is a block-level element (heading, hrule, list item)
-		isUL, _, _ := isUnorderedListItem(line)
-		isOL, _, _, _ := isOrderedListItem(line)
+		isUL, ulIndent, ulContentStart := isUnorderedListItem(line)
+		isOL, olIndent, olContentStart, olItemNum := isOrderedListItem(line)
 		isListItem := isUL || isOL
 		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line) || isListItem
 
@@ -638,6 +787,28 @@ func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
 				result = append(result, span)
 			}
 		}
+
+		// After parsing a list item, set up list context for continuation detection
+		if isListItem {
+			if isUL {
+				activeList = &listCtxSM{
+					contentCol: ulContentStart,
+					indentLvl:  ulIndent,
+				}
+			} else {
+				activeList = &listCtxSM{
+					contentCol: olContentStart,
+					indentLvl:  olIndent,
+					ordered:    true,
+					itemNumber: olItemNum,
+				}
+			}
+		}
+	}
+
+	// Handle trailing list context
+	if activeList != nil {
+		endListContext()
 	}
 
 	// Handle unclosed fenced code block - treat remaining content as code

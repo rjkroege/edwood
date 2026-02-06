@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -4772,6 +4773,241 @@ func TestIsBlockquoteLine(t *testing.T) {
 			}
 			if contentStart != tt.wantContent {
 				t.Errorf("isBlockquoteLine(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContent)
+			}
+		})
+	}
+}
+
+// Tests for Phase 8.2: Nested Code Blocks in Lists
+
+func TestParseNestedCodeBlockInList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text       string
+			code       bool
+			block      bool
+			listBullet bool
+			listItem   bool
+			listIndent int
+		}
+	}{
+		{
+			name: "fenced code block inside unordered list item",
+			input: "- Item\n" +
+				"  ```\n" +
+				"  code here\n" +
+				"  ```",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "code here\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "fenced code block inside ordered list item",
+			input: "1. Item\n" +
+				"   ```\n" +
+				"   some code\n" +
+				"   ```",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "1.", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "some code\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "fenced code block in nested list item",
+			input: "- Outer\n" +
+				"  - Inner\n" +
+				"    ```\n" +
+				"    nested code\n" +
+				"    ```",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Outer\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 1},
+				{text: " ", listBullet: false, listItem: true, listIndent: 1},
+				{text: "Inner\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 1},
+				{text: "nested code\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 1},
+			},
+		},
+		{
+			name: "multiple list items with one code block",
+			input: "- First\n" +
+				"- Second\n" +
+				"  ```\n" +
+				"  code\n" +
+				"  ```\n" +
+				"- Third",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "First\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Second\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "code\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Third", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "code block followed by next list item",
+			input: "- Item\n" +
+				"  ```\n" +
+				"  code\n" +
+				"  ```\n" +
+				"- Next",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "code\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Next", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "indented code block inside list item",
+			// 2 spaces for list content + 4 spaces for code = 6 spaces total
+			input: "- Item\n" +
+				"      code line\n" +
+				"- Next",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "code line\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Next", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "fenced code block with multiple lines in list",
+			input: "- Item\n" +
+				"  ```\n" +
+				"  line one\n" +
+				"  line two\n" +
+				"  line three\n" +
+				"  ```",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "line one\nline two\nline three\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+		{
+			name: "code block preserves content in list",
+			// Verify code block content is not parsed for inline formatting
+			input: "- Item\n" +
+				"  ```\n" +
+				"  **not bold** and `not code`\n" +
+				"  ```",
+			wantSpan: []struct {
+				text       string
+				code       bool
+				block      bool
+				listBullet bool
+				listItem   bool
+				listIndent int
+			}{
+				{text: "•", listBullet: true, listItem: false, listIndent: 0},
+				{text: " ", listBullet: false, listItem: true, listIndent: 0},
+				{text: "Item\n", code: false, block: false, listBullet: false, listItem: true, listIndent: 0},
+				{text: "**not bold** and `not code`\n", code: true, block: true, listBullet: false, listItem: true, listIndent: 0},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				var gotDesc []string
+				for _, s := range got {
+					gotDesc = append(gotDesc, fmt.Sprintf("{text:%q code:%v block:%v listBullet:%v listItem:%v listIndent:%d}",
+						s.Text, s.Style.Code, s.Style.Block, s.Style.ListBullet, s.Style.ListItem, s.Style.ListIndent))
+				}
+				t.Fatalf("got %d spans, want %d spans\n  got:\n    %s",
+					len(got), len(tt.wantSpan), strings.Join(gotDesc, "\n    "))
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Code != want.code {
+					t.Errorf("span[%d].Style.Code = %v, want %v", i, got[i].Style.Code, want.code)
+				}
+				if got[i].Style.Block != want.block {
+					t.Errorf("span[%d].Style.Block = %v, want %v", i, got[i].Style.Block, want.block)
+				}
+				if got[i].Style.ListBullet != want.listBullet {
+					t.Errorf("span[%d].Style.ListBullet = %v, want %v", i, got[i].Style.ListBullet, want.listBullet)
+				}
+				if got[i].Style.ListItem != want.listItem {
+					t.Errorf("span[%d].Style.ListItem = %v, want %v", i, got[i].Style.ListItem, want.listItem)
+				}
+				if got[i].Style.ListIndent != want.listIndent {
+					t.Errorf("span[%d].Style.ListIndent = %d, want %d", i, got[i].Style.ListIndent, want.listIndent)
+				}
 			}
 		})
 	}

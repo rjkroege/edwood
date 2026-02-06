@@ -57,6 +57,45 @@ func Parse(text string) rich.Content {
 	// Track if we're in a paragraph (consecutive non-block lines)
 	inParagraph := false
 
+	// Track list context for nested blocks
+	type listCtx struct {
+		contentCol int  // column where content starts (for continuation detection)
+		indentLvl  int  // nesting level (for ListIndent)
+		ordered    bool // true for ordered lists
+		itemNumber int  // item number for ordered lists
+	}
+	var activeList *listCtx
+	inListCodeBlock := false
+	var listCodeContent strings.Builder
+
+	// Helper to emit a code block accumulated within a list item
+	emitListCodeBlock := func() {
+		if listCodeContent.Len() > 0 {
+			codeSpan := rich.Span{
+				Text: listCodeContent.String(),
+				Style: rich.Style{
+					Bg:       rich.InlineCodeBg,
+					Code:     true,
+					Block:    true,
+					ListItem: true,
+					ListIndent: activeList.indentLvl,
+					Scale:    1.0,
+				},
+			}
+			result = append(result, codeSpan)
+			listCodeContent.Reset()
+		}
+		inListCodeBlock = false
+	}
+
+	// Helper to end the active list context
+	endListContext := func() {
+		if inListCodeBlock {
+			emitListCodeBlock()
+		}
+		activeList = nil
+	}
+
 	// Track blockquote state
 	inBlockquote := false
 	blockquoteDepth := 0
@@ -74,6 +113,98 @@ func Parse(text string) rich.Content {
 
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
+
+		// --- List context: handle continuation lines within a list item ---
+		if activeList != nil {
+			// Inside a list code block: accumulate or close
+			if inListCodeBlock {
+				// Check if line is indented to contentCol and has a fence delimiter
+				stripped, ok := stripListIndent(line, activeList.contentCol)
+				if ok && isFenceDelimiter(stripped) {
+					// Closing fence — emit the code block
+					emitListCodeBlock()
+					continue
+				}
+				// Accumulate code content (strip list indent)
+				if ok {
+					listCodeContent.WriteString(stripped)
+				} else {
+					// Line not indented enough — still accumulate raw
+					// (handles empty lines within code blocks)
+					trimmed := strings.TrimRight(line, "\n")
+					if trimmed == "" {
+						listCodeContent.WriteString(line)
+					} else {
+						// Not indented enough and not blank — end code block and list context
+						emitListCodeBlock()
+						endListContext()
+						goto normalDispatch
+					}
+				}
+				continue
+			}
+
+			// Not in a list code block — check if this is a continuation line
+			// First check: is this another list item at same or lower indent?
+			isULCont, contIndent, _ := isUnorderedListItem(line)
+			isOLCont, contOLIndent, _, _ := isOrderedListItem(line)
+			if isULCont && contIndent <= activeList.indentLvl {
+				endListContext()
+				goto normalDispatch
+			}
+			if isOLCont && contOLIndent <= activeList.indentLvl {
+				endListContext()
+				goto normalDispatch
+			}
+
+			// Check if line is indented to contentCol (continuation)
+			stripped, ok := stripListIndent(line, activeList.contentCol)
+			if ok {
+				// It's a continuation line — check for nested blocks
+				if isFenceDelimiter(stripped) {
+					// Opening fence within list item
+					inListCodeBlock = true
+					listCodeContent.Reset()
+					continue
+				}
+				// Check for indented code within list item (4 extra spaces)
+				if isIndentedCodeLine(stripped) {
+					codeContent := stripIndent(stripped)
+					codeSpan := rich.Span{
+						Text: codeContent,
+						Style: rich.Style{
+							Bg:       rich.InlineCodeBg,
+							Code:     true,
+							Block:    true,
+							ListItem: true,
+							ListIndent: activeList.indentLvl,
+							Scale:    1.0,
+						},
+					}
+					result = append(result, codeSpan)
+					continue
+				}
+				// Other continuation content (plain text, blockquote, etc.)
+				// For now, treat as paragraph continuation within the list item
+				// (Phase 8.3 will handle blockquotes here)
+				endListContext()
+				goto normalDispatch
+			}
+
+			// Check for blank line — could be intra-item paragraph break
+			trimmedCont := strings.TrimRight(line, "\n")
+			if trimmedCont == "" {
+				// Blank line — end list context (simple approach)
+				endListContext()
+				goto normalDispatch
+			}
+
+			// Line not indented enough and not a list item — end context
+			endListContext()
+			goto normalDispatch
+		}
+
+	normalDispatch:
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
 			// If we were in an indented block, emit it first
@@ -265,8 +396,8 @@ func Parse(text string) rich.Content {
 		}
 
 		// Check if this is a block-level element (heading, hrule, list item)
-		isUL, _, _ := isUnorderedListItem(line)
-		isOL, _, _, _ := isOrderedListItem(line)
+		isUL, ulIndent, ulContentStart := isUnorderedListItem(line)
+		isOL, olIndent, olContentStart, olItemNum := isOrderedListItem(line)
 		isListItem := isUL || isOL
 		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line) || isListItem
 
@@ -311,6 +442,28 @@ func Parse(text string) rich.Content {
 				result = append(result, span)
 			}
 		}
+
+		// After parsing a list item, set up list context for continuation detection
+		if isListItem {
+			if isUL {
+				activeList = &listCtx{
+					contentCol: ulContentStart,
+					indentLvl:  ulIndent,
+				}
+			} else {
+				activeList = &listCtx{
+					contentCol: olContentStart,
+					indentLvl:  olIndent,
+					ordered:    true,
+					itemNumber: olItemNum,
+				}
+			}
+		}
+	}
+
+	// Handle trailing list context
+	if activeList != nil {
+		endListContext()
 	}
 
 	// Handle trailing blockquote
@@ -372,6 +525,31 @@ func stripIndent(line string) string {
 		return line[4:]
 	}
 	return line
+}
+
+// stripListIndent strips leading whitespace up to contentCol columns from a line.
+// Returns the stripped line and true if the line was indented to at least contentCol,
+// or ("", false) if the line has insufficient indentation.
+// Tabs count as advancing to the next tab stop (every 4 columns).
+func stripListIndent(line string, contentCol int) (string, bool) {
+	col := 0
+	byteIdx := 0
+	for byteIdx < len(line) && col < contentCol {
+		if line[byteIdx] == ' ' {
+			col++
+			byteIdx++
+		} else if line[byteIdx] == '\t' {
+			col += 4 - (col % 4) // advance to next tab stop
+			byteIdx++
+		} else {
+			// Non-whitespace before reaching contentCol
+			return "", false
+		}
+	}
+	if col < contentCol {
+		return "", false
+	}
+	return line[byteIdx:], true
 }
 
 // isBlockquoteLine checks if a line starts with a blockquote marker.
