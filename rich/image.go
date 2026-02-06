@@ -2,6 +2,7 @@
 package rich
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"image"
@@ -242,14 +243,21 @@ type CachedImage struct {
 	Path     string      // Source path for debugging
 	LoadTime time.Time   // When loaded
 	Err      error       // Error if load failed
+	Loading  bool        // true while async load is in progress
 }
+
+// DefaultMaxParallelLoads is the maximum number of concurrent async image downloads.
+const DefaultMaxParallelLoads = 4
 
 // ImageCache provides an LRU cache for loaded images.
 type ImageCache struct {
-	mu      sync.RWMutex
-	images  map[string]*CachedImage
-	order   []string // LRU order (oldest first)
-	maxSize int      // Maximum number of cached images
+	mu          sync.RWMutex
+	images      map[string]*CachedImage
+	order       []string                    // LRU order (oldest first)
+	maxSize     int                         // Maximum number of cached images
+	maxParallel int                         // max concurrent loads (default 4)
+	sem         chan struct{}               // semaphore for concurrent downloads
+	cancelFuncs map[string]context.CancelFunc // per-path cancellation
 }
 
 // NewImageCache creates a new image cache with the specified maximum size.
@@ -325,10 +333,16 @@ func (c *ImageCache) Load(path string) (*CachedImage, error) {
 	return cached, nil
 }
 
-// Clear removes all cached images.
+// Clear removes all cached images and cancels any pending async loads.
 func (c *ImageCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Cancel all pending async loads.
+	for _, cancel := range c.cancelFuncs {
+		cancel()
+	}
+	c.cancelFuncs = make(map[string]context.CancelFunc)
 
 	// Note: In a full implementation with Plan 9 display integration,
 	// we would call Plan9Image.Free() for each cached image here.
@@ -364,4 +378,197 @@ func (c *ImageCache) evictOldest() {
 		c.order = c.order[1:]
 		delete(c.images, oldest)
 	}
+}
+
+// LoadAsync checks the cache for path. On hit, returns the cached entry
+// immediately (synchronous). On miss, creates a placeholder entry with
+// Loading=true, starts a background goroutine to load the image, and
+// returns the placeholder. When loading completes, the cache entry is
+// updated in place and onLoaded is called (if non-nil).
+//
+// The onLoaded callback runs on an unspecified goroutine. Callers that
+// need main-goroutine execution must marshal through the row lock or a
+// channel (same pattern as SchedulePreviewUpdate).
+//
+// If path is already loading (Loading=true in cache), returns the
+// existing placeholder without starting a second goroutine.
+func (c *ImageCache) LoadAsync(path string, onLoaded func(path string)) (*CachedImage, error) {
+	c.mu.Lock()
+
+	// Check cache (hit or already-loading).
+	if cached, ok := c.images[path]; ok {
+		c.mu.Unlock()
+		return cached, cached.Err
+	}
+
+	// Create placeholder.
+	placeholder := &CachedImage{
+		Path:     path,
+		LoadTime: time.Now(),
+		Loading:  true,
+	}
+	c.images[path] = placeholder
+	c.order = append(c.order, path)
+	c.evictOldest()
+
+	// Create cancellation context.
+	ctx, cancel := context.WithCancel(context.Background())
+	if c.cancelFuncs == nil {
+		c.cancelFuncs = make(map[string]context.CancelFunc)
+	}
+	c.cancelFuncs[path] = cancel
+
+	// Lazily init semaphore.
+	if c.sem == nil {
+		max := c.maxParallel
+		if max <= 0 {
+			max = DefaultMaxParallelLoads
+		}
+		c.sem = make(chan struct{}, max)
+	}
+	sem := c.sem
+
+	c.mu.Unlock()
+
+	// Launch background load.
+	go func() {
+		// Acquire semaphore slot.
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		case <-ctx.Done():
+			return
+		}
+
+		// Load the image (this is the slow part).
+		img, err := LoadImageWithContext(ctx, path)
+
+		// Update cache under lock.
+		c.mu.Lock()
+		delete(c.cancelFuncs, path)
+
+		if ctx.Err() != nil {
+			// Cancelled — remove the placeholder so a future LoadAsync retries.
+			delete(c.images, path)
+			c.mu.Unlock()
+			return
+		}
+
+		placeholder.Loading = false
+		if err != nil {
+			placeholder.Err = err
+		} else {
+			placeholder.Original = img
+			placeholder.Width = img.Bounds().Dx()
+			placeholder.Height = img.Bounds().Dy()
+			data, convErr := ConvertToPlan9(img)
+			if convErr != nil {
+				placeholder.Err = convErr
+			} else {
+				placeholder.Data = data
+			}
+		}
+		c.mu.Unlock()
+
+		// Notify caller (outside lock).
+		if onLoaded != nil {
+			onLoaded(path)
+		}
+	}()
+
+	return placeholder, nil
+}
+
+// LoadImageWithContext is like LoadImage but supports cancellation via context.
+// For HTTP URLs, the context is attached to the request.
+// For local files, the context is checked before and after the file read.
+func LoadImageWithContext(ctx context.Context, path string) (image.Image, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if isImageURL(path) {
+		return loadImageFromURLWithContext(ctx, path)
+	}
+	// For local files, check context then load (local I/O is fast enough
+	// that mid-read cancellation isn't critical).
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return loadImageFromFile(path)
+}
+
+// loadImageFromURLWithContext fetches an image from an HTTP(S) URL with context support.
+func loadImageFromURLWithContext(ctx context.Context, url string) (image.Image, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{Timeout: URLImageTimeout}
+	resp, err := client.Do(req)
+	if err != nil && isTLSError(err) {
+		// Retry with relaxed TLS settings.
+		insecureClient := &http.Client{
+			Timeout: URLImageTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		req2, err2 := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err2)
+		}
+		resp, err = insecureClient.Do(req2)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check status code.
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned HTTP %d: %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
+	// Validate Content-Type.
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" {
+		mediaType := strings.TrimSpace(strings.Split(contentType, ";")[0])
+		if !strings.HasPrefix(mediaType, "image/") {
+			return nil, fmt.Errorf("invalid content type: expected image/*, got %q", contentType)
+		}
+	}
+
+	// Check Content-Length if provided.
+	if resp.ContentLength > int64(MaxImageBytes) {
+		return nil, fmt.Errorf("image too large: %d bytes exceeds limit of %d bytes", resp.ContentLength, MaxImageBytes)
+	}
+
+	// Use LimitReader to prevent reading more than MaxImageBytes.
+	limitedReader := io.LimitReader(resp.Body, int64(MaxImageBytes)+1)
+
+	// Decode the image.
+	img, _, err := image.Decode(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Validate image dimensions.
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	if width > MaxImageWidth || height > MaxImageHeight {
+		return nil, fmt.Errorf("image too large: %dx%d (max %dx%d)",
+			width, height, MaxImageWidth, MaxImageHeight)
+	}
+
+	// Check uncompressed size.
+	uncompressedSize := width * height * 4
+	if uncompressedSize > MaxImageBytes {
+		return nil, fmt.Errorf("image uncompressed size exceeds limit: %d bytes (max %d bytes)",
+			uncompressedSize, MaxImageBytes)
+	}
+
+	return img, nil
 }

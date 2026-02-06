@@ -3,6 +3,7 @@ package rich
 import (
 	"image"
 	"image/color"
+	"strings"
 	"unicode/utf8"
 
 	"9fans.net/go/draw"
@@ -1043,6 +1044,12 @@ func (f *frameImpl) drawTextTo(target edwooddraw.Image, offset image.Point) {
 			pt := image.Point{
 				X: offset.X + pb.X - hOff,
 				Y: offset.Y + line.Y,
+			}
+
+			// Check for loading placeholder case (async load in progress)
+			if pb.Box.ImageData != nil && pb.Box.ImageData.Loading {
+				f.drawImageLoadingPlaceholder(target, pt, string(pb.Box.Text))
+				continue
 			}
 
 			// Check for error placeholder case
@@ -2172,6 +2179,30 @@ func (f *frameImpl) drawImageTo(target edwooddraw.Image, pb PositionedBox, line 
 	}
 
 	target.Draw(clippedDst, srcImg, nil, srcPt)
+}
+
+// LoadingGray is the muted gray color for loading image placeholders.
+var LoadingGray = color.RGBA{R: 153, G: 153, B: 153, A: 255}
+
+// drawImageLoadingPlaceholder renders a loading placeholder for images being fetched asynchronously.
+// It displays "[Loading: alt]" in muted gray to distinguish from error placeholders (blue) and links.
+func (f *frameImpl) drawImageLoadingPlaceholder(target edwooddraw.Image, pt image.Point, boxText string) {
+	if f.font == nil || f.textColor == nil {
+		return
+	}
+
+	// Replace "[Image:" prefix with "[Loading:" if present
+	placeholder := boxText
+	if strings.HasPrefix(placeholder, "[Image:") {
+		placeholder = "[Loading:" + placeholder[len("[Image:"):]
+	}
+
+	grayColor := f.allocColorImage(LoadingGray)
+	if grayColor == nil {
+		grayColor = f.textColor
+	}
+
+	target.Bytes(pt, grayColor, image.ZP, f.font, []byte(placeholder))
 }
 
 // drawImageErrorPlaceholder renders an error placeholder for failed image loads.
