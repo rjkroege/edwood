@@ -1212,6 +1212,11 @@ func previewcmd(et *Text, _ *Text, _ *Text, _, _ bool, _ string) {
 
 	// If already in preview mode, toggle it off
 	if w.IsPreviewMode() {
+		// Cancel pending preview update timer
+		if w.previewUpdateTimer != nil {
+			w.previewUpdateTimer.Stop()
+			w.previewUpdateTimer = nil
+		}
 		// Clean up image cache before exiting preview mode
 		if w.imageCache != nil {
 			w.imageCache.Clear()

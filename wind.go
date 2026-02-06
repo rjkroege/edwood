@@ -410,6 +410,14 @@ func (w *Window) MouseBut() {
 
 func (w *Window) Close() {
 	if w.ref.Dec() == 0 {
+		// Cancel pending preview update timer to prevent callback
+		// firing on a closed window.
+		if w.previewUpdateTimer != nil {
+			w.previewUpdateTimer.Stop()
+			w.previewUpdateTimer = nil
+		}
+		w.previewMode = false
+		w.richBody = nil
 		xfidlog(w, "del")
 		w.tag.file.DelObserver(w)
 		w.body.file.DelTagStatusObserver(w)
@@ -1523,6 +1531,8 @@ const previewUpdateDelay = 3 * time.Second
 // SchedulePreviewUpdate schedules a debounced update of the Markdeep preview.
 // If called multiple times in quick succession, only the last call will trigger
 // an update after the delay. This prevents excessive re-rendering during editing.
+//
+// Must be called with global.row.lk held.
 func (w *Window) SchedulePreviewUpdate() {
 	if !w.previewMode || w.richBody == nil {
 		return
@@ -1533,10 +1543,19 @@ func (w *Window) SchedulePreviewUpdate() {
 		w.previewUpdateTimer.Stop()
 	}
 
-	// Schedule a new update after the delay
+	// Schedule a new update after the delay.
+	// The callback runs on a timer goroutine; acquire the row lock
+	// to synchronize with mousethread, keyboardthread, and others.
 	w.previewUpdateTimer = time.AfterFunc(previewUpdateDelay, func() {
-		// UpdatePreview must be called from the main goroutine
-		// Use the global display channel to schedule the update
+		global.row.lk.Lock()
+		defer global.row.lk.Unlock()
+
+		// Re-check: window may have exited preview mode or been closed
+		// while we waited for the lock.
+		if !w.previewMode || w.richBody == nil {
+			return
+		}
+
 		w.UpdatePreview()
 	})
 }
