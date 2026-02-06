@@ -4373,3 +4373,406 @@ func TestImageSourceMap(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBlockquote(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text            string
+			blockquote      bool
+			blockquoteDepth int
+		}
+	}{
+		{
+			name:  "single-line blockquote",
+			input: "> hello",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "hello", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "single-line blockquote with trailing newline",
+			input: "> hello\n",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "hello\n", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "multi-line blockquote joins as paragraph continuation",
+			input: "> line1\n> line2",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "line1 line2", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "multi-line blockquote three lines",
+			input: "> first\n> second\n> third",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "first second third", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "nested blockquote depth 2",
+			input: "> > inner",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "inner", blockquote: true, blockquoteDepth: 2},
+			},
+		},
+		{
+			name:  "nested blockquote depth 3",
+			input: "> > > deep",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "deep", blockquote: true, blockquoteDepth: 3},
+			},
+		},
+		{
+			name:  "compact nested blockquote (no spaces between markers)",
+			input: ">> inner",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "inner", blockquote: true, blockquoteDepth: 2},
+			},
+		},
+		{
+			name:  "blockquote with bold inline formatting",
+			input: "> **bold** text",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "bold", blockquote: true, blockquoteDepth: 1},
+				{text: " text", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "blockquote with italic inline formatting",
+			input: "> *italic* text",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "italic", blockquote: true, blockquoteDepth: 1},
+				{text: " text", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "blockquote with code span",
+			input: "> use `code` here",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "use ", blockquote: true, blockquoteDepth: 1},
+				{text: "code", blockquote: true, blockquoteDepth: 1},
+				{text: " here", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "blockquote with link",
+			input: "> [click](http://example.com)",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "click", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "blockquote with paragraph break",
+			input: "> para1\n>\n> para2",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "para1\n", blockquote: true, blockquoteDepth: 1},
+				{text: "\n", blockquote: true, blockquoteDepth: 1}, // paragraph break within blockquote
+				{text: "para2", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "empty blockquote marker only",
+			input: ">",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{},
+		},
+		{
+			name:  "empty blockquote with space",
+			input: "> ",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{},
+		},
+		{
+			name:  "blockquote followed by blank line and paragraph",
+			input: "> quote\n\nparagraph",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "quote\n", blockquote: true, blockquoteDepth: 1},
+				{text: "\n", blockquote: false, blockquoteDepth: 0}, // paragraph break
+				{text: "paragraph", blockquote: false, blockquoteDepth: 0},
+			},
+		},
+		{
+			name:  "blockquote followed by heading",
+			input: "> quote\n# Heading",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "quote\n", blockquote: true, blockquoteDepth: 1},
+				{text: "Heading", blockquote: false, blockquoteDepth: 0},
+			},
+		},
+		{
+			name:  "heading followed by blockquote",
+			input: "# Heading\n> quote",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "Heading\n", blockquote: false, blockquoteDepth: 0},
+				{text: "quote", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "blockquote followed by list",
+			input: "> quote\n- item",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "quote\n", blockquote: true, blockquoteDepth: 1},
+				// list bullet and item spans follow, not blockquoted
+				{text: "•", blockquote: false, blockquoteDepth: 0},
+				{text: " ", blockquote: false, blockquoteDepth: 0},
+				{text: "item", blockquote: false, blockquoteDepth: 0},
+			},
+		},
+		{
+			name:  "depth change from 1 to 2",
+			input: "> outer\n> > inner",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "outer\n", blockquote: true, blockquoteDepth: 1},
+				{text: "inner", blockquote: true, blockquoteDepth: 2},
+			},
+		},
+		{
+			name:  "depth change from 2 to 1",
+			input: "> > inner\n> outer",
+			wantSpan: []struct {
+				text            string
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "inner\n", blockquote: true, blockquoteDepth: 2},
+				{text: "outer", blockquote: true, blockquoteDepth: 1},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				t.Fatalf("got %d spans, want %d spans\n  got: %+v", len(got), len(tt.wantSpan), got)
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Blockquote != want.blockquote {
+					t.Errorf("span[%d].Style.Blockquote = %v, want %v", i, got[i].Style.Blockquote, want.blockquote)
+				}
+				if got[i].Style.BlockquoteDepth != want.blockquoteDepth {
+					t.Errorf("span[%d].Style.BlockquoteDepth = %d, want %d", i, got[i].Style.BlockquoteDepth, want.blockquoteDepth)
+				}
+			}
+		})
+	}
+}
+
+func TestParseBlockquoteBoldCheck(t *testing.T) {
+	// Verify that inline formatting styles are preserved alongside blockquote fields
+	got := Parse("> **bold** and *italic*")
+	if len(got) < 3 {
+		t.Fatalf("got %d spans, want at least 3", len(got))
+	}
+
+	// First span should be bold and blockquoted
+	if !got[0].Style.Bold {
+		t.Errorf("span[0].Style.Bold = false, want true")
+	}
+	if !got[0].Style.Blockquote {
+		t.Errorf("span[0].Style.Blockquote = false, want true")
+	}
+	if got[0].Text != "bold" {
+		t.Errorf("span[0].Text = %q, want %q", got[0].Text, "bold")
+	}
+
+	// " and " span should be blockquoted but not bold/italic
+	if got[1].Style.Bold || got[1].Style.Italic {
+		t.Errorf("span[1] should not be bold or italic")
+	}
+	if !got[1].Style.Blockquote {
+		t.Errorf("span[1].Style.Blockquote = false, want true")
+	}
+
+	// "italic" span should be italic and blockquoted
+	if !got[2].Style.Italic {
+		t.Errorf("span[2].Style.Italic = false, want true")
+	}
+	if !got[2].Style.Blockquote {
+		t.Errorf("span[2].Style.Blockquote = false, want true")
+	}
+}
+
+func TestIsBlockquoteLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		wantIsBQ    bool
+		wantDepth   int
+		wantContent int // contentStart byte index
+	}{
+		{
+			name:        "simple blockquote with space",
+			line:        "> hello",
+			wantIsBQ:    true,
+			wantDepth:   1,
+			wantContent: 2,
+		},
+		{
+			name:        "blockquote without space after marker",
+			line:        ">hello",
+			wantIsBQ:    true,
+			wantDepth:   1,
+			wantContent: 1,
+		},
+		{
+			name:        "nested depth 2 with spaces",
+			line:        "> > inner",
+			wantIsBQ:    true,
+			wantDepth:   2,
+			wantContent: 4,
+		},
+		{
+			name:        "nested depth 2 compact",
+			line:        ">> inner",
+			wantIsBQ:    true,
+			wantDepth:   2,
+			wantContent: 3,
+		},
+		{
+			name:        "nested depth 3",
+			line:        "> > > deep",
+			wantIsBQ:    true,
+			wantDepth:   3,
+			wantContent: 6,
+		},
+		{
+			name:        "empty blockquote marker only",
+			line:        ">",
+			wantIsBQ:    true,
+			wantDepth:   1,
+			wantContent: 1,
+		},
+		{
+			name:        "empty blockquote with trailing space",
+			line:        "> ",
+			wantIsBQ:    true,
+			wantDepth:   1,
+			wantContent: 2,
+		},
+		{
+			name:        "not a blockquote - plain text",
+			line:        "hello world",
+			wantIsBQ:    false,
+			wantDepth:   0,
+			wantContent: 0,
+		},
+		{
+			name:        "not a blockquote - empty string",
+			line:        "",
+			wantIsBQ:    false,
+			wantDepth:   0,
+			wantContent: 0,
+		},
+		{
+			name:        "not a blockquote - space then marker",
+			line:        " > indented",
+			wantIsBQ:    false,
+			wantDepth:   0,
+			wantContent: 0,
+		},
+		{
+			name:        "blockquote with newline in content",
+			line:        "> hello\n",
+			wantIsBQ:    true,
+			wantDepth:   1,
+			wantContent: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isBQ, depth, contentStart := isBlockquoteLine(tt.line)
+			if isBQ != tt.wantIsBQ {
+				t.Errorf("isBlockquoteLine(%q) isBQ = %v, want %v", tt.line, isBQ, tt.wantIsBQ)
+			}
+			if depth != tt.wantDepth {
+				t.Errorf("isBlockquoteLine(%q) depth = %d, want %d", tt.line, depth, tt.wantDepth)
+			}
+			if contentStart != tt.wantContent {
+				t.Errorf("isBlockquoteLine(%q) contentStart = %d, want %d", tt.line, contentStart, tt.wantContent)
+			}
+		})
+	}
+}

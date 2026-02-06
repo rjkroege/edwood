@@ -31,6 +31,10 @@ type Style struct {
 	TableHeader bool      // This is a header cell
 	TableAlign  Alignment // Cell alignment (left, center, right)
 
+	// Blockquote formatting
+	Blockquote      bool // This span is inside a blockquote
+	BlockquoteDepth int  // Nesting level (1 = `>`, 2 = `> >`, …)
+
 	// Image placeholder
 	Image      bool   // This span is an image placeholder
 	ImageURL   string // URL/path of the image
