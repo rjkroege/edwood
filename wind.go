@@ -452,6 +452,13 @@ func (w *Window) Undo(isundo bool) {
 	// TODO(rjk): Updates the scrollbar and selection.
 	// Be sure not to do this inside of the Undo operation's callbacks.
 	body.Show(body.q0, body.q1, true)
+
+	// Undo/Redo bypasses the buffer's Insert/Delete observers, so the
+	// preview is not notified through the normal SchedulePreviewUpdate path.
+	// Update it immediately — undo is a discrete action, not rapid typing.
+	if w.IsPreviewMode() {
+		w.UpdatePreview()
+	}
 }
 
 func (w *Window) SetName(name string) {
@@ -2006,10 +2013,23 @@ func (w *Window) HandlePreviewType(t *Text, r rune) {
 	// 1. Map rendered cursor/selection to source positions.
 	w.syncSourceSelection()
 
-	// 2. Create an undo point.
-	t.TypeCommit()
-	global.seq++
-	t.file.Mark(global.seq)
+	// 2. Create undo points matching text mode behavior.
+	// Deletion keys and newline always start a new undo group.
+	// Regular characters only create an undo point at the start of
+	// a typing sequence (eq0 == -1), so consecutive chars are grouped
+	// into one Undo operation.
+	switch r {
+	case 0x08, 0x7F, 0x15, 0x17, '\n': // deletion keys and newline
+		t.TypeCommit()
+		global.seq++
+		t.file.Mark(global.seq)
+	default:
+		if t.eq0 == -1 {
+			t.TypeCommit()
+			global.seq++
+			t.file.Mark(global.seq)
+		}
+	}
 
 	// 3. Handle deletion keys.
 	switch r {

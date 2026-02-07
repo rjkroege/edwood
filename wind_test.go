@@ -8580,6 +8580,8 @@ func setupPreviewTypeTestWindow(t *testing.T, sourceMarkdown string) *Window {
 		display: display,
 		fr:      &MockFrame{},
 		file:    file.MakeObservableEditableBuffer("/test/readme.md", sourceRunes),
+		eq0:     ^0,
+		what:    Body,
 	}
 	w.body.all = image.Rect(0, 20, 800, 600)
 	w.tag = Text{
@@ -8587,6 +8589,7 @@ func setupPreviewTypeTestWindow(t *testing.T, sourceMarkdown string) *Window {
 		fr:      &MockFrame{},
 		file:    file.MakeObservableEditableBuffer("", nil),
 	}
+	w.body.file.AddObserver(&w.body)
 	w.col = &Column{safe: true}
 	w.r = rect
 	w.body.w = w
@@ -9022,4 +9025,353 @@ func TestPreviewTypeIgnoresSpecialKeys(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPreviewTypeMultipleCharsMiddle tests typing multiple characters in
+// the middle of content with the body registered as an observer.
+// This exercises the full syncSourceSelection → edit → re-render → remap
+// cycle including the incremental update path (since the observer records
+// edits into pendingEdits).
+func TestPreviewTypeMultipleCharsMiddle(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		pos    int // rendered position to place cursor
+		chars  string
+		want   string
+		wantQ0 int // expected source cursor position after typing
+	}{
+		{
+			name:   "plain text middle",
+			source: "Hello world",
+			pos:    5, // after "Hello"
+			chars:  "XY",
+			want:   "HelloXY world",
+			wantQ0: 7,
+		},
+		{
+			name:   "plain text start",
+			source: "Hello",
+			pos:    0,
+			chars:  "AB",
+			want:   "ABHello",
+			wantQ0: 2,
+		},
+		{
+			name:   "heading middle",
+			source: "# Hello\n",
+			pos:    2, // between 'l' and 'l' in rendered "Hello\n"
+			chars:  "XY",
+			want:   "# HeXYllo\n",
+			wantQ0: 6,
+		},
+		{
+			name:   "with trailing newline",
+			source: "Hello\n",
+			pos:    3,
+			chars:  "XY",
+			want:   "HelXYlo\n",
+			wantQ0: 5,
+		},
+		{
+			name:   "bold text middle",
+			source: "**bold**",
+			pos:    2, // between 'l' and 'd' in rendered "bold"
+			chars:  "XY",
+			want:   "**boXYld**",
+			wantQ0: 6,
+		},
+		{
+			name:   "inline code middle",
+			source: "`code`",
+			pos:    2, // between 'o' and 'd' in rendered "code"
+			chars:  "XY",
+			want:   "`coXYde`",
+			wantQ0: 5,
+		},
+		{
+			name:   "two paragraphs first line",
+			source: "abc\n\ndef\n",
+			pos:    1, // between 'a' and 'b' in first paragraph
+			chars:  "XY",
+			want:   "aXYbc\n\ndef\n",
+			wantQ0: 3,
+		},
+		{
+			name:   "two paragraphs second line",
+			source: "abc\n\ndef\n",
+			pos:    5, // rendered "abc\ndef" → a=0,b=1,c=2,\n(parabreak)=3,d=4,e=5,f=6; pos 5 = before 'e'
+			chars:  "XY",
+			want:   "abc\n\ndXYef\n",
+			wantQ0: 8,
+		},
+		{
+			name:   "heading then text",
+			source: "# Title\nBody text\n",
+			pos:    8, // rendered "Title\nBody text" → T=0..e=4,\n=5,B=6,o=7,d=8,y=9; pos 8 = before 'd'
+			chars:  "XY",
+			want:   "# Title\nBoXYdy text\n",
+			wantQ0: 12,
+		},
+		{
+			name:   "list item middle",
+			source: "- hello\n",
+			pos:    4, // rendered "• hello\n" → pos 4 = between 'l' and 'l'
+			chars:  "XY",
+			want:   "- heXYllo\n",
+			wantQ0: 6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := setupPreviewTypeTestWindow(t, tt.source)
+			// Register the body as an observer, matching real code (wind.go:139).
+			// This causes InsertAt to trigger Text.Inserted which records edits
+			// into w.pendingEdits, enabling the incremental update path.
+			w.body.file.AddObserver(&w.body)
+
+			// Position cursor at the specified rendered position.
+			w.richBody.SetSelection(tt.pos, tt.pos)
+			w.syncSourceSelection()
+
+			// Type each character.
+			for _, r := range tt.chars {
+				w.HandlePreviewType(&w.body, r)
+			}
+
+			got := w.body.file.String()
+			if got != tt.want {
+				t.Errorf("after typing %q at rendered pos %d:\ngot  %q\nwant %q", tt.chars, tt.pos, got, tt.want)
+			}
+
+			if w.body.q0 != tt.wantQ0 || w.body.q1 != tt.wantQ0 {
+				t.Errorf("cursor should be at (%d,%d), got (%d,%d)", tt.wantQ0, tt.wantQ0, w.body.q0, w.body.q1)
+			}
+
+			// Verify the rendered selection round-trips correctly.
+			rp0, rp1 := w.richBody.Selection()
+			w.syncSourceSelection()
+			if w.body.q0 != tt.wantQ0 || w.body.q1 != tt.wantQ0 {
+				t.Errorf("round-trip: rendered sel (%d,%d) → source (%d,%d), want (%d,%d)",
+					rp0, rp1, w.body.q0, w.body.q1, tt.wantQ0, tt.wantQ0)
+			}
+		})
+	}
+}
+
+// TestPreviewTypeParagraphJoin tests typing at the paragraph join space
+// (where two consecutive source lines are rendered joined with a space).
+// The join space has no sourcemap entry — it's a gap.
+func TestPreviewTypeParagraphJoin(t *testing.T) {
+	// Source "abc\ndef\n" → rendered "abc def" (space at pos 3 from join)
+	w := setupPreviewTypeTestWindow(t, "abc\ndef\n")
+	w.body.file.AddObserver(&w.body)
+
+	// Place cursor at rendered position 3 (the join space).
+	w.richBody.SetSelection(3, 3)
+	w.syncSourceSelection()
+
+	startQ0 := w.body.q0
+	t.Logf("Join space pos 3 → source q0=%d (source: %q)", startQ0, w.body.file.String())
+
+	// Type 3 characters at the join.
+	for i, r := range "XYZ" {
+		beforeQ0 := w.body.q0
+		w.HandlePreviewType(&w.body, r)
+		if w.body.q0 != beforeQ0+1 {
+			t.Errorf("char %d (%c): q0 should be %d, got %d (source: %q)",
+				i, r, beforeQ0+1, w.body.q0, w.body.file.String())
+		}
+		// Verify round-trip.
+		expected := w.body.q0
+		w.syncSourceSelection()
+		if w.body.q0 != expected {
+			rp0, _ := w.richBody.Selection()
+			t.Errorf("char %d (%c): round-trip drift: was %d, now %d (rend sel %d, source: %q)",
+				i, r, expected, w.body.q0, rp0, w.body.file.String())
+		}
+	}
+
+	t.Logf("After typing: source=%q, q0=%d", w.body.file.String(), w.body.q0)
+}
+
+// TestPreviewTypeManyCharsValidateEach types many characters and validates
+// the source position after every keystroke. This catches incremental
+// sourcemap drift bugs that only appear after multiple edits.
+func TestPreviewTypeManyCharsValidateEach(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		pos    int // rendered starting position
+	}{
+		{"plain text", "Hello world", 5},
+		{"heading", "# Hello world\n", 3},
+		{"bold", "some **bold** text", 4},
+		{"two paragraphs", "abc\n\ndef\n", 1},
+		{"heading + body", "# Title\nBody text\n", 8},
+		{"list item", "- hello world\n", 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := setupPreviewTypeTestWindow(t, tt.source)
+			w.body.file.AddObserver(&w.body)
+
+			// Position cursor
+			w.richBody.SetSelection(tt.pos, tt.pos)
+			w.syncSourceSelection()
+			initialQ0 := w.body.q0
+
+			// Type 6 characters, validating after each.
+			typed := "ABCDEF"
+			for i, r := range typed {
+				beforeQ0 := w.body.q0
+				w.HandlePreviewType(&w.body, r)
+
+				// Source cursor should advance by exactly 1.
+				if w.body.q0 != beforeQ0+1 {
+					t.Errorf("char %d (%c): source q0 should be %d, got %d (source: %q)",
+						i, r, beforeQ0+1, w.body.q0, w.body.file.String())
+				}
+
+				// Verify the round-trip: rendered → source → matches q0.
+				expectedQ0 := w.body.q0
+				w.syncSourceSelection()
+				if w.body.q0 != expectedQ0 {
+					rp0, _ := w.richBody.Selection()
+					t.Errorf("char %d (%c): round-trip drift: q0 was %d, after syncSourceSelection got %d (rendered sel %d, source: %q)",
+						i, r, expectedQ0, w.body.q0, rp0, w.body.file.String())
+				}
+			}
+
+			// After 6 chars, source q0 should be initialQ0 + 6.
+			if w.body.q0 != initialQ0+6 {
+				t.Errorf("final q0: want %d, got %d", initialQ0+6, w.body.q0)
+			}
+		})
+	}
+}
+
+// TestPreviewTypeUndoGrouping verifies that consecutive typed characters in
+// preview mode are grouped into a single undo point, matching text mode behavior.
+func TestPreviewTypeUndoGrouping(t *testing.T) {
+	t.Run("ConsecutiveCharsGrouped", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello")
+
+		// Position cursor at end.
+		w.body.q0 = 5
+		w.body.q1 = 5
+		contentLen := w.richBody.Content().Len()
+		w.richBody.SetSelection(contentLen, contentLen)
+
+		// Type 'a', 'b', 'c' — should be one undo group.
+		w.HandlePreviewType(&w.body, 'a')
+		w.HandlePreviewType(&w.body, 'b')
+		w.HandlePreviewType(&w.body, 'c')
+
+		got := w.body.file.String()
+		if got != "Helloabc" {
+			t.Fatalf("after typing abc: got %q, want %q", got, "Helloabc")
+		}
+
+		// One undo should remove all three characters at once.
+		w.Undo(true)
+
+		got = w.body.file.String()
+		if got != "Hello" {
+			t.Errorf("after one undo: got %q, want %q", got, "Hello")
+		}
+	})
+
+	t.Run("BackspaceCreatesUndoBoundary", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello")
+
+		// Position cursor at end.
+		w.body.q0 = 5
+		w.body.q1 = 5
+		contentLen := w.richBody.Content().Len()
+		w.richBody.SetSelection(contentLen, contentLen)
+
+		// Type 'a', 'b' — grouped into one undo group.
+		w.HandlePreviewType(&w.body, 'a')
+		w.HandlePreviewType(&w.body, 'b')
+
+		got := w.body.file.String()
+		if got != "Helloab" {
+			t.Fatalf("after typing ab: got %q, want %q", got, "Helloab")
+		}
+
+		// Backspace creates a new undo boundary. After this, 'b' is deleted
+		// and the subsequent 'c' is in the same undo group as the backspace
+		// (matching text mode behavior where eq0 stays set).
+		w.HandlePreviewType(&w.body, 0x08)
+
+		got = w.body.file.String()
+		if got != "Helloa" {
+			t.Fatalf("after backspace: got %q, want %q", got, "Helloa")
+		}
+
+		w.HandlePreviewType(&w.body, 'c')
+
+		got = w.body.file.String()
+		if got != "Helloac" {
+			t.Fatalf("after typing c: got %q, want %q", got, "Helloac")
+		}
+
+		// First undo: undoes backspace and 'c' together (same seq group).
+		w.Undo(true)
+		got = w.body.file.String()
+		if got != "Helloab" {
+			t.Errorf("after first undo: got %q, want %q", got, "Helloab")
+		}
+
+		// Second undo: removes 'a' and 'b' together.
+		w.Undo(true)
+		got = w.body.file.String()
+		if got != "Hello" {
+			t.Errorf("after second undo: got %q, want %q", got, "Hello")
+		}
+	})
+
+	t.Run("NewlineCreatesUndoBoundary", func(t *testing.T) {
+		w := setupPreviewTypeTestWindow(t, "Hello")
+
+		// Position cursor at end.
+		w.body.q0 = 5
+		w.body.q1 = 5
+		contentLen := w.richBody.Content().Len()
+		w.richBody.SetSelection(contentLen, contentLen)
+
+		// Type 'a', 'b' — grouped into one undo group.
+		w.HandlePreviewType(&w.body, 'a')
+		w.HandlePreviewType(&w.body, 'b')
+
+		got := w.body.file.String()
+		if got != "Helloab" {
+			t.Fatalf("after typing ab: got %q, want %q", got, "Helloab")
+		}
+
+		// Newline creates a new undo boundary.
+		w.HandlePreviewType(&w.body, '\n')
+
+		afterNewline := w.body.file.String()
+		if !strings.Contains(afterNewline, "\n") {
+			t.Fatalf("after newline: buffer should contain newline, got %q", afterNewline)
+		}
+
+		// First undo: undoes the newline.
+		w.Undo(true)
+		got = w.body.file.String()
+		if got != "Helloab" {
+			t.Errorf("after first undo: got %q, want %q", got, "Helloab")
+		}
+
+		// Second undo: removes 'a' and 'b' together.
+		w.Undo(true)
+		got = w.body.file.String()
+		if got != "Hello" {
+			t.Errorf("after second undo: got %q, want %q", got, "Hello")
+		}
+	})
 }
