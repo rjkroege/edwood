@@ -74,49 +74,49 @@ func TestMouseWaiterInterface(t *testing.T) {
 	//   waiter.WaitForChange(b, image.Point{x, y}, 3)
 
 	tests := []struct {
-		name           string
-		initialButton  int
-		initialPos     image.Point
-		threshold      int
-		wantInterrupt  bool
-		finalButton    int
-		finalPos       image.Point
+		name          string
+		initialButton int
+		initialPos    image.Point
+		threshold     int
+		wantInterrupt bool
+		finalButton   int
+		finalPos      image.Point
 	}{
 		{
-			name:           "button released",
-			initialButton:  1,
-			initialPos:     image.Point{100, 100},
-			threshold:      3,
-			wantInterrupt:  true,
-			finalButton:    0,
-			finalPos:       image.Point{100, 100},
+			name:          "button released",
+			initialButton: 1,
+			initialPos:    image.Point{100, 100},
+			threshold:     3,
+			wantInterrupt: true,
+			finalButton:   0,
+			finalPos:      image.Point{100, 100},
 		},
 		{
-			name:           "mouse moved beyond threshold",
-			initialButton:  1,
-			initialPos:     image.Point{100, 100},
-			threshold:      3,
-			wantInterrupt:  true,
-			finalButton:    1,
-			finalPos:       image.Point{105, 100},
+			name:          "mouse moved beyond threshold",
+			initialButton: 1,
+			initialPos:    image.Point{100, 100},
+			threshold:     3,
+			wantInterrupt: true,
+			finalButton:   1,
+			finalPos:      image.Point{105, 100},
 		},
 		{
-			name:           "mouse moved within threshold",
-			initialButton:  1,
-			initialPos:     image.Point{100, 100},
-			threshold:      3,
-			wantInterrupt:  false, // stays in loop
-			finalButton:    1,
-			finalPos:       image.Point{102, 101},
+			name:          "mouse moved within threshold",
+			initialButton: 1,
+			initialPos:    image.Point{100, 100},
+			threshold:     3,
+			wantInterrupt: false, // stays in loop
+			finalButton:   1,
+			finalPos:      image.Point{102, 101},
 		},
 		{
-			name:           "different button pressed",
-			initialButton:  1,
-			initialPos:     image.Point{100, 100},
-			threshold:      3,
-			wantInterrupt:  true,
-			finalButton:    4, // right button
-			finalPos:       image.Point{100, 100},
+			name:          "different button pressed",
+			initialButton: 1,
+			initialPos:    image.Point{100, 100},
+			threshold:     3,
+			wantInterrupt: true,
+			finalButton:   4, // right button
+			finalPos:      image.Point{100, 100},
 		},
 	}
 
@@ -253,40 +253,40 @@ func TestTagProviderForParseTag(t *testing.T) {
 	// the filename. With TagProvider, this is abstracted.
 
 	tests := []struct {
-		name        string
-		filename    string
-		hasTag      bool
-		wantDir     string
+		name     string
+		filename string
+		hasTag   bool
+		wantDir  string
 	}{
 		{
-			name:        "file in directory",
-			filename:    "/home/user/project/main.go",
-			hasTag:      true,
-			wantDir:     "/home/user/project",
+			name:     "file in directory",
+			filename: "/home/user/project/main.go",
+			hasTag:   true,
+			wantDir:  "/home/user/project",
 		},
 		{
-			name:        "directory listing",
-			filename:    "/home/user/project/",
-			hasTag:      true,
-			wantDir:     "/home/user/project/",
+			name:     "directory listing",
+			filename: "/home/user/project/",
+			hasTag:   true,
+			wantDir:  "/home/user/project/",
 		},
 		{
-			name:        "no tag",
-			filename:    "",
-			hasTag:      false,
-			wantDir:     "",
+			name:     "no tag",
+			filename: "",
+			hasTag:   false,
+			wantDir:  "",
 		},
 		{
-			name:        "root directory",
-			filename:    "/file.go",
-			hasTag:      true,
-			wantDir:     "/",
+			name:     "root directory",
+			filename: "/file.go",
+			hasTag:   true,
+			wantDir:  "/",
 		},
 		{
-			name:        "empty filename in tag",
-			filename:    "",
-			hasTag:      true,
-			wantDir:     "",
+			name:     "empty filename in tag",
+			filename: "",
+			hasTag:   true,
+			wantDir:  "",
 		},
 	}
 
@@ -330,36 +330,36 @@ func TestDirectoryContextForAbsDirName(t *testing.T) {
 	// With DirectoryContext, this is abstracted.
 
 	tests := []struct {
-		name        string
-		filename    string
-		hasTag      bool
-		workDir     string
-		inputName   string
-		wantResult  string
+		name       string
+		filename   string
+		hasTag     bool
+		workDir    string
+		inputName  string
+		wantResult string
 	}{
 		{
-			name:        "relative path with tag dir",
-			filename:    "/home/user/project/main.go",
-			hasTag:      true,
-			workDir:     "/other/workdir",
-			inputName:   "util.go",
-			wantResult:  "/home/user/project/util.go",
+			name:       "relative path with tag dir",
+			filename:   "/home/user/project/main.go",
+			hasTag:     true,
+			workDir:    "/other/workdir",
+			inputName:  "util.go",
+			wantResult: "/home/user/project/util.go",
 		},
 		{
-			name:        "relative path falls back to workdir",
-			filename:    "",
-			hasTag:      false,
-			workDir:     "/home/user/workdir",
-			inputName:   "file.go",
-			wantResult:  "/home/user/workdir/file.go",
+			name:       "relative path falls back to workdir",
+			filename:   "",
+			hasTag:     false,
+			workDir:    "/home/user/workdir",
+			inputName:  "file.go",
+			wantResult: "/home/user/workdir/file.go",
 		},
 		{
-			name:        "absolute path unchanged",
-			filename:    "/home/user/project/main.go",
-			hasTag:      true,
-			workDir:     "/other/workdir",
-			inputName:   "/abs/path/file.go",
-			wantResult:  "/abs/path/file.go",
+			name:       "absolute path unchanged",
+			filename:   "/home/user/project/main.go",
+			hasTag:     true,
+			workDir:    "/other/workdir",
+			inputName:  "/abs/path/file.go",
+			wantResult: "/abs/path/file.go",
 		},
 	}
 

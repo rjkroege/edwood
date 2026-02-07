@@ -1558,11 +1558,11 @@ func TestXfidutfreadLargeOffset(t *testing.T) {
 		name   string
 		offset uint64
 	}{
-		{"JustOverMaxInt32", uint64(1<<31 + 1000)},        // 2GB + 1000 bytes
-		{"LargeOffset", uint64(1<<32 + 5000)},             // 4GB + 5000 bytes
-		{"VeryLargeOffset", uint64(1<<40)},                // 1TB - extreme case
-		{"MaxSafeOffset", uint64(1<<62)},                  // Very large but not overflow uint64
-		{"OffsetNearMaxUint64", uint64(1<<63 - 1000000)},  // Near max uint64
+		{"JustOverMaxInt32", uint64(1<<31 + 1000)},       // 2GB + 1000 bytes
+		{"LargeOffset", uint64(1<<32 + 5000)},            // 4GB + 5000 bytes
+		{"VeryLargeOffset", uint64(1 << 40)},             // 1TB - extreme case
+		{"MaxSafeOffset", uint64(1 << 62)},               // Very large but not overflow uint64
+		{"OffsetNearMaxUint64", uint64(1<<63 - 1000000)}, // Near max uint64
 	}
 
 	for _, tc := range testCases {
@@ -1678,7 +1678,7 @@ func TestInt64OffsetArithmetic(t *testing.T) {
 		want  string // "safe" or "would_overflow"
 	}{
 		{"SmallValues", 100, 50, 50, "safe"},
-		{"LargeOffset", 1 << 33, 0, 100, "safe"},          // 8GB offset
+		{"LargeOffset", 1 << 33, 0, 100, "safe"}, // 8GB offset
 		{"OffsetDiffWithinInt", 1 << 33, 1<<33 - 50, 100, "safe"},
 		{"OffsetDiffBeyondInt32", 1 << 33, 0, 100, "safe"}, // diff > MaxInt32 but should not be used as index
 	}

@@ -1,5 +1,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rjkroege/edwood)](https://goreportcard.com/report/github.com/rjkroege/edwood)[![Build Status](https://github.com/rjkroege/edwood/actions/workflows/edwood.yml/badge.svg?branch=master)](https://github.com/rjkroege/edwood/actions)
 
+![Images](images.jpeg)
+
 # Overview
 Go port of Rob Pike's Acme editor. Derived from
 [ProjectSerenity](https://github.com/ProjectSerenity/acme) but now

@@ -5501,13 +5501,13 @@ func TestSelectionContext(t *testing.T) {
 		// Source: "**bold**" (positions 0-8)
 		// Rendered: "bold" (positions 0-4)
 		ctx := SelectionContext{
-			SourceStart:        0,
-			SourceEnd:          8,
-			RenderedStart:      0,
-			RenderedEnd:        4,
-			ContentType:        ContentBold,
-			PrimaryStyle:       rich.Style{Bold: true, Scale: 1.0},
-			IncludesOpenMarker: true,
+			SourceStart:         0,
+			SourceEnd:           8,
+			RenderedStart:       0,
+			RenderedEnd:         4,
+			ContentType:         ContentBold,
+			PrimaryStyle:        rich.Style{Bold: true, Scale: 1.0},
+			IncludesOpenMarker:  true,
 			IncludesCloseMarker: true,
 		}
 		if ctx.ContentType != ContentBold {

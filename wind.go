@@ -78,9 +78,9 @@ type Window struct {
 	selectionContext   *SelectionContext   // context metadata for the current preview selection
 
 	// Preview double-click state (mirrors clicktext/clickmsec in text.go)
-	previewClickPos  int        // rune position of last B1 null-click
-	previewClickMsec uint32     // timestamp of last B1 null-click
-	previewClickRT   *RichText  // which richtext received the last click
+	previewClickPos  int       // rune position of last B1 null-click
+	previewClickMsec uint32    // timestamp of last B1 null-click
+	previewClickRT   *RichText // which richtext received the last click
 
 	// Incremental preview update state
 	prevBlockIndex *markdown.BlockIndex  // block boundaries from last parse

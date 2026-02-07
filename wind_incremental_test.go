@@ -194,7 +194,7 @@ func TestIncrementalPreviewEditInParagraph(t *testing.T) {
 	// Insert " extra" after "Some" in the first paragraph.
 	insertPos := len([]rune("# Title\n\nSome"))
 	insertText := []rune(" extra")
-	testInsert(w,insertPos, insertText)
+	testInsert(w, insertPos, insertText)
 
 	w.UpdatePreview()
 
@@ -209,8 +209,8 @@ func TestIncrementalPreviewEditInCodeBlock(t *testing.T) {
 
 	// Replace "old" with "new" inside the code block.
 	replacePos := len([]rune("# Title\n\n```\n"))
-	testDelete(w,replacePos, replacePos+3)
-	testInsert(w,replacePos, []rune("new"))
+	testDelete(w, replacePos, replacePos+3)
+	testInsert(w, replacePos, []rune("new"))
 
 	w.UpdatePreview()
 
@@ -226,7 +226,7 @@ func TestIncrementalPreviewDeleteHeading(t *testing.T) {
 	// Delete "## Section\n".
 	headingStart := len([]rune("# Title\n\nFirst paragraph.\n\n"))
 	headingEnd := headingStart + len([]rune("## Section\n"))
-	testDelete(w,headingStart, headingEnd)
+	testDelete(w, headingStart, headingEnd)
 
 	w.UpdatePreview()
 
@@ -241,7 +241,7 @@ func TestIncrementalPreviewAddListItem(t *testing.T) {
 
 	// Insert "- item three\n" after "- item two\n".
 	insertPos := len([]rune("# Title\n\n- item one\n- item two\n"))
-	testInsert(w,insertPos, []rune("- item three\n"))
+	testInsert(w, insertPos, []rune("- item three\n"))
 
 	w.UpdatePreview()
 
@@ -256,7 +256,7 @@ func TestIncrementalPreviewEditWithBoldFormatting(t *testing.T) {
 
 	// Insert " very" before "bold" (inside the bold markers).
 	insertPos := len([]rune("# Title\n\nSome **"))
-	testInsert(w,insertPos, []rune("very "))
+	testInsert(w, insertPos, []rune("very "))
 
 	w.UpdatePreview()
 
@@ -271,7 +271,7 @@ func TestIncrementalPreviewEditWithLink(t *testing.T) {
 
 	// Append " now" after "please".
 	insertPos := len([]rune("# Title\n\nClick [here](http://example.com) please"))
-	testInsert(w,insertPos, []rune(" now"))
+	testInsert(w, insertPos, []rune(" now"))
 
 	w.UpdatePreview()
 
@@ -286,8 +286,8 @@ func TestIncrementalPreviewEditInTable(t *testing.T) {
 
 	// Replace "1" with "10" in the table cell.
 	replacePos := len([]rune("Text.\n\n| A | B |\n|---|---|\n| "))
-	testDelete(w,replacePos, replacePos+1)
-	testInsert(w,replacePos, []rune("10"))
+	testDelete(w, replacePos, replacePos+1)
+	testInsert(w, replacePos, []rune("10"))
 
 	w.UpdatePreview()
 
@@ -302,7 +302,7 @@ func TestIncrementalPreviewMergeParagraphs(t *testing.T) {
 
 	// Delete the blank line "\n" between paragraphs.
 	deletePos := len([]rune("First paragraph.\n"))
-	testDelete(w,deletePos, deletePos+1)
+	testDelete(w, deletePos, deletePos+1)
 
 	w.UpdatePreview()
 
@@ -317,7 +317,7 @@ func TestIncrementalPreviewSplitParagraph(t *testing.T) {
 
 	// Insert "\n" after first line to split into two paragraphs.
 	insertPos := len([]rune("First line.\n"))
-	testInsert(w,insertPos, []rune("\n"))
+	testInsert(w, insertPos, []rune("\n"))
 
 	w.UpdatePreview()
 
@@ -332,12 +332,12 @@ func TestIncrementalPreviewMultipleEdits(t *testing.T) {
 
 	// Edit 1: Insert " updated" after "First" in the first paragraph.
 	insertPos1 := len([]rune("# Title\n\nFirst"))
-	testInsert(w,insertPos1, []rune(" updated"))
+	testInsert(w, insertPos1, []rune(" updated"))
 
 	// Edit 2: Insert " also" after "Third" in the third paragraph.
 	// Account for the shift from the first insertion.
 	insertPos2 := len([]rune("# Title\n\nFirst updated paragraph.\n\nSecond paragraph.\n\nThird"))
-	testInsert(w,insertPos2, []rune(" also"))
+	testInsert(w, insertPos2, []rune(" also"))
 
 	w.UpdatePreview()
 
@@ -352,8 +352,8 @@ func TestIncrementalPreviewReplaceEntireContent(t *testing.T) {
 
 	// Replace the entire content.
 	newSource := "# New Title\n\n## Section\n\nCompletely different content.\n\n- list item\n"
-	testDelete(w,0, w.body.file.Nr())
-	testInsert(w,0, []rune(newSource))
+	testDelete(w, 0, w.body.file.Nr())
+	testInsert(w, 0, []rune(newSource))
 
 	w.UpdatePreview()
 
@@ -368,7 +368,7 @@ func TestIncrementalPreviewNonASCII(t *testing.T) {
 
 	// Insert " more" after "émojis".
 	insertPos := len([]rune("# Über\n\nText with émojis"))
-	testInsert(w,insertPos, []rune(" more"))
+	testInsert(w, insertPos, []rune(" more"))
 
 	w.UpdatePreview()
 
@@ -383,8 +383,8 @@ func TestIncrementalPreviewEditFirstBlock(t *testing.T) {
 
 	// Replace "Title" with "New Title".
 	replacePos := len([]rune("# "))
-	testDelete(w,replacePos, replacePos+5) // delete "Title"
-	testInsert(w,replacePos, []rune("New Title"))
+	testDelete(w, replacePos, replacePos+5) // delete "Title"
+	testInsert(w, replacePos, []rune("New Title"))
 
 	w.UpdatePreview()
 
@@ -399,7 +399,7 @@ func TestIncrementalPreviewEditLastBlock(t *testing.T) {
 
 	// Append " extra" before the trailing newline.
 	insertPos := len([]rune("# Title\n\nOnly paragraph"))
-	testInsert(w,insertPos, []rune(" extra"))
+	testInsert(w, insertPos, []rune(" extra"))
 
 	w.UpdatePreview()
 
@@ -416,7 +416,7 @@ func TestIncrementalPreviewAddFencedCodeBlock(t *testing.T) {
 	// Insert a fenced code block between paragraphs.
 	insertPos := len([]rune("# Title\n\nSome text.\n\n"))
 	codeBlock := "```\nnew code\n```\n\n"
-	testInsert(w,insertPos, []rune(codeBlock))
+	testInsert(w, insertPos, []rune(codeBlock))
 
 	w.UpdatePreview()
 
@@ -432,18 +432,18 @@ func TestIncrementalPreviewSequentialUpdates(t *testing.T) {
 
 	// First edit + update.
 	insertPos := len([]rune("# Title\n\nParagraph one"))
-	testInsert(w,insertPos, []rune(" edited"))
+	testInsert(w, insertPos, []rune(" edited"))
 	w.UpdatePreview()
 	comparePreviewWithFullParse(t, w, "sequential-update-1")
 
 	// Second edit + update.
 	insertPos2 := len([]rune("# Title\n\nParagraph one edited.\n\nParagraph two"))
-	testInsert(w,insertPos2, []rune(" also"))
+	testInsert(w, insertPos2, []rune(" also"))
 	w.UpdatePreview()
 	comparePreviewWithFullParse(t, w, "sequential-update-2")
 
 	// Third edit: delete heading + update.
-	testDelete(w,0, len([]rune("# Title\n\n")))
+	testDelete(w, 0, len([]rune("# Title\n\n")))
 	w.UpdatePreview()
 	comparePreviewWithFullParse(t, w, "sequential-update-3")
 }

@@ -19,8 +19,8 @@ type RichText struct {
 	lastScrollRect image.Rectangle // Scrollbar area (cached)
 
 	display draw.Display
-	frame      rich.Frame
-	content    rich.Content
+	frame   rich.Frame
+	content rich.Content
 
 	// Options stored for frame initialization
 	background     draw.Image
