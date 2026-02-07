@@ -150,7 +150,7 @@ Do not continue to other tasks - complete only this one stage and then quit."
 
     echo -e "${MAGENTA}Calling Claude to do the task...${NC}"
     echo "$RALPH_PROMPT"
-    echo "$RALPH_PROMPT" | claude --print --verbose --allowedTools Edit "Bash(git:*)" "Bash(go:*)"
+    echo "$RALPH_PROMPT" | claude --model opus --print --verbose --allowedTools Edit "Bash(git:*)" "Bash(go:*)"
 
     echo ""
     idx=$((RANDOM % ${#DONE_QUOTES[@]}))
