@@ -727,19 +727,6 @@ forloop:
 func xfideventwrite(x *Xfid, w *Window) {
 	var err error
 
-	// We can't lock row while we have a window locked
-	// because that can create deadlock with mousethread.
-	rowLock := func() {
-		defer w.Lock(w.owner)
-		w.Unlock() // sets w.owner to 0
-		global.row.lk.Lock()
-	}
-	rowUnlock := func() {
-		defer w.Lock(w.owner)
-		w.Unlock() // sets w.owner to 0
-		global.row.lk.Unlock()
-	}
-
 	// The messages have a fixed format: a character indicating the
 	// origin or cause of the action, a character indicating
 	// the type of the action, four free-format blank-terminated
@@ -795,18 +782,21 @@ forloop:
 			break
 		}
 
-		rowLock() // just like mousethread
+		// Do not acquire row.lk here. The old rowLock helper acquired
+		// row.lk while also holding w.Lock, causing self-deadlock when
+		// look3/execute internally acquire row.lk via makenewwindow.
+		// Mousethread calls look3/execute with only w.Lock held (it
+		// releases row.lk at acme.go:431 before the click handlers).
+		// Match that: just dispatch with w.Lock held, no row.lk.
 		switch c {
 		case 'x', 'X':
 			execute(t, q0, q1, true, nil)
 		case 'l', 'L':
 			look3(t, q0, q1, true)
 		default:
-			rowUnlock()
 			err = ErrBadEvent
 			break forloop
 		}
-		rowUnlock()
 	}
 
 	var fc plan9.Fcall
