@@ -467,6 +467,10 @@ func ParseRegion(lines []string, sourceRuneOffset int, sourceByteOffset ...int) 
 		sm.entries[i].SourceStart += byteOff
 		sm.entries[i].SourceEnd += byteOff
 	}
+	// Byte positions have been shifted but rune positions are still relative
+	// to the region text. Mark rune positions as invalid to prevent mapping
+	// functions from using stale values.
+	sm.InvalidateRunePositions()
 
 	return content, sm, lm
 }

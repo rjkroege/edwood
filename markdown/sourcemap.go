@@ -1,15 +1,36 @@
 package markdown
 
-import (
-	"fmt"
-	"strings"
+import "sort"
 
-	"github.com/rjkroege/edwood/rich"
+// EntryKind discriminates the type of a source map entry so that gap handling
+// and marker-length computation can use an explicit switch instead of heuristics.
+type EntryKind int
+
+const (
+	KindPlainText       EntryKind = iota // 1:1 mapping (default zero value)
+	KindSymmetricMarker                  // bold/italic/code: opening = closing = extra/2
+	KindPrefix                           // heading/blockquote: PrefixLen runes stripped
+	KindTableCell                        // cell content within padded row
+	KindSynthetic                        // border lines with no source
 )
+
+// startGapSnap reports whether a gap before this entry kind should snap to
+// the preceding entry's SourceRuneEnd (true) or the following entry's
+// SourceRuneStart (false).
+func (k EntryKind) startGapSnap() bool {
+	return k == KindTableCell
+}
+
+// endGapSnap reports whether a gap after this entry kind should snap to the
+// entry's SourceRuneEnd (true) or use a 1:1 offset from it (false).
+func (k EntryKind) endGapSnap() bool {
+	return k == KindTableCell
+}
 
 // SourceMap maps positions in rendered content back to positions in source markdown.
 type SourceMap struct {
-	entries []SourceMapEntry
+	entries            []SourceMapEntry
+	runePositionsValid bool // true after populateRunePositions; false when byte positions are shifted without rune recalculation
 }
 
 // SourceMapEntry maps a range in rendered content to a range in source markdown.
@@ -20,7 +41,66 @@ type SourceMapEntry struct {
 	SourceEnd       int
 	SourceRuneStart int // Rune position in source markdown
 	SourceRuneEnd   int
-	PrefixLen       int // Length of source prefix not in rendered (e.g., "# " for headings)
+	PrefixLen       int       // Length of source prefix not in rendered (e.g., "# " for headings)
+	Kind            EntryKind // Discriminant for entry type
+}
+
+// searchRendered returns the index of the entry containing the rendered
+// position pos (i.e. RenderedStart <= pos < RenderedEnd), or -1 if pos
+// falls in a gap between entries.
+func (sm *SourceMap) searchRendered(pos int) int {
+	// Find rightmost entry with RenderedStart <= pos.
+	i := sort.Search(len(sm.entries), func(i int) bool {
+		return sm.entries[i].RenderedStart > pos
+	}) - 1
+	if i >= 0 && pos < sm.entries[i].RenderedEnd {
+		return i
+	}
+	return -1
+}
+
+// precedingRendered returns the index of the last entry with
+// RenderedEnd <= pos, or -1 if no such entry exists.
+func (sm *SourceMap) precedingRendered(pos int) int {
+	// Find rightmost entry with RenderedEnd <= pos.
+	i := sort.Search(len(sm.entries), func(i int) bool {
+		return sm.entries[i].RenderedEnd > pos
+	}) - 1
+	return i // -1 if none
+}
+
+// followingRendered returns the index of the first entry with
+// RenderedStart >= pos, or -1 if no such entry exists.
+func (sm *SourceMap) followingRendered(pos int) int {
+	i := sort.Search(len(sm.entries), func(i int) bool {
+		return sm.entries[i].RenderedStart >= pos
+	})
+	if i < len(sm.entries) {
+		return i
+	}
+	return -1
+}
+
+// searchSource returns the index of the entry containing the source rune
+// position pos (i.e. SourceRuneStart <= pos < SourceRuneEnd), or -1 if
+// pos falls in a gap between entries.
+func (sm *SourceMap) searchSource(pos int) int {
+	i := sort.Search(len(sm.entries), func(i int) bool {
+		return sm.entries[i].SourceRuneStart > pos
+	}) - 1
+	if i >= 0 && pos < sm.entries[i].SourceRuneEnd {
+		return i
+	}
+	return -1
+}
+
+// precedingSource returns the index of the last entry with
+// SourceRuneEnd <= pos, or -1 if no such entry exists.
+func (sm *SourceMap) precedingSource(pos int) int {
+	i := sort.Search(len(sm.entries), func(i int) bool {
+		return sm.entries[i].SourceRuneEnd > pos
+	}) - 1
+	return i // -1 if none
 }
 
 // ToSource maps a range in rendered content (renderedStart, renderedEnd) to
@@ -32,29 +112,32 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	if len(sm.entries) == 0 {
 		return renderedStart, renderedEnd
 	}
+	sm.requireRunePositions("ToSource")
 
 	// Find the entry containing renderedStart
 	srcStart = -1
 	var startEntry *SourceMapEntry
-	for i := range sm.entries {
-		e := &sm.entries[i]
-		if renderedStart >= e.RenderedStart && renderedStart < e.RenderedEnd {
-			startEntry = e
-			break
-		}
+	if idx := sm.searchRendered(renderedStart); idx >= 0 {
+		startEntry = &sm.entries[idx]
 	}
 
 	if startEntry == nil {
-		// Position falls in a gap between entries — find nearest entry after.
-		for i := range sm.entries {
-			e := &sm.entries[i]
-			if e.RenderedStart >= renderedStart {
-				srcStart = e.SourceRuneStart
-				break
-			}
+		// Position falls in a gap between entries.
+		// Find the preceding entry to determine gap behavior.
+		var preceding *SourceMapEntry
+		if idx := sm.precedingRendered(renderedStart); idx >= 0 {
+			preceding = &sm.entries[idx]
 		}
-		if srcStart == -1 {
-			srcStart = renderedStart
+		if preceding != nil && preceding.Kind.startGapSnap() {
+			srcStart = preceding.SourceRuneEnd
+		} else {
+			// Find nearest entry after and snap to its start.
+			if idx := sm.followingRendered(renderedStart); idx >= 0 {
+				srcStart = sm.entries[idx].SourceRuneStart
+			}
+			if srcStart == -1 {
+				srcStart = renderedStart
+			}
 		}
 	} else {
 		// Use the unified formula: map rendered position to source content
@@ -76,26 +159,22 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 	if renderedEnd > renderedStart {
 		lookupPos = renderedEnd - 1
 	}
-	for i := range sm.entries {
-		e := &sm.entries[i]
-		if lookupPos >= e.RenderedStart && lookupPos < e.RenderedEnd {
-			endEntry = e
-			break
-		}
+	if idx := sm.searchRendered(lookupPos); idx >= 0 {
+		endEntry = &sm.entries[idx]
 	}
 
 	if endEntry == nil {
 		// Position falls in a gap — find nearest entry before renderedEnd.
-		// Map through the gap using 1:1 offset from the entry's source end,
-		// which handles unmapped characters like synthetic paragraph-break newlines.
-		for i := len(sm.entries) - 1; i >= 0; i-- {
-			if sm.entries[i].RenderedEnd <= renderedEnd {
-				endEntry = &sm.entries[i]
-				break
-			}
+		// Gap behavior depends on the entry's Kind.
+		if idx := sm.precedingRendered(renderedEnd); idx >= 0 {
+			endEntry = &sm.entries[idx]
 		}
 		if endEntry != nil {
-			srcEnd = endEntry.SourceRuneEnd + (renderedEnd - endEntry.RenderedEnd)
+			if endEntry.Kind.endGapSnap() {
+				srcEnd = endEntry.SourceRuneEnd
+			} else {
+				srcEnd = endEntry.SourceRuneEnd + (renderedEnd - endEntry.RenderedEnd)
+			}
 		} else {
 			srcEnd = renderedEnd
 		}
@@ -122,22 +201,17 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 }
 
 // entryOpeningLen computes the rune length of the opening marker for a source
-// map entry. For heading-style entries (PrefixLen > 0), this is PrefixLen.
-// For symmetric markers (bold, italic, code), it is half the extra source runes.
-// For 1:1 entries (plain text) or synthetic entries (table borders with zero-length
-// source), returns 0.
+// map entry, using the entry's Kind discriminant.
 func entryOpeningLen(e *SourceMapEntry) int {
-	if e.PrefixLen > 0 {
+	switch e.Kind {
+	case KindPrefix:
 		return e.PrefixLen
-	}
-	renderedLen := e.RenderedEnd - e.RenderedStart
-	sourceRuneLen := e.SourceRuneEnd - e.SourceRuneStart
-	if sourceRuneLen <= renderedLen {
-		// 1:1 mapping (plain text) or synthetic entry (source shorter than rendered)
+	case KindSymmetricMarker:
+		extra := (e.SourceRuneEnd - e.SourceRuneStart) - (e.RenderedEnd - e.RenderedStart)
+		return extra / 2
+	default:
 		return 0
 	}
-	extra := sourceRuneLen - renderedLen
-	return extra / 2
 }
 
 // ToRendered maps a range in source markdown (srcRuneStart, srcRuneEnd as rune positions)
@@ -149,15 +223,12 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 	if len(sm.entries) == 0 {
 		return -1, -1
 	}
+	sm.requireRunePositions("ToRendered")
 
 	// Find the entry containing srcRuneStart
 	renderedStart = -1
-	for i := range sm.entries {
-		e := &sm.entries[i]
-		if srcRuneStart >= e.SourceRuneStart && srcRuneStart < e.SourceRuneEnd {
-			renderedStart = sm.sourceRuneToRendered(e, srcRuneStart)
-			break
-		}
+	if idx := sm.searchSource(srcRuneStart); idx >= 0 {
+		renderedStart = sm.sourceRuneToRendered(&sm.entries[idx], srcRuneStart)
 	}
 
 	if renderedStart == -1 {
@@ -165,11 +236,8 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 		// between paragraph lines that becomes a join space in rendered
 		// content). Find the nearest entry before this position and map
 		// to its rendered end.
-		for i := len(sm.entries) - 1; i >= 0; i-- {
-			if sm.entries[i].SourceRuneEnd <= srcRuneStart {
-				renderedStart = sm.entries[i].RenderedEnd
-				break
-			}
+		if idx := sm.precedingSource(srcRuneStart); idx >= 0 {
+			renderedStart = sm.entries[idx].RenderedEnd
 		}
 		if renderedStart == -1 {
 			// Before all entries — map to start of first entry.
@@ -187,27 +255,21 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 	if srcRuneEnd > srcRuneStart {
 		lookupPos = srcRuneEnd - 1
 	}
-	for i := range sm.entries {
-		e := &sm.entries[i]
-		if lookupPos >= e.SourceRuneStart && lookupPos < e.SourceRuneEnd {
-			// For end position, if srcRuneEnd is at or past the entry end,
-			// map to the full rendered end
-			if srcRuneEnd >= e.SourceRuneEnd {
-				renderedEnd = e.RenderedEnd
-			} else {
-				renderedEnd = sm.sourceRuneToRendered(e, srcRuneEnd)
-			}
-			break
+	if idx := sm.searchSource(lookupPos); idx >= 0 {
+		e := &sm.entries[idx]
+		// For end position, if srcRuneEnd is at or past the entry end,
+		// map to the full rendered end
+		if srcRuneEnd >= e.SourceRuneEnd {
+			renderedEnd = e.RenderedEnd
+		} else {
+			renderedEnd = sm.sourceRuneToRendered(e, srcRuneEnd)
 		}
 	}
 
 	if renderedEnd == -1 {
 		// Same gap handling as for start: find nearest entry before.
-		for i := len(sm.entries) - 1; i >= 0; i-- {
-			if sm.entries[i].SourceRuneEnd <= lookupPos {
-				renderedEnd = sm.entries[i].RenderedEnd
-				break
-			}
+		if idx := sm.precedingSource(lookupPos); idx >= 0 {
+			renderedEnd = sm.entries[idx].RenderedEnd
 		}
 		if renderedEnd == -1 {
 			if len(sm.entries) > 0 && sm.entries[0].SourceRuneStart > lookupPos {
@@ -228,25 +290,11 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 func (sm *SourceMap) sourceRuneToRendered(e *SourceMapEntry, srcRunePos int) int {
 	offset := srcRunePos - e.SourceRuneStart
 	renderedLen := e.RenderedEnd - e.RenderedStart
-	sourceRuneLen := e.SourceRuneEnd - e.SourceRuneStart
 
-	if renderedLen == sourceRuneLen {
+	openingLen := entryOpeningLen(e)
+	if openingLen == 0 {
 		// 1:1 mapping (plain text, code block content, list content, etc.)
 		return e.RenderedStart + offset
-	}
-
-	// Formatted element: source has markers around rendered content.
-	// Compute the opening marker length in runes.
-	// For headings: PrefixLen is the byte length of "# " etc.; since markers are ASCII, bytes=runes.
-	// For symmetric markers (**bold**, *italic*, `code`, ***bi***): opening = closing = (extra / 2).
-	var openingLen int
-	if e.PrefixLen > 0 {
-		// Heading-style prefix (e.g., "# ", "## ")
-		openingLen = e.PrefixLen
-	} else {
-		// Symmetric markers (**, *, `, ***)
-		extra := sourceRuneLen - renderedLen
-		openingLen = extra / 2
 	}
 
 	if offset <= openingLen {
@@ -263,728 +311,14 @@ func (sm *SourceMap) sourceRuneToRendered(e *SourceMapEntry, srcRunePos int) int
 	return e.RenderedStart + contentOffset
 }
 
-// ParseWithSourceMap parses markdown and returns the styled content,
-// a source map for mapping rendered positions back to source positions,
-// and a link map for tracking which rendered positions contain links.
-func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
-	if text == "" {
-		return rich.Content{}, &SourceMap{}, NewLinkMap()
+
+// requireRunePositions panics if rune positions have not been populated or have
+// been invalidated by byte-position shifts. This turns silent wrong-answer bugs
+// (stale SourceRuneStart/End values) into loud failures.
+func (sm *SourceMap) requireRunePositions(caller string) {
+	if !sm.runePositionsValid {
+		panic("sourcemap: " + caller + " called before PopulateRunePositions")
 	}
-
-	var result rich.Content
-	sm := &SourceMap{}
-	lm := NewLinkMap()
-	lines := splitLines(text)
-
-	sourcePos := 0   // Current position in source
-	renderedPos := 0 // Current position in rendered content
-
-	// Track fenced code block state
-	inFencedBlock := false
-	var codeBlockContent strings.Builder
-	codeBlockSourceStart := 0 // Source position where code content starts (after opening fence line)
-
-	// Track indented code block state
-	inIndentedBlock := false
-	var indentedBlockContent strings.Builder
-	indentedBlockSourceStart := 0
-
-	// Track list context for nested blocks
-	type listCtxSM struct {
-		contentCol int
-		indentLvl  int
-		ordered    bool
-		itemNumber int
-	}
-	var activeList *listCtxSM
-	inListCodeBlock := false
-	var listCodeContent strings.Builder
-	listCodeSourceStart := 0
-
-	// Helper to emit a code block accumulated within a list item
-	emitListCodeBlock := func() {
-		if listCodeContent.Len() > 0 {
-			codeContent := listCodeContent.String()
-			codeSpan := rich.Span{
-				Text: codeContent,
-				Style: rich.Style{
-					Bg:         rich.InlineCodeBg,
-					Code:       true,
-					Block:      true,
-					ListItem:   true,
-					ListIndent: activeList.indentLvl,
-					Scale:      1.0,
-				},
-			}
-
-			// Create source map entry
-			codeLen := len([]rune(codeContent))
-			entry := SourceMapEntry{
-				RenderedStart: renderedPos,
-				RenderedEnd:   renderedPos + codeLen,
-				SourceStart:   listCodeSourceStart,
-				SourceEnd:     sourcePos,
-			}
-			sm.entries = append(sm.entries, entry)
-			renderedPos += codeLen
-
-			result = append(result, codeSpan)
-			listCodeContent.Reset()
-		}
-		inListCodeBlock = false
-	}
-
-	// Track blockquote-within-list state
-	inListBlockquote := false
-	listBlockquoteDepth := 0
-	listBlockquoteHadNewline := false
-
-	// Helper to end a blockquote within a list item
-	endListBlockquote := func() {
-		if inListBlockquote && len(result) > 0 && listBlockquoteHadNewline {
-			result[len(result)-1].Text += "\n"
-			renderedPos++
-		}
-		inListBlockquote = false
-		listBlockquoteDepth = 0
-		listBlockquoteHadNewline = false
-	}
-
-	// Helper to end the active list context
-	endListContext := func() {
-		if inListCodeBlock {
-			emitListCodeBlock()
-		}
-		if inListBlockquote {
-			endListBlockquote()
-		}
-		activeList = nil
-	}
-
-	// Track blockquote state
-	inBlockquote := false
-	blockquoteDepth := 0
-	blockquoteLineHadNewline := false
-
-	// Helper to end the current blockquote by appending \n to the last span
-	endBlockquote := func() {
-		if inBlockquote && len(result) > 0 && blockquoteLineHadNewline {
-			result[len(result)-1].Text += "\n"
-			renderedPos++
-		}
-		inBlockquote = false
-		blockquoteDepth = 0
-		blockquoteLineHadNewline = false
-	}
-
-	// Track paragraph state for joining lines
-	inParagraph := false
-
-	// Helper to emit indented code block
-	emitIndentedBlock := func() {
-		if indentedBlockContent.Len() > 0 {
-			codeContent := indentedBlockContent.String()
-			codeSpan := rich.Span{
-				Text: codeContent,
-				Style: rich.Style{
-					Bg:    rich.InlineCodeBg,
-					Code:  true,
-					Block: true,
-					Scale: 1.0,
-				},
-			}
-
-			// Create source map entry
-			codeLen := len([]rune(codeContent))
-			entry := SourceMapEntry{
-				RenderedStart: renderedPos,
-				RenderedEnd:   renderedPos + codeLen,
-				SourceStart:   indentedBlockSourceStart,
-				SourceEnd:     sourcePos,
-			}
-			sm.entries = append(sm.entries, entry)
-			renderedPos += codeLen
-
-			// Merge or append
-			if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
-				result[len(result)-1].Text += codeSpan.Text
-			} else {
-				result = append(result, codeSpan)
-			}
-			indentedBlockContent.Reset()
-		}
-		inIndentedBlock = false
-	}
-
-	for i := 0; i < len(lines); i++ {
-		line := lines[i]
-
-		// --- List context: handle continuation lines within a list item ---
-		if activeList != nil {
-			// Inside a list code block: accumulate or close
-			if inListCodeBlock {
-				stripped, ok := stripListIndent(line, activeList.contentCol)
-				if ok && isFenceDelimiter(stripped) {
-					// Closing fence — emit the code block
-					emitListCodeBlock()
-					sourcePos += len(line)
-					continue
-				}
-				if ok {
-					listCodeContent.WriteString(stripped)
-				} else {
-					trimmed := strings.TrimRight(line, "\n")
-					if trimmed == "" {
-						listCodeContent.WriteString(line)
-					} else {
-						emitListCodeBlock()
-						endListContext()
-						goto normalDispatchSM
-					}
-				}
-				sourcePos += len(line)
-				continue
-			}
-
-			// Not in a list code block — check if this is a continuation line
-			isULCont, contIndent, _ := isUnorderedListItem(line)
-			isOLCont, contOLIndent, _, _ := isOrderedListItem(line)
-			if isULCont && contIndent <= activeList.indentLvl {
-				endListContext()
-				goto normalDispatchSM
-			}
-			if isOLCont && contOLIndent <= activeList.indentLvl {
-				endListContext()
-				goto normalDispatchSM
-			}
-
-			stripped, ok := stripListIndent(line, activeList.contentCol)
-			if ok {
-				if isFenceDelimiter(stripped) {
-					// Opening fence within list item
-					inListCodeBlock = true
-					listCodeContent.Reset()
-					// Source position: skip past the opening fence line
-					sourcePos += len(line)
-					listCodeSourceStart = sourcePos
-					continue
-				}
-				if isIndentedCodeLine(stripped) {
-					codeContent := stripIndent(stripped)
-					codeSpan := rich.Span{
-						Text: codeContent,
-						Style: rich.Style{
-							Bg:         rich.InlineCodeBg,
-							Code:       true,
-							Block:      true,
-							ListItem:   true,
-							ListIndent: activeList.indentLvl,
-							Scale:      1.0,
-						},
-					}
-
-					// Create source map entry for indented code in list
-					codeLen := len([]rune(codeContent))
-					entry := SourceMapEntry{
-						RenderedStart: renderedPos,
-						RenderedEnd:   renderedPos + codeLen,
-						SourceStart:   sourcePos,
-						SourceEnd:     sourcePos + len(line),
-					}
-					sm.entries = append(sm.entries, entry)
-					renderedPos += codeLen
-
-					result = append(result, codeSpan)
-					sourcePos += len(line)
-					continue
-				}
-				// Check for blockquote within list item
-				if isBQ, depth, bqContentStart := isBlockquoteLine(stripped); isBQ {
-					lineHadNewline := strings.HasSuffix(stripped, "\n")
-					content := strings.TrimSuffix(stripped[bqContentStart:], "\n")
-
-					// End any active top-level blockquote
-					if inBlockquote {
-						endBlockquote()
-					}
-
-					if content == "" {
-						// Empty blockquote line within list item — skip
-						sourcePos += len(line)
-						continue
-					}
-
-					// Continuation of same-depth list blockquote — join with space
-					if inListBlockquote && depth == listBlockquoteDepth {
-						if len(result) > 0 {
-							lastSpan := &result[len(result)-1]
-							if !strings.HasSuffix(lastSpan.Text, " ") {
-								lastSpan.Text += " "
-								renderedPos++
-							}
-						}
-					} else if inListBlockquote && depth != listBlockquoteDepth {
-						// Depth changed — end previous list blockquote
-						endListBlockquote()
-					}
-
-					// Parse inner content with inline formatting and source mapping
-					bqBaseStyle := rich.Style{
-						Blockquote:      true,
-						BlockquoteDepth: depth,
-						ListItem:        true,
-						ListIndent:      activeList.indentLvl,
-						Scale:           1.0,
-					}
-					var bqEntries []SourceMapEntry
-					var bqLinkEntries []LinkEntry
-					// Source offset: list indent bytes + blockquote prefix bytes
-					listIndentBytes := len(line) - len(stripped)
-					contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
-						SourceMap:      &bqEntries,
-						LinkMap:        &bqLinkEntries,
-						SourceOffset:   sourcePos + listIndentBytes + bqContentStart,
-						RenderedOffset: renderedPos,
-					})
-
-					// Post-process: adjust the first entry to include list indent + `> ` prefix
-					if len(bqEntries) > 0 {
-						bqEntries[0].SourceStart = sourcePos
-						bqEntries[0].PrefixLen = listIndentBytes + bqContentStart
-					}
-
-					sm.entries = append(sm.entries, bqEntries...)
-					for _, le := range bqLinkEntries {
-						lm.Add(le.Start, le.End, le.URL)
-					}
-
-					// Update rendered position based on spans
-					for _, span := range contentSpans {
-						renderedPos += len([]rune(span.Text))
-					}
-
-					sourcePos += len(line)
-
-					// Merge consecutive spans with the same style
-					for _, span := range contentSpans {
-						if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
-							result[len(result)-1].Text += span.Text
-						} else {
-							result = append(result, span)
-						}
-					}
-
-					inListBlockquote = true
-					listBlockquoteDepth = depth
-					listBlockquoteHadNewline = lineHadNewline
-					continue
-				}
-				// Other continuation content — end list context, fall through
-				endListContext()
-				goto normalDispatchSM
-			}
-
-			trimmedCont := strings.TrimRight(line, "\n")
-			if trimmedCont == "" {
-				endListContext()
-				goto normalDispatchSM
-			}
-
-			endListContext()
-			goto normalDispatchSM
-		}
-
-	normalDispatchSM:
-		// Check for fenced code block delimiter
-		if isFenceDelimiter(line) {
-			// If we were in an indented block, emit it first
-			if inIndentedBlock {
-				emitIndentedBlock()
-			}
-			// End blockquote before code block
-			if inBlockquote {
-				endBlockquote()
-			}
-			// End paragraph with newline before code block
-			if inParagraph && len(result) > 0 {
-				result[len(result)-1].Text += "\n"
-				renderedPos++
-			}
-			inParagraph = false
-			if !inFencedBlock {
-				// Opening fence - start collecting code
-				inFencedBlock = true
-				codeBlockContent.Reset()
-				// Skip past the fence line in source, remember where code content starts
-				sourcePos += len(line)
-				codeBlockSourceStart = sourcePos
-				continue
-			} else {
-				// Closing fence - emit the code block
-				inFencedBlock = false
-				codeContent := codeBlockContent.String()
-				if codeContent != "" {
-					codeSpan := rich.Span{
-						Text: codeContent,
-						Style: rich.Style{
-							Bg:    rich.InlineCodeBg,
-							Code:  true,
-							Block: true,
-							Scale: 1.0,
-						},
-					}
-
-					// Create source map entry for the code content
-					// Maps rendered code to source code (excluding fence lines)
-					codeLen := len([]rune(codeContent))
-					entry := SourceMapEntry{
-						RenderedStart: renderedPos,
-						RenderedEnd:   renderedPos + codeLen,
-						SourceStart:   codeBlockSourceStart,
-						SourceEnd:     sourcePos, // sourcePos is at start of closing fence
-					}
-					sm.entries = append(sm.entries, entry)
-					renderedPos += codeLen
-
-					// Merge or append the code span
-					if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
-						result[len(result)-1].Text += codeSpan.Text
-					} else {
-						result = append(result, codeSpan)
-					}
-				}
-				// Skip past the closing fence line in source
-				sourcePos += len(line)
-				continue
-			}
-		}
-
-		if inFencedBlock {
-			// Inside fenced block - collect raw content without parsing
-			codeBlockContent.WriteString(line)
-			sourcePos += len(line)
-			continue
-		}
-
-		// Check for list items BEFORE checking for indented code blocks
-		// This ensures deeply nested list items (with 4+ spaces or tabs) are recognized
-		isULEarly, _, _ := isUnorderedListItem(line)
-		isOLEarly, _, _, _ := isOrderedListItem(line)
-		isListItemEarly := isULEarly || isOLEarly
-
-		// Check for indented code block (4 spaces or 1 tab)
-		// But NOT if it's a list item - list items take precedence
-		if isIndentedCodeLine(line) && !isListItemEarly {
-			// End blockquote before code block
-			if inBlockquote {
-				endBlockquote()
-			}
-			// End paragraph with newline before code block
-			if inParagraph && len(result) > 0 {
-				result[len(result)-1].Text += "\n"
-				renderedPos++
-			}
-			inParagraph = false
-			if !inIndentedBlock {
-				// Start of indented block
-				inIndentedBlock = true
-				indentedBlockSourceStart = sourcePos
-				indentedBlockContent.Reset()
-			}
-			// Add the line content (with indent stripped)
-			indentedBlockContent.WriteString(stripIndent(line))
-			sourcePos += len(line)
-			continue
-		}
-
-		// Not an indented line - if we were in an indented block, emit it
-		if inIndentedBlock {
-			emitIndentedBlock()
-		}
-
-		// Check for blank line (paragraph break)
-		trimmedLine := strings.TrimRight(line, "\n")
-		if trimmedLine == "" {
-			// End blockquote before paragraph break
-			wasInBlockquote := inBlockquote
-			if inBlockquote {
-				endBlockquote()
-			}
-			// Blank line = paragraph break
-			if inParagraph || wasInBlockquote {
-				if len(result) > 0 {
-					// End the paragraph with a newline (with ParaBreak for extra spacing)
-					result = append(result, rich.Span{
-						Text:  "\n",
-						Style: rich.Style{ParaBreak: true, Scale: 1.0},
-					})
-					renderedPos++
-				}
-			}
-			inParagraph = false
-			sourcePos += len(line)
-			continue
-		}
-
-		// Check for table (must have header row followed by separator row)
-		isRow, _ := isTableRow(line)
-		if isRow && i+1 < len(lines) && isTableSeparatorRow(lines[i+1]) {
-			// End blockquote before table
-			if inBlockquote {
-				endBlockquote()
-			}
-			// End paragraph before table
-			if inParagraph && len(result) > 0 {
-				result[len(result)-1].Text += "\n"
-				renderedPos++
-			}
-			inParagraph = false
-
-			// Parse the table - collect all consecutive table rows
-			tableSpans, tableEntries, consumed := parseTableBlockWithSourceMap(lines, i, sourcePos, renderedPos)
-			result = append(result, tableSpans...)
-			sm.entries = append(sm.entries, tableEntries...)
-
-			// Update positions based on consumed lines
-			for j := 0; j < consumed; j++ {
-				sourcePos += len(lines[i+j])
-			}
-			for _, span := range tableSpans {
-				renderedPos += len([]rune(span.Text))
-			}
-			i += consumed - 1 // -1 because loop will increment
-			continue
-		}
-
-		// Check for blockquote
-		if isBQ, depth, contentStart := isBlockquoteLine(line); isBQ {
-			// End paragraph before blockquote
-			if inParagraph && len(result) > 0 {
-				result[len(result)-1].Text += "\n"
-				renderedPos++
-			}
-			inParagraph = false
-
-			lineHadNewline := strings.HasSuffix(line, "\n")
-
-			// Get the inner content after stripping the prefix and trailing newline
-			content := strings.TrimSuffix(line[contentStart:], "\n")
-
-			// Empty blockquote line (just ">" or "> " with no content)
-			if content == "" {
-				if inBlockquote {
-					// Paragraph break within blockquote
-					endBlockquote()
-					result = append(result, rich.Span{
-						Text: "\n",
-						Style: rich.Style{
-							ParaBreak:       true,
-							Blockquote:      true,
-							BlockquoteDepth: depth,
-							Scale:           1.0,
-						},
-					})
-					renderedPos++
-				}
-				sourcePos += len(line)
-				continue
-			}
-
-			// Depth changed — end previous blockquote
-			if inBlockquote && depth != blockquoteDepth {
-				endBlockquote()
-			}
-
-			// Continuation of same-depth blockquote — join with space
-			if inBlockquote && depth == blockquoteDepth {
-				if len(result) > 0 {
-					lastSpan := &result[len(result)-1]
-					if !strings.HasSuffix(lastSpan.Text, " ") {
-						lastSpan.Text += " "
-						renderedPos++
-					}
-				}
-			}
-
-			// Parse inner content with inline formatting and source mapping
-			bqBaseStyle := rich.Style{
-				Blockquote:      true,
-				BlockquoteDepth: depth,
-				Scale:           1.0,
-			}
-			var bqEntries []SourceMapEntry
-			var bqLinkEntries []LinkEntry
-			contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
-				SourceMap:      &bqEntries,
-				LinkMap:        &bqLinkEntries,
-				SourceOffset:   sourcePos + contentStart,
-				RenderedOffset: renderedPos,
-			})
-
-			// Post-process: adjust the first entry to include the `> ` prefix
-			// using PrefixLen, matching the heading model.
-			if len(bqEntries) > 0 {
-				bqEntries[0].SourceStart = sourcePos
-				bqEntries[0].PrefixLen = contentStart
-			}
-
-			sm.entries = append(sm.entries, bqEntries...)
-			for _, le := range bqLinkEntries {
-				lm.Add(le.Start, le.End, le.URL)
-			}
-
-			// Update rendered position based on spans
-			for _, span := range contentSpans {
-				renderedPos += len([]rune(span.Text))
-			}
-
-			sourcePos += len(line)
-
-			// Merge consecutive spans with the same style
-			for _, span := range contentSpans {
-				if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
-					result[len(result)-1].Text += span.Text
-				} else {
-					result = append(result, span)
-				}
-			}
-
-			inBlockquote = true
-			blockquoteDepth = depth
-			blockquoteLineHadNewline = lineHadNewline
-			continue
-		}
-
-		// Non-blockquote line — end any active blockquote
-		if inBlockquote {
-			endBlockquote()
-		}
-
-		// Check if this is a block-level element (heading, hrule, list item)
-		isUL, ulIndent, ulContentStart := isUnorderedListItem(line)
-		isOL, olIndent, olContentStart, olItemNum := isOrderedListItem(line)
-		isListItem := isUL || isOL
-		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line) || isListItem
-
-		if isBlockElement {
-			// Block elements start fresh - end previous paragraph with newline
-			if inParagraph && len(result) > 0 {
-				result[len(result)-1].Text += "\n"
-				renderedPos++
-			}
-			inParagraph = false
-		} else {
-			// Regular text line - join with previous paragraph text
-			if inParagraph && len(result) > 0 {
-				// Add space to end of last span for paragraph continuation
-				lastSpan := &result[len(result)-1]
-				if strings.HasSuffix(lastSpan.Text, "\n") {
-					lastSpan.Text = strings.TrimSuffix(lastSpan.Text, "\n") + " "
-				} else if !strings.HasSuffix(lastSpan.Text, " ") {
-					lastSpan.Text += " "
-					renderedPos++
-				}
-			}
-			inParagraph = true
-		}
-
-		// For regular text, strip trailing newline (paragraph text is joined with spaces)
-		lineToPass := line
-		if !isBlockElement {
-			lineToPass = strings.TrimSuffix(line, "\n")
-		}
-
-		// Normal line parsing
-		spans, entries, linkEntries := parseLineWithSourceMap(lineToPass, sourcePos, renderedPos)
-		sm.entries = append(sm.entries, entries...)
-		for _, le := range linkEntries {
-			lm.Add(le.Start, le.End, le.URL)
-		}
-
-		// Update rendered position based on spans
-		for _, span := range spans {
-			renderedPos += len([]rune(span.Text))
-		}
-
-		// Update source position (use original line length, not stripped)
-		sourcePos += len(line)
-
-		// Merge consecutive spans with the same style
-		for _, span := range spans {
-			if len(result) > 0 && result[len(result)-1].Style == span.Style {
-				result[len(result)-1].Text += span.Text
-			} else {
-				result = append(result, span)
-			}
-		}
-
-		// After parsing a list item, set up list context for continuation detection
-		if isListItem {
-			if isUL {
-				activeList = &listCtxSM{
-					contentCol: ulContentStart,
-					indentLvl:  ulIndent,
-				}
-			} else {
-				activeList = &listCtxSM{
-					contentCol: olContentStart,
-					indentLvl:  olIndent,
-					ordered:    true,
-					itemNumber: olItemNum,
-				}
-			}
-		}
-	}
-
-	// Handle trailing list context
-	if activeList != nil {
-		endListContext()
-	}
-
-	// Handle unclosed fenced code block - treat remaining content as code
-	if inFencedBlock {
-		codeContent := codeBlockContent.String()
-		if codeContent != "" {
-			codeSpan := rich.Span{
-				Text: codeContent,
-				Style: rich.Style{
-					Bg:    rich.InlineCodeBg,
-					Code:  true,
-					Block: true,
-					Scale: 1.0,
-				},
-			}
-
-			// Create source map entry
-			codeLen := len([]rune(codeContent))
-			entry := SourceMapEntry{
-				RenderedStart: renderedPos,
-				RenderedEnd:   renderedPos + codeLen,
-				SourceStart:   codeBlockSourceStart,
-				SourceEnd:     sourcePos,
-			}
-			sm.entries = append(sm.entries, entry)
-			renderedPos += codeLen
-
-			result = append(result, codeSpan)
-		}
-	}
-
-	// Handle trailing blockquote
-	if inBlockquote {
-		endBlockquote()
-	}
-
-	// Handle trailing indented code block
-	if inIndentedBlock {
-		emitIndentedBlock()
-	}
-
-	// Post-process: populate SourceRuneStart/SourceRuneEnd from byte positions.
-	// Build a byte-to-rune mapping table for the source text.
-	sm.populateRunePositions(text)
-
-	return result, sm, lm
 }
 
 // PopulateRunePositions fills in SourceRuneStart/SourceRuneEnd for all entries
@@ -995,10 +329,18 @@ func (sm *SourceMap) PopulateRunePositions(source string) {
 	sm.populateRunePositions(source)
 }
 
+// InvalidateRunePositions marks the source map's rune positions as stale.
+// Call this after shifting byte positions (e.g., in ParseRegion) to prevent
+// mapping functions from using outdated rune positions.
+func (sm *SourceMap) InvalidateRunePositions() {
+	sm.runePositionsValid = false
+}
+
 // populateRunePositions fills in SourceRuneStart/SourceRuneEnd for all entries
 // by converting byte positions to rune positions using the source text.
 func (sm *SourceMap) populateRunePositions(source string) {
 	if len(sm.entries) == 0 {
+		sm.runePositionsValid = true
 		return
 	}
 
@@ -1035,427 +377,5 @@ func (sm *SourceMap) populateRunePositions(source string) {
 		e.SourceRuneStart = b2r[start]
 		e.SourceRuneEnd = b2r[end]
 	}
-}
-
-// parseLineWithSourceMap parses a single line and returns spans, source map entries, and link entries.
-func parseLineWithSourceMap(line string, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
-	// Check for horizontal rule (---, ***, ___)
-	if isHorizontalRule(line) {
-		// Emit the HRuleRune marker plus newline if the original line had one
-		text := string(rich.HRuleRune)
-		hasNewline := strings.HasSuffix(line, "\n")
-		if hasNewline {
-			text += "\n"
-		}
-
-		var entries []SourceMapEntry
-
-		// Source line without newline (e.g., "---" from "---\n")
-		sourceWithoutNewline := strings.TrimSuffix(line, "\n")
-
-		// Entry for HRuleRune maps to the hrule characters (without newline)
-		entries = append(entries, SourceMapEntry{
-			RenderedStart: renderedOffset,
-			RenderedEnd:   renderedOffset + 1, // Just HRuleRune
-			SourceStart:   sourceOffset,
-			SourceEnd:     sourceOffset + len(sourceWithoutNewline),
-		})
-
-		// If there's a newline, add a separate entry for it
-		if hasNewline {
-			entries = append(entries, SourceMapEntry{
-				RenderedStart: renderedOffset + 1,
-				RenderedEnd:   renderedOffset + 2, // The newline
-				SourceStart:   sourceOffset + len(sourceWithoutNewline),
-				SourceEnd:     sourceOffset + len(line),
-			})
-		}
-
-		span := rich.Span{
-			Text:  text,
-			Style: rich.StyleHRule,
-		}
-		return []rich.Span{span}, entries, nil
-	}
-
-	// Check for heading (# at start of line)
-	level := headingLevel(line)
-	if level > 0 {
-		// Extract heading text (strip # prefix and leading space)
-		prefixLen := level
-		content := line[level:]
-		if len(content) > 0 && content[0] == ' ' {
-			content = content[1:]
-			prefixLen++ // Include the space in prefix
-		}
-
-		renderedLen := len([]rune(content))
-		entry := SourceMapEntry{
-			RenderedStart: renderedOffset,
-			RenderedEnd:   renderedOffset + renderedLen,
-			SourceStart:   sourceOffset,
-			SourceEnd:     sourceOffset + len(line),
-			PrefixLen:     prefixLen,
-		}
-
-		span := rich.Span{
-			Text: content,
-			Style: rich.Style{
-				Bold:  true,
-				Scale: headingScales[level],
-			},
-		}
-		return []rich.Span{span}, []SourceMapEntry{entry}, nil
-	}
-
-	// Check for unordered list item (-, *, +)
-	if isUL, indentLevel, contentStart := isUnorderedListItem(line); isUL {
-		return parseUnorderedListItemWithSourceMap(line, indentLevel, contentStart, sourceOffset, renderedOffset)
-	}
-
-	// Check for ordered list item (1., 2), etc.)
-	if isOL, indentLevel, contentStart, itemNumber := isOrderedListItem(line); isOL {
-		return parseOrderedListItemWithSourceMap(line, indentLevel, contentStart, itemNumber, sourceOffset, renderedOffset)
-	}
-
-	// Parse inline formatting
-	var entries []SourceMapEntry
-	var linkEntries []LinkEntry
-	spans := parseInline(line, rich.DefaultStyle(), InlineOpts{
-		SourceMap:      &entries,
-		LinkMap:        &linkEntries,
-		SourceOffset:   sourceOffset,
-		RenderedOffset: renderedOffset,
-	})
-	return spans, entries, linkEntries
-}
-
-// parseUnorderedListItemWithSourceMap parses an unordered list line with source mapping.
-// It emits: bullet span ("•") + space span + content spans (with inline formatting).
-// The source map maps the entire rendered line (including bullet) back to the source
-// line (including leading whitespace and marker).
-func parseUnorderedListItemWithSourceMap(line string, indentLevel, contentStart, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
-	var spans []rich.Span
-	var entries []SourceMapEntry
-	var linkEntries []LinkEntry
-
-	// Emit the bullet marker (•)
-	bulletStyle := rich.Style{
-		ListBullet: true,
-		ListIndent: indentLevel,
-		Scale:      1.0,
-	}
-	spans = append(spans, rich.Span{
-		Text:  "•",
-		Style: bulletStyle,
-	})
-
-	// Create source map entry for bullet: maps "•" to leading whitespace + marker
-	// Source is: leading whitespace + "- " (contentStart bytes)
-	// Rendered is: "•" (1 rune)
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: renderedOffset,
-		RenderedEnd:   renderedOffset + 1, // "•" is 1 rune
-		SourceStart:   sourceOffset,
-		SourceEnd:     sourceOffset + contentStart - 1, // everything up to space after marker
-	})
-	renderedOffset++
-
-	// Emit the space after bullet
-	itemStyle := rich.Style{
-		ListItem:   true,
-		ListIndent: indentLevel,
-		Scale:      1.0,
-	}
-	spans = append(spans, rich.Span{
-		Text:  " ",
-		Style: itemStyle,
-	})
-
-	// Source map for space
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: renderedOffset,
-		RenderedEnd:   renderedOffset + 1,
-		SourceStart:   sourceOffset + contentStart - 1, // space in source
-		SourceEnd:     sourceOffset + contentStart,
-	})
-	renderedOffset++
-
-	// Get the content after the marker
-	content := ""
-	if contentStart < len(line) {
-		content = line[contentStart:]
-	}
-
-	// If content is empty, we're done
-	if content == "" {
-		return spans, entries, linkEntries
-	}
-
-	// Parse inline formatting in the content, using itemStyle as the base
-	contentSpans := parseInline(content, itemStyle, InlineOpts{
-		SourceMap:      &entries,
-		LinkMap:        &linkEntries,
-		SourceOffset:   sourceOffset + contentStart,
-		RenderedOffset: renderedOffset,
-	})
-	spans = append(spans, contentSpans...)
-
-	return spans, entries, linkEntries
-}
-
-// parseOrderedListItemWithSourceMap parses an ordered list line with source mapping.
-// It emits: number span ("N.") + space span + content spans (with inline formatting).
-func parseOrderedListItemWithSourceMap(line string, indentLevel, contentStart, itemNumber, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, []LinkEntry) {
-	var spans []rich.Span
-	var entries []SourceMapEntry
-	var linkEntries []LinkEntry
-
-	// Emit the number marker (e.g., "1.")
-	bulletStyle := rich.Style{
-		ListBullet:  true,
-		ListOrdered: true,
-		ListNumber:  itemNumber,
-		ListIndent:  indentLevel,
-		Scale:       1.0,
-	}
-	numberText := fmt.Sprintf("%d.", itemNumber)
-	spans = append(spans, rich.Span{
-		Text:  numberText,
-		Style: bulletStyle,
-	})
-
-	// Calculate rendered length of number (e.g., "1." = 2, "10." = 3)
-	numberLen := len([]rune(numberText))
-
-	// Create source map entry for number: maps "N." to leading whitespace + marker
-	// Source is: leading whitespace + "N." or "N)" (contentStart - 1 bytes, minus the space)
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: renderedOffset,
-		RenderedEnd:   renderedOffset + numberLen,
-		SourceStart:   sourceOffset,
-		SourceEnd:     sourceOffset + contentStart - 1, // everything up to space after marker
-	})
-	renderedOffset += numberLen
-
-	// Emit the space after number
-	itemStyle := rich.Style{
-		ListItem:   true,
-		ListIndent: indentLevel,
-		Scale:      1.0,
-	}
-	spans = append(spans, rich.Span{
-		Text:  " ",
-		Style: itemStyle,
-	})
-
-	// Source map for space
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: renderedOffset,
-		RenderedEnd:   renderedOffset + 1,
-		SourceStart:   sourceOffset + contentStart - 1,
-		SourceEnd:     sourceOffset + contentStart,
-	})
-	renderedOffset++
-
-	// Get the content after the marker
-	content := ""
-	if contentStart < len(line) {
-		content = line[contentStart:]
-	}
-
-	// If content is empty, we're done
-	if content == "" {
-		return spans, entries, linkEntries
-	}
-
-	// Parse inline formatting in the content, using itemStyle as the base
-	contentSpans := parseInline(content, itemStyle, InlineOpts{
-		SourceMap:      &entries,
-		LinkMap:        &linkEntries,
-		SourceOffset:   sourceOffset + contentStart,
-		RenderedOffset: renderedOffset,
-	})
-	spans = append(spans, contentSpans...)
-
-	return spans, entries, linkEntries
-}
-
-// parseTableBlockWithSourceMap parses a table starting at the given line index.
-// Returns the spans for the table, source map entries, and the number of lines consumed.
-func parseTableBlockWithSourceMap(lines []string, startIdx int, sourceOffset, renderedOffset int) ([]rich.Span, []SourceMapEntry, int) {
-	if startIdx >= len(lines) {
-		return nil, nil, 0
-	}
-
-	// First line should be header row
-	isRow, _ := isTableRow(lines[startIdx])
-	if !isRow {
-		return nil, nil, 0
-	}
-
-	// Second line should be separator row
-	if startIdx+1 >= len(lines) || !isTableSeparatorRow(lines[startIdx+1]) {
-		return nil, nil, 0
-	}
-
-	// Collect all table lines (header, separator, and data rows)
-	var tableLines []string
-	consumed := 0
-
-	for i := startIdx; i < len(lines); i++ {
-		line := lines[i]
-		isTableLine, _ := isTableRow(line)
-		isSep := isTableSeparatorRow(line)
-
-		// A line is part of the table if it's a table row or separator
-		if isTableLine || isSep {
-			tableLines = append(tableLines, line)
-			consumed++
-		} else {
-			// Non-table line ends the table
-			break
-		}
-	}
-
-	if consumed < 2 {
-		// Need at least header + separator
-		return nil, nil, 0
-	}
-
-	// Parse alignment from separator row (line index 1)
-	_, aligns := parseTableSeparator(tableLines[1])
-
-	// Parse all rows into cells (skip separator at index 1)
-	var allCells [][]string
-	for i, line := range tableLines {
-		if i == 1 {
-			allCells = append(allCells, nil)
-			continue
-		}
-		_, cells := isTableRow(line)
-		allCells = append(allCells, cells)
-	}
-
-	// Collect non-nil rows for width calculation
-	var dataCells [][]string
-	for _, cells := range allCells {
-		if cells != nil {
-			dataCells = append(dataCells, cells)
-		}
-	}
-
-	// Calculate column widths
-	widths := calculateColumnWidths(dataCells)
-
-	// Ensure minimum width of 3 for separator dashes
-	for i, w := range widths {
-		if w < 3 {
-			widths[i] = 3
-		}
-	}
-
-	// Build box-drawing grid lines
-	topBorder := buildGridLine(widths, '┌', '┬', '┐', '─')
-	headerSep := buildGridLine(widths, '├', '┼', '┤', '─')
-	bottomBorder := buildGridLine(widths, '└', '┴', '┘', '─')
-
-	borderStyle := rich.Style{
-		Table: true,
-		Code:  true,
-		Block: true,
-		Bg:    rich.InlineCodeBg,
-		Scale: 1.0,
-	}
-
-	var spans []rich.Span
-	var entries []SourceMapEntry
-	srcPos := sourceOffset
-	rendPos := renderedOffset
-
-	// Top border (synthetic — no source mapping, zero-length source range)
-	topText := topBorder + "\n"
-	topLen := len([]rune(topText))
-	spans = append(spans, rich.Span{
-		Text:  topText,
-		Style: borderStyle,
-	})
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: rendPos,
-		RenderedEnd:   rendPos + topLen,
-		SourceStart:   srcPos,
-		SourceEnd:     srcPos, // zero-length: synthetic line
-	})
-	rendPos += topLen
-
-	for i, line := range tableLines {
-		isHeader := i == 0
-		isSeparator := i == 1
-
-		if isSeparator {
-			// Replace ASCII separator with box-drawing header separator
-			sepText := headerSep + "\n"
-			sepLen := len([]rune(sepText))
-			spans = append(spans, rich.Span{
-				Text:  sepText,
-				Style: borderStyle,
-			})
-			// Separator maps to the source separator line
-			entries = append(entries, SourceMapEntry{
-				RenderedStart: rendPos,
-				RenderedEnd:   rendPos + sepLen,
-				SourceStart:   srcPos,
-				SourceEnd:     srcPos + len(line),
-			})
-			rendPos += sepLen
-			srcPos += len(line)
-		} else {
-			cells := allCells[i]
-			lineText := replaceDelimiters(rebuildTableRow(cells, widths, aligns))
-			lineText += "\n" // all rows get newline since bottom border follows
-
-			style := rich.Style{
-				Table:       true,
-				TableHeader: isHeader,
-				Code:        true,
-				Block:       true,
-				Bg:          rich.InlineCodeBg,
-				Scale:       1.0,
-			}
-			if isHeader {
-				style.Bold = true
-			}
-
-			spans = append(spans, rich.Span{
-				Text:  lineText,
-				Style: style,
-			})
-
-			renderedLen := len([]rune(lineText))
-			entries = append(entries, SourceMapEntry{
-				RenderedStart: rendPos,
-				RenderedEnd:   rendPos + renderedLen,
-				SourceStart:   srcPos,
-				SourceEnd:     srcPos + len(line),
-			})
-			rendPos += renderedLen
-			srcPos += len(line)
-		}
-	}
-
-	// Bottom border with trailing newline (synthetic — no source mapping, zero-length source range)
-	bottomLen := len([]rune(bottomBorder)) + 1 // +1 for trailing newline
-	spans = append(spans, rich.Span{
-		Text:  bottomBorder + "\n",
-		Style: borderStyle,
-	})
-	entries = append(entries, SourceMapEntry{
-		RenderedStart: rendPos,
-		RenderedEnd:   rendPos + bottomLen,
-		SourceStart:   srcPos,
-		SourceEnd:     srcPos, // zero-length: synthetic line
-	})
-	rendPos += bottomLen
-
-	return spans, entries, consumed
+	sm.runePositionsValid = true
 }

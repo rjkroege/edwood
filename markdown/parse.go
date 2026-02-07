@@ -19,69 +19,92 @@ var headingScales = [7]float64{
 	6:     0.875, // H6
 }
 
+// listCtx tracks list context for nested blocks within a list item.
+type listCtx struct {
+	contentCol int  // column where content starts (for continuation detection)
+	indentLvl  int  // nesting level (for ListIndent)
+	ordered    bool // true for ordered lists
+	itemNumber int  // item number for ordered lists
+}
+
 // Parse converts markdown text to styled rich.Content.
 func Parse(text string) rich.Content {
+	return parseInternal(text, nil, nil)
+}
+
+// ParseWithSourceMap parses markdown and returns the styled content,
+// a source map for mapping rendered positions back to source positions,
+// and a link map for tracking which rendered positions contain links.
+func ParseWithSourceMap(text string) (rich.Content, *SourceMap, *LinkMap) {
+	if text == "" {
+		return rich.Content{}, &SourceMap{}, NewLinkMap()
+	}
+	sm := &SourceMap{}
+	lm := NewLinkMap()
+	result := parseInternal(text, sm, lm)
+	sm.populateRunePositions(text)
+	return result, sm, lm
+}
+
+// parseInternal is the unified markdown parser. When sm and lm are non-nil,
+// source map entries and link entries are accumulated; otherwise only
+// rich.Content is produced.
+func parseInternal(text string, sm *SourceMap, lm *LinkMap) rich.Content {
 	if text == "" {
 		return rich.Content{}
 	}
 
+	tracking := sm != nil
+
 	var result rich.Content
 	lines := splitLines(text)
+
+	sourcePos := 0
+	renderedPos := 0
 
 	// Track fenced code block state
 	inFencedBlock := false
 	var codeBlockContent strings.Builder
+	codeBlockSourceStart := 0
 
 	// Track indented code block state
 	inIndentedBlock := false
 	var indentedBlockContent strings.Builder
-
-	// Helper to emit indented code block
-	emitIndentedBlock := func() {
-		if indentedBlockContent.Len() > 0 {
-			codeSpan := rich.Span{
-				Text: indentedBlockContent.String(),
-				Style: rich.Style{
-					Bg:    rich.InlineCodeBg,
-					Code:  true,
-					Block: true,
-					Scale: 1.0,
-				},
-			}
-			result = append(result, codeSpan)
-			indentedBlockContent.Reset()
-		}
-		inIndentedBlock = false
-	}
-
-	// Track if we're in a paragraph (consecutive non-block lines)
-	inParagraph := false
+	indentedBlockSourceStart := 0
 
 	// Track list context for nested blocks
-	type listCtx struct {
-		contentCol int  // column where content starts (for continuation detection)
-		indentLvl  int  // nesting level (for ListIndent)
-		ordered    bool // true for ordered lists
-		itemNumber int  // item number for ordered lists
-	}
 	var activeList *listCtx
 	inListCodeBlock := false
 	var listCodeContent strings.Builder
+	listCodeSourceStart := 0
 
 	// Helper to emit a code block accumulated within a list item
 	emitListCodeBlock := func() {
 		if listCodeContent.Len() > 0 {
+			codeContent := listCodeContent.String()
 			codeSpan := rich.Span{
-				Text: listCodeContent.String(),
+				Text: codeContent,
 				Style: rich.Style{
-					Bg:       rich.InlineCodeBg,
-					Code:     true,
-					Block:    true,
-					ListItem: true,
+					Bg:         rich.InlineCodeBg,
+					Code:       true,
+					Block:      true,
+					ListItem:   true,
 					ListIndent: activeList.indentLvl,
-					Scale:    1.0,
+					Scale:      1.0,
 				},
 			}
+
+			if tracking {
+				codeLen := len([]rune(codeContent))
+				sm.entries = append(sm.entries, SourceMapEntry{
+					RenderedStart: renderedPos,
+					RenderedEnd:   renderedPos + codeLen,
+					SourceStart:   listCodeSourceStart,
+					SourceEnd:     sourcePos,
+				})
+				renderedPos += codeLen
+			}
+
 			result = append(result, codeSpan)
 			listCodeContent.Reset()
 		}
@@ -97,6 +120,9 @@ func Parse(text string) rich.Content {
 	endListBlockquote := func() {
 		if inListBlockquote && len(result) > 0 && listBlockquoteHadNewline {
 			result[len(result)-1].Text += "\n"
+			if tracking {
+				renderedPos++
+			}
 		}
 		inListBlockquote = false
 		listBlockquoteDepth = 0
@@ -123,10 +149,52 @@ func Parse(text string) rich.Content {
 	endBlockquote := func() {
 		if inBlockquote && len(result) > 0 && blockquoteLineHadNewline {
 			result[len(result)-1].Text += "\n"
+			if tracking {
+				renderedPos++
+			}
 		}
 		inBlockquote = false
 		blockquoteDepth = 0
 		blockquoteLineHadNewline = false
+	}
+
+	// Track paragraph state for joining lines
+	inParagraph := false
+
+	// Helper to emit indented code block
+	emitIndentedBlock := func() {
+		if indentedBlockContent.Len() > 0 {
+			codeContent := indentedBlockContent.String()
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:    rich.InlineCodeBg,
+					Code:  true,
+					Block: true,
+					Scale: 1.0,
+				},
+			}
+
+			if tracking {
+				codeLen := len([]rune(codeContent))
+				sm.entries = append(sm.entries, SourceMapEntry{
+					RenderedStart: renderedPos,
+					RenderedEnd:   renderedPos + codeLen,
+					SourceStart:   indentedBlockSourceStart,
+					SourceEnd:     sourcePos,
+				})
+				renderedPos += codeLen
+			}
+
+			// Merge or append
+			if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
+				result[len(result)-1].Text += codeSpan.Text
+			} else {
+				result = append(result, codeSpan)
+			}
+			indentedBlockContent.Reset()
+		}
+		inIndentedBlock = false
 	}
 
 	for i := 0; i < len(lines); i++ {
@@ -136,34 +204,33 @@ func Parse(text string) rich.Content {
 		if activeList != nil {
 			// Inside a list code block: accumulate or close
 			if inListCodeBlock {
-				// Check if line is indented to contentCol and has a fence delimiter
 				stripped, ok := stripListIndent(line, activeList.contentCol)
 				if ok && isFenceDelimiter(stripped) {
-					// Closing fence — emit the code block
 					emitListCodeBlock()
+					if tracking {
+						sourcePos += len(line)
+					}
 					continue
 				}
-				// Accumulate code content (strip list indent)
 				if ok {
 					listCodeContent.WriteString(stripped)
 				} else {
-					// Line not indented enough — still accumulate raw
-					// (handles empty lines within code blocks)
 					trimmed := strings.TrimRight(line, "\n")
 					if trimmed == "" {
 						listCodeContent.WriteString(line)
 					} else {
-						// Not indented enough and not blank — end code block and list context
 						emitListCodeBlock()
 						endListContext()
 						goto normalDispatch
 					}
 				}
+				if tracking {
+					sourcePos += len(line)
+				}
 				continue
 			}
 
 			// Not in a list code block — check if this is a continuation line
-			// First check: is this another list item at same or lower indent?
 			isULCont, contIndent, _ := isUnorderedListItem(line)
 			isOLCont, contOLIndent, _, _ := isOrderedListItem(line)
 			if isULCont && contIndent <= activeList.indentLvl {
@@ -175,31 +242,46 @@ func Parse(text string) rich.Content {
 				goto normalDispatch
 			}
 
-			// Check if line is indented to contentCol (continuation)
 			stripped, ok := stripListIndent(line, activeList.contentCol)
 			if ok {
-				// It's a continuation line — check for nested blocks
 				if isFenceDelimiter(stripped) {
-					// Opening fence within list item
 					inListCodeBlock = true
 					listCodeContent.Reset()
+					if tracking {
+						sourcePos += len(line)
+						listCodeSourceStart = sourcePos
+					}
 					continue
 				}
-				// Check for indented code within list item (4 extra spaces)
 				if isIndentedCodeLine(stripped) {
 					codeContent := stripIndent(stripped)
 					codeSpan := rich.Span{
 						Text: codeContent,
 						Style: rich.Style{
-							Bg:       rich.InlineCodeBg,
-							Code:     true,
-							Block:    true,
-							ListItem: true,
+							Bg:         rich.InlineCodeBg,
+							Code:       true,
+							Block:      true,
+							ListItem:   true,
 							ListIndent: activeList.indentLvl,
-							Scale:    1.0,
+							Scale:      1.0,
 						},
 					}
+
+					if tracking {
+						codeLen := len([]rune(codeContent))
+						sm.entries = append(sm.entries, SourceMapEntry{
+							RenderedStart: renderedPos,
+							RenderedEnd:   renderedPos + codeLen,
+							SourceStart:   sourcePos,
+							SourceEnd:     sourcePos + len(line),
+						})
+						renderedPos += codeLen
+					}
+
 					result = append(result, codeSpan)
+					if tracking {
+						sourcePos += len(line)
+					}
 					continue
 				}
 				// Check for blockquote within list item
@@ -207,30 +289,31 @@ func Parse(text string) rich.Content {
 					lineHadNewline := strings.HasSuffix(stripped, "\n")
 					content := strings.TrimSuffix(stripped[bqContentStart:], "\n")
 
-					// End any active top-level blockquote
 					if inBlockquote {
 						endBlockquote()
 					}
 
 					if content == "" {
-						// Empty blockquote line within list item — skip
+						if tracking {
+							sourcePos += len(line)
+						}
 						continue
 					}
 
-					// Continuation of same-depth list blockquote — join with space
 					if inListBlockquote && depth == listBlockquoteDepth {
 						if len(result) > 0 {
 							lastSpan := &result[len(result)-1]
 							if !strings.HasSuffix(lastSpan.Text, " ") {
 								lastSpan.Text += " "
+								if tracking {
+									renderedPos++
+								}
 							}
 						}
 					} else if inListBlockquote && depth != listBlockquoteDepth {
-						// Depth changed — end previous list blockquote
 						endListBlockquote()
 					}
 
-					// Parse inner content with inline formatting
 					bqBaseStyle := rich.Style{
 						Blockquote:      true,
 						BlockquoteDepth: depth,
@@ -238,10 +321,40 @@ func Parse(text string) rich.Content {
 						ListIndent:      activeList.indentLvl,
 						Scale:           1.0,
 					}
-					spans := parseInline(content, bqBaseStyle, InlineOpts{})
 
-					// Merge consecutive spans with the same style
-					for _, span := range spans {
+					var bqSMEntries *[]SourceMapEntry
+					var bqLMEntries *[]LinkEntry
+					var bqEntries []SourceMapEntry
+					var bqLinkEntries []LinkEntry
+					listIndentBytes := len(line) - len(stripped)
+					if tracking {
+						bqSMEntries = &bqEntries
+						bqLMEntries = &bqLinkEntries
+					}
+					contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
+						SourceMap:      bqSMEntries,
+						LinkMap:        bqLMEntries,
+						SourceOffset:   sourcePos + listIndentBytes + bqContentStart,
+						RenderedOffset: renderedPos,
+					})
+
+					if tracking {
+						if len(bqEntries) > 0 {
+							bqEntries[0].SourceStart = sourcePos
+							bqEntries[0].PrefixLen = listIndentBytes + bqContentStart
+							bqEntries[0].Kind = KindPrefix
+						}
+						sm.entries = append(sm.entries, bqEntries...)
+						for _, le := range bqLinkEntries {
+							lm.Add(le.Start, le.End, le.URL)
+						}
+						for _, span := range contentSpans {
+							renderedPos += len([]rune(span.Text))
+						}
+						sourcePos += len(line)
+					}
+
+					for _, span := range contentSpans {
 						if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
 							result[len(result)-1].Text += span.Text
 						} else {
@@ -254,20 +367,16 @@ func Parse(text string) rich.Content {
 					listBlockquoteHadNewline = lineHadNewline
 					continue
 				}
-				// Other continuation content (plain text, etc.)
 				endListContext()
 				goto normalDispatch
 			}
 
-			// Check for blank line — could be intra-item paragraph break
 			trimmedCont := strings.TrimRight(line, "\n")
 			if trimmedCont == "" {
-				// Blank line — end list context (simple approach)
 				endListContext()
 				goto normalDispatch
 			}
 
-			// Line not indented enough and not a list item — end context
 			endListContext()
 			goto normalDispatch
 		}
@@ -275,26 +384,28 @@ func Parse(text string) rich.Content {
 	normalDispatch:
 		// Check for fenced code block delimiter
 		if isFenceDelimiter(line) {
-			// If we were in an indented block, emit it first
 			if inIndentedBlock {
 				emitIndentedBlock()
 			}
-			// End blockquote before code block
 			if inBlockquote {
 				endBlockquote()
 			}
-			// End paragraph with newline before code block
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
+				if tracking {
+					renderedPos++
+				}
 			}
 			inParagraph = false
 			if !inFencedBlock {
-				// Opening fence - start collecting code
 				inFencedBlock = true
 				codeBlockContent.Reset()
+				if tracking {
+					sourcePos += len(line)
+					codeBlockSourceStart = sourcePos
+				}
 				continue
 			} else {
-				// Closing fence - emit the code block
 				inFencedBlock = false
 				codeContent := codeBlockContent.String()
 				if codeContent != "" {
@@ -307,43 +418,67 @@ func Parse(text string) rich.Content {
 							Scale: 1.0,
 						},
 					}
-					result = append(result, codeSpan)
+
+					if tracking {
+						codeLen := len([]rune(codeContent))
+						sm.entries = append(sm.entries, SourceMapEntry{
+							RenderedStart: renderedPos,
+							RenderedEnd:   renderedPos + codeLen,
+							SourceStart:   codeBlockSourceStart,
+							SourceEnd:     sourcePos,
+						})
+						renderedPos += codeLen
+					}
+
+					// Merge or append the code span
+					if len(result) > 0 && result[len(result)-1].Style == codeSpan.Style {
+						result[len(result)-1].Text += codeSpan.Text
+					} else {
+						result = append(result, codeSpan)
+					}
+				}
+				if tracking {
+					sourcePos += len(line)
 				}
 				continue
 			}
 		}
 
 		if inFencedBlock {
-			// Inside fenced block - collect raw content without parsing
 			codeBlockContent.WriteString(line)
+			if tracking {
+				sourcePos += len(line)
+			}
 			continue
 		}
 
-		// Check for list items BEFORE checking for indented code blocks
-		// This ensures deeply nested list items (with 4+ spaces or tabs) are recognized
 		isULEarly, _, _ := isUnorderedListItem(line)
 		isOLEarly, _, _, _ := isOrderedListItem(line)
 		isListItemEarly := isULEarly || isOLEarly
 
-		// Check for indented code block (4 spaces or 1 tab)
-		// But NOT if it's a list item - list items take precedence
 		if isIndentedCodeLine(line) && !isListItemEarly {
-			// End blockquote before code block
 			if inBlockquote {
 				endBlockquote()
 			}
-			// End paragraph with newline before code block
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
+				if tracking {
+					renderedPos++
+				}
 			}
 			inParagraph = false
-			inIndentedBlock = true
-			// Remove the indent prefix and add to block
+			if !inIndentedBlock {
+				inIndentedBlock = true
+				indentedBlockSourceStart = sourcePos
+				indentedBlockContent.Reset()
+			}
 			indentedBlockContent.WriteString(stripIndent(line))
+			if tracking {
+				sourcePos += len(line)
+			}
 			continue
 		}
 
-		// Not an indented line - if we were in an indented block, emit it
 		if inIndentedBlock {
 			emitIndentedBlock()
 		}
@@ -351,60 +486,76 @@ func Parse(text string) rich.Content {
 		// Check for blank line (paragraph break)
 		trimmedLine := strings.TrimRight(line, "\n")
 		if trimmedLine == "" {
-			// End blockquote before paragraph break
 			wasInBlockquote := inBlockquote
 			if inBlockquote {
 				endBlockquote()
 			}
-			// Blank line = paragraph break
 			if inParagraph || wasInBlockquote {
-				// End the paragraph with a newline (with ParaBreak for extra spacing)
-				result = append(result, rich.Span{
-					Text:  "\n",
-					Style: rich.Style{ParaBreak: true, Scale: 1.0},
-				})
-				inParagraph = false
+				if len(result) > 0 {
+					result = append(result, rich.Span{
+						Text:  "\n",
+						Style: rich.Style{ParaBreak: true, Scale: 1.0},
+					})
+					if tracking {
+						renderedPos++
+					}
+				}
+			}
+			inParagraph = false
+			if tracking {
+				sourcePos += len(line)
 			}
 			continue
 		}
 
-		// Check for table (must have header row followed by separator row)
+		// Check for table
 		isRow, _ := isTableRow(line)
 		if isRow && i+1 < len(lines) && isTableSeparatorRow(lines[i+1]) {
-			// End blockquote before table
 			if inBlockquote {
 				endBlockquote()
 			}
-			// End paragraph before table
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
+				if tracking {
+					renderedPos++
+				}
 			}
 			inParagraph = false
 
-			// Parse the table - collect all consecutive table rows
-			tableSpans, consumed := parseTableBlock(lines, i)
+			var smEntriesPtr *[]SourceMapEntry
+			if tracking {
+				smEntriesPtr = &sm.entries
+			}
+			tableSpans, consumed := parseTableBlockInternal(lines, i, sourcePos, renderedPos, smEntriesPtr)
 			result = append(result, tableSpans...)
-			i += consumed - 1 // -1 because loop will increment
+
+			if tracking {
+				for j := 0; j < consumed; j++ {
+					sourcePos += len(lines[i+j])
+				}
+				for _, span := range tableSpans {
+					renderedPos += len([]rune(span.Text))
+				}
+			}
+			i += consumed - 1
 			continue
 		}
 
 		// Check for blockquote
 		if isBQ, depth, contentStart := isBlockquoteLine(line); isBQ {
-			// End paragraph before blockquote
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
+				if tracking {
+					renderedPos++
+				}
 			}
 			inParagraph = false
 
 			lineHadNewline := strings.HasSuffix(line, "\n")
-
-			// Get the inner content after stripping the prefix and trailing newline
 			content := strings.TrimSuffix(line[contentStart:], "\n")
 
-			// Empty blockquote line (just ">" or "> " with no content)
 			if content == "" {
 				if inBlockquote {
-					// Paragraph break within blockquote
 					endBlockquote()
 					result = append(result, rich.Span{
 						Text: "\n",
@@ -415,36 +566,70 @@ func Parse(text string) rich.Content {
 							Scale:           1.0,
 						},
 					})
+					if tracking {
+						renderedPos++
+					}
 				}
-				// If not in a blockquote, empty blockquote produces no output
+				if tracking {
+					sourcePos += len(line)
+				}
 				continue
 			}
 
-			// Depth changed — end previous blockquote
 			if inBlockquote && depth != blockquoteDepth {
 				endBlockquote()
 			}
 
-			// Continuation of same-depth blockquote — join with space
 			if inBlockquote && depth == blockquoteDepth {
 				if len(result) > 0 {
 					lastSpan := &result[len(result)-1]
 					if !strings.HasSuffix(lastSpan.Text, " ") {
 						lastSpan.Text += " "
+						if tracking {
+							renderedPos++
+						}
 					}
 				}
 			}
 
-			// Parse inner content with inline formatting
 			bqBaseStyle := rich.Style{
 				Blockquote:      true,
 				BlockquoteDepth: depth,
 				Scale:           1.0,
 			}
-			spans := parseInline(content, bqBaseStyle, InlineOpts{})
 
-			// Merge consecutive spans with the same style
-			for _, span := range spans {
+			var bqSMEntries *[]SourceMapEntry
+			var bqLMEntries *[]LinkEntry
+			var bqEntries []SourceMapEntry
+			var bqLinkEntries []LinkEntry
+			if tracking {
+				bqSMEntries = &bqEntries
+				bqLMEntries = &bqLinkEntries
+			}
+			contentSpans := parseInline(content, bqBaseStyle, InlineOpts{
+				SourceMap:      bqSMEntries,
+				LinkMap:        bqLMEntries,
+				SourceOffset:   sourcePos + contentStart,
+				RenderedOffset: renderedPos,
+			})
+
+			if tracking {
+				if len(bqEntries) > 0 {
+					bqEntries[0].SourceStart = sourcePos
+					bqEntries[0].PrefixLen = contentStart
+					bqEntries[0].Kind = KindPrefix
+				}
+				sm.entries = append(sm.entries, bqEntries...)
+				for _, le := range bqLinkEntries {
+					lm.Add(le.Start, le.End, le.URL)
+				}
+				for _, span := range contentSpans {
+					renderedPos += len([]rune(span.Text))
+				}
+				sourcePos += len(line)
+			}
+
+			for _, span := range contentSpans {
 				if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link {
 					result[len(result)-1].Text += span.Text
 				} else {
@@ -458,60 +643,76 @@ func Parse(text string) rich.Content {
 			continue
 		}
 
-		// Non-blockquote line — end any active blockquote
 		if inBlockquote {
 			endBlockquote()
 		}
 
-		// Check if this is a block-level element (heading, hrule, list item)
+		// Check if this is a block-level element
 		isUL, ulIndent, ulContentStart := isUnorderedListItem(line)
 		isOL, olIndent, olContentStart, olItemNum := isOrderedListItem(line)
 		isListItem := isUL || isOL
 		isBlockElement := headingLevel(line) > 0 || isHorizontalRule(line) || isListItem
 
 		if isBlockElement {
-			// Block elements start fresh - end previous paragraph with newline
 			if inParagraph && len(result) > 0 {
 				result[len(result)-1].Text += "\n"
+				if tracking {
+					renderedPos++
+				}
 			}
 			inParagraph = false
 		} else {
-			// Regular text line - join with previous paragraph text
 			if inParagraph && len(result) > 0 {
-				// Add space to end of last span for paragraph continuation
 				lastSpan := &result[len(result)-1]
 				if strings.HasSuffix(lastSpan.Text, "\n") {
 					lastSpan.Text = strings.TrimSuffix(lastSpan.Text, "\n") + " "
 				} else if !strings.HasSuffix(lastSpan.Text, " ") {
 					lastSpan.Text += " "
+					if tracking {
+						renderedPos++
+					}
 				}
 			}
 			inParagraph = true
 		}
 
-		// Normal line parsing - strip trailing newline for paragraph text
-		// But preserve newline for list items so they end with \n
 		lineToPass := line
 		if !isBlockElement {
 			lineToPass = strings.TrimSuffix(line, "\n")
-		} else if isListItem {
-			// List items keep their trailing newline (if present) in the content
-			// but parseLine will handle the line with the newline
 		}
-		spans := parseLine(lineToPass)
+
+		// Normal line parsing
+		var smEntriesPtr *[]SourceMapEntry
+		var lmEntriesPtr *[]LinkEntry
+		var lineEntries []SourceMapEntry
+		var lineLinkEntries []LinkEntry
+		if tracking {
+			smEntriesPtr = &lineEntries
+			lmEntriesPtr = &lineLinkEntries
+		}
+		spans := parseLineInternal(lineToPass, sourcePos, renderedPos, smEntriesPtr, lmEntriesPtr)
+
+		if tracking {
+			sm.entries = append(sm.entries, lineEntries...)
+			for _, le := range lineLinkEntries {
+				lm.Add(le.Start, le.End, le.URL)
+			}
+			for _, span := range spans {
+				renderedPos += len([]rune(span.Text))
+			}
+			sourcePos += len(line)
+		}
 
 		// Merge consecutive spans with the same style
 		// (but don't merge link spans or list item spans - each should remain distinct)
 		for _, span := range spans {
 			if len(result) > 0 && result[len(result)-1].Style == span.Style && !span.Style.Link && !span.Style.ListItem && !span.Style.ListBullet {
-				// Merge with previous span
 				result[len(result)-1].Text += span.Text
 			} else {
 				result = append(result, span)
 			}
 		}
 
-		// After parsing a list item, set up list context for continuation detection
 		if isListItem {
 			if isUL {
 				activeList = &listCtx{
@@ -529,17 +730,14 @@ func Parse(text string) rich.Content {
 		}
 	}
 
-	// Handle trailing list context
 	if activeList != nil {
 		endListContext()
 	}
 
-	// Handle trailing blockquote
 	if inBlockquote {
 		endBlockquote()
 	}
 
-	// Handle unclosed fenced code block - treat remaining content as code
 	if inFencedBlock {
 		codeContent := codeBlockContent.String()
 		if codeContent != "" {
@@ -552,18 +750,28 @@ func Parse(text string) rich.Content {
 					Scale: 1.0,
 				},
 			}
+
+			if tracking {
+				codeLen := len([]rune(codeContent))
+				sm.entries = append(sm.entries, SourceMapEntry{
+					RenderedStart: renderedPos,
+					RenderedEnd:   renderedPos + codeLen,
+					SourceStart:   codeBlockSourceStart,
+					SourceEnd:     sourcePos,
+				})
+				renderedPos += codeLen
+			}
+
 			result = append(result, codeSpan)
 		}
 	}
 
-	// Handle trailing indented code block
 	if inIndentedBlock {
 		emitIndentedBlock()
 	}
 
 	return result
 }
-
 // isIndentedCodeLine returns true if the line is an indented code line
 // (starts with 4 spaces or 1 tab).
 func isIndentedCodeLine(line string) bool {
@@ -700,13 +908,41 @@ func splitLines(text string) []string {
 
 // parseLine parses a single line and returns the appropriate spans.
 func parseLine(line string) []rich.Span {
+	return parseLineInternal(line, 0, 0, nil, nil)
+}
+
+// parseLineInternal parses a single line and returns spans, optionally accumulating
+// source map entries and link entries when the pointer parameters are non-nil.
+func parseLineInternal(line string, sourceOffset, renderedOffset int,
+	smEntries *[]SourceMapEntry, lmEntries *[]LinkEntry) []rich.Span {
+
 	// Check for horizontal rule (---, ***, ___)
 	if isHorizontalRule(line) {
 		// Emit the HRuleRune marker plus newline if the original line had one
 		text := string(rich.HRuleRune)
-		if strings.HasSuffix(line, "\n") {
+		hasNewline := strings.HasSuffix(line, "\n")
+		if hasNewline {
 			text += "\n"
 		}
+
+		if smEntries != nil {
+			sourceWithoutNewline := strings.TrimSuffix(line, "\n")
+			*smEntries = append(*smEntries, SourceMapEntry{
+				RenderedStart: renderedOffset,
+				RenderedEnd:   renderedOffset + 1,
+				SourceStart:   sourceOffset,
+				SourceEnd:     sourceOffset + len(sourceWithoutNewline),
+			})
+			if hasNewline {
+				*smEntries = append(*smEntries, SourceMapEntry{
+					RenderedStart: renderedOffset + 1,
+					RenderedEnd:   renderedOffset + 2,
+					SourceStart:   sourceOffset + len(sourceWithoutNewline),
+					SourceEnd:     sourceOffset + len(line),
+				})
+			}
+		}
+
 		return []rich.Span{{
 			Text:  text,
 			Style: rich.StyleHRule,
@@ -716,9 +952,26 @@ func parseLine(line string) []rich.Span {
 	// Check for heading (# at start of line)
 	level := headingLevel(line)
 	if level > 0 {
-		// Extract heading text (strip # prefix and leading space)
-		content := line[level:] // Remove the # characters
-		content = strings.TrimLeft(content, " ")
+		// Extract heading text (strip # prefix and one leading space)
+		prefixLen := level
+		content := line[level:]
+		if len(content) > 0 && content[0] == ' ' {
+			content = content[1:]
+			prefixLen++
+		}
+
+		if smEntries != nil {
+			renderedLen := len([]rune(content))
+			*smEntries = append(*smEntries, SourceMapEntry{
+				RenderedStart: renderedOffset,
+				RenderedEnd:   renderedOffset + renderedLen,
+				SourceStart:   sourceOffset,
+				SourceEnd:     sourceOffset + len(line),
+				PrefixLen:     prefixLen,
+				Kind:          KindPrefix,
+			})
+		}
+
 		return []rich.Span{{
 			Text: content,
 			Style: rich.Style{
@@ -730,16 +983,21 @@ func parseLine(line string) []rich.Span {
 
 	// Check for unordered list item (-, *, +)
 	if isUL, indentLevel, contentStart := isUnorderedListItem(line); isUL {
-		return parseUnorderedListItem(line, indentLevel, contentStart)
+		return parseUnorderedListItemInternal(line, indentLevel, contentStart, sourceOffset, renderedOffset, smEntries, lmEntries)
 	}
 
 	// Check for ordered list item (1., 2), etc.)
 	if isOL, indentLevel, contentStart, itemNumber := isOrderedListItem(line); isOL {
-		return parseOrderedListItem(line, indentLevel, contentStart, itemNumber)
+		return parseOrderedListItemInternal(line, indentLevel, contentStart, itemNumber, sourceOffset, renderedOffset, smEntries, lmEntries)
 	}
 
 	// Parse inline formatting (bold, italic)
-	return parseInline(line, rich.DefaultStyle(), InlineOpts{})
+	return parseInline(line, rich.DefaultStyle(), InlineOpts{
+		SourceMap:      smEntries,
+		LinkMap:        lmEntries,
+		SourceOffset:   sourceOffset,
+		RenderedOffset: renderedOffset,
+	})
 }
 
 // parseURLPart extracts the URL and optional title from a URL part.
@@ -953,8 +1211,14 @@ func isOrderedListItem(line string) (bool, int, int, int) {
 }
 
 // parseUnorderedListItem parses an unordered list line and returns styled spans.
-// It emits: bullet span + space span + content spans (with inline formatting).
 func parseUnorderedListItem(line string, indentLevel int, contentStart int) []rich.Span {
+	return parseUnorderedListItemInternal(line, indentLevel, contentStart, 0, 0, nil, nil)
+}
+
+// parseUnorderedListItemInternal parses an unordered list line with optional source mapping.
+// It emits: bullet span ("•") + space span + content spans (with inline formatting).
+func parseUnorderedListItemInternal(line string, indentLevel, contentStart, sourceOffset, renderedOffset int,
+	smEntries *[]SourceMapEntry, lmEntries *[]LinkEntry) []rich.Span {
 	var spans []rich.Span
 
 	// Emit the bullet marker (•)
@@ -968,6 +1232,16 @@ func parseUnorderedListItem(line string, indentLevel int, contentStart int) []ri
 		Style: bulletStyle,
 	})
 
+	if smEntries != nil {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + 1,
+			SourceStart:   sourceOffset,
+			SourceEnd:     sourceOffset + contentStart - 1,
+		})
+	}
+	renderedOffset++
+
 	// Emit the space after bullet
 	itemStyle := rich.Style{
 		ListItem:   true,
@@ -978,6 +1252,16 @@ func parseUnorderedListItem(line string, indentLevel int, contentStart int) []ri
 		Text:  " ",
 		Style: itemStyle,
 	})
+
+	if smEntries != nil {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + 1,
+			SourceStart:   sourceOffset + contentStart - 1,
+			SourceEnd:     sourceOffset + contentStart,
+		})
+	}
+	renderedOffset++
 
 	// Get the content after the marker
 	content := ""
@@ -991,15 +1275,26 @@ func parseUnorderedListItem(line string, indentLevel int, contentStart int) []ri
 	}
 
 	// Parse inline formatting in the content, using itemStyle as the base
-	contentSpans := parseInline(content, itemStyle, InlineOpts{})
+	contentSpans := parseInline(content, itemStyle, InlineOpts{
+		SourceMap:      smEntries,
+		LinkMap:        lmEntries,
+		SourceOffset:   sourceOffset + contentStart,
+		RenderedOffset: renderedOffset,
+	})
 	spans = append(spans, contentSpans...)
 
 	return spans
 }
 
 // parseOrderedListItem parses an ordered list line and returns styled spans.
-// It emits: number span + space span + content spans (with inline formatting).
 func parseOrderedListItem(line string, indentLevel int, contentStart int, itemNumber int) []rich.Span {
+	return parseOrderedListItemInternal(line, indentLevel, contentStart, itemNumber, 0, 0, nil, nil)
+}
+
+// parseOrderedListItemInternal parses an ordered list line with optional source mapping.
+// It emits: number span ("N.") + space span + content spans (with inline formatting).
+func parseOrderedListItemInternal(line string, indentLevel, contentStart, itemNumber, sourceOffset, renderedOffset int,
+	smEntries *[]SourceMapEntry, lmEntries *[]LinkEntry) []rich.Span {
 	var spans []rich.Span
 
 	// Emit the number marker (e.g., "1.")
@@ -1011,10 +1306,22 @@ func parseOrderedListItem(line string, indentLevel int, contentStart int, itemNu
 		ListIndent:  indentLevel,
 		Scale:       1.0,
 	}
+	numberText := fmt.Sprintf("%d.", itemNumber)
 	spans = append(spans, rich.Span{
-		Text:  fmt.Sprintf("%d.", itemNumber),
+		Text:  numberText,
 		Style: bulletStyle,
 	})
+
+	numberLen := len([]rune(numberText))
+	if smEntries != nil {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + numberLen,
+			SourceStart:   sourceOffset,
+			SourceEnd:     sourceOffset + contentStart - 1,
+		})
+	}
+	renderedOffset += numberLen
 
 	// Emit the space after number
 	itemStyle := rich.Style{
@@ -1029,6 +1336,16 @@ func parseOrderedListItem(line string, indentLevel int, contentStart int, itemNu
 		Style: itemStyle,
 	})
 
+	if smEntries != nil {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: renderedOffset,
+			RenderedEnd:   renderedOffset + 1,
+			SourceStart:   sourceOffset + contentStart - 1,
+			SourceEnd:     sourceOffset + contentStart,
+		})
+	}
+	renderedOffset++
+
 	// Get the content after the marker
 	content := ""
 	if contentStart < len(line) {
@@ -1041,7 +1358,12 @@ func parseOrderedListItem(line string, indentLevel int, contentStart int, itemNu
 	}
 
 	// Parse inline formatting in the content, using itemStyle as the base
-	contentSpans := parseInline(content, itemStyle, InlineOpts{})
+	contentSpans := parseInline(content, itemStyle, InlineOpts{
+		SourceMap:      smEntries,
+		LinkMap:        lmEntries,
+		SourceOffset:   sourceOffset + contentStart,
+		RenderedOffset: renderedOffset,
+	})
 	spans = append(spans, contentSpans...)
 
 	return spans
@@ -1328,6 +1650,14 @@ func rebuildSeparatorRow(widths []int, aligns []rich.Alignment) string {
 // parseTableBlock parses a table starting at the given line index.
 // Returns the spans for the table and the number of lines consumed.
 func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
+	return parseTableBlockInternal(lines, startIdx, 0, 0, nil)
+}
+
+// parseTableBlockInternal parses a table starting at the given line index,
+// optionally accumulating source map entries when smEntries is non-nil.
+// Returns the spans for the table, source map entries, and the number of lines consumed.
+func parseTableBlockInternal(lines []string, startIdx int, sourceOffset, renderedOffset int,
+	smEntries *[]SourceMapEntry) ([]rich.Span, int) {
 	if startIdx >= len(lines) {
 		return nil, 0
 	}
@@ -1342,6 +1672,8 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 	if startIdx+1 >= len(lines) || !isTableSeparatorRow(lines[startIdx+1]) {
 		return nil, 0
 	}
+
+	tracking := smEntries != nil
 
 	// Collect all table lines (header, separator, and data rows)
 	var tableLines []string
@@ -1414,31 +1746,55 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 		Scale: 1.0,
 	}
 
-	// Build spans: top border, then rows with box-drawing delimiters, then bottom border
 	var spans []rich.Span
+	srcPos := sourceOffset
+	rendPos := renderedOffset
 
 	// Top border
+	topText := topBorder + "\n"
+	topLen := len([]rune(topText))
 	spans = append(spans, rich.Span{
-		Text:  topBorder + "\n",
+		Text:  topText,
 		Style: borderStyle,
 	})
+	if tracking {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: rendPos,
+			RenderedEnd:   rendPos + topLen,
+			SourceStart:   srcPos,
+			SourceEnd:     srcPos, // zero-length: synthetic line
+			Kind:          KindSynthetic,
+		})
+	}
+	rendPos += topLen
 
-	for i := range tableLines {
+	for i, line := range tableLines {
 		isHeader := i == 0
 		isSeparator := i == 1
 
 		if isSeparator {
 			// Replace ASCII separator with box-drawing header separator
+			sepText := headerSep + "\n"
+			sepLen := len([]rune(sepText))
 			spans = append(spans, rich.Span{
-				Text:  headerSep + "\n",
+				Text:  sepText,
 				Style: borderStyle,
 			})
+			if tracking {
+				*smEntries = append(*smEntries, SourceMapEntry{
+					RenderedStart: rendPos,
+					RenderedEnd:   rendPos + sepLen,
+					SourceStart:   srcPos,
+					SourceEnd:     srcPos + len(line),
+					Kind:          KindSynthetic,
+				})
+			}
+			rendPos += sepLen
+			srcPos += len(line)
 		} else {
 			cells := allCells[i]
 			lineText := replaceDelimiters(rebuildTableRow(cells, widths, aligns))
-
-			// Add newline (all rows get newline since bottom border follows)
-			lineText += "\n"
+			lineText += "\n" // all rows get newline since bottom border follows
 
 			style := rich.Style{
 				Table:       true,
@@ -1456,14 +1812,75 @@ func parseTableBlock(lines []string, startIdx int) ([]rich.Span, int) {
 				Text:  lineText,
 				Style: style,
 			})
+
+			// Per-cell source map entries
+			if tracking {
+				cellPositions := splitTableCellPositions(line)
+				for j, cp := range cellPositions {
+					if j >= len(widths) {
+						break
+					}
+
+					// Compute rendered rune position of cell j's content.
+					chunkStart := 1
+					for k := 0; k < j; k++ {
+						chunkStart += widths[k] + 3
+					}
+
+					// Content offset within the padded area depends on alignment
+					a := rich.AlignLeft
+					if j < len(aligns) {
+						a = aligns[j]
+					}
+					contentRuneLen := len([]rune(cp.Content))
+					var contentOffset int
+					switch a {
+					case rich.AlignRight:
+						contentOffset = widths[j] - contentRuneLen
+					case rich.AlignCenter:
+						contentOffset = (widths[j] - contentRuneLen) / 2
+					default: // AlignLeft
+						contentOffset = 0
+					}
+
+					rendCellStart := rendPos + chunkStart + 1 + contentOffset
+					rendCellEnd := rendCellStart + contentRuneLen
+
+					if contentRuneLen == 0 {
+						rendCellEnd = rendCellStart
+					}
+
+					*smEntries = append(*smEntries, SourceMapEntry{
+						RenderedStart: rendCellStart,
+						RenderedEnd:   rendCellEnd,
+						SourceStart:   srcPos + cp.ByteStart,
+						SourceEnd:     srcPos + cp.ByteEnd,
+						Kind:          KindTableCell,
+					})
+				}
+			}
+
+			rendPos += len([]rune(lineText))
+			srcPos += len(line)
 		}
 	}
 
-	// Bottom border with trailing newline to properly end the table block
+	// Bottom border with trailing newline
+	bottomText := bottomBorder + "\n"
+	bottomLen := len([]rune(bottomText))
 	spans = append(spans, rich.Span{
-		Text:  bottomBorder + "\n",
+		Text:  bottomText,
 		Style: borderStyle,
 	})
+	if tracking {
+		*smEntries = append(*smEntries, SourceMapEntry{
+			RenderedStart: rendPos,
+			RenderedEnd:   rendPos + bottomLen,
+			SourceStart:   srcPos,
+			SourceEnd:     srcPos, // zero-length: synthetic line
+			Kind:          KindSynthetic,
+		})
+	}
 
 	return spans, consumed
 }
@@ -1484,6 +1901,79 @@ func buildGridLine(widths []int, left, mid, right, fill rune) string {
 	}
 	b.WriteRune(right)
 	return b.String()
+}
+
+// cellPosition describes the rune/byte position of a cell's trimmed content
+// within a table row source line.
+type cellPosition struct {
+	Content   string
+	RuneStart int // rune offset of content within the line
+	RuneEnd   int // rune offset of content end within the line
+	ByteStart int // byte offset of content within the line
+	ByteEnd   int // byte offset of content end within the line
+}
+
+// splitTableCellPositions walks a table row source line and returns the
+// position of each cell's trimmed content. It splits on '|' delimiters,
+// and for each segment between pipes, finds the trimmed content's start/end
+// positions in both rune and byte offsets.
+func splitTableCellPositions(line string) []cellPosition {
+	// Strip trailing newline for position tracking
+	trimmed := strings.TrimSuffix(line, "\n")
+
+	// We need to iterate rune-by-rune, splitting on '|' and tracking positions.
+	runes := []rune(trimmed)
+	var cells []cellPosition
+
+	// Skip leading '|'
+	idx := 0
+	if idx < len(runes) && runes[idx] == '|' {
+		idx++
+	}
+
+	// Process segments between pipes
+	for idx < len(runes) {
+		// Find the next '|' or end of line
+		segStart := idx
+		for idx < len(runes) && runes[idx] != '|' {
+			idx++
+		}
+		segEnd := idx
+
+		// Skip the closing '|' if present
+		if idx < len(runes) && runes[idx] == '|' {
+			idx++
+		}
+
+		// The segment is runes[segStart:segEnd]
+		// Find the trimmed content within this segment
+		contentStart := segStart
+		contentEnd := segEnd
+
+		// Trim leading spaces
+		for contentStart < contentEnd && runes[contentStart] == ' ' {
+			contentStart++
+		}
+		// Trim trailing spaces
+		for contentEnd > contentStart && runes[contentEnd-1] == ' ' {
+			contentEnd--
+		}
+
+		// Convert rune positions to byte positions
+		byteStart := len(string(runes[:contentStart]))
+		byteEnd := len(string(runes[:contentEnd]))
+
+		content := string(runes[contentStart:contentEnd])
+		cells = append(cells, cellPosition{
+			Content:   content,
+			RuneStart: contentStart,
+			RuneEnd:   contentEnd,
+			ByteStart: byteStart,
+			ByteEnd:   byteEnd,
+		})
+	}
+
+	return cells
 }
 
 // replaceDelimiters replaces ASCII pipe '|' delimiters with box-drawing '│' (U+2502)

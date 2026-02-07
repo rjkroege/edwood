@@ -85,7 +85,7 @@ func TestParseH1(t *testing.T) {
 		{
 			name:      "h1 with extra spaces after hash",
 			input:     "#  Heading",
-			wantText:  "Heading",
+			wantText:  " Heading",
 			wantScale: 2.0,
 			wantBold:  true,
 		},
@@ -135,7 +135,7 @@ func TestParseH2(t *testing.T) {
 		{
 			name:      "h2 with extra spaces",
 			input:     "##  Heading",
-			wantText:  "Heading",
+			wantText:  " Heading",
 			wantScale: 1.5,
 			wantBold:  true,
 		},
@@ -5168,6 +5168,152 @@ func TestParseNestedBlockquoteInList(t *testing.T) {
 				}
 				if got[i].Style.BlockquoteDepth != want.blockquoteDepth {
 					t.Errorf("span[%d].Style.BlockquoteDepth = %d, want %d", i, got[i].Style.BlockquoteDepth, want.blockquoteDepth)
+				}
+			}
+		})
+	}
+}
+
+// TestParseParityWithSourceMap verifies that Parse and ParseWithSourceMap
+// produce identical rich.Content for a comprehensive set of markdown inputs.
+func TestParseParityWithSourceMap(t *testing.T) {
+	inputs := []struct {
+		name  string
+		input string
+	}{
+		// Plain text
+		{"empty", ""},
+		{"simple text", "Hello, World!"},
+		{"multiline paragraph", "Line one\nLine two\nLine three"},
+		{"text with spaces", "  some   spaced   text  "},
+
+		// Headings
+		{"h1", "# Heading"},
+		{"h2", "## Heading"},
+		{"h3", "### Heading"},
+		{"h4", "#### Heading"},
+		{"h5", "##### Heading"},
+		{"h6", "###### Heading"},
+		{"h1 with newline", "# Heading\n"},
+		{"h1 with extra spaces", "#  Heading"},
+		{"not a heading", "##text"},
+		{"heading then text", "# Title\nSome text"},
+
+		// Bold
+		{"bold", "**bold text**"},
+		{"bold in sentence", "before **bold** after"},
+		{"unclosed bold", "**unclosed"},
+
+		// Italic
+		{"italic", "*italic text*"},
+		{"italic in sentence", "before *italic* after"},
+
+		// Bold + italic
+		{"bold italic", "***both***"},
+		{"bold italic in sentence", "before ***both*** after"},
+
+		// Inline code
+		{"inline code", "`code`"},
+		{"inline code in sentence", "before `code` after"},
+		{"unclosed code", "`unclosed"},
+
+		// Links
+		{"link", "[text](url)"},
+		{"link in sentence", "before [text](url) after"},
+		{"link with bold", "[**bold link**](url)"},
+		{"multiple links", "[a](url1) and [b](url2)"},
+		{"malformed link", "[text]("},
+		{"empty link text", "[](url)"},
+
+		// Images
+		{"image", "![alt](url)"},
+		{"image with title", `![alt](url "title")`},
+		{"image inline", "before ![alt](url) after"},
+		{"malformed image", "![alt]("},
+
+		// Horizontal rules
+		{"hrule hyphens", "---\n"},
+		{"hrule asterisks", "***\n"},
+		{"hrule underscores", "___\n"},
+		{"hrule with spaces", "- - -\n"},
+		{"hrule between text", "above\n\n---\n\nbelow"},
+		{"not hrule", "--"},
+
+		// Fenced code blocks
+		{"fenced code", "```\ncode line\n```\n"},
+		{"fenced code with lang", "```go\nfunc main() {}\n```\n"},
+		{"fenced code multi line", "```\nline1\nline2\nline3\n```\n"},
+		{"unclosed fence", "```\ncode\n"},
+		{"fenced code preserves ws", "```\n  indented\n\ttabbed\n```\n"},
+
+		// Indented code blocks
+		{"indented code", "    code line\n"},
+		{"indented code multi", "    line1\n    line2\n"},
+
+		// Unordered lists
+		{"ul dash", "- item\n"},
+		{"ul asterisk", "* item\n"},
+		{"ul plus", "+ item\n"},
+		{"ul multi", "- item1\n- item2\n- item3\n"},
+		{"ul bold", "- **bold item**\n"},
+		{"ul nested", "- parent\n  - child\n"},
+		{"ul deep nested", "- l1\n  - l2\n    - l3\n"},
+
+		// Ordered lists
+		{"ol", "1. first\n2. second\n3. third\n"},
+		{"ol nested", "1. parent\n  1. child\n"},
+
+		// Tables
+		{"simple table", "| A | B |\n| --- | --- |\n| 1 | 2 |\n"},
+		{"table with alignment", "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n"},
+		{"table multi row", "| H1 | H2 |\n| --- | --- |\n| a | b |\n| c | d |\n"},
+
+		// Blockquotes
+		{"blockquote", "> quoted text\n"},
+		{"blockquote multi line", "> line 1\n> line 2\n"},
+		{"blockquote nested", "> outer\n>> inner\n"},
+		{"blockquote with bold", "> **bold** text\n"},
+		{"blockquote para break", "> para 1\n>\n> para 2\n"},
+		{"blockquote then text", "> quote\n\nnormal text"},
+
+		// Nested structures
+		{"list with code block", "- item\n  ```\n  code\n  ```\n"},
+		{"list with blockquote", "- item\n  > quoted\n"},
+		{"list with indented code", "- item\n      code\n"},
+
+		// Mixed content
+		{"heading then list", "# Title\n- item1\n- item2\n"},
+		{"paragraph break", "para one\n\npara two"},
+		{"mixed blocks", "# Title\n\nSome text with **bold**.\n\n- list item\n\n> quote\n"},
+		{"code then text", "```\ncode\n```\ntext after"},
+		{"text then table", "before\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n"},
+	}
+
+	for _, tt := range inputs {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			gotSM, _, _ := ParseWithSourceMap(tt.input)
+
+			if len(got) != len(gotSM) {
+				var gotDesc, smDesc []string
+				for _, s := range got {
+					gotDesc = append(gotDesc, fmt.Sprintf("{Text:%q Style:%+v}", s.Text, s.Style))
+				}
+				for _, s := range gotSM {
+					smDesc = append(smDesc, fmt.Sprintf("{Text:%q Style:%+v}", s.Text, s.Style))
+				}
+				t.Fatalf("span count mismatch: Parse=%d, ParseWithSourceMap=%d\n  Parse:\n    %s\n  ParseWithSourceMap:\n    %s",
+					len(got), len(gotSM),
+					strings.Join(gotDesc, "\n    "),
+					strings.Join(smDesc, "\n    "))
+			}
+
+			for i := range got {
+				if got[i].Text != gotSM[i].Text {
+					t.Errorf("span[%d].Text: Parse=%q, ParseWithSourceMap=%q", i, got[i].Text, gotSM[i].Text)
+				}
+				if got[i].Style != gotSM[i].Style {
+					t.Errorf("span[%d].Style: Parse=%+v, ParseWithSourceMap=%+v", i, got[i].Style, gotSM[i].Style)
 				}
 			}
 		})

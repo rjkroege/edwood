@@ -44,25 +44,31 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 
 	srcPos := opts.SourceOffset
 	rendPos := opts.RenderedOffset
+	plainSrcStart := srcPos
+	plainRendStart := rendPos
 
-	flushPlain := func() {
-		if currentText.Len() > 0 {
-			spans = append(spans, rich.Span{
-				Text:  currentText.String(),
-				Style: baseStyle,
-			})
-			currentText.Reset()
-		}
-	}
-
-	addSourceEntry := func(rendStart, rendEnd, srcStart, srcEnd int) {
+	addSourceEntry := func(rendStart, rendEnd, srcStart, srcEnd int, kind EntryKind) {
 		if opts.SourceMap != nil {
 			*opts.SourceMap = append(*opts.SourceMap, SourceMapEntry{
 				RenderedStart: rendStart,
 				RenderedEnd:   rendEnd,
 				SourceStart:   srcStart,
 				SourceEnd:     srcEnd,
+				Kind:          kind,
 			})
+		}
+	}
+
+	flushPlain := func() {
+		if currentText.Len() > 0 {
+			addSourceEntry(plainRendStart, rendPos, plainSrcStart, srcPos, KindPlainText)
+			spans = append(spans, rich.Span{
+				Text:  currentText.String(),
+				Style: baseStyle,
+			})
+			currentText.Reset()
+			plainRendStart = rendPos
+			plainSrcStart = srcPos
 		}
 	}
 
@@ -108,11 +114,13 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 						})
 
 						sourceLen := urlEnd - i + 1 // full ![alt](url) length
-						addSourceEntry(rendPos, rendPos+placeholderLen, srcPos, srcPos+sourceLen)
+						addSourceEntry(rendPos, rendPos+placeholderLen, srcPos, srcPos+sourceLen, KindPlainText)
 						if tracking {
 							rendPos += placeholderLen
 							srcPos += sourceLen
 						}
+						plainRendStart = rendPos
+						plainSrcStart = srcPos
 
 						i = urlEnd + 1
 						continue
@@ -121,7 +129,6 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 			}
 			// Not a valid image, treat ! as regular text
 			currentText.WriteByte(text[i])
-			addSourceEntry(rendPos, rendPos+1, srcPos, srcPos+1)
 			if tracking {
 				rendPos++
 				srcPos++
@@ -195,6 +202,8 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 						if tracking {
 							srcPos += sourceLen
 						}
+						plainRendStart = rendPos
+						plainSrcStart = srcPos
 						i = closeBracket + 2 + urlEnd + 1
 						continue
 					}
@@ -202,7 +211,6 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 			}
 			// Not a valid link, treat [ as regular text
 			currentText.WriteByte(text[i])
-			addSourceEntry(rendPos, rendPos+1, srcPos, srcPos+1)
 			if tracking {
 				rendPos++
 				srcPos++
@@ -229,18 +237,19 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 				})
 
 				sourceLen := 1 + end + 1
-				addSourceEntry(rendPos, rendPos+codeLen, srcPos, srcPos+sourceLen)
+				addSourceEntry(rendPos, rendPos+codeLen, srcPos, srcPos+sourceLen, KindSymmetricMarker)
 				if tracking {
 					rendPos += codeLen
 					srcPos += sourceLen
 				}
+				plainRendStart = rendPos
+				plainSrcStart = srcPos
 
 				i = i + 1 + end + 1
 				continue
 			}
 			// No closing ` found, treat as literal
 			currentText.WriteByte(text[i])
-			addSourceEntry(rendPos, rendPos+1, srcPos, srcPos+1)
 			if tracking {
 				rendPos++
 				srcPos++
@@ -267,11 +276,13 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 				})
 
 				sourceLen := 3 + end + 3
-				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen)
+				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen, KindSymmetricMarker)
 				if tracking {
 					rendPos += innerLen
 					srcPos += sourceLen
 				}
+				plainRendStart = rendPos
+				plainSrcStart = srcPos
 
 				i = i + 3 + end + 3
 				continue
@@ -295,18 +306,19 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 				})
 
 				sourceLen := 2 + end + 2
-				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen)
+				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen, KindSymmetricMarker)
 				if tracking {
 					rendPos += innerLen
 					srcPos += sourceLen
 				}
+				plainRendStart = rendPos
+				plainSrcStart = srcPos
 
 				i = i + 2 + end + 2
 				continue
 			}
 			// No closing ** found, treat as literal
 			currentText.WriteString("**")
-			addSourceEntry(rendPos, rendPos+2, srcPos, srcPos+2)
 			if tracking {
 				rendPos += 2
 				srcPos += 2
@@ -332,11 +344,13 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 				})
 
 				sourceLen := 1 + end + 1
-				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen)
+				addSourceEntry(rendPos, rendPos+innerLen, srcPos, srcPos+sourceLen, KindSymmetricMarker)
 				if tracking {
 					rendPos += innerLen
 					srcPos += sourceLen
 				}
+				plainRendStart = rendPos
+				plainSrcStart = srcPos
 
 				i = i + 1 + end + 1
 				continue
@@ -345,7 +359,6 @@ func parseInline(text string, baseStyle rich.Style, opts InlineOpts) []rich.Span
 
 		// 7. Regular character
 		currentText.WriteByte(text[i])
-		addSourceEntry(rendPos, rendPos+1, srcPos, srcPos+1)
 		if tracking {
 			rendPos++
 			srcPos++

@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -1431,6 +1432,438 @@ func TestBlockquoteSourceMapContentProduction(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTableSourceMapPerCell tests that per-cell source map entries correctly
+// map rendered positions to source positions for table cells. This replaces
+// the old per-row mapping that caused incorrect highlights due to column
+// width normalization.
+func TestTableSourceMapPerCell(t *testing.T) {
+	// Source:
+	//   | Flag | Purpose |\n     (line 1, 19 bytes, runes 0-18)
+	//   | --- | --- |\n          (line 2, 14 bytes, runes 19-32)
+	//   | -v | Verbose |\n       (line 3, 19 bytes, runes 33-51)
+	//
+	// Rendered (box-drawn):
+	//   ┌──────┬─────────┐\n    (span 0, rendPos 0-18)
+	//   │ Flag │ Purpose │\n    (span 1, rendPos 19-37)
+	//   ├──────┼─────────┤\n    (span 2, rendPos 38-56)
+	//   │ -v   │ Verbose │\n    (span 3, rendPos 57-75)
+	//   └──────┴─────────┘\n    (span 4, rendPos 76-94)
+	//
+	// Cell content rendered positions:
+	//   Header: "Flag" at rend 21-25, "Purpose" at rend 28-35
+	//   Data:   "-v" at rend 59-61,   "Verbose" at rend 66-73
+	//
+	// Cell content source rune positions:
+	//   Header: "Flag" at src 2-6, "Purpose" at src 9-16
+	//   Data:   "-v" at src 35-37, "Verbose" at src 40-47
+
+	input := "| Flag | Purpose |\n| --- | --- |\n| -v | Verbose |\n"
+
+	t.Run("ToSource maps rendered cell positions to correct source positions", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			renderedPos  int
+			renderedEnd  int
+			wantSrcStart int
+			wantSrcEnd   int
+		}{
+			{"Flag full cell", 21, 25, 2, 6},
+			{"Purpose full cell", 28, 35, 9, 16},
+			{"-v full cell", 59, 61, 35, 37},
+			{"Verbose full cell", 66, 73, 40, 47},
+			{"Flag partial (Fl)", 21, 23, 2, 4},
+			{"Purpose partial (Pur)", 28, 31, 9, 12},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, sm, _ := ParseWithSourceMap(input)
+				srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+				if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+					t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+						tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+						tt.wantSrcStart, tt.wantSrcEnd)
+				}
+			})
+		}
+	})
+
+	t.Run("ToRendered maps source cell positions to correct rendered positions", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			srcRuneStart  int
+			srcRuneEnd    int
+			wantRendStart int
+			wantRendEnd   int
+		}{
+			{"Flag", 2, 6, 21, 25},
+			{"Purpose", 9, 16, 28, 35},
+			{"-v", 35, 37, 59, 61},
+			{"Verbose", 40, 47, 66, 73},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, sm, _ := ParseWithSourceMap(input)
+				rendStart, rendEnd := sm.ToRendered(tt.srcRuneStart, tt.srcRuneEnd)
+				if rendStart != tt.wantRendStart || rendEnd != tt.wantRendEnd {
+					t.Errorf("ToRendered(%d, %d) = (%d, %d), want (%d, %d)",
+						tt.srcRuneStart, tt.srcRuneEnd, rendStart, rendEnd,
+						tt.wantRendStart, tt.wantRendEnd)
+				}
+			})
+		}
+	})
+
+	t.Run("point selections map correctly", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		// Point selection in rendered table cell should produce point in source
+		for _, rendPos := range []int{21, 23, 25, 28, 32, 59, 66, 70} {
+			srcStart, srcEnd := sm.ToSource(rendPos, rendPos)
+			if srcStart != srcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection",
+					rendPos, rendPos, srcStart, srcEnd)
+			}
+		}
+	})
+
+	t.Run("round trip rendered→source→rendered", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		cases := []struct {
+			name string
+			rS   int
+			rE   int
+		}{
+			{"Flag", 21, 25},
+			{"Purpose", 28, 35},
+			{"-v", 59, 61},
+			{"Verbose", 66, 73},
+		}
+
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				srcStart, srcEnd := sm.ToSource(tt.rS, tt.rE)
+				srcRuneStart := byteToRunePos(input, srcStart)
+				srcRuneEnd := byteToRunePos(input, srcEnd)
+				rendStart, rendEnd := sm.ToRendered(srcRuneStart, srcRuneEnd)
+
+				if rendStart > tt.rS || rendEnd < tt.rE {
+					t.Errorf("round trip: rendered(%d,%d) → source(%d,%d) → rendered(%d,%d); want to contain [%d,%d]",
+						tt.rS, tt.rE, srcStart, srcEnd, rendStart, rendEnd, tt.rS, tt.rE)
+				}
+			})
+		}
+	})
+}
+
+// TestTableSourceMapAlignments tests per-cell source map entries with
+// left, center, and right aligned columns.
+func TestTableSourceMapAlignments(t *testing.T) {
+	input := "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// Source line 3: "| a | b | c |\n" (14 bytes)
+	// starts at byte/rune 50 (26 + 24 = 50)
+	// "a" at source rune 52, "b" at 56, "c" at 60
+
+	// Test ToRendered for each alignment
+	rsA, reA := sm.ToRendered(52, 53)
+	rsB, reB := sm.ToRendered(56, 57)
+	rsC, reC := sm.ToRendered(60, 61)
+
+	// Each should map to exactly 1 rune in rendered
+	if reA-rsA != 1 {
+		t.Errorf("left-aligned 'a': ToRendered(52,53) = (%d,%d), want 1-rune span", rsA, reA)
+	}
+	if reB-rsB != 1 {
+		t.Errorf("center-aligned 'b': ToRendered(56,57) = (%d,%d), want 1-rune span", rsB, reB)
+	}
+	if reC-rsC != 1 {
+		t.Errorf("right-aligned 'c': ToRendered(60,61) = (%d,%d), want 1-rune span", rsC, reC)
+	}
+
+	// Verify round trip for each
+	for _, tt := range []struct {
+		name string
+		rS   int
+		rE   int
+	}{
+		{"a left-aligned", rsA, reA},
+		{"b center-aligned", rsB, reB},
+		{"c right-aligned", rsC, reC},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			srcStart, srcEnd := sm.ToSource(tt.rS, tt.rE)
+			srcRuneStart := byteToRunePos(input, srcStart)
+			srcRuneEnd := byteToRunePos(input, srcEnd)
+			rendStart, rendEnd := sm.ToRendered(srcRuneStart, srcRuneEnd)
+
+			if rendStart > tt.rS || rendEnd < tt.rE {
+				t.Errorf("round trip: rendered(%d,%d) → source(%d,%d) → rendered(%d,%d); want to contain [%d,%d]",
+					tt.rS, tt.rE, srcStart, srcEnd, rendStart, rendEnd, tt.rS, tt.rE)
+			}
+		})
+	}
+}
+
+// TestTableSourceMapEmptyCell tests that empty cells get zero-length
+// point entries in the source map.
+func TestTableSourceMapEmptyCell(t *testing.T) {
+	input := "| A | |\n| --- | --- |\n| x | |\n"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// "A" in header should map correctly
+	rsA, reA := sm.ToRendered(2, 3) // "A" at source rune 2-3
+	if reA-rsA != 1 {
+		t.Errorf("'A': ToRendered(2,3) = (%d,%d), want 1-rune span", rsA, reA)
+	}
+
+	// "x" in data row should map correctly
+	// Source line 1: "| A | |\n" = 8 runes (0-7)
+	// Source line 2: "| --- | --- |\n" = 14 runes (8-21)
+	// Source line 3: "| x | |\n" starts at rune 22
+	// "x" at source rune 24
+	rsX, reX := sm.ToRendered(24, 25)
+	if reX-rsX != 1 {
+		t.Errorf("'x': ToRendered(24,25) = (%d,%d), want 1-rune span", rsX, reX)
+	}
+}
+
+// TestTableGapSnapping tests that clicking on gap positions (padding spaces,
+// pipe delimiters) within a rendered table row snaps the cursor to the end of
+// the preceding cell's content, not into the delimiter area.
+func TestTableGapSnapping(t *testing.T) {
+	// Source:
+	//   | Flag | Purpose |\n
+	//   | --- | --- |\n
+	//   | -v | Verbose |\n
+	//
+	// Rendered (box-drawn):
+	//   ┌──────┬─────────┐\n    (rend 0-18)
+	//   │ Flag │ Purpose │\n    (rend 19-37)
+	//   ├──────┼─────────┤\n    (rend 38-56)
+	//   │ -v   │ Verbose │\n    (rend 57-75)
+	//   └──────┴─────────┘\n    (rend 76-94)
+	//
+	// Per-cell entries for header row:
+	//   "Flag"    at rend [21,25), source rune [2,6)
+	//   "Purpose" at rend [28,35), source rune [9,16)
+	// Gap positions 25-27 (space, │, space) are between entries.
+	//
+	// Per-cell entries for data row:
+	//   "-v"      at rend [59,61), source rune [35,37)
+	//   "Verbose" at rend [66,73), source rune [40,47)
+	// Gap positions 61-65 are between entries.
+
+	input := "| Flag | Purpose |\n| --- | --- |\n| -v | Verbose |\n"
+
+	t.Run("point selection in header row gap snaps to cell end", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		// Gap positions 25, 26, 27 are between "Flag" and "Purpose" entries.
+		// All should snap to source rune 6 (end of "Flag" content).
+		for _, rendPos := range []int{25, 26, 27} {
+			srcStart, srcEnd := sm.ToSource(rendPos, rendPos)
+			if srcStart != srcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection", rendPos, rendPos, srcStart, srcEnd)
+			}
+			if srcStart != 6 {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (6, 6) — snap to end of 'Flag'", rendPos, rendPos, srcStart, srcEnd)
+			}
+		}
+	})
+
+	t.Run("point selection in data row gap snaps to cell end", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		// Gap positions 61-65 are between "-v" and "Verbose" entries.
+		// All should snap to source rune 37 (end of "-v" content).
+		for _, rendPos := range []int{61, 62, 63, 64, 65} {
+			srcStart, srcEnd := sm.ToSource(rendPos, rendPos)
+			if srcStart != srcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection", rendPos, rendPos, srcStart, srcEnd)
+			}
+			if srcStart != 37 {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (37, 37) — snap to end of '-v'", rendPos, rendPos, srcStart, srcEnd)
+			}
+		}
+	})
+}
+
+// TestTableGapTyping simulates the full type-in-gap scenario: click a gap
+// position, map to source, verify the source position is at cell content end
+// (not in the pipe delimiter), so inserting a character appends to the cell.
+func TestTableGapTyping(t *testing.T) {
+	input := "| Flag | Purpose |\n| --- | --- |\n| -v | Verbose |\n"
+	_, sm, _ := ParseWithSourceMap(input)
+
+	// Click at rendered position 26 (the │ between "Flag" and "Purpose")
+	srcStart, srcEnd := sm.ToSource(26, 26)
+
+	// Should snap to source rune 6 (right after "g" in "Flag")
+	if srcStart != 6 || srcEnd != 6 {
+		t.Fatalf("ToSource(26, 26) = (%d, %d), want (6, 6)", srcStart, srcEnd)
+	}
+
+	// Verify that source rune 6 is the position right after "Flag" content
+	// In source "| Flag | Purpose |\n", rune 6 is the space after "Flag"
+	// which is the pipe position — but since we're snapping to SourceRuneEnd
+	// of the "Flag" cell entry (which is the byte-end converted to rune),
+	// inserting here would append to cell content.
+	sourceRunes := []rune(input)
+	if srcStart > len(sourceRunes) {
+		t.Fatalf("source position %d out of range (source len %d runes)", srcStart, len(sourceRunes))
+	}
+}
+
+// TestTableGapDoesNotAffectNonTable verifies that non-table gap handling
+// (paragraph breaks, code block boundaries) still uses 1:1 offset and
+// is not affected by the table cell gap snapping logic.
+func TestTableGapDoesNotAffectNonTable(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		renderedPos  int
+		renderedEnd  int
+		wantSrcStart int
+		wantSrcEnd   int
+	}{
+		{
+			name: "paragraph break gap uses offset",
+			// Source: "Para1\n\nPara2" (12 bytes)
+			// Rendered: "Para1\n" + "\n" (parabreak) + "Para2"
+			// The "\n" parabreak at rendered pos 6 is a gap between entries.
+			// The end gap handler finds "Para1\n" entry and adds 1:1 offset,
+			// mapping to source rune 7 (start of "Para2").
+			input:        "Para1\n\nPara2",
+			renderedPos:  6,
+			renderedEnd:  6,
+			wantSrcStart: 7, // 1:1 offset through gap (non-table)
+			wantSrcEnd:   7,
+		},
+		{
+			name: "code block boundary gap",
+			// Source: "Before\n```\ncode\n```\nAfter" (25 bytes)
+			// Rendered: "Before\ncode\nAfter" (17 runes)
+			// Clicking at the start of "After" (rendered 12) should map correctly.
+			input:        "Before\n```\ncode\n```\nAfter",
+			renderedPos:  12,
+			renderedEnd:  17,
+			wantSrcStart: 20,
+			wantSrcEnd:   25,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sm, _ := ParseWithSourceMap(tt.input)
+			srcStart, srcEnd := sm.ToSource(tt.renderedPos, tt.renderedEnd)
+			if srcStart != tt.wantSrcStart || srcEnd != tt.wantSrcEnd {
+				t.Errorf("ToSource(%d, %d) = (%d, %d), want (%d, %d)",
+					tt.renderedPos, tt.renderedEnd, srcStart, srcEnd,
+					tt.wantSrcStart, tt.wantSrcEnd)
+			}
+		})
+	}
+}
+
+// TestRunePositionsValidGuard verifies that ToSource and ToRendered panic
+// when called on a SourceMap whose rune positions have not been populated
+// (or have been invalidated). This catches the temporal coupling bug where
+// SourceRuneStart/End are zero-valued but treated as meaningful.
+func TestRunePositionsValidGuard(t *testing.T) {
+	t.Run("ToSource panics on invalid rune positions", func(t *testing.T) {
+		sm := &SourceMap{
+			entries: []SourceMapEntry{
+				{RenderedStart: 0, RenderedEnd: 5, SourceStart: 0, SourceEnd: 5},
+			},
+		}
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("expected panic from ToSource on invalid rune positions")
+			}
+			msg, ok := r.(string)
+			if !ok || !strings.Contains(msg, "ToSource") {
+				t.Errorf("unexpected panic message: %v", r)
+			}
+		}()
+		sm.ToSource(0, 1)
+	})
+
+	t.Run("ToRendered panics on invalid rune positions", func(t *testing.T) {
+		sm := &SourceMap{
+			entries: []SourceMapEntry{
+				{RenderedStart: 0, RenderedEnd: 5, SourceStart: 0, SourceEnd: 5},
+			},
+		}
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("expected panic from ToRendered on invalid rune positions")
+			}
+			msg, ok := r.(string)
+			if !ok || !strings.Contains(msg, "ToRendered") {
+				t.Errorf("unexpected panic message: %v", r)
+			}
+		}()
+		sm.ToRendered(0, 1)
+	})
+
+	t.Run("PopulateRunePositions enables ToSource", func(t *testing.T) {
+		// After PopulateRunePositions, the guard should pass.
+		source := "Hello"
+		sm := &SourceMap{
+			entries: []SourceMapEntry{
+				{RenderedStart: 0, RenderedEnd: 5, SourceStart: 0, SourceEnd: 5},
+			},
+		}
+		sm.PopulateRunePositions(source)
+		// Should not panic.
+		sm.ToSource(0, 1)
+	})
+
+	t.Run("InvalidateRunePositions re-enables guard", func(t *testing.T) {
+		source := "Hello"
+		sm := &SourceMap{
+			entries: []SourceMapEntry{
+				{RenderedStart: 0, RenderedEnd: 5, SourceStart: 0, SourceEnd: 5},
+			},
+		}
+		sm.PopulateRunePositions(source)
+		sm.InvalidateRunePositions()
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("expected panic after InvalidateRunePositions")
+			}
+		}()
+		sm.ToSource(0, 1)
+	})
+
+	t.Run("empty SourceMap does not panic", func(t *testing.T) {
+		sm := &SourceMap{}
+		// Empty entries should return early before the guard check.
+		srcStart, srcEnd := sm.ToSource(0, 0)
+		if srcStart != 0 || srcEnd != 0 {
+			t.Errorf("empty ToSource = (%d,%d), want (0,0)", srcStart, srcEnd)
+		}
+		rendStart, rendEnd := sm.ToRendered(0, 0)
+		if rendStart != -1 || rendEnd != -1 {
+			t.Errorf("empty ToRendered = (%d,%d), want (-1,-1)", rendStart, rendEnd)
+		}
+	})
+
+	t.Run("ParseWithSourceMap returns valid rune positions", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap("Hello **bold** world")
+		// Should not panic — ParseWithSourceMap calls populateRunePositions.
+		sm.ToSource(0, 5)
+		sm.ToRendered(0, 5)
+	})
 }
 
 // byteToRunePos converts a byte position in a string to a rune position.

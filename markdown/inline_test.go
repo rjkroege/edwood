@@ -484,23 +484,16 @@ func TestInlineSourceMapPlainText(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
-	// Plain text: each character gets a 1:1 source map entry
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 source map entries, got %d", len(entries))
+	// Plain text: one consolidated 1:1 source map entry for entire run
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 source map entry, got %d", len(entries))
 	}
-	for i, e := range entries {
-		if e.RenderedStart != i {
-			t.Errorf("entry[%d]: RenderedStart=%d, expected %d", i, e.RenderedStart, i)
-		}
-		if e.RenderedEnd != i+1 {
-			t.Errorf("entry[%d]: RenderedEnd=%d, expected %d", i, e.RenderedEnd, i+1)
-		}
-		if e.SourceStart != i {
-			t.Errorf("entry[%d]: SourceStart=%d, expected %d", i, e.SourceStart, i)
-		}
-		if e.SourceEnd != i+1 {
-			t.Errorf("entry[%d]: SourceEnd=%d, expected %d", i, e.SourceEnd, i+1)
-		}
+	e := entries[0]
+	if e.RenderedStart != 0 || e.RenderedEnd != 3 {
+		t.Errorf("rendered range: expected [0,3), got [%d,%d)", e.RenderedStart, e.RenderedEnd)
+	}
+	if e.SourceStart != 0 || e.SourceEnd != 3 {
+		t.Errorf("source range: expected [0,3), got [%d,%d)", e.SourceStart, e.SourceEnd)
 	}
 }
 
@@ -556,38 +549,30 @@ func TestInlineSourceMapMixed(t *testing.T) {
 		SourceOffset:   0,
 		RenderedOffset: 0,
 	})
-	// "a " = 2 char-by-char entries, "b" = 1 bold entry, " c" = 2 char-by-char entries
-	if len(entries) != 5 {
-		t.Fatalf("expected 5 source map entries, got %d: %+v", len(entries), entries)
+	// "a " = 1 consolidated entry, "b" = 1 bold entry, " c" = 1 consolidated entry
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 source map entries, got %d: %+v", len(entries), entries)
 	}
-	// Entry for 'a': rendered [0,1) source [0,1)
-	if entries[0].RenderedStart != 0 || entries[0].RenderedEnd != 1 {
-		t.Errorf("entry[0] rendered: expected [0,1), got [%d,%d)", entries[0].RenderedStart, entries[0].RenderedEnd)
+	// Entry for "a ": rendered [0,2) source [0,2)
+	if entries[0].RenderedStart != 0 || entries[0].RenderedEnd != 2 {
+		t.Errorf("entry[0] rendered: expected [0,2), got [%d,%d)", entries[0].RenderedStart, entries[0].RenderedEnd)
 	}
-	if entries[0].SourceStart != 0 || entries[0].SourceEnd != 1 {
-		t.Errorf("entry[0] source: expected [0,1), got [%d,%d)", entries[0].SourceStart, entries[0].SourceEnd)
-	}
-	// Entry for ' ': rendered [1,2) source [1,2)
-	if entries[1].RenderedStart != 1 || entries[1].RenderedEnd != 2 {
-		t.Errorf("entry[1] rendered: expected [1,2), got [%d,%d)", entries[1].RenderedStart, entries[1].RenderedEnd)
+	if entries[0].SourceStart != 0 || entries[0].SourceEnd != 2 {
+		t.Errorf("entry[0] source: expected [0,2), got [%d,%d)", entries[0].SourceStart, entries[0].SourceEnd)
 	}
 	// Entry for bold 'b': rendered [2,3) source [2,7) i.e. "**b**"
-	if entries[2].RenderedStart != 2 || entries[2].RenderedEnd != 3 {
-		t.Errorf("entry[2] rendered: expected [2,3), got [%d,%d)", entries[2].RenderedStart, entries[2].RenderedEnd)
+	if entries[1].RenderedStart != 2 || entries[1].RenderedEnd != 3 {
+		t.Errorf("entry[1] rendered: expected [2,3), got [%d,%d)", entries[1].RenderedStart, entries[1].RenderedEnd)
 	}
-	if entries[2].SourceStart != 2 || entries[2].SourceEnd != 7 {
-		t.Errorf("entry[2] source: expected [2,7), got [%d,%d)", entries[2].SourceStart, entries[2].SourceEnd)
+	if entries[1].SourceStart != 2 || entries[1].SourceEnd != 7 {
+		t.Errorf("entry[1] source: expected [2,7), got [%d,%d)", entries[1].SourceStart, entries[1].SourceEnd)
 	}
-	// Entry for ' ': rendered [3,4) source [7,8)
-	if entries[3].RenderedStart != 3 || entries[3].RenderedEnd != 4 {
-		t.Errorf("entry[3] rendered: expected [3,4), got [%d,%d)", entries[3].RenderedStart, entries[3].RenderedEnd)
+	// Entry for " c": rendered [3,5) source [7,9)
+	if entries[2].RenderedStart != 3 || entries[2].RenderedEnd != 5 {
+		t.Errorf("entry[2] rendered: expected [3,5), got [%d,%d)", entries[2].RenderedStart, entries[2].RenderedEnd)
 	}
-	if entries[3].SourceStart != 7 || entries[3].SourceEnd != 8 {
-		t.Errorf("entry[3] source: expected [7,8), got [%d,%d)", entries[3].SourceStart, entries[3].SourceEnd)
-	}
-	// Entry for 'c': rendered [4,5) source [8,9)
-	if entries[4].RenderedStart != 4 || entries[4].RenderedEnd != 5 {
-		t.Errorf("entry[4] rendered: expected [4,5), got [%d,%d)", entries[4].RenderedStart, entries[4].RenderedEnd)
+	if entries[2].SourceStart != 7 || entries[2].SourceEnd != 9 {
+		t.Errorf("entry[2] source: expected [7,9), got [%d,%d)", entries[2].SourceStart, entries[2].SourceEnd)
 	}
 }
 
