@@ -161,7 +161,24 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 	}
 
 	if renderedStart == -1 {
-		return -1, -1
+		// Source position falls in a gap between entries (e.g., a newline
+		// between paragraph lines that becomes a join space in rendered
+		// content). Find the nearest entry before this position and map
+		// to its rendered end.
+		for i := len(sm.entries) - 1; i >= 0; i-- {
+			if sm.entries[i].SourceRuneEnd <= srcRuneStart {
+				renderedStart = sm.entries[i].RenderedEnd
+				break
+			}
+		}
+		if renderedStart == -1 {
+			// Before all entries — map to start of first entry.
+			if sm.entries[0].SourceRuneStart > srcRuneStart {
+				renderedStart = sm.entries[0].RenderedStart
+			} else {
+				return -1, -1
+			}
+		}
 	}
 
 	// Find the entry containing srcRuneEnd-1 (or handle edge cases)
@@ -185,7 +202,20 @@ func (sm *SourceMap) ToRendered(srcRuneStart, srcRuneEnd int) (renderedStart, re
 	}
 
 	if renderedEnd == -1 {
-		return -1, -1
+		// Same gap handling as for start: find nearest entry before.
+		for i := len(sm.entries) - 1; i >= 0; i-- {
+			if sm.entries[i].SourceRuneEnd <= lookupPos {
+				renderedEnd = sm.entries[i].RenderedEnd
+				break
+			}
+		}
+		if renderedEnd == -1 {
+			if len(sm.entries) > 0 && sm.entries[0].SourceRuneStart > lookupPos {
+				renderedEnd = sm.entries[0].RenderedStart
+			} else {
+				return -1, -1
+			}
+		}
 	}
 
 	return renderedStart, renderedEnd
