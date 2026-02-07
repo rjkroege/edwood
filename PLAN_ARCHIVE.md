@@ -1,6 +1,6 @@
-# Rich Text Implementation Plan - Archive (Phases 1-15)
+# Rich Text Implementation Plan - Archive (Phases 1-24)
 
-This file contains completed phases 1-15. See `PLAN.md` for current work.
+This file contains completed phases 1-24. See `PLAN.md` for current work (Codebase Refactoring).
 
 ## Status Legend
 - `[ ]` = not done
@@ -1997,3 +1997,110 @@ When a `.md` file is opened via `openfile()`, automatically activate Markdeep pr
 | Code written | [x] | Add `previewcmd()` call after `t.file.Clean()` in `openfile()` when filename ends in `.md` |
 | Tests pass | [x] | go test ./... passes |
 | Code committed | [x] | |
+
+---
+
+## Phase 23: Cursor Bar for Rich Text Frame
+
+The Markdeep preview has no visible insertion cursor. Regular Edwood windows show a black tick (vertical bar with serif boxes) when the selection is a point (`p0 == p1`). The rich frame should match this, with cursor height scaled to the tallest of the two adjacent boxes.
+
+See `docs/cursor-bar-design.md` for full design.
+
+### Design Summary
+
+- **Tick appearance**: Vertical line with serif boxes at top/bottom, matching `frame/tick.go`
+- **Height rule**: Tallest of the two adjacent boxes (not line height)
+- **No save/restore**: Rich frame fully redraws via scratch image, so tick is drawn each pass
+- **All code in `rich/frame.go`**: No new files
+
+---
+
+### Phase 23A: Add Tick Fields and initTick Method
+
+Add `tickImage`, `tickScale`, `tickHeight` fields to `frameImpl`. Port tick image creation from `frame/tick.go:InitTick()` — allocate transparent image, draw vertical line and serif boxes. Re-create when height changes.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestInitTickCreatesImage, TestInitTickReusesForSameHeight in rich/frame_test.go; stub initTick() and tick fields added to frameImpl |
+| Code written | [x] | Add fields to `frameImpl`, implement `initTick(height int)` |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 24d05a0 |
+
+### Phase 23B: Add boxHeight Helper
+
+Add `boxHeight(box Box) int` method that returns the height of a box: `fontForStyle(box.Style).Height()` for text/special boxes, or the image's scaled height for image boxes.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestBoxHeightBody, TestBoxHeightHeading, TestBoxHeightImage in rich/frame_test.go |
+| Code written | [x] | Implement `boxHeight()` on `frameImpl` — returns font height for text, scaled image height for images |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit d6cca86 |
+
+### Phase 23C: Add drawTickTo Method
+
+Implement `drawTickTo(target, offset)`: walk layout lines/boxes to find cursor position, compute X coordinate (same logic as `Ptofchar`), determine height from tallest adjacent box, call `initTick(height)`, draw tick via `target.Draw(rect, display.Black(), tickImage, image.ZP)`.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestDrawTickAtCursor, TestNoTickWithSelection, TestTickHeightScaling, TestTickHeightBodyText in rich/frame_test.go |
+| Code written | [x] | Implement `drawTickTo()` on `frameImpl` |
+| Tests pass | [x] | go test ./rich/... passes |
+| Code committed | [x] | Commit 7e6e16f |
+
+### Phase 23D: Wire into Redraw
+
+Call `drawTickTo()` from `Redraw()` after text drawing, when `p0 == p1`. This draws the cursor on top of text in the scratch image before blit to screen.
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | TestRedrawDrawsTickWhenCursorPoint, TestRedrawNoTickWhenSelection in rich/frame_test.go |
+| Code written | [x] | Add conditional call in `Redraw()` after `drawTextTo()` |
+| Tests pass | [x] | go test ./... passes |
+| Code committed | [x] | Commit 373c8c4 |
+
+---
+
+## Phase 24: Table Grid Layout and Visual Polish
+
+Tables currently render as raw ASCII passthrough — no column normalization, no alignment application, no grid lines. This phase fixes all three, bringing tables up to proper visual quality.
+
+See `docs/tables-lists-images-design.md` § "Table Remediation: Grid Layout and Visual Polish" for the full design.
+
+### Phase 24A: Column Width Normalization and Alignment
+
+Wire up `calculateColumnWidths()` in `parseTableBlock()` so all cells are padded to uniform column widths. Apply the per-column alignment parsed from the separator row (`AlignLeft`, `AlignCenter`, `AlignRight`) when padding.
+
+**Files:** `markdown/parse.go`, `markdown/sourcemap.go`, `markdown/parse_test.go`
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | `TestParseTableNormalizedWidths`, `TestParseTableRightAlign`, `TestParseTableCenterAlign`, `TestParseTableSourceMapWithPadding` in `markdown/parse_test.go` |
+| Code written | [x] | Normalization + alignment in `parseTableBlock()` and `parseTableBlockWithSourceMap()`; added `padCell()`, `rebuildTableRow()`, `rebuildSeparatorRow()` helpers; updated `TestParseSimpleTable` expected values and `TestParseTableSourceMapWithPadding` bounds check for padded output |
+| Tests pass | [x] | `go test ./markdown/...` passes |
+| Code committed | [x] | Commit 4233b9f |
+
+### Phase 24B: Box-Drawing Grid Lines
+
+Replace ASCII pipes and dashes with Unicode box-drawing characters. Add top border, bottom border, and replace the raw `|---|` separator with `├──┼──┤`. Replace `|` cell delimiters with `│`.
+
+**Files:** `markdown/parse.go`, `markdown/sourcemap.go`, `markdown/parse_test.go`
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests exist | [x] | `TestParseTableBoxDrawing`, `TestParseTableTopBorder`, `TestParseTableBottomBorder`, `TestParseTableHeaderSeparator`, `TestParseTableVerticalRules`, `TestParseTableSourceMapBoxDrawing` in `markdown/parse_test.go` |
+| Code written | [x] | `buildGridLine()` helper, `replaceDelimiters()` helper, box-drawing emission in `parseTableBlock()` and `parseTableBlockWithSourceMap()`; fixed `TestParseTableSourceMapBoxDrawing` to use rune-based index for multi-byte `│` chars |
+| Tests pass | [x] | `go test ./markdown/...` passes |
+| Code committed | [x] | Commit 67dde46 |
+
+### Phase 24C: Update Existing Table Tests
+
+The existing 11+ table tests assert on raw ASCII passthrough output. After Phases 24A and 24B change the emitted text, these tests will break. Update them to expect normalized, box-drawn output.
+
+**Files:** `markdown/parse_test.go`
+
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Tests updated | [x] | All existing table tests already expect new output format; `TestParseSimpleTable` was updated in Phase 24A (commit 4233b9f), remaining tests (`TestParseTableWithAlignment`, `TestEmitAlignedTable`, `TestEmitTableWithWrap`, `TestTableSourceMap`, `TestTableInDocument`, `TestTableNotTable`) only assert structural properties (table spans exist, source map valid, negative cases) and pass without changes |
+| Tests pass | [x] | `go test ./markdown/... ./rich/...` passes |
+| Code committed | [x] | No separate commit needed — tests already passed in prior commits (4233b9f, 67dde46); no test files were modified |

@@ -361,6 +361,37 @@ Same structure via `previewHScrollLatch(rt, mc, button, regionIndex)`:
 **Debounce helper** (`previewScrSleep`): matches `ScrSleep` from
 `scrl.go` but reads from the passed-in `mc` rather than `global.mousectl`.
 
+## Viewport-Local Region Index Offset (Bug Fix)
+
+### Problem
+
+When the viewport is vertically scrolled so that some block regions are
+above the visible area, the horizontal scroll positions "leak" between
+blocks. For example, if code block A is scrolled off-screen and code
+block B is visible, block B displays block A's horizontal scroll offset.
+
+### Root Cause
+
+`hscrollOrigins[]` is indexed by **global** block region ordinal (all
+blocks in the document, 0..N). But the visible-region indices used
+during drawing and interaction are **viewport-local** (only blocks in
+visible lines, 0..M where M <= N).
+
+The mismatch happens in `drawTextTo`: it calls `findBlockRegions` on
+the visible-only lines returned by `layoutFromOrigin`, producing region
+indices starting at 0. When it calls `GetHScrollOrigin(ri)` with
+these viewport-local indices, it reads the wrong entries from the
+global `hscrollOrigins` array.
+
+### Fix
+
+Add an `hscrollRegionOffset` field to `frameImpl` that records how many
+block regions are entirely above the viewport. This is computed in
+`layoutFromOrigin` by counting global regions whose `EndLine <=
+startLineIdx`. The offset is applied inside `GetHScrollOrigin` and
+`SetHScrollOrigin` so all callers (drawing, hit-testing, click/wheel
+handlers) automatically map viewport-local indices to global indices.
+
 ## Open Questions
 
 1. **Should the scrollbar be inside or outside the block background?**
