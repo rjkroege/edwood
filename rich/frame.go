@@ -47,9 +47,9 @@ type Frame interface {
 	GetOrigin() int
 	MaxLines() int
 	VisibleLines() int
-	TotalLines() int           // Total number of layout lines in the content
-	LineStartRunes() []int     // Rune offset at the start of each visual line
-	LinePixelHeights() []int   // Pixel height of each visual line (accounts for images)
+	TotalLines() int         // Total number of layout lines in the content
+	LineStartRunes() []int   // Rune offset at the start of each visual line
+	LinePixelHeights() []int // Pixel height of each visual line (accounts for images)
 
 	// Rendering
 	Redraw()

@@ -590,9 +590,9 @@ func TestParseInlineCode(t *testing.T) {
 				text   string
 				isCode bool
 			}{
-				{text: "bold", isCode: false},   // bold, not code
-				{text: " and ", isCode: false},  // plain
-				{text: "code", isCode: true},    // code
+				{text: "bold", isCode: false},  // bold, not code
+				{text: " and ", isCode: false}, // plain
+				{text: "code", isCode: true},   // code
 			},
 		},
 	}
@@ -2122,7 +2122,7 @@ func TestParseUnorderedList(t *testing.T) {
 			}{
 				{text: "•", listBullet: true, listItem: false, listIndent: 0},
 				{text: " ", listBullet: false, listItem: true, listIndent: 0},
-				{text: "Bold", listBullet: false, listItem: true, listIndent: 0},   // bold
+				{text: "Bold", listBullet: false, listItem: true, listIndent: 0},  // bold
 				{text: " item", listBullet: false, listItem: true, listIndent: 0}, // plain
 			},
 		},
@@ -2568,7 +2568,7 @@ func TestParseOrderedList(t *testing.T) {
 			}{
 				{text: "1.", listBullet: true, listItem: false, listOrdered: true, listNumber: 1, listIndent: 0},
 				{text: " ", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},
-				{text: "Bold", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},   // bold
+				{text: "Bold", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0},  // bold
 				{text: " item", listBullet: false, listItem: true, listOrdered: true, listNumber: 1, listIndent: 0}, // plain
 			},
 		},

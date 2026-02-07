@@ -10,13 +10,13 @@ import (
 
 // headingScales maps heading level (1-6) to scale factor.
 var headingScales = [7]float64{
-	0:     1.0,   // not used (no level 0)
-	1:     2.0,   // H1
-	2:     1.5,   // H2
-	3:     1.25,  // H3
-	4:     1.125, // H4
-	5:     1.0,   // H5
-	6:     0.875, // H6
+	0: 1.0,   // not used (no level 0)
+	1: 2.0,   // H1
+	2: 1.5,   // H2
+	3: 1.25,  // H3
+	4: 1.125, // H4
+	5: 1.0,   // H5
+	6: 0.875, // H6
 }
 
 // listCtx tracks list context for nested blocks within a list item.
@@ -864,6 +864,7 @@ func parseInternal(text string, sm *SourceMap, lm *LinkMap) rich.Content {
 
 	return result
 }
+
 // isIndentedCodeLine returns true if the line is an indented code line
 // (starts with 4 spaces or 1 tab).
 func isIndentedCodeLine(line string) bool {
