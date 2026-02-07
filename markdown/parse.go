@@ -1856,6 +1856,7 @@ func parseTableBlockInternal(lines []string, startIdx int, sourceOffset, rendere
 						SourceStart:   srcPos + cp.ByteStart,
 						SourceEnd:     srcPos + cp.ByteEnd,
 						Kind:          KindTableCell,
+						CellBorderPos: rendPos + chunkStart - 1,
 					})
 				}
 			}

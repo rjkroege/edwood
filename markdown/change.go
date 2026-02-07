@@ -577,6 +577,9 @@ func Stitch(
 		for _, e := range newRegion.SM.entries {
 			e.RenderedStart += prefixRenderedEnd
 			e.RenderedEnd += prefixRenderedEnd
+			if e.Kind == KindTableCell {
+				e.CellBorderPos += prefixRenderedEnd
+			}
 			resultSM.entries = append(resultSM.entries, e)
 		}
 	}
@@ -592,6 +595,9 @@ func Stitch(
 			e.SourceEnd += sourceBytesDelta
 			e.RenderedStart += renderedDelta
 			e.RenderedEnd += renderedDelta
+			if e.Kind == KindTableCell {
+				e.CellBorderPos += renderedDelta
+			}
 			resultSM.entries = append(resultSM.entries, e)
 		}
 	}

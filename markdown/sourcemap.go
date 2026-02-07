@@ -43,6 +43,7 @@ type SourceMapEntry struct {
 	SourceRuneEnd   int
 	PrefixLen       int       // Length of source prefix not in rendered (e.g., "# " for headings)
 	Kind            EntryKind // Discriminant for entry type
+	CellBorderPos   int       // For KindTableCell: rendered position of the │ delimiter to the left of this cell
 }
 
 // searchRendered returns the index of the entry containing the rendered
@@ -129,7 +130,17 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 			preceding = &sm.entries[idx]
 		}
 		if preceding != nil && preceding.Kind.startGapSnap() {
+			// Default: snap to preceding cell's end.
 			srcStart = preceding.SourceRuneEnd
+			// If we're past the │ border of the following cell,
+			// snap to its content start instead — the click is
+			// in the following cell's area.
+			if idx := sm.followingRendered(renderedStart); idx >= 0 {
+				following := &sm.entries[idx]
+				if following.Kind == KindTableCell && renderedStart > following.CellBorderPos {
+					srcStart = following.SourceRuneStart
+				}
+			}
 		} else {
 			// Find nearest entry after and snap to its start.
 			if idx := sm.followingRendered(renderedStart); idx >= 0 {
@@ -171,7 +182,16 @@ func (sm *SourceMap) ToSource(renderedStart, renderedEnd int) (srcStart, srcEnd 
 		}
 		if endEntry != nil {
 			if endEntry.Kind.endGapSnap() {
+				// Default: snap to this cell's end.
 				srcEnd = endEntry.SourceRuneEnd
+				// If we're past the │ border of the following cell,
+				// snap to its content start instead.
+				if idx := sm.followingRendered(renderedEnd); idx >= 0 {
+					following := &sm.entries[idx]
+					if following.Kind == KindTableCell && renderedEnd > following.CellBorderPos {
+						srcEnd = following.SourceRuneStart
+					}
+				}
 			} else {
 				srcEnd = endEntry.SourceRuneEnd + (renderedEnd - endEntry.RenderedEnd)
 			}

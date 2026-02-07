@@ -1661,12 +1661,12 @@ func TestTableGapSnapping(t *testing.T) {
 
 	input := "| Flag | Purpose |\n| --- | --- |\n| -v | Verbose |\n"
 
-	t.Run("point selection in header row gap snaps to cell end", func(t *testing.T) {
+	t.Run("point selection in header row gap before border snaps to cell end", func(t *testing.T) {
 		_, sm, _ := ParseWithSourceMap(input)
 
-		// Gap positions 25, 26, 27 are between "Flag" and "Purpose" entries.
-		// All should snap to source rune 6 (end of "Flag" content).
-		for _, rendPos := range []int{25, 26, 27} {
+		// Gap positions 25 (space), 26 (│) are before or on the border.
+		// They should snap to source rune 6 (end of "Flag" content).
+		for _, rendPos := range []int{25, 26} {
 			srcStart, srcEnd := sm.ToSource(rendPos, rendPos)
 			if srcStart != srcEnd {
 				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection", rendPos, rendPos, srcStart, srcEnd)
@@ -1677,12 +1677,26 @@ func TestTableGapSnapping(t *testing.T) {
 		}
 	})
 
-	t.Run("point selection in data row gap snaps to cell end", func(t *testing.T) {
+	t.Run("point selection in header row gap after border snaps to following cell", func(t *testing.T) {
 		_, sm, _ := ParseWithSourceMap(input)
 
-		// Gap positions 61-65 are between "-v" and "Verbose" entries.
-		// All should snap to source rune 37 (end of "-v" content).
-		for _, rendPos := range []int{61, 62, 63, 64, 65} {
+		// Gap position 27 (space after │) is in the following cell's area.
+		// It should snap to source rune 9 (start of "Purpose" content).
+		srcStart, srcEnd := sm.ToSource(27, 27)
+		if srcStart != srcEnd {
+			t.Errorf("ToSource(27, 27) = (%d, %d), want point selection", srcStart, srcEnd)
+		}
+		if srcStart != 9 {
+			t.Errorf("ToSource(27, 27) = (%d, %d), want (9, 9) — snap to start of 'Purpose'", srcStart, srcEnd)
+		}
+	})
+
+	t.Run("point selection in data row gap before border snaps to cell end", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		// Gap positions 61-64 are before or on the border (│ at 64).
+		// They should snap to source rune 37 (end of "-v" content).
+		for _, rendPos := range []int{61, 62, 63, 64} {
 			srcStart, srcEnd := sm.ToSource(rendPos, rendPos)
 			if srcStart != srcEnd {
 				t.Errorf("ToSource(%d, %d) = (%d, %d), want point selection", rendPos, rendPos, srcStart, srcEnd)
@@ -1690,6 +1704,20 @@ func TestTableGapSnapping(t *testing.T) {
 			if srcStart != 37 {
 				t.Errorf("ToSource(%d, %d) = (%d, %d), want (37, 37) — snap to end of '-v'", rendPos, rendPos, srcStart, srcEnd)
 			}
+		}
+	})
+
+	t.Run("point selection in data row gap after border snaps to following cell", func(t *testing.T) {
+		_, sm, _ := ParseWithSourceMap(input)
+
+		// Gap position 65 (space after │) is in the following cell's area.
+		// It should snap to source rune 40 (start of "Verbose" content).
+		srcStart, srcEnd := sm.ToSource(65, 65)
+		if srcStart != srcEnd {
+			t.Errorf("ToSource(65, 65) = (%d, %d), want point selection", srcStart, srcEnd)
+		}
+		if srcStart != 40 {
+			t.Errorf("ToSource(65, 65) = (%d, %d), want (40, 40) — snap to start of 'Verbose'", srcStart, srcEnd)
 		}
 	})
 }
