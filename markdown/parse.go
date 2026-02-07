@@ -145,8 +145,50 @@ func parseInternal(text string, sm *SourceMap, lm *LinkMap) rich.Content {
 	blockquoteDepth := 0
 	blockquoteLineHadNewline := false
 
+	// Track fenced code block within blockquote
+	inBQCodeBlock := false
+	var bqCodeContent strings.Builder
+	bqCodeSourceStart := 0
+	bqCodeDepth := 0
+
+	// Helper to emit a code block accumulated within a blockquote
+	emitBQCodeBlock := func() {
+		if bqCodeContent.Len() > 0 {
+			codeContent := bqCodeContent.String()
+			codeSpan := rich.Span{
+				Text: codeContent,
+				Style: rich.Style{
+					Bg:              rich.InlineCodeBg,
+					Code:            true,
+					Block:           true,
+					Blockquote:      true,
+					BlockquoteDepth: bqCodeDepth,
+					Scale:           1.0,
+				},
+			}
+
+			if tracking {
+				codeLen := len([]rune(codeContent))
+				sm.entries = append(sm.entries, SourceMapEntry{
+					RenderedStart: renderedPos,
+					RenderedEnd:   renderedPos + codeLen,
+					SourceStart:   bqCodeSourceStart,
+					SourceEnd:     sourcePos,
+				})
+				renderedPos += codeLen
+			}
+
+			result = append(result, codeSpan)
+			bqCodeContent.Reset()
+		}
+		inBQCodeBlock = false
+	}
+
 	// Helper to end the current blockquote by appending \n to the last span
 	endBlockquote := func() {
+		if inBQCodeBlock {
+			emitBQCodeBlock()
+		}
 		if inBlockquote && len(result) > 0 && blockquoteLineHadNewline {
 			result[len(result)-1].Text += "\n"
 			if tracking {
@@ -554,6 +596,52 @@ func parseInternal(text string, sm *SourceMap, lm *LinkMap) rich.Content {
 			lineHadNewline := strings.HasSuffix(line, "\n")
 			content := strings.TrimSuffix(line[contentStart:], "\n")
 
+			// --- Fenced code block within blockquote ---
+			if inBQCodeBlock {
+				if depth != bqCodeDepth {
+					// Depth changed: emit code block and fall through to normal BQ handling
+					emitBQCodeBlock()
+				} else if isFenceDelimiter(content) {
+					// Closing fence
+					emitBQCodeBlock()
+					inBlockquote = false
+					blockquoteDepth = 0
+					blockquoteLineHadNewline = false
+					if tracking {
+						sourcePos += len(line)
+					}
+					continue
+				} else {
+					// Accumulate code content
+					bqCodeContent.WriteString(content + "\n")
+					if tracking {
+						sourcePos += len(line)
+					}
+					continue
+				}
+			}
+
+			if !inBQCodeBlock && isFenceDelimiter(content) {
+				// Opening fence: finalize any current BQ text (trailing newline)
+				if inBlockquote && len(result) > 0 && blockquoteLineHadNewline {
+					result[len(result)-1].Text += "\n"
+					if tracking {
+						renderedPos++
+					}
+				}
+				inBQCodeBlock = true
+				bqCodeContent.Reset()
+				bqCodeDepth = depth
+				if tracking {
+					sourcePos += len(line)
+					bqCodeSourceStart = sourcePos
+				}
+				inBlockquote = true
+				blockquoteDepth = depth
+				blockquoteLineHadNewline = false
+				continue
+			}
+
 			if content == "" {
 				if inBlockquote {
 					endBlockquote()
@@ -732,6 +820,10 @@ func parseInternal(text string, sm *SourceMap, lm *LinkMap) rich.Content {
 
 	if activeList != nil {
 		endListContext()
+	}
+
+	if inBQCodeBlock {
+		emitBQCodeBlock()
 	}
 
 	if inBlockquote {

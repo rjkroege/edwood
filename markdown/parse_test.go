@@ -5319,3 +5319,156 @@ func TestParseParityWithSourceMap(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFencedCodeBlockInBlockquote(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSpan []struct {
+			text            string
+			code            bool
+			block           bool
+			blockquote      bool
+			blockquoteDepth int
+		}
+	}{
+		{
+			name:  "simple code block in blockquote",
+			input: "> ```\n> hello\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "hello\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "multi-line code block in blockquote",
+			input: "> ```\n> line one\n> line two\n> line three\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "line one\nline two\nline three\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "code block with language tag in blockquote",
+			input: "> ```bash\n> echo hello\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "echo hello\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "text before and after code block in same blockquote",
+			input: "> Some text\n> ```\n> code\n> ```\n> More text",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "Some text\n", code: false, block: false, blockquote: true, blockquoteDepth: 1},
+				{text: "code\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+				{text: "More text", code: false, block: false, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "empty line within code block in blockquote",
+			input: "> ```\n> line one\n>\n> line two\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "line one\n\nline two\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "code block preserves markdown formatting literally",
+			input: "> ```\n> **not bold** and `not code`\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "**not bold** and `not code`\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "unclosed code block at EOF",
+			input: "> ```\n> unclosed code",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				{text: "unclosed code\n", code: true, block: true, blockquote: true, blockquoteDepth: 1},
+			},
+		},
+		{
+			name:  "empty code block in blockquote",
+			input: "> ```\n> ```",
+			wantSpan: []struct {
+				text            string
+				code            bool
+				block           bool
+				blockquote      bool
+				blockquoteDepth int
+			}{
+				// Empty code block produces no spans (content length is 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Parse(tt.input)
+			if len(got) != len(tt.wantSpan) {
+				var gotDesc []string
+				for _, s := range got {
+					gotDesc = append(gotDesc, fmt.Sprintf("{text:%q code:%v block:%v blockquote:%v blockquoteDepth:%d}",
+						s.Text, s.Style.Code, s.Style.Block, s.Style.Blockquote, s.Style.BlockquoteDepth))
+				}
+				t.Fatalf("got %d spans, want %d spans\n  got:\n    %s",
+					len(got), len(tt.wantSpan), strings.Join(gotDesc, "\n    "))
+			}
+			for i, want := range tt.wantSpan {
+				if got[i].Text != want.text {
+					t.Errorf("span[%d].Text = %q, want %q", i, got[i].Text, want.text)
+				}
+				if got[i].Style.Code != want.code {
+					t.Errorf("span[%d].Style.Code = %v, want %v", i, got[i].Style.Code, want.code)
+				}
+				if got[i].Style.Block != want.block {
+					t.Errorf("span[%d].Style.Block = %v, want %v", i, got[i].Style.Block, want.block)
+				}
+				if got[i].Style.Blockquote != want.blockquote {
+					t.Errorf("span[%d].Style.Blockquote = %v, want %v", i, got[i].Style.Blockquote, want.blockquote)
+				}
+				if got[i].Style.BlockquoteDepth != want.blockquoteDepth {
+					t.Errorf("span[%d].Style.BlockquoteDepth = %d, want %d", i, got[i].Style.BlockquoteDepth, want.blockquoteDepth)
+				}
+			}
+		})
+	}
+}
