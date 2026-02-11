@@ -351,6 +351,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		t.w.dirnames = dirNames
 		t.w.widths = widths
 
+		// TODO(rjk): don't stash it. instead, recreate it yeah?
 		t.w.readmeContent = loadReadmeContent(filename)
 		t.appendReadmeContent()
 
@@ -360,6 +361,7 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }
 
+// TODO(rjk): Consider if this
 func (t *Text) appendReadmeContent() {
 	if len(t.w.readmeContent) > 0 {
 		q1 := t.file.Nr()
@@ -368,6 +370,7 @@ func (t *Text) appendReadmeContent() {
 }
 
 // loadReadmeContent reads a README file from the directory and formats it
+// Just shove this into the buffer?
 func loadReadmeContent(dirPath string) []rune {
 	readmeNames := []string{"README.md", "README"}
 	for _, readmeName := range readmeNames {
