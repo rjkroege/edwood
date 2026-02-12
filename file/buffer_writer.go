@@ -40,6 +40,11 @@ func (w *bufferWriter) Write(mnp []byte) (int, error) {
 	err := w.b.Insert(w.pos, p, nr, w.seq)
 	w.pos = npos
 	w.nr += nr
+
+	//  can call the inserted here?
+	// TODO(rjk): is the order sensible?
+	/// w.b.oeb.inserted()
+
 	return len(p), err
 }
 
