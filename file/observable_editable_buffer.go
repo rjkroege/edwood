@@ -330,6 +330,7 @@ func (e *ObservableEditableBuffer) SetName(name string) {
 // Undo is a forwarding function for file.Undo.
 func (e *ObservableEditableBuffer) Undo(isundo bool) (q0, q1 int, ok bool) {
 	before := e.getTagStatus()
+	// TODO(rjk): Does undo change the order of the notifies compared to Insert
 	defer e.notifyTagObservers(before)
 
 	if isundo {
