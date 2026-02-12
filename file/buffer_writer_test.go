@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestWriterAtWriter(t *testing.T) {
+func TestBufferWriter(t *testing.T) {
 	// Create a buffer to use as our underlying storage
 	buf := NewBufferNoNr(nil)
 
@@ -62,5 +62,33 @@ func TestWriterAtWriter(t *testing.T) {
 	expected = "Hello, 日本語 World!"
 	if result := buf.String(); result != expected {
 		t.Errorf("Buffer contains '%s', expected '%s'", result, expected)
+	}
+}
+
+func TestBufferWriterNulls(t *testing.T) {
+	// Create a buffer to use as our underlying storage
+	buf := NewBufferNoNr(nil)
+
+	// Create the WriterAtWriter
+	writer := buf.NewWriter(buf.End(), 0)
+
+	// Test 1: Write some data
+	data1 := []byte("Hel\000lo")
+	n, err := writer.Write(data1)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if n != len(data1)-1 {
+		t.Errorf("Write returned %d bytes, expected %d", n, len(data1)-1)
+	}
+
+	// Verify the complete data
+	expected := "Hello"
+	if result := buf.String(); result != expected {
+		t.Errorf("Buffer contains '%s', expected '%s'", result, expected)
+	}
+
+	if writer.HadNull() != true {
+		t.Errorf("data1 had nulls but hasnull not set")
 	}
 }
