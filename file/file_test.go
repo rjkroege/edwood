@@ -175,8 +175,7 @@ func TestFileLoadNoUndo(t *testing.T) {
 }
 
 func TestFileLoadUndoHash(t *testing.T) {
-	hashOfS2nS2 :=
-		Hash{0xf0, 0x21, 0xb5, 0x73, 0x6a, 0xb5, 0x21, 0x6d, 0x29, 0x1b, 0x19, 0xfb, 0xe, 0xa8, 0x53, 0x4a, 0x59, 0x7e, 0xb3, 0xfa}
+	hashOfS2nS2 := uint64(0xd8d145ba409cd681)
 
 	f := MakeObservableEditableBuffer("edwood", []rune{})
 	if got, want := f.Name(), "edwood"; got != want {
@@ -191,7 +190,7 @@ func TestFileLoadUndoHash(t *testing.T) {
 	// f.Load marks the file as modified.
 	f.Clean()
 
-	if got, want := f.Hash(), hashOfS2nS2; !got.Eq(want) {
+	if got, want := f.Hash(), hashOfS2nS2; got != want {
 		t.Errorf("TestFileLoadUndoHash bad initial name. got %#v want %#v", got, want)
 	}
 
@@ -396,7 +395,7 @@ func TestFileUpdateInfo(t *testing.T) {
 		t.Fatalf("stat failed: %v", err)
 	}
 	oeb := MakeObservableEditableBuffer(filename, nil)
-	oeb.SetHash(EmptyHash)
+	oeb.SetHash(uint64(0))
 	oeb.SetInfo(nil)
 
 	oeb.UpdateInfo(filename, d)

@@ -2,14 +2,16 @@ package file
 
 import (
 	"fmt"
+	"hash/fnv"
+	"io"
 	"os"
 )
 
 type DiskDetails struct {
 	Name  string
 	Info  os.FileInfo
-	Hash  Hash // Used to check if the file has changed on disk since loaded.
-	isdir bool // Used to track if this File is populated from a directory list. [private]
+	Hash  uint64 // Used to check if the file has changed on disk since loaded.
+	isdir bool   // Used to track if this File is populated from a directory list. [private]
 }
 
 // IsDir returns true if the File has a synthetic backing of
@@ -30,12 +32,27 @@ func (f *DiskDetails) SetDir(isdir bool) {
 
 // UpdateInfo updates File's info to d if file hash hasn't changed.
 func (f *DiskDetails) UpdateInfo(filename string, d os.FileInfo) error {
-	h, err := HashFor(filename)
+
+	filehashcode, err := HashFor(filename)
 	if err != nil {
 		return fmt.Errorf("failed to compute hash for %v: %v", filename, err)
 	}
-	if h.Eq(f.Hash) {
+	if f.Hash == filehashcode {
 		f.Info = d
 	}
 	return nil
+}
+
+func HashFor(filename string) (uint64, error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return 0, err
+	}
+	defer fd.Close()
+
+	hh := fnv.New64a()
+	if _, err := io.Copy(hh, fd); err != nil {
+		return 0, err
+	}
+	return hh.Sum64(), nil
 }
