@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"fmt"
+	"hash/fnv"
 	"image"
 	"io"
 	"os"
@@ -537,8 +537,7 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 			// By setting File.info here, a subsequent Put will ignore that
 			// the disk file was mutated and will write File to the disk file.
 			oeb.SetInfo(d)
-
-			if oeb.Hash() == file.EmptyHash {
+			if oeb.Hash() == uint64(0) {
 				// Edwood created the File but a disk file with the same name exists.
 				return warnError(nil, "%s not written; file already exists", name)
 			}
@@ -554,15 +553,14 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 	}
 	defer fd.Close()
 
-	h := sha1.New()
-
+	hh := fnv.New64a()
 	d, err = fd.Stat()
 	isapp := err == nil && d.Size() > 0 && (d.Mode()&os.ModeAppend) != 0
 	if isapp {
 		return warnError(nil, "%s not written; file is append only", name)
 	}
 
-	_, err = io.Copy(io.MultiWriter(h, fd), oeb.Reader(q0, q1))
+	_, err = io.Copy(io.MultiWriter(hh, fd), oeb.Reader(q0, q1))
 	if err != nil {
 		return warnError(nil, "can't write file %s: %v", name, err)
 	}
@@ -581,7 +579,10 @@ func putfile(oeb *file.ObservableEditableBuffer, q0 int, q1 int, name string) er
 				d = d1
 			}
 			oeb.SetInfo(d)
-			oeb.Set(h.Sum(nil))
+			// It's possible that there was a bug here before this patch. As I
+			// understood the previous code, it was zeroing the hash when that was
+			// not the intent.
+			oeb.Set(hh.Sum64())
 			oeb.Clean()
 		}
 	}

@@ -1,14 +1,12 @@
 package file
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/rjkroege/edwood/sam"
-	"github.com/rjkroege/edwood/util"
 )
 
 // The ObservableEditableBuffer is used by the main program to add,
@@ -26,6 +24,8 @@ type ObservableEditableBuffer struct {
 
 	// Used to note that the oeb's contents will be replaced with a new disk backing
 	// when the Elog is applied and should be marked Clean() at that time.
+	// TODO(rjk): Consider having the Clean() be an op applied by the sam
+	// implementation as part of the Elog.
 	EditClean bool
 
 	details *DiskDetails
@@ -50,9 +50,12 @@ const (
 	plusErrors = "+Errors"
 )
 
-// Set is a forwarding function for file_hash.Set
-func (e *ObservableEditableBuffer) Set(hash []byte) {
-	e.details.Hash.Set(hash)
+// Set is a forwarding function for file_hash.Set TODO(rjk): This is
+// function is incredibly badly named and original actually before this
+// CL *Gets* the hash into its argument.
+// TODO(rjk): I have changed it to do what it says.
+func (e *ObservableEditableBuffer) Set(hc uint64) {
+	e.details.Hash = hc
 }
 
 func (e *ObservableEditableBuffer) SetInfo(info os.FileInfo) {
@@ -136,11 +139,25 @@ func _makeObservableEditableBuffer(filename string, b []rune, newtype bool) *Obs
 	oeb := &ObservableEditableBuffer{
 		currobserver: nil,
 		observers:    nil,
-		details:      &DiskDetails{Name: filename, Hash: Hash{}},
+		details:      &DiskDetails{Name: filename},
 		Elog:         sam.MakeElog(),
 		EditClean:    true,
 	}
 	oeb.f = NewTypeBuffer(b, oeb)
+	return oeb
+}
+
+// NewObservableEditableBuffer returns a new ObservableEditableBuffer that is
+// empty of content.
+func NewObservableEditableBuffer() *ObservableEditableBuffer {
+	oeb := &ObservableEditableBuffer{
+		currobserver: nil,
+		observers:    nil,
+		details:      &DiskDetails{Name: ""}, // Empty name for an empty buffer
+		Elog:         sam.MakeElog(),
+		EditClean:    true,
+	}
+	oeb.f = NewTypeBuffer([]rune{}, oeb) // Initialize with an empty buffer
 	return oeb
 }
 
@@ -264,18 +281,23 @@ func (e *ObservableEditableBuffer) SaveableAndDirty() bool {
 // but I need the UTF-8 interpretation. I could fix this by using a UTF-8
 // -> []rune reader on top of the os.File instead.
 func (e *ObservableEditableBuffer) Load(q0 int, fd io.Reader, sethash bool) (int, bool, error) {
-	d, err := io.ReadAll(fd)
-	// TODO(rjk): improve handling of read errors.
-	if err != nil {
-		err = errors.New("read error in RuneArray.Load")
-	}
-	if sethash {
-		e.SetHash(CalcHash(d))
+	before := e.getTagStatus()
+	defer e.notifyTagObservers(before)
+
+	offtup := e.f.RuneTuple(q0)
+	writer := e.f.NewWriter(offtup, e.seq)
+	if _, err := io.Copy(writer, fd); err != nil {
+		// TODO(rjk): Are the partials meaningful?
+		return writer.Nr(), writer.HadNull(), err
 	}
 
-	runes, _, hasNulls := util.Cvttorunes(d, len(d))
-	e.InsertAt(q0, runes)
-	return len(runes), hasNulls, err
+	if sethash {
+		e.SetHash(writer.GetHash())
+	}
+	if e.seq < 1 {
+		e.f.FlattenHistory()
+	}
+	return writer.Nr(), writer.HadNull(), nil
 }
 
 // Dirty returns true when the ObservableEditableBuffer differs from its disk
@@ -394,12 +416,12 @@ func (e *ObservableEditableBuffer) UpdateInfo(filename string, d os.FileInfo) er
 }
 
 // Hash is a getter for DiskDetails.Hash
-func (e *ObservableEditableBuffer) Hash() Hash {
+func (e *ObservableEditableBuffer) Hash() uint64 {
 	return e.details.Hash
 }
 
 // SetHash is a setter for DiskDetails.Hash
-func (e *ObservableEditableBuffer) SetHash(hash Hash) {
+func (e *ObservableEditableBuffer) SetHash(hash uint64) {
 	e.details.Hash = hash
 }
 

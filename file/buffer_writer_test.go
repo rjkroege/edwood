@@ -5,10 +5,7 @@ import (
 )
 
 func TestBufferWriter(t *testing.T) {
-	// Create a buffer to use as our underlying storage
 	buf := NewBufferNoNr(nil)
-
-	// Create the WriterAtWriter
 	writer := buf.NewWriter(buf.End(), 0)
 
 	// Test 1: Write some data
@@ -67,10 +64,12 @@ func TestBufferWriter(t *testing.T) {
 
 func TestBufferWriterNulls(t *testing.T) {
 	// Create a buffer to use as our underlying storage
-	buf := NewBufferNoNr(nil)
+	buf := MakeObservableEditableBuffer("edwood", []rune{})
+	to := MakeTestObserver(t)
+	buf.AddObserver(to)
 
 	// Create the WriterAtWriter
-	writer := buf.NewWriter(buf.End(), 0)
+	writer := buf.f.NewWriter(buf.End(), 0)
 
 	// Test 1: Write some data
 	data1 := []byte("Hel\000lo")
@@ -78,8 +77,8 @@ func TestBufferWriterNulls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
-	if n != len(data1)-1 {
-		t.Errorf("Write returned %d bytes, expected %d", n, len(data1)-1)
+	if n != len(data1) {
+		t.Errorf("Write returned %d bytes, expected %d", n, len(data1))
 	}
 
 	// Verify the complete data
@@ -91,4 +90,11 @@ func TestBufferWriterNulls(t *testing.T) {
 	if writer.HadNull() != true {
 		t.Errorf("data1 had nulls but hasnull not set")
 	}
+
+	to.Check([]*observation{{
+		callback: "Inserted",
+		q0:       0,
+		payload:  "Hello",
+	},
+	})
 }
