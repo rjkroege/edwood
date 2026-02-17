@@ -158,7 +158,6 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 			// and reformat it.
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
-			// TODO(rjk): adjust the width of the
 			t.appendReadmeContent(t.file.Name())
 			t.Show(0, 0, false)
 		}
@@ -378,13 +377,12 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 // appendReadmeContent reads a README file from the directory and
 // appends it to the buffer.
 func (t *Text) appendReadmeContent(dirPath string) error {
-	// TODO(rjk): Need to file the end.
 	offtup := t.file.End()
 	writer := t.file.NewWriter(offtup)
 	bufwriter := bufio.NewWriter(writer)
 	defer bufwriter.Flush()
 
-	// TODO(rjk): Make this configurable.
+	// TODO(rjk): Make the list of files to append configurable.
 	readmeNames := []string{"README.md", "README"}
 	for _, readmeName := range readmeNames {
 		readmePath := filepath.Join(dirPath, readmeName)
@@ -395,10 +393,9 @@ func (t *Text) appendReadmeContent(dirPath string) error {
 		}
 		defer readmeFile.Close()
 
-		// TODO(rjk): Can use a nicer unicode.
-		// TODO(rjk): Scale this for the width of the window.
-		// Really... just want some markup with CSS. Ha!
-		bufwriter.Write(bytes.Repeat([]byte("─"), 80))
+		dashwidth := t.getfont().StringWidth("─")
+		repeats := t.fr.Rect().Dx() / dashwidth
+		bufwriter.Write(bytes.Repeat([]byte("─"), repeats))
 		bufwriter.WriteByte('\n')
 
 		if _, err := io.Copy(bufwriter, readmeFile); err != nil {
