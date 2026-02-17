@@ -560,3 +560,8 @@ func (e *ObservableEditableBuffer) MakeBufferCursor(p0, p1 OffsetTuple) *BufferC
 func (e *ObservableEditableBuffer) DebugSeqState() string {
 	return fmt.Sprintf("oeb seq %d putseq %d treatasclean %v", e.seq, e.putseq, e.treatasclean)
 }
+
+// NewWriter forwards to the underlying file.Buffer implementation.
+func (e *ObservableEditableBuffer) NewWriter(pos OffsetTuple) io.Writer {
+	return e.f.NewWriter(pos, e.seq)
+}
