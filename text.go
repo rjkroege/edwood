@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"image"
@@ -153,9 +154,12 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 
 	if t.what == Body && t.file.IsDir() && odx != t.all.Dx() {
 		if t.fr.GetFrameFillStatus().Maxlines > 0 {
+			// This nukes everything. I don't want to do that. just pull the content out
+			// and reformat it.
 			t.Reset()
 			t.Columnate(t.w.dirnames, t.w.widths)
-			t.appendReadmeContent()
+			// TODO(rjk): adjust the width of the
+			t.appendReadmeContent(t.file.Name())
 			t.Show(0, 0, false)
 		}
 	} else {
@@ -218,6 +222,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	Lnl := []rune("\n")
 	Ltab := []rune("\t")
 
+	// TODO(rjk): Why?
 	if t.file.HasMultipleObservers() {
 		panic("Text.Columnate is only for directories that can't have zerox")
 	}
@@ -310,6 +315,8 @@ func (t *Text) LoadReader(q0 int, filename string, rd io.Reader, sethash bool) (
 }
 
 // Load loads filename into the Text.file. Text must be of type body.
+// TODO(rjk): Rewrite this in terms of the new writer functionality.
+// That needs some kind of "structure" of the file.
 func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error) {
 	if err := t.checkSafeToLoad(filename); err != nil {
 		return 0, err
@@ -328,6 +335,10 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	}
 
 	if d.IsDir() {
+		// TODO(rjk): These bespoke "formatted" buffers should really
+		// be external apps written against the API
+
+		// TODO(rjk): Why this check? Doesn't it screw up handling multiple
 		// this is checked in get() but it's possible the file changed underfoot
 		if t.file.HasMultipleObservers() {
 			return 0, warnError(nil, "%s is a directory; can't read with multiple windows on it", filename)
@@ -338,6 +349,8 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 			t.file.SetName(t.file.Name() + string(filepath.Separator))
 			t.w.SetName(t.file.Name())
 		}
+
+		// TODO(rjk): This ad hoc layout code doesn't belong here.
 		dirNames, err := getDirNames(fd)
 		if err != nil {
 			return 0, warnError(nil, "getDirNames failed: %v", err)
@@ -347,13 +360,14 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 		for i, s := range dirNames {
 			widths[i] = dft.StringWidth(s)
 		}
+
 		t.Columnate(dirNames, widths)
+		// TODO(rjk): What happens with a large directory? Redesign all of this
+		// around a more general mechanism of "pluggable" viewers like `win`.
 		t.w.dirnames = dirNames
 		t.w.widths = widths
 
-		// TODO(rjk): don't stash it. instead, recreate it yeah?
-		t.w.readmeContent = loadReadmeContent(filename)
-		t.appendReadmeContent()
+		t.appendReadmeContent(filename)
 
 		q1 := t.file.Nr()
 		return q1 - q0, nil
@@ -361,43 +375,46 @@ func (t *Text) Load(q0 int, filename string, setqid bool) (nread int, err error)
 	return t.loadReader(q0, filename, fd, setqid && q0 == 0)
 }
 
-// TODO(rjk): Consider if this
-func (t *Text) appendReadmeContent() {
-	if len(t.w.readmeContent) > 0 {
-		q1 := t.file.Nr()
-		t.file.InsertAt(q1, t.w.readmeContent)
-	}
-}
+// appendReadmeContent reads a README file from the directory and
+// appends it to the buffer.
+func (t *Text) appendReadmeContent(dirPath string) error {
+	// TODO(rjk): Need to file the end.
+	offtup := t.file.End()
+	writer := t.file.NewWriter(offtup)
+	bufwriter := bufio.NewWriter(writer)
+	defer bufwriter.Flush()
 
-// loadReadmeContent reads a README file from the directory and formats it
-// Just shove this into the buffer?
-func loadReadmeContent(dirPath string) []rune {
+	// TODO(rjk): Make this configurable.
 	readmeNames := []string{"README.md", "README"}
 	for _, readmeName := range readmeNames {
 		readmePath := filepath.Join(dirPath, readmeName)
-		if readmeFile, err := os.Open(readmePath); err == nil {
-			defer readmeFile.Close()
-			if readmeInfo, err := readmeFile.Stat(); err == nil && !readmeInfo.IsDir() {
-				var result []rune
-
-				result = append(result, []rune("\n"+strings.Repeat("─", 80)+"\n")...)
-				result = append(result, []rune(readmeName+":\n")...)
-
-				if readmeBytes, err := io.ReadAll(readmeFile); err == nil {
-					readmeRunes := bytetorune(readmeBytes)
-					result = append(result, readmeRunes...)
-
-					if len(readmeRunes) > 0 && readmeRunes[len(readmeRunes)-1] != '\n' {
-						result = append(result, '\n')
-					}
-				}
-				return result
-			}
-			break
+		readmeFile, err := os.Open(readmePath)
+		if err != nil {
+			// Maybe there is another file.
+			continue
 		}
+		defer readmeFile.Close()
+
+		// TODO(rjk): Can use a nicer unicode.
+		// TODO(rjk): Scale this for the width of the window.
+		// Really... just want some markup with CSS. Ha!
+		bufwriter.Write(bytes.Repeat([]byte("─"), 80))
+		bufwriter.WriteByte('\n')
+
+		if _, err := io.Copy(bufwriter, readmeFile); err != nil {
+			return err
+		}
+
+		break
 	}
 	return nil
 }
+
+// Support for directory previews is creeping featurism. Instead, there
+// should be an external program that uses the filesystem API to list
+// files. The buffer should provide some kind of mechanism to make text
+// that it will keep formatted in some fashion.
+// TODO(rjk): Design and implement this.
 
 func getDirNames(f *os.File) ([]string, error) {
 	entries, err := f.Readdir(0)
