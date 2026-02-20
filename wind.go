@@ -40,18 +40,19 @@ type Window struct {
 	eventx *Xfid
 	events []byte
 
-	owner       int // TODO(fhs): change type to rune
-	maxlines    int
-	dirnames    []string
-	widths      []int
-	incl        []string
-	ctrllock    sync.Mutex // used for lock/unlock ctl mesage
-	ctlfid      uint32     // ctl file Fid which has the ctrllock
-	dumpstr     string
-	dumpdir     string
-	utflastqid  int    // Qid of last read request (QWbody or QWtag)
-	utflastboff uint64 // Byte offset of last read of body or tag
-	utflastq    int    // Rune offset of last read of body or tag
+	owner         int // TODO(fhs): change type to rune
+	maxlines      int
+	dirnames      []string
+	widths        []int
+	readmeContent []rune
+	incl          []string
+	ctrllock      sync.Mutex // used for lock/unlock ctl mesage
+	ctlfid        uint32     // ctl file Fid which has the ctrllock
+	dumpstr       string
+	dumpdir       string
+	utflastqid    int    // Qid of last read request (QWbody or QWtag)
+	utflastboff   uint64 // Byte offset of last read of body or tag
+	utflastq      int    // Rune offset of last read of body or tag
 
 	tagfilenameend     int
 	tagfilenamechanged bool

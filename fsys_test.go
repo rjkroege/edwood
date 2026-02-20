@@ -281,7 +281,7 @@ func TestFSys(t *testing.T) {
 			{"/edwood/name with space", true},
 			{"/edwood/\x00\x00test2", false},
 		} {
-			err := w.Name(tc.name)
+			err := w.Name("%s", tc.name)
 			if !tc.ok {
 				if err == nil {
 					t.Errorf("Writing window name %q returned nil error\n", tc.name)

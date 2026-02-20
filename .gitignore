@@ -31,3 +31,4 @@ _testmain.go
 
 # Mac stuffs
 .DS_Store
+/.gemini

@@ -1,8 +1,6 @@
 module github.com/rjkroege/edwood
 
-go 1.22.4
-
-toolchain go1.23.5
+go 1.24.0
 
 require (
 	9fans.net/go v0.0.2
@@ -12,7 +10,7 @@ require (
 	github.com/ktye/duitdraw v0.0.0-20190328070634-a54e9bd5a862
 	github.com/pkg/term v1.1.0
 	github.com/sanity-io/litter v1.1.0
-	golang.org/x/sys v0.20.0
+	golang.org/x/sys v0.39.0
 )
 
 require (
@@ -25,4 +23,5 @@ require (
 	golang.org/x/exp v0.0.0-20190212162250-21964bba6549 // indirect
 	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/mobile v0.0.0-20190127143845-a42111704963 // indirect
+	golang.org/x/term v0.38.0 // indirect
 )
