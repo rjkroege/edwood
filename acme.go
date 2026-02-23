@@ -17,6 +17,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/theme"
 )
 
 var (
@@ -31,6 +32,7 @@ var (
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
 	ncol              = flag.Int("c", 2, "Number of columns at startup")
 	loadfile          = flag.String("l", "", "Load state from file generated with Dump command")
+	darkFlag          = flag.Bool("dark", false, "Enable dark mode colour scheme")
 )
 
 func predrawInit() *dumpfile.Content {
@@ -76,7 +78,15 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 	if err := display.Attach(draw.Refnone); err != nil {
 		log.Fatalf("failed to attach to window %v\n", err)
 	}
-	display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+
+	// Apply the appropriate mode based on the flag
+	g.applyMode(display)
+
+	if theme.IsDarkMode() {
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.Black(), nil, image.Point{})
+	} else {
+		display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+	}
 
 	g.mousectl = display.InitMouse()
 	g.mouse = &g.mousectl.Mouse
@@ -153,14 +163,17 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 
 func main() {
 	dump := predrawInit()
-
 	// Make the display here in the wrapper to make it possible to provide a
 	// different display for testing.
+	// Create the display within the closure to ensure proper scope
 	draw.Main(func(dd *draw.Device) {
 		display, err := dd.NewDisplay(nil, *varfontflag, "edwood", *winsize)
 		if err != nil {
 			log.Fatalf("can't open display: %v\n", err)
 		}
+
+		// Set dark mode state in theme package with display
+		theme.SetDarkMode(*darkFlag)
 		mainWithDisplay(global, dump, display)
 	})
 }
@@ -229,7 +242,11 @@ func mousethread(g *globals, display draw.Display) {
 			if err := display.Attach(draw.Refnone); err != nil {
 				panic("failed to attach to window")
 			}
-			display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+			if theme.IsDarkMode() {
+				display.ScreenImage().Draw(display.ScreenImage().R(), display.Black(), nil, image.Point{})
+			} else {
+				display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
+			}
 			// TODO(rjk): We appear to have already done this.
 			g.iconinit(display)
 			ScrlResize(display)

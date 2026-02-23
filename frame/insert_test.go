@@ -208,7 +208,7 @@ func setupFrame(t *testing.T, iv *invariants) Frame {
 	if err != nil {
 		t.Fatalf("can't make mock font %q: %v", name, err)
 	}
-	fr := NewFrame(iv.textarea, font, display.ScreenImage(), textcolors)
+	fr := NewFrame(iv.textarea, font, display.ScreenImage(), textcolors, nil)
 
 	return fr
 }

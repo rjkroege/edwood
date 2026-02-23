@@ -214,9 +214,14 @@ func (f *frameimpl) tick(pt image.Point, ticked bool) {
 		r.Max.X = f.rect.Max.X
 	}
 
+	tickColor := f.tickcolor
+	if tickColor == nil {
+		tickColor = f.display.Black()
+	}
+
 	if ticked {
 		f.tickback.Draw(f.tickback.R(), f.background, nil, pt)
-		f.background.Draw(r, f.display.Black(), f.tickimage, image.Point{}) // draws an alpha-blended box
+		f.background.Draw(r, tickColor, f.tickimage, image.Point{}) // draws an alpha-blended box
 	} else {
 		// There is an issue with tick management
 		f.background.Draw(r, f.tickback, nil, image.Point{})
