@@ -22,8 +22,4 @@ Assorted useful internal notes.
 - [[EdwoodFilePkgTesting]] discussion of testing the file package.
 - [[MultiUndoTesting]] ideas for how to test undo spanning multiple windows. (This code is buggy)
 
-# helpers
-go build -o . ./cmd/*
-echo 'blah blah' | ./logtowin
-
 go install github.com/client9/misspell/cmd/misspell@v0.3.4

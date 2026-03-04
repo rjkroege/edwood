@@ -67,17 +67,17 @@ with Edwood or if your favourite Acme feature doesn't work.
 # Tools
 A selection of perhaps useful helpers are in `cmd`. In particular:
 
-- `cmd/win` is a slightly wip Golang version of the `win` program from p9p.
-- `cmd/B` is a Golang reimplementation of the `B` program from p9p that does a blocking open of 
-a file in Edwood. This `B` is a more 
-- `cmd/logtowin` A simple program to log stdin to a window. Useful in shell scripts if the filesystem
-implementation isn't mounted.
+- `cmd/win` is a slightly wip Golang version of the `win` program from p9p. (Aside:
+I'd expect to move this into the [rjkroege/go: Packages and commands for using Plan 9 from Go](https://github.com/rjkroege/go) package eventually.)
 
 Install with:
 
 ```sh
 go install ./cmd/*
 ```
+
+For more tools and Acme integration, see [rjkroege/go: Packages and commands for using Plan 9 from Go](https://github.com/rjkroege/go). In particular, use that
+package's `editinacme` as `EDITOR`.
 
 # Roadmap
 
@@ -88,4 +88,6 @@ go install ./cmd/*
 * Improve the testing [code coverage](https://codecov.io/gh/rjkroege/edwood)
 * More tools and documentation for an "ecosystem" (maybe this word is a bit cringe) of external
 scripts and software that make Acme/Edwood windows of text an important
-part of a larger editing system.
+part of a larger editing system. I've started adding these in [rjkroege/go: Packages and commands for using Plan 9 from Go](https://github.com/rjkroege/go). Way more documentation and examples are needed.
+
+

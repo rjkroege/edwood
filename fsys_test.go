@@ -298,7 +298,6 @@ func TestFSys(t *testing.T) {
 				continue
 			}
 			// Supporting spaces requires different parsing.
-			// TODO(rjk): Consider adding a helper to gozen for this task.
 			tags := strings.SplitN(string(b), " ", 2)
 			fn := tags[0]
 			if b[0] == '\'' {
