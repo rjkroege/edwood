@@ -6,13 +6,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
 
 	"9fans.net/go/plan9/client"
 	"github.com/fhs/mux9p"
-	"github.com/rjkroege/edwood/util"
 )
 
 func newPipe() (net.Conn, net.Conn, error) {
@@ -33,7 +33,7 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 	go func() {
 		err := mux9p.Listen("unix", addr, conn, nil)
 		if err != nil {
-			util.AcmeError("9P multiplexer failed", err)
+			log.Panicf("acme: %s: %v\n", "9P multiplexer failed", err)
 		}
 	}()
 	return nil

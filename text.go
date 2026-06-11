@@ -19,7 +19,6 @@ import (
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
 	"github.com/rjkroege/edwood/runes"
-	"github.com/rjkroege/edwood/util"
 )
 
 const (
@@ -139,7 +138,7 @@ func (t *Text) Redraw(r image.Rectangle, odx int, noredraw bool) {
 	maxt := int(global.maxtab)
 	if t.what == Body {
 		if t.file.IsDir() {
-			maxt = util.Min(TABDIR, int(global.maxtab))
+			maxt = min(TABDIR, int(global.maxtab))
 		} else {
 			maxt = t.tabstop
 		}
@@ -195,7 +194,7 @@ func (t *Text) Resize(r image.Rectangle, keepextra, noredraw bool) int {
 func (t *Text) Close() {
 	t.fr.Clear(true)
 	if err := t.file.DelObserver(t); err != nil {
-		util.AcmeError(err.Error(), nil)
+		log.Panicf("acme: %s: %v\n", err.Error(), nil)
 	}
 	t.file = nil
 	if global.argtext == t {
@@ -228,7 +227,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 
 	mint = t.getfont().StringWidth("0")
 	// go for narrower tabs if set more than 3 wide
-	t.fr.Maxtab(util.Min(int(global.maxtab), TABDIR) * mint)
+	t.fr.Maxtab(min(int(global.maxtab), TABDIR) * mint)
 	maxt = t.fr.GetMaxtab()
 	for _, w := range widths {
 		if maxt-w%maxt < mint || w%maxt == 0 {
@@ -244,7 +243,7 @@ func (t *Text) Columnate(names []string, widths []int) {
 	if colw == 0 {
 		ncol = 1
 	} else {
-		ncol = util.Max(1, t.fr.Rect().Dx()/colw)
+		ncol = max(1, t.fr.Rect().Dx()/colw)
 	}
 	nrow = (len(names) + ncol - 1) / ncol
 
@@ -637,13 +636,13 @@ func (t *Text) Deleted(oq0, oq1 file.OffsetTuple) {
 		t.w.utflastqid = -1
 	}
 	if q0 < t.iq1 {
-		t.iq1 -= util.Min(n, t.iq1-q0)
+		t.iq1 -= min(n, t.iq1-q0)
 	}
 	if q0 < t.q0 {
-		t.q0 -= util.Min(n, t.q0-q0)
+		t.q0 -= min(n, t.q0-q0)
 	}
 	if q0 < t.q1 {
-		t.q1 -= util.Min(n, t.q1-q0)
+		t.q1 -= min(n, t.q1-q0)
 	}
 	if q1 <= t.org {
 		t.org -= n
@@ -689,8 +688,8 @@ func (t *Text) Q1() int                                  { return t.q1 }
 func (t *Text) SetQ0(q0 int)                             { t.q0 = q0 }
 func (t *Text) SetQ1(q1 int)                             { t.q1 = q1 }
 func (t *Text) Constrain(q0, q1 int) (p0, p1 int) {
-	p0 = util.Min(q0, t.file.Nr())
-	p1 = util.Min(q1, t.file.Nr())
+	p0 = min(q0, t.file.Nr())
+	p1 = min(q1, t.file.Nr())
 	return p0, p1
 }
 
@@ -1191,7 +1190,7 @@ func (t *Text) Select() {
 		// TODO(rjk): Ack. This is horrible? Layering violation?
 		for {
 			global.mousectl.Read()
-			if !(global.mouse.Buttons == b && util.Abs(global.mouse.Point.X-x) < 3 && util.Abs(global.mouse.Point.Y-y) < 3) {
+			if !(global.mouse.Buttons == b && max(global.mouse.Point.X-x, -(global.mouse.Point.X-x)) < 3 && max(global.mouse.Point.Y-y, -(global.mouse.Point.Y-y)) < 3) {
 				break
 			}
 		}

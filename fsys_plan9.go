@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path"
 	"syscall"
 
 	"9fans.net/go/plan9/client"
-	"github.com/rjkroege/edwood/util"
 )
 
 // These constants are from /sys/include/libc.h
@@ -50,15 +50,15 @@ func post9pservice(conn net.Conn, name string, mtpt string) error {
 		// hasn't been started yet.
 		err := syscall.Mount(cfd, -1, mtpt, MREPL, "")
 		if err != nil {
-			util.AcmeError("mount failed", err)
+			log.Panicf("acme: %s: %v\n", "mount failed", err)
 		}
 		err = syscall.Bind(mtpt, "/mnt/wsys", MREPL)
 		if err != nil {
-			util.AcmeError("bind /mnt/wsys filed", err)
+			log.Panicf("acme: %s: %v\n", "bind /mnt/wsys filed", err)
 		}
 		err = syscall.Bind(mtpt, "/dev", MBEFORE)
 		if err != nil {
-			util.AcmeError("bind /dev filed", err)
+			log.Panicf("acme: %s: %v\n", "bind /dev filed", err)
 		}
 	}()
 	return nil

@@ -7,7 +7,6 @@ import (
 
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/runes"
-	"github.com/rjkroege/edwood/util"
 	//	"log"
 )
 
@@ -271,7 +270,7 @@ func (w *Window) setTag1() {
 			w.tag.q0 = w.tagfilenameend
 		default:
 			// log.Println("q0 default")
-			w.tag.q0 = util.Min(q0, w.tag.Nc())
+			w.tag.q0 = min(q0, w.tag.Nc())
 		}
 
 		switch { // q1
@@ -293,13 +292,13 @@ func (w *Window) setTag1() {
 			w.tag.q1 = w.tag.Nc()
 		default:
 			// log.Println("q1", "default")
-			w.tag.q1 = util.Min(q1, w.tag.Nc())
+			w.tag.q1 = min(q1, w.tag.Nc())
 		}
 	}
 
 	w.tag.file.Clean()
-	w.tag.q0 = util.Min(w.tag.q0, w.tag.Nc())
-	w.tag.q1 = util.Min(w.tag.q1, w.tag.Nc())
+	w.tag.q0 = min(w.tag.q0, w.tag.Nc())
+	w.tag.q1 = min(w.tag.q1, w.tag.Nc())
 
 	// TODO(rjk): This can redraw the selection unnecessarily.
 	w.tag.SetSelect(w.tag.q0, w.tag.q1)

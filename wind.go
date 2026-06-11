@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,7 +12,6 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
 	"github.com/rjkroege/edwood/frame"
-	"github.com/rjkroege/edwood/util"
 )
 
 type Window struct {
@@ -268,12 +268,12 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 	w.tagtop.Max.Y = r.Min.Y + fontget(global.tagfont, w.display).Height()
 
 	r1 := r
-	r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
+	r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
 
 	// If needed, recompute number of lines in tag.
 	if !safe || !w.tagsafe || !w.tag.all.Eq(r1) {
 		w.taglines = w.TagLines(r)
-		r1.Max.Y = util.Min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
+		r1.Max.Y = min(r.Max.Y, r1.Min.Y+w.taglines*fontget(global.tagfont, w.display).Height())
 	}
 
 	// Resize/redraw tag TODO(flux)
@@ -313,7 +313,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 				w.display.ScreenImage().Draw(r1, global.tagcolors[frame.ColBord], nil, image.Point{})
 			}
 			y++
-			r1.Min.Y = util.Min(y, r.Max.Y)
+			r1.Min.Y = min(y, r.Max.Y)
 			r1.Max.Y = r.Max.Y
 		} else {
 			r1.Min.Y = y
@@ -325,7 +325,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 		w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 		w.body.all.Min.Y = oy
 	}
-	w.maxlines = util.Min(w.body.fr.GetFrameFillStatus().Nlines, util.Max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
+	w.maxlines = min(w.body.fr.GetFrameFillStatus().Nlines, max(w.maxlines, w.body.fr.GetFrameFillStatus().Maxlines))
 	// TODO(rjk): this value doesn't make sense when we've collapsed
 	// the tag if the rectangle update block is not executed.
 	return w.r.Max.Y
@@ -534,7 +534,7 @@ func (w *Window) Eventf(format string, args ...interface{}) {
 		return
 	}
 	if w.owner == 0 {
-		util.AcmeError("no window owner", nil)
+		log.Panicf("acme: %s: %v\n", "no window owner", nil)
 	}
 	buffy := new(bytes.Buffer)
 	fmt.Fprintf(buffy, format, args...)
