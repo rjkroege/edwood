@@ -1,39 +1,8 @@
 package util
 
 import (
-	"log"
 	"unicode/utf8"
 )
-
-func Min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func Minu(a, b uint) uint {
-	if a < b {
-		return a
-	}
-	return b
-}
-func Max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func Abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func AcmeError(s string, err error) {
-	log.Panicf("acme: %s: %v\n", s, err)
-}
 
 // Cvttorunes decodes runes r from p. It's guaranteed that first n
 // bytes of p will be interpreted without worrying about partial runes.

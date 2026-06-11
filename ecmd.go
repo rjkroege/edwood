@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1049,7 +1050,7 @@ func cmdaddress(ap *Addr, a Address, sign int) Address {
 				a = lineaddr(1, a, sign)
 			}
 		default:
-			util.AcmeError("cmdaddress", nil)
+			log.Panicf("acme: %s: %v\n", "cmdaddress", nil)
 			return a
 		}
 		ap = ap.next

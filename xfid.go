@@ -229,7 +229,7 @@ func xfidclose(x *Xfid) {
 		case QWwrsel:
 			w.nomark = false
 			t := &w.body
-			t.Show(util.Min(w.wrselrange.q0, t.Nc()), util.Min(w.wrselrange.q1, t.Nc()), true)
+			t.Show(min(w.wrselrange.q0, t.Nc()), min(w.wrselrange.q1, t.Nc()), true)
 			t.ScrDraw(t.fr.GetFrameFillStatus().Nchars)
 		case QWeditout:
 			<-w.editoutlk
@@ -873,7 +873,7 @@ func xfidutfread(x *Xfid, t *Text, q1 int, qid int) {
 		} else {
 			if boff+uint64(nb) > off {
 				if n != 0 {
-					util.AcmeError("bad count in utfrune", nil)
+					log.Panicf("acme: %s: %v\n", "bad count in utfrune", nil)
 				}
 				m := nb - int(off-boff)
 				if m > int(x.fcall.Count) {
@@ -903,7 +903,7 @@ func xfidruneread(x *Xfid, t *Text, q0 int, q1 int) int {
 	t.w.Commit(t)
 
 	// Get Count runes, but that might be larger than Count bytes
-	nr := util.Min(q1-q0, int(x.fcall.Count))
+	nr := min(q1-q0, int(x.fcall.Count))
 	tmp := make([]rune, nr)
 	t.file.Read(q0, tmp)
 	buf := []byte(string(tmp))
@@ -989,7 +989,7 @@ func xfidindexread(x *Xfid) {
 				continue
 			}
 			sb.WriteString(w.CtlPrint(false))
-			m := util.Min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
+			m := min(BUFSIZE/utf8.UTFMax, w.tag.Nc())
 			tag := make([]rune, m)
 			w.tag.file.Read(0, tag)
 

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/file"
-	"github.com/rjkroege/edwood/util"
 )
 
 const RowTag = "Newcol Kill Putall Dump Exit"
@@ -80,7 +80,7 @@ func (row *Row) Add(c *Column, x int) *Column {
 		}
 		row.display.ScreenImage().Draw(r, row.display.White(), nil, image.Point{})
 		r1 := r
-		r1.Max.X = util.Min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
+		r1.Max.X = min(x-row.display.ScaleSize(Border), r.Max.X-row.display.ScaleSize(50))
 		if r1.Dx() < row.display.ScaleSize(50) {
 			r1.Max.X = r1.Min.X + row.display.ScaleSize(50)
 		}
@@ -163,11 +163,11 @@ func (row *Row) DragCol(c *Column, _ int) {
 			goto Found
 		}
 	}
-	util.AcmeError("can't find column", nil)
+	log.Panicf("acme: %s: %v\n", "can't find column", nil)
 
 Found:
 	p = global.mouse.Point
-	if util.Abs(p.X-op.X) < 5 && util.Abs(p.Y-op.Y) < 5 {
+	if max(p.X-op.X, -(p.X-op.X)) < 5 && max(p.Y-op.Y, -(p.Y-op.Y)) < 5 {
 		return
 	}
 	if (i > 0 && p.X < row.col[i-1].r.Min.X) || (i < len(row.col)-1 && p.X > c.r.Max.X) {
@@ -220,7 +220,7 @@ func (row *Row) Close(c *Column, dofree bool) {
 			goto Found
 		}
 	}
-	util.AcmeError("can't find column", nil)
+	log.Panicf("acme: %s: %v\n", "can't find column", nil)
 Found:
 	r = c.r
 	if dofree {
@@ -530,7 +530,7 @@ func (row *Row) loadhelper(win *dumpfile.Window) error {
 	// Update the selection on the Text.
 	w.body.Show(q0, q1, true)
 	ffs := w.body.fr.GetFrameFillStatus()
-	w.maxlines = util.Min(ffs.Nlines, util.Max(w.maxlines, ffs.Nlines))
+	w.maxlines = min(ffs.Nlines, max(w.maxlines, ffs.Nlines))
 
 	// TODO(rjk): Conceivably this should be a zerox xfidlog when reconstituting a zerox?
 	xfidlog(w, "new")

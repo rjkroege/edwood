@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"log"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -70,7 +71,7 @@ func errorwin1(dir string, incl []string) *Window {
 		// TODO(rjk): This should be inside the row lock.
 		if len(global.row.col) == 0 {
 			if global.row.Add(nil, -1) == nil {
-				util.AcmeError("can't create column to make error window", nil)
+				log.Panicf("acme: %s: %v\n", "can't create column to make error window", nil)
 			}
 		}
 		w = global.row.col[len(global.row.col)-1].Add(nil, nil, -1)
@@ -155,7 +156,7 @@ func makenewwindow(t *Text) *Window {
 		c = t.col
 	default:
 		if len(global.row.col) == 0 && global.row.Add(nil, -1) == nil {
-			util.AcmeError("can't make column", nil)
+			log.Panicf("acme: %s: %v\n", "can't make column", nil)
 		}
 		c = global.row.col[len(global.row.col)-1]
 	}

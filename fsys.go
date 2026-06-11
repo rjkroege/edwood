@@ -13,7 +13,6 @@ import (
 
 	"9fans.net/go/plan9"
 	"github.com/rjkroege/edwood/ninep"
-	"github.com/rjkroege/edwood/util"
 )
 
 type fileServer struct {
@@ -105,10 +104,10 @@ var mnt Mnt
 func fsysinit() *fileServer {
 	p0, p1, err := newPipe()
 	if err != nil {
-		util.AcmeError("failed to create pipe", err)
+		log.Panicf("acme: %s: %v\n", "failed to create pipe", err)
 	}
 	if err := post9pservice(p0, "acme", *mtpt); err != nil {
-		util.AcmeError("can't post service", err)
+		log.Panicf("acme: %s: %v\n", "can't post service", err)
 	}
 
 	fs := &fileServer{
@@ -133,7 +132,7 @@ func (fs *fileServer) fsysproc() {
 			if fs.closing {
 				break
 			}
-			util.AcmeError("fsysproc", err)
+			log.Panicf("acme: %s: %v\n", "fsysproc", err)
 		}
 		if DEBUG {
 			fmt.Fprintf(os.Stderr, "<-- %v\n", fc)
@@ -242,7 +241,7 @@ func (fs *fileServer) respond(x *Xfid, t *plan9.Fcall, err error) *Xfid {
 	t.Fid = x.fcall.Fid
 	t.Tag = x.fcall.Tag
 	if err := plan9.WriteFcall(fs.conn, t); err != nil {
-		util.AcmeError("write error in respond", err)
+		log.Panicf("acme: %s: %v\n", "write error in respond", err)
 	}
 	if DEBUG {
 		fmt.Fprintf(os.Stderr, "--> %v\n", t)
@@ -448,7 +447,7 @@ func (f *Fid) Walk1(wname string) (found bool, err error) {
 	err = nil
 	if wname == "new" {
 		if f.w != nil {
-			util.AcmeError("w set in walk to new", nil)
+			log.Panicf("acme: %s: %v\n", "w set in walk to new", nil)
 		}
 		global.cnewwindow <- nil  // signal newwindowthread
 		f.w = <-global.cnewwindow // receive new window
