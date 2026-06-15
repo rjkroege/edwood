@@ -272,6 +272,12 @@ func TestEditMultipleWindows(t *testing.T) {
 		t.Fatalf("can't make a temp file because: %v\n", err)
 	}
 
+	fn4, cleaner, err := makeTempFile("file four\n")
+	defer cleaner()
+	if err != nil {
+		t.Fatalf("can't make a temp file because: %v\n", err)
+	}
+
 	testtab := []struct {
 		dot           Range
 		filename      string
@@ -356,6 +362,10 @@ func TestEditMultipleWindows(t *testing.T) {
 			// " +  alt_example_2\n'+. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 			" +  alt_example_2\n +. alt_example_2\n", // NB: scaffold-built buffer starts as not-dirty
 		}},
+		{Range{0, 0}, fn4, "b " + fn4[:len(fn4)-2] + "." + "\ni/Outer Space/", []string{
+			"Outer Space" + contents,
+			alt_contents,
+		}, []string{"'+. " + fn4 + "\n"}},
 
 		// u
 		// 10
@@ -421,6 +431,7 @@ func TestEditMultipleWindows(t *testing.T) {
 			}
 
 			if got, want := len(warnings), len(test.expectedwarns); got != want {
+				fmt.Printf("Warnings: %v", warnings[0].buf.String())
 				t.Errorf("test %d: expected %d warnings but got %d warnings", i, want, got)
 				return
 			}
