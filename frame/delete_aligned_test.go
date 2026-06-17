@@ -75,10 +75,9 @@ func TestDeleteAligned(t *testing.T) {
 			},
 		},
 		{
-			name:        "rippleUpMultiLine",
-			fn:          rippleUpMultiLine,
-			knowntofail: true,
-			textarea:    image.Rect(20, 10, 59, 40),
+			name:     "rippleUpMultiLine",
+			fn:       rippleUpMultiLine,
+			textarea: image.Rect(20, 10, 59, 40),
 			want: []string{
 				"blit (20,30)-(59,40) [0,2],[3,1], to (20,10)-(59,20) [0,0],[3,1]",
 				"blit (20,40)-(59,40) [0,3],[3,0], to (20,20)-(59,20) [0,1],[3,0]",

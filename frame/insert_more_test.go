@@ -337,3 +337,67 @@ func TestInsertAligned(t *testing.T) {
 		})
 	}
 }
+
+// TestInsertBoxModel examines the frame's box array after insertion to
+// determine whether text that falls beyond the visible area is stored.
+func TestInsertBoxModel(t *testing.T) {
+	iv := &invariants{
+		topcorner: image.Pt(20, 10),
+	}
+	*validate = true
+
+	tests := []struct {
+		name         string
+		fn           func(t *testing.T, fr Frame, iv *invariants)
+		textarea     image.Rectangle
+		wantNbox     int
+		wantNchars   int
+		wantNlines   int
+		wantLastFull bool
+	}{
+		{
+			// "0a\nb1\ncd2\nef" fills the 3-line frame exactly: cd2\n advances Y
+			// to rect.Max.Y=40, so "ef" arrives at the boundary and _draw chops
+			// it. No box for "ef" should exist; nchars should count only the 10
+			// visible characters.
+			name: "occludedTextNotStored",
+			fn: func(t *testing.T, fr Frame, iv *invariants) {
+				t.Helper()
+				fr.Insert([]rune("0a\nb1\ncd2\nef"), 0)
+			},
+			textarea:     image.Rect(20, 10, 59, 40),
+			wantNbox:     6, // "0a" "\n" "b1" "\n" "cd2" "\n" — no "ef"
+			wantNchars:   10,
+			wantNlines:   3,
+			wantLastFull: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			iv.textarea = tc.textarea
+			fr := setupFrame(t, iv)
+
+			tc.fn(t, fr, iv)
+
+			frimpl := fr.(*frameimpl)
+			for i, b := range frimpl.box {
+				t.Logf("box[%d] = %v", i, b)
+			}
+			t.Logf("nchars=%d nlines=%d lastlinefull=%v", frimpl.nchars, frimpl.nlines, frimpl.lastlinefull)
+
+			if got, want := len(frimpl.box), tc.wantNbox; got != want {
+				t.Errorf("len(box): got %d, want %d", got, want)
+			}
+			if got, want := frimpl.nchars, tc.wantNchars; got != want {
+				t.Errorf("nchars: got %d, want %d", got, want)
+			}
+			if got, want := frimpl.nlines, tc.wantNlines; got != want {
+				t.Errorf("nlines: got %d, want %d", got, want)
+			}
+			if got, want := frimpl.lastlinefull, tc.wantLastFull; got != want {
+				t.Errorf("lastlinefull: got %v, want %v", got, want)
+			}
+		})
+	}
+}
