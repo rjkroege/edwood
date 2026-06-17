@@ -430,6 +430,41 @@ func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// insertAtExactWrapBoundary inserts a character at position 3, which is exactly
+// at the end of the first soft-wrapped visual line (3 chars × 13 px = 39 px).
+// In the aligned frame the inserted character has 0 px of space remaining and
+// must wrap; in the non-aligned frame it has 1 px remaining, which also forces
+// a wrap. Either way the fill left on line 1 differs: 1 px vs 0 px.
+func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	gdo(t, fr).Clear()
+	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
+
+	s := fr.Insert([]rune{'X'}, 3)
+
+	if got, want := s, true; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// insertExactlyFillsAlignedLine inserts the character that makes the first
+// visual line exactly reach the frame's right edge (from 2 chars to 3 chars =
+// 39 px in the aligned frame, 39 px + 1 px gap in the non-aligned frame).
+// No wrap should be triggered by this insertion.
+func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	gdo(t, fr).Clear()
+	fr.Insert([]rune("0a\n1cd\n2ef\n3gh\n4ij"), 0)
+
+	s := fr.Insert([]rune{'X'}, 2)
+
+	if got, want := s, false; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func nop(t *testing.T, _ Frame, _ *invariants) {
 	// t.Log("hi from nop")
 }
@@ -723,6 +758,51 @@ func TestInsert(t *testing.T) {
 			},
 
 			// TODO(rjk): Wrapping with tabs
+		},
+		{
+			// Insert a character exactly at the wrap boundary (position where the
+			// first visual line is already full). The character wraps to line 2.
+			name:     "insertAtExactWrapBoundary",
+			fn:       insertAtExactWrapBoundary,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(60,50) [0,1],[-,3]",
+				"fill (20,50)-(59,60) [0,4],[3,1]",
+				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
+				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
+				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
+				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
+				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
+				"fill (33,20)-(60,30) [1,1],[-,1]",
+				"fill (59,10)-(60,20) [3,0],[-,1]",
+				"fill (20,20)-(33,30) [0,1],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (20,20) [0,1] fill: black`,
+			},
+		},
+		{
+			// Insert a character that exactly fills the first visual line from 2
+			// to 3 characters. No wrap should occur.
+			name:     "insertExactlyFillsAlignedLine",
+			fn:       insertExactlyFillsAlignedLine,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+				"fill (20,10)-(60,20) [0,0],[-,1]",
+				"fill (20,20)-(60,50) [0,1],[-,3]",
+				"fill (20,50)-(59,60) [0,4],[3,1]",
+				`screen-800x600 <- string "0a" atpoint: (20,10) [0,0] fill: black`,
+				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
+				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
+				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
+				"blit (20,20)-(59,30) [0,1],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
+				"fill (59,10)-(60,20) [3,0],[-,1]",
+				"fill (46,10)-(59,20) [2,0],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (46,10) [2,0] fill: black`,
+			},
 		},
 	}
 
