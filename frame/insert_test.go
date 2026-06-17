@@ -808,12 +808,16 @@ func TestInsert(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.knowntofail {
-				return
-			}
-
 			iv.textarea = tc.textarea
 			fr := setupFrame(t, iv)
+
+			if tc.knowntofail {
+				tc.fn(t, fr, iv)
+				generateVisualizedOutput(t, fr)
+				t.Log("known failing: bug not yet fixed")
+				t.Fail()
+				return
+			}
 
 			// TODO(rjk): validate here
 

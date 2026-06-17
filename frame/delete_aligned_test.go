@@ -75,9 +75,10 @@ func TestDeleteAligned(t *testing.T) {
 			},
 		},
 		{
-			name:     "rippleUpMultiLine",
-			fn:       rippleUpMultiLine,
-			textarea: image.Rect(20, 10, 59, 40),
+			name:        "rippleUpMultiLine",
+			fn:          rippleUpMultiLine,
+			knowntofail: true,
+			textarea:    image.Rect(20, 10, 59, 40),
 			want: []string{
 				"blit (20,30)-(59,40) [0,2],[3,1], to (20,10)-(59,20) [0,0],[3,1]",
 				"blit (20,40)-(59,40) [0,3],[3,0], to (20,20)-(59,20) [0,1],[3,0]",
@@ -90,9 +91,10 @@ func TestDeleteAligned(t *testing.T) {
 			// The soft-wrap cancellation path with exact alignment: after the
 			// delete the first logical line fits in exactly 39 px, leaving a
 			// zero-width fill at the frame right edge.
-			name:     "deleteEliminatesSoftWrap",
-			fn:       deleteEliminatesSoftWrap,
-			textarea: image.Rect(20, 10, 59, 40),
+			name:        "deleteEliminatesSoftWrap",
+			fn:          deleteEliminatesSoftWrap,
+			knowntofail: true,
+			textarea:    image.Rect(20, 10, 59, 40),
 			want: []string{
 				"fill (20,20)-(59,30) [0,1],[3,1]",
 				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
@@ -128,12 +130,16 @@ func TestDeleteAligned(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.knowntofail {
-				return
-			}
-
 			iv.textarea = tc.textarea
 			fr := setupFrame(t, iv)
+
+			if tc.knowntofail {
+				tc.fn(t, fr, iv)
+				generateVisualizedOutput(t, fr)
+				t.Log("known failing: bug not yet fixed")
+				t.Fail()
+				return
+			}
 
 			tc.fn(t, fr, iv)
 
