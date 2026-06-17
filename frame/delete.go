@@ -98,7 +98,15 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 		pt1 = f.advance(pt1, b)
 		// newwid updates b with the value computed by newwid0.
 		// TODO(rjk): make the code cleaner with a side-effect free version.
-		pt0.X += f.newwid(pt0, b)
+		//
+		// For a newline box, advance only resets X to the left margin.
+		// Y stays put so the pt1.Y != pt0.Y block below can blit remaining
+		// lines upward by the correct amount.
+		if b.Nrune < 0 && b.Bc == '\n' {
+			pt0.X = f.rect.Min.X
+		} else {
+			pt0.X += f.newwid(pt0, b)
+		}
 		f.box[n0] = f.box[n1]
 		n0++
 		n1++

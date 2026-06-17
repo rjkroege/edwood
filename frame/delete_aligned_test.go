@@ -91,14 +91,15 @@ func TestDeleteAligned(t *testing.T) {
 			// The soft-wrap cancellation path with exact alignment: after the
 			// delete the first logical line fits in exactly 39 px, leaving a
 			// zero-width fill at the frame right edge.
-			name:        "deleteEliminatesSoftWrap",
-			fn:          deleteEliminatesSoftWrap,
-			knowntofail: true,
-			textarea:    image.Rect(20, 10, 59, 40),
+			name:     "deleteEliminatesSoftWrap",
+			fn:       deleteEliminatesSoftWrap,
+			textarea: image.Rect(20, 10, 59, 40),
 			want: []string{
 				"fill (20,20)-(59,30) [0,1],[3,1]",
-				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (59,30)-(59,40) [3,2],[0,1]",
+				"blit (20,30)-(59,40) [0,2],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
+				"blit (20,40)-(59,40) [0,3],[3,0], to (20,30)-(59,30) [0,2],[3,0]",
+				"fill (58,20)-(59,30) [-,1],[-,1]",
+				"fill (20,30)-(59,40) [0,2],[3,1]",
 			},
 		},
 		{

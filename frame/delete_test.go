@@ -241,13 +241,14 @@ func TestDelete(t *testing.T) {
 		{
 			// Delete the character that causes a soft wrap; the wrap disappears
 			// and text ripples up to fill the freed visual line.
-			name:        "deleteEliminatesSoftWrap",
-			fn:          deleteEliminatesSoftWrap,
-			knowntofail: true,
+			name: "deleteEliminatesSoftWrap",
+			fn:   deleteEliminatesSoftWrap,
 			want: []string{
 				"fill (20,20)-(60,30) [0,1],[-,1]",
-				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (59,30)-(59,40) [3,2],[0,1]",
+				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
+				"fill (59,20)-(60,30) [3,1],[-,1]",
+				"fill (20,30)-(59,40) [0,2],[3,1]",
 			},
 			textarea: image.Rect(20, 10, 60, 40),
 		},
