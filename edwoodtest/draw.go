@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
+	imagedraw "image/draw"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,6 +34,11 @@ type GettableDrawOps interface {
 	// SVGDrawOps writes the accumulated SVG format drawops to w where rect
 	// is the area of interest for the drawops.
 	SVGDrawOps(w io.Writer) error
+
+	// ScreenImageAsPNG writes the current pixel state of the screen image
+	// as a PNG. Only meaningful when the display was created with
+	// NewDisplayWithDPI; returns an error otherwise.
+	ScreenImageAsPNG(w io.Writer) error
 }
 
 // mockDisplay implements draw.Display.
@@ -51,6 +59,14 @@ type mockDisplay struct {
 
 	// roi is the rectangle of interest.
 	rectofi image.Rectangle
+
+	// dpi is non-zero only for displays created with NewDisplayWithDPI.
+	// A zero value means the non-rendering (string-recording only) path.
+	dpi int
+
+	// pixscreen is the backing pixel buffer for the screen image.
+	// Non-nil only when dpi > 0.
+	pixscreen *image.RGBA
 }
 
 // NewDisplay returns a mock draw.Display where visulizations of the output are w.r.t. rectangle rectofi.
@@ -65,21 +81,72 @@ func NewDisplay(rectofi image.Rectangle) draw.Display {
 	return md
 }
 
+// luridPink is the initial fill colour of a rendering display's pixel buffer.
+// Any pixel that is never written by Draw or Bytes will remain this colour,
+// making rendering gaps immediately obvious in PNG output.
+var luridPink = color.RGBA{R: 0xFF, G: 0x00, B: 0xCC, A: 0xFF}
+
+// NewDisplayWithDPI returns a mock draw.Display that renders to a real
+// *image.RGBA in addition to recording draw operations as strings. dpi
+// controls ScaleSize; 100 is "1:1 logical-to-physical". rectofi controls SVG
+// output as in NewDisplay. Call ScreenImageAsPNG on the returned
+// GettableDrawOps to obtain a PNG of the current screen state.
+func NewDisplayWithDPI(rectofi image.Rectangle, dpi int) draw.Display {
+	const w, h = 800, 600
+	px := image.NewRGBA(image.Rect(0, 0, w, h))
+	imagedraw.Draw(px, px.Bounds(), image.NewUniform(luridPink), image.Point{}, imagedraw.Src)
+
+	md := &mockDisplay{
+		rectofi:   rectofi,
+		dpi:       dpi,
+		pixscreen: px,
+	}
+	md.screenimage = &mockImage{
+		d: md,
+		r: image.Rect(0, 0, w, h),
+		n: "screen-800x600",
+		c: draw.Notacolor,
+		m: px,
+	}
+	md.svgdrawops = append(md.svgdrawops, boundingboxsvg(0, rectofi))
+	md.annotations = append(md.annotations, fmt.Sprintf("target rect %v", rectofi))
+	return md
+}
+
+// drawColorToRGBA converts a draw.Color (0xRRGGBBAA) to color.RGBA.
+func drawColorToRGBA(c draw.Color) color.RGBA {
+	return color.RGBA{
+		R: uint8(c >> 24),
+		G: uint8(c >> 16),
+		B: uint8(c >> 8),
+		A: uint8(c),
+	}
+}
+
+// solidImage returns an image.Uniform for the given draw.Color when the
+// display is in rendering mode, or nil otherwise.
+func (d *mockDisplay) solidImage(c draw.Color) image.Image {
+	if d.pixscreen == nil {
+		return nil
+	}
+	return image.NewUniform(drawColorToRGBA(c))
+}
+
 func (d *mockDisplay) ScreenImage() draw.Image {
 	return d.screenimage
 }
 
 func (d *mockDisplay) White() draw.Image {
-	return newimageimpl(d, "white", draw.White, image.Rectangle{})
+	return &mockImage{d: d, n: "white", c: draw.White, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.White)}
 }
 func (d *mockDisplay) Black() draw.Image {
-	return newimageimpl(d, "black", draw.Black, image.Rectangle{})
+	return &mockImage{d: d, n: "black", c: draw.Black, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Black)}
 }
 func (d *mockDisplay) Opaque() draw.Image {
-	return newimageimpl(d, "opaque", draw.Opaque, image.Rectangle{})
+	return &mockImage{d: d, n: "opaque", c: draw.Opaque, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Opaque)}
 }
 func (d *mockDisplay) Transparent() draw.Image {
-	return newimageimpl(d, "transparent", draw.Transparent, image.Rectangle{})
+	return &mockImage{d: d, n: "transparent", c: draw.Transparent, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Transparent)}
 }
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return &draw.Keyboardctl{} }
 func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{} }
@@ -90,12 +157,23 @@ func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{}
 func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(fwidth, fheight), nil }
 
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
-	return &mockImage{
+	mi := &mockImage{
 		d:    d,
 		r:    r,
 		c:    val,
 		repl: repl,
-	}, nil
+	}
+	if d.pixscreen != nil {
+		c := drawColorToRGBA(val)
+		if repl && r == image.Rect(0, 0, 1, 1) {
+			mi.m = image.NewUniform(c)
+		} else {
+			px := image.NewRGBA(r)
+			imagedraw.Draw(px, px.Bounds(), image.NewUniform(c), image.Point{}, imagedraw.Src)
+			mi.m = px
+		}
+	}
+	return mi, nil
 }
 
 func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
@@ -103,17 +181,31 @@ func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
 	c3 := draw.WithAlpha(color3, 0xbf) >> 8
 	c := ((c1 + c3) << 8) | 0xff
 
-	return &mockImage{
+	mi := &mockImage{
 		d:    d,
 		r:    image.Rect(0, 0, 1, 1),
 		repl: true,
 		c:    c,
 	}
+	if d.pixscreen != nil {
+		mi.m = image.NewUniform(drawColorToRGBA(c))
+	}
+	return mi
 }
 
 func (d *mockDisplay) Attach(ref int) error { return nil }
 func (d *mockDisplay) Flush() error         { return nil }
-func (d *mockDisplay) ScaleSize(n int) int  { return 1 }
+
+func (d *mockDisplay) ScaleSize(n int) int {
+	if d.dpi == 0 {
+		// Preserve existing non-rendering behaviour.
+		return 1
+	}
+	if d.dpi <= 100 {
+		return n
+	}
+	return (n*d.dpi + 50) / 100
+}
 
 // ReadSnarf reads the snarf buffer into buf, returning the number of bytes read,
 // the total size of the snarf buffer (useful if buf is too short), and any
@@ -149,6 +241,13 @@ func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
 	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
 }
 
+func (d *mockDisplay) ScreenImageAsPNG(w io.Writer) error {
+	if d.pixscreen == nil {
+		return errors.New("ScreenImageAsPNG: display not created with NewDisplayWithDPI")
+	}
+	return png.Encode(w, d.pixscreen)
+}
+
 var _ = draw.Image((*mockImage)(nil))
 
 // mockImage implements draw.Image.
@@ -158,6 +257,11 @@ type mockImage struct {
 	n    string
 	c    draw.Color
 	repl bool
+
+	// m is the pixel backing for this image. Non-nil only in displays created
+	// with NewDisplayWithDPI. For the screen image it is *image.RGBA; for solid
+	// colours it is *image.Uniform.
+	m image.Image
 }
 
 // newimage creates a new mockImage. Use Notacolor for the situation
@@ -289,6 +393,26 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 		}
 	}
 	i.d.drawops = append(i.d.drawops, op)
+
+	// Pixel-rendering path: only when this image has an RGBA backing.
+	dstRGBA, dstOK := i.m.(*image.RGBA)
+	if !dstOK {
+		return
+	}
+	msrc, srcOK := src.(*mockImage)
+	if !srcOK || msrc.m == nil {
+		return
+	}
+	if mask == nil {
+		imagedraw.Draw(dstRGBA, r, msrc.m, p1, imagedraw.Src)
+	} else {
+		mmask, maskOK := mask.(*mockImage)
+		if maskOK && mmask.m != nil {
+			imagedraw.DrawMask(dstRGBA, r, msrc.m, p1, mmask.m, p1, imagedraw.Over)
+		} else {
+			imagedraw.Draw(dstRGBA, r, msrc.m, p1, imagedraw.Src)
+		}
+	}
 }
 
 func (i *mockImage) Border(r image.Rectangle, n int, color draw.Image, sp image.Point) {
@@ -333,6 +457,20 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 
 	i.d.svgdrawops = append(i.d.svgdrawops, bytessvg(len(i.d.svgdrawops), pt, b))
 	i.d.annotations = append(i.d.annotations, shortop)
+
+	// Pixel-rendering path: fill the bounding box of the glyph run with the
+	// source colour. This is Option A from the proposal — no real font face
+	// needed, platform-independent, deterministic. The rectangle geometry
+	// matches what the fixed-width mockFont reports, so positions are correct.
+	if dstRGBA, ok := i.m.(*image.RGBA); ok {
+		if msrc, ok := src.(*mockImage); ok && msrc.m != nil {
+			box := image.Rectangle{
+				Min: pt,
+				Max: pt.Add(image.Pt(f.BytesWidth(b), f.Height())),
+			}
+			imagedraw.Draw(dstRGBA, box, msrc.m, image.Point{}, imagedraw.Src)
+		}
+	}
 
 	// TODO(rjk): This assumes fixed width. Consider generalizing.
 	return pt.Add(image.Pt(f.BytesWidth(b), 0))
