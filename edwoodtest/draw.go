@@ -86,25 +86,50 @@ func NewDisplay(rectofi image.Rectangle) draw.Display {
 // making rendering gaps immediately obvious in PNG output.
 var luridPink = color.RGBA{R: 0xFF, G: 0x00, B: 0xCC, A: 0xFF}
 
+// pixelScale returns the largest integer s such that
+// s*rectofi.Max.X ≤ backW and s*rectofi.Max.Y ≤ backH, with a minimum of 1.
+func pixelScale(rectofi image.Rectangle) int {
+	const backW, backH = 900, 220
+	if rectofi.Max.X == 0 || rectofi.Max.Y == 0 {
+		return 1
+	}
+	s := 1
+	for (s+1)*rectofi.Max.X <= backW && (s+1)*rectofi.Max.Y <= backH {
+		s++
+	}
+	return s
+}
+
+func scalePt(p image.Point, s int) image.Point  { return image.Pt(p.X*s, p.Y*s) }
+func scaleRect(r image.Rectangle, s int) image.Rectangle {
+	return image.Rectangle{Min: scalePt(r.Min, s), Max: scalePt(r.Max, s)}
+}
+
 // NewDisplayWithDPI returns a mock draw.Display that renders to a real
-// *image.RGBA in addition to recording draw operations as strings. dpi
-// controls ScaleSize; 100 is "1:1 logical-to-physical". rectofi controls SVG
-// output as in NewDisplay. Call ScreenImageAsPNG on the returned
-// GettableDrawOps to obtain a PNG of the current screen state.
-func NewDisplayWithDPI(rectofi image.Rectangle, dpi int) draw.Display {
-	const w, h = 800, 600
-	px := image.NewRGBA(image.Rect(0, 0, w, h))
+// *image.RGBA in addition to recording draw operations as strings.
+// The backing image is 900×220. The DPI is chosen automatically as the
+// largest integer multiple of 100 (i.e. 200, 300, …) such that rectofi
+// scaled by that factor fits within the backing; pixel drawing is scaled
+// by the same factor so the frame fills the PNG.
+// rectofi controls SVG output as in NewDisplay.
+func NewDisplayWithDPI(rectofi image.Rectangle) draw.Display {
+	const backW, backH = 900, 220
+	scale := pixelScale(rectofi)
+	dpi := scale * 100
+
+	px := image.NewRGBA(image.Rect(0, 0, backW, backH))
 	imagedraw.Draw(px, px.Bounds(), image.NewUniform(luridPink), image.Point{}, imagedraw.Src)
 
-	// Draw a 1-pixel red border just outside the frame rectangle. Any draw
-	// operation that escapes the frame boundary will overwrite the red ring,
-	// making the transgression immediately visible in PNG output.
+	// Draw a 1-pixel dark green border just outside the scaled frame rectangle.
+	// Any draw operation that escapes the frame boundary will overwrite the
+	// border, making the transgression immediately visible in PNG output.
 	darkGreen := image.NewUniform(color.RGBA{R: 0x00, G: 0x80, B: 0x00, A: 0xFF})
-	outer := rectofi.Inset(-1)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, outer.Min.Y, outer.Max.X, rectofi.Min.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, rectofi.Max.Y, outer.Max.X, outer.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, rectofi.Min.Y, rectofi.Min.X, rectofi.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(rectofi.Max.X, rectofi.Min.Y, outer.Max.X, rectofi.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+	sr := scaleRect(rectofi, scale)
+	outer := sr.Inset(-1)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, outer.Min.Y, outer.Max.X, sr.Min.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, sr.Max.Y, outer.Max.X, outer.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, sr.Min.Y, sr.Min.X, sr.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(sr.Max.X, sr.Min.Y, outer.Max.X, sr.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
 
 	md := &mockDisplay{
 		rectofi:   rectofi,
@@ -113,7 +138,7 @@ func NewDisplayWithDPI(rectofi image.Rectangle, dpi int) draw.Display {
 	}
 	md.screenimage = &mockImage{
 		d: md,
-		r: image.Rect(0, 0, w, h),
+		r: image.Rect(0, 0, backW, backH),
 		n: "screen-800x600",
 		c: draw.Notacolor,
 		m: px,
@@ -413,14 +438,20 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 	if !srcOK || msrc.m == nil {
 		return
 	}
+	s := i.d.dpi / 100
+	if s < 1 {
+		s = 1
+	}
+	sr := scaleRect(r, s)
+	sp1 := scalePt(p1, s)
 	if mask == nil {
-		imagedraw.Draw(dstRGBA, r, msrc.m, p1, imagedraw.Src)
+		imagedraw.Draw(dstRGBA, sr, msrc.m, sp1, imagedraw.Src)
 	} else {
 		mmask, maskOK := mask.(*mockImage)
 		if maskOK && mmask.m != nil {
-			imagedraw.DrawMask(dstRGBA, r, msrc.m, p1, mmask.m, p1, imagedraw.Over)
+			imagedraw.DrawMask(dstRGBA, sr, msrc.m, sp1, mmask.m, sp1, imagedraw.Over)
 		} else {
-			imagedraw.Draw(dstRGBA, r, msrc.m, p1, imagedraw.Src)
+			imagedraw.Draw(dstRGBA, sr, msrc.m, sp1, imagedraw.Src)
 		}
 	}
 }
@@ -474,9 +505,14 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 	// matches what the fixed-width mockFont reports, so positions are correct.
 	if dstRGBA, ok := i.m.(*image.RGBA); ok {
 		if msrc, ok := src.(*mockImage); ok && msrc.m != nil {
+			s := i.d.dpi / 100
+			if s < 1 {
+				s = 1
+			}
+			spt := scalePt(pt, s)
 			box := image.Rectangle{
-				Min: pt,
-				Max: pt.Add(image.Pt(f.BytesWidth(b), f.Height())),
+				Min: spt,
+				Max: spt.Add(image.Pt(s*f.BytesWidth(b), s*f.Height())),
 			}
 			imagedraw.Draw(dstRGBA, box, msrc.m, image.Point{}, imagedraw.Src)
 		}

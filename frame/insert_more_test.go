@@ -328,6 +328,10 @@ func TestInsertAligned(t *testing.T) {
 
 			// TODO(rjk): validate here
 
+			frimpl := fr.(*frameimpl)
+			t.Logf("rect=%v nlines=%d nchars=%d nbox=%d lastlinefull=%v",
+				frimpl.rect, frimpl.nlines, frimpl.nchars, len(frimpl.box), frimpl.lastlinefull)
+
 			// Peek inside.
 			got := gdo(t, fr).DrawOps()
 			if diff := cmp.Diff(tc.want, got); diff != "" {

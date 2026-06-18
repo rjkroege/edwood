@@ -190,7 +190,7 @@ type invariants struct {
 // setupFrame makes a Frame object for testing with a pixel-rendering Display.
 func setupFrame(t *testing.T, iv *invariants) Frame {
 	t.Helper()
-	display := edwoodtest.NewDisplayWithDPI(iv.textarea, 100)
+	display := edwoodtest.NewDisplayWithDPI(iv.textarea)
 
 	var textcolors [NumColours]draw.Image
 
@@ -506,13 +506,14 @@ func TestInsert(t *testing.T) {
 		{
 			name: "setupFrame",
 			fn:   nop,
-			want: []string{"fill (0,0)-(3,10) [-,-1],[-,1]",
-				"fill (0,0)-(3,10) [-,-1],[-,1]",
-				"fill (1,0)-(2,10) [-,-1],[-,1]",
-				"fill (0,0)-(3,3) [-,-1],[-,-]",
-				"fill (0,7)-(3,10) [-,-],[-,-]",
+			want: []string{
+				"fill (0,0)-(6,10) [-,-1],[-,1]",
+				"fill (0,0)-(6,10) [-,-1],[-,1]",
+				"fill (2,0)-(4,10) [-,-1],[-,1]",
+				"fill (0,0)-(6,6) [-,-1],[-,-]",
+				"fill (0,4)-(6,10) [-,-],[-,-]",
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// Inserts ab at the start of the line with no wrapping or ripple.
@@ -841,6 +842,10 @@ func TestInsert(t *testing.T) {
 			tc.fn(t, fr, iv, tc.name)
 
 			// TODO(rjk): validate here
+
+			frimpl := fr.(*frameimpl)
+			t.Logf("rect=%v nlines=%d nchars=%d nbox=%d lastlinefull=%v",
+				frimpl.rect, frimpl.nlines, frimpl.nchars, len(frimpl.box), frimpl.lastlinefull)
 
 			// Peek inside.
 			got := gdo(t, fr).DrawOps()
