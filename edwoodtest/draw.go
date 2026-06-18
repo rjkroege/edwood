@@ -96,6 +96,16 @@ func NewDisplayWithDPI(rectofi image.Rectangle, dpi int) draw.Display {
 	px := image.NewRGBA(image.Rect(0, 0, w, h))
 	imagedraw.Draw(px, px.Bounds(), image.NewUniform(luridPink), image.Point{}, imagedraw.Src)
 
+	// Draw a 1-pixel red border just outside the frame rectangle. Any draw
+	// operation that escapes the frame boundary will overwrite the red ring,
+	// making the transgression immediately visible in PNG output.
+	darkGreen := image.NewUniform(color.RGBA{R: 0x00, G: 0x80, B: 0x00, A: 0xFF})
+	outer := rectofi.Inset(-1)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, outer.Min.Y, outer.Max.X, rectofi.Min.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, rectofi.Max.Y, outer.Max.X, outer.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(outer.Min.X, rectofi.Min.Y, rectofi.Min.X, rectofi.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+	imagedraw.Draw(px, image.Rect(rectofi.Max.X, rectofi.Min.Y, outer.Max.X, rectofi.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
+
 	md := &mockDisplay{
 		rectofi:   rectofi,
 		dpi:       dpi,
