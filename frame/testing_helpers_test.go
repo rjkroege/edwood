@@ -96,8 +96,8 @@ func pixelPNGPath(t *testing.T, name, suffix string) string {
 	return filepath.Join(dir, name+"_"+suffix+".png")
 }
 
-// snapBeforePNG writes the pixel state that was captured by the most recent
-// gdo.Clear() call (the "before" image) as a PNG file.
+// snapBeforePNG writes the current pixel state of the screen as the "before"
+// PNG. Call it before gdo.Clear() and the operation under test.
 func snapBeforePNG(t *testing.T, fr Frame, name string) {
 	t.Helper()
 	path := pixelPNGPath(t, name, "before")
@@ -106,7 +106,7 @@ func snapBeforePNG(t *testing.T, fr Frame, name string) {
 		t.Fatalf("snapBeforePNG create %s: %v", path, err)
 	}
 	defer f.Close()
-	if err := gdo(t, fr).BeforeImageAsPNG(f); err != nil {
+	if err := gdo(t, fr).ScreenImageAsPNG(f); err != nil {
 		t.Fatalf("snapBeforePNG write %s: %v", path, err)
 	}
 }

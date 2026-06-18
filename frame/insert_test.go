@@ -215,8 +215,8 @@ func setupFrame(t *testing.T, iv *invariants) Frame {
 func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ab"), 0)
 
