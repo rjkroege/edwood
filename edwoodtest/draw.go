@@ -39,6 +39,11 @@ type GettableDrawOps interface {
 	// as a PNG. Only meaningful when the display was created with
 	// NewDisplayWithDPI; returns an error otherwise.
 	ScreenImageAsPNG(w io.Writer) error
+
+	// BeforeImageAsPNG writes the pixel state that was captured by the most
+	// recent Clear() call as a PNG. Only meaningful on a rendering display;
+	// returns an error if Clear() has not yet been called on one.
+	BeforeImageAsPNG(w io.Writer) error
 }
 
 // mockDisplay implements draw.Display.
@@ -67,6 +72,10 @@ type mockDisplay struct {
 	// pixscreen is the backing pixel buffer for the screen image.
 	// Non-nil only when dpi > 0.
 	pixscreen *image.RGBA
+
+	// beforePixels is a snapshot of pixscreen taken by the most recent
+	// Clear() call. Used to produce "before" PNG images in tests.
+	beforePixels *image.RGBA
 }
 
 // NewDisplay returns a mock draw.Display where visulizations of the output are w.r.t. rectangle rectofi.
@@ -234,8 +243,17 @@ func (d *mockDisplay) WriteSnarf(data []byte) error {
 
 func (d *mockDisplay) MoveTo(pt image.Point) error    { return nil }
 func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
-func (d *mockDisplay) DrawOps() []string              { return d.drawops }
-func (d *mockDisplay) Clear()                         { d.drawops = nil }
+func (d *mockDisplay) DrawOps() []string { return d.drawops }
+func (d *mockDisplay) Clear() {
+	d.drawops = nil
+	if d.pixscreen != nil {
+		// Snapshot the current pixel state as the "before" image so that
+		// BeforeImageAsPNG can return it after the test operation runs.
+		b := d.pixscreen.Bounds()
+		d.beforePixels = image.NewRGBA(b)
+		copy(d.beforePixels.Pix, d.pixscreen.Pix)
+	}
+}
 
 func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
 	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
@@ -246,6 +264,13 @@ func (d *mockDisplay) ScreenImageAsPNG(w io.Writer) error {
 		return errors.New("ScreenImageAsPNG: display not created with NewDisplayWithDPI")
 	}
 	return png.Encode(w, d.pixscreen)
+}
+
+func (d *mockDisplay) BeforeImageAsPNG(w io.Writer) error {
+	if d.beforePixels == nil {
+		return errors.New("BeforeImageAsPNG: Clear has not been called on a rendering display")
+	}
+	return png.Encode(w, d.beforePixels)
 }
 
 var _ = draw.Image((*mockImage)(nil))

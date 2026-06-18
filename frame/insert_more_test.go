@@ -22,7 +22,7 @@ func TestInsertAligned(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fn          func(t *testing.T, fr Frame, iv *invariants)
+		fn          func(t *testing.T, fr Frame, iv *invariants, name string)
 		want        []string
 		textarea    image.Rectangle
 		knowntofail bool
@@ -314,8 +314,9 @@ func TestInsertAligned(t *testing.T) {
 			fr := setupFrame(t, iv)
 
 			if tc.knowntofail {
-				tc.fn(t, fr, iv)
+				tc.fn(t, fr, iv, tc.name)
 				generateVisualizedOutput(t, fr)
+				snapAfterPNG(t, fr, tc.name)
 				t.Log("known failing: bug not yet fixed")
 				t.Fail()
 				return
@@ -323,7 +324,7 @@ func TestInsertAligned(t *testing.T) {
 
 			// TODO(rjk): validate here
 
-			tc.fn(t, fr, iv)
+			tc.fn(t, fr, iv, tc.name)
 
 			// TODO(rjk): validate here
 
@@ -334,6 +335,7 @@ func TestInsertAligned(t *testing.T) {
 			}
 
 			visualizedoutputtest(t, fr)
+			snapAfterPNG(t, fr, tc.name)
 		})
 	}
 }

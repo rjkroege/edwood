@@ -187,11 +187,10 @@ type invariants struct {
 	textarea  image.Rectangle
 }
 
-// setupFrame makes a Frame object for testing with a recording Display
-// implementation.
+// setupFrame makes a Frame object for testing with a pixel-rendering Display.
 func setupFrame(t *testing.T, iv *invariants) Frame {
 	t.Helper()
-	display := edwoodtest.NewDisplay(iv.textarea)
+	display := edwoodtest.NewDisplayWithDPI(iv.textarea, 100)
 
 	var textcolors [NumColours]draw.Image
 
@@ -213,10 +212,11 @@ func setupFrame(t *testing.T, iv *invariants) Frame {
 	return fr
 }
 
-func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants) {
+func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
+	snapBeforePNG(t, fr, name)
 
 	s := fr.Insert([]rune("ab"), 0)
 
@@ -231,7 +231,7 @@ func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func multiInsertShortString(t *testing.T, fr Frame, iv *invariants) {
+func multiInsertShortString(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -249,7 +249,7 @@ func multiInsertShortString(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertLongLine(t *testing.T, fr Frame, iv *invariants) {
+func insertLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
@@ -263,7 +263,7 @@ func insertLongLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants) {
+func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
@@ -278,7 +278,7 @@ func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertTabAndChar(t *testing.T, fr Frame, iv *invariants) {
+func insertTabAndChar(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab"), 0)
@@ -291,7 +291,7 @@ func insertTabAndChar(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertPastEnd(t *testing.T, fr Frame, iv *invariants) {
+func insertPastEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -303,7 +303,7 @@ func insertPastEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func splitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+func splitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -319,7 +319,7 @@ func splitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 }
 
 // preSplitWrappedLine is a handy test function for generating output.
-func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -338,7 +338,7 @@ func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertForcesWrap(t *testing.T, fr Frame, iv *invariants) {
+func insertForcesWrap(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -352,7 +352,7 @@ func insertForcesWrap(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func appendAtEnd(t *testing.T, fr Frame, iv *invariants) {
+func appendAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -365,7 +365,7 @@ func appendAtEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants) {
+func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -378,7 +378,7 @@ func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants) {
+func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -391,7 +391,7 @@ func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants) {
+func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -404,7 +404,7 @@ func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants) {
+func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -417,7 +417,7 @@ func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
+func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -435,7 +435,7 @@ func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
 // In the aligned frame the inserted character has 0 px of space remaining and
 // must wrap; in the non-aligned frame it has 1 px remaining, which also forces
 // a wrap. Either way the fill left on line 1 differs: 1 px vs 0 px.
-func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants) {
+func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -452,7 +452,7 @@ func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants) {
 // visual line exactly reach the frame's right edge (from 2 chars to 3 chars =
 // 39 px in the aligned frame, 39 px + 1 px gap in the non-aligned frame).
 // No wrap should be triggered by this insertion.
-func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants) {
+func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	t.Helper()
 
 	gdo(t, fr).Clear()
@@ -465,7 +465,7 @@ func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func nop(t *testing.T, _ Frame, _ *invariants) {
+func nop(t *testing.T, _ Frame, _ *invariants, _ string) {
 	// t.Log("hi from nop")
 }
 
@@ -480,7 +480,7 @@ func TestInsert(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fn          func(t *testing.T, fr Frame, iv *invariants)
+		fn          func(t *testing.T, fr Frame, iv *invariants, name string)
 		want        []string
 		textarea    image.Rectangle
 		knowntofail bool
@@ -812,8 +812,9 @@ func TestInsert(t *testing.T) {
 			fr := setupFrame(t, iv)
 
 			if tc.knowntofail {
-				tc.fn(t, fr, iv)
+				tc.fn(t, fr, iv, tc.name)
 				generateVisualizedOutput(t, fr)
+				snapAfterPNG(t, fr, tc.name)
 				t.Log("known failing: bug not yet fixed")
 				t.Fail()
 				return
@@ -821,7 +822,7 @@ func TestInsert(t *testing.T) {
 
 			// TODO(rjk): validate here
 
-			tc.fn(t, fr, iv)
+			tc.fn(t, fr, iv, tc.name)
 
 			// TODO(rjk): validate here
 
@@ -833,6 +834,7 @@ func TestInsert(t *testing.T) {
 
 			// SVG based output and comparison.
 			visualizedoutputtest(t, fr)
+			snapAfterPNG(t, fr, tc.name)
 		})
 	}
 }

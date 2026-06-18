@@ -84,6 +84,48 @@ func generateVisualizedOutput(t *testing.T, fr Frame) {
 	sf.Close()
 }
 
+// pixelPNGPath returns the path for a before/after PNG file.
+// Within a subtest "TestInsert/simpleInsertShortString", name="simpleInsertShortString"
+// and suffix="before" yields "testdata/TestInsert/simpleInsertShortString_before.png".
+func pixelPNGPath(t *testing.T, name, suffix string) string {
+	t.Helper()
+	dir := filepath.Join("testdata", filepath.Dir(t.Name()))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("pixelPNGPath mkdir %s: %v", dir, err)
+	}
+	return filepath.Join(dir, name+"_"+suffix+".png")
+}
+
+// snapBeforePNG writes the pixel state that was captured by the most recent
+// gdo.Clear() call (the "before" image) as a PNG file.
+func snapBeforePNG(t *testing.T, fr Frame, name string) {
+	t.Helper()
+	path := pixelPNGPath(t, name, "before")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("snapBeforePNG create %s: %v", path, err)
+	}
+	defer f.Close()
+	if err := gdo(t, fr).BeforeImageAsPNG(f); err != nil {
+		t.Fatalf("snapBeforePNG write %s: %v", path, err)
+	}
+}
+
+// snapAfterPNG writes the current pixel state of the screen (the "after" image)
+// as a PNG file.
+func snapAfterPNG(t *testing.T, fr Frame, name string) {
+	t.Helper()
+	path := pixelPNGPath(t, name, "after")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("snapAfterPNG create %s: %v", path, err)
+	}
+	defer f.Close()
+	if err := gdo(t, fr).ScreenImageAsPNG(f); err != nil {
+		t.Fatalf("snapAfterPNG write %s: %v", path, err)
+	}
+}
+
 // visualizedoutputtest generates SVG-based graphical output
 func visualizedoutputtest(t *testing.T, fr Frame) {
 	t.Helper()
