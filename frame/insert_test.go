@@ -231,9 +231,10 @@ func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants, name string
 	}
 }
 
-func multiInsertShortString(t *testing.T, fr Frame, iv *invariants, _ string) {
+func multiInsertShortString(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ab\ncd"), 0)
@@ -249,10 +250,11 @@ func multiInsertShortString(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertLongLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	bigstring := makereplicatedstring(iv.textarea.Dx() / 10)
@@ -263,12 +265,13 @@ func insertLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
 	bigstring := makereplicatedstring(iv.textarea.Dx() / 10)
 	s := fr.Insert([]rune(bigstring), 4)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	fr.Insert([]rune("X"), 4)
@@ -278,10 +281,11 @@ func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertTabAndChar(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertTabAndChar(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	s := fr.Insert([]rune("\t"), 1)
 	fr.Insert([]rune("X"), 1)
@@ -291,9 +295,10 @@ func insertTabAndChar(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertPastEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertPastEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	s := fr.Insert([]rune(makereplicatedstring(6)), 0)
 
@@ -303,9 +308,10 @@ func insertPastEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func splitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func splitWrappedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	rss := []rune(makereplicatedstring(6))
 
@@ -319,9 +325,10 @@ func splitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 }
 
 // preSplitWrappedLine is a handy test function for generating output.
-func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	tmparr := []rune(makereplicatedstring(6))
 	rss := make([]rune, 0, len(tmparr)+1)
@@ -338,9 +345,10 @@ func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertForcesWrap(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertForcesWrap(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
 
@@ -352,9 +360,10 @@ func insertForcesWrap(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func appendAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
+func appendAtEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
 
@@ -365,9 +374,10 @@ func appendAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
+func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0\n1\n2\n3\n4\n"), 0)
 
@@ -378,9 +388,10 @@ func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0\n1\n2\n3b\n4\n"), 0)
 
@@ -391,9 +402,10 @@ func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants, _ str
 	}
 }
 
-func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n\n"), 0)
 
@@ -404,9 +416,10 @@ func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants, _ strin
 	}
 }
 
-func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n"), 0)
 
@@ -417,9 +430,10 @@ func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants, _ string) {
 	}
 }
 
-func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab1cd2ef3gh4ij5"), 0)
 
@@ -435,9 +449,10 @@ func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants, _ strin
 // In the aligned frame the inserted character has 0 px of space remaining and
 // must wrap; in the non-aligned frame it has 1 px remaining, which also forces
 // a wrap. Either way the fill left on line 1 differs: 1 px vs 0 px.
-func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
 
@@ -452,9 +467,10 @@ func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants, _ string)
 // visual line exactly reach the frame's right edge (from 2 chars to 3 chars =
 // 39 px in the aligned frame, 39 px + 1 px gap in the non-aligned frame).
 // No wrap should be triggered by this insertion.
-func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants, _ string) {
+func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	fr.Insert([]rune("0a\n1cd\n2ef\n3gh\n4ij"), 0)
 
@@ -465,8 +481,8 @@ func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants, _ str
 	}
 }
 
-func nop(t *testing.T, _ Frame, _ *invariants, _ string) {
-	// t.Log("hi from nop")
+func nop(t *testing.T, fr Frame, _ *invariants, name string) {
+	snapBeforePNG(t, fr, name)
 }
 
 // TODO(rjk): Conceivably the bxscan test can go away once I have written
