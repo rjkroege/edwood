@@ -202,10 +202,11 @@ func (d *mockDisplay) OpenFont(name string) (draw.Font, error) {
 		// ascent is in scaled pixel space — used by Bytes to position the baseline.
 		ascent := m.Ascent.Ceil()
 		return &mockFont{
-			width:  fwidth,  // frame coordinate space (unscaled)
-			height: fheight, // frame coordinate space (unscaled)
-			ascent: ascent,  // pixel space (scaled) for font.Drawer baseline
-			face:   face,
+			width:        fwidth,                       // frame coordinate space (unscaled)
+			height:       fheight,                      // frame coordinate space (unscaled)
+			ascent:       ascent,                       // pixel space (scaled) for baseline
+			face:         face,
+			fallbackFace: scaledCJKFallbackFace(scale), // nil if no system font found
 		}, nil
 	}
 	return NewFont(fwidth, fheight), nil
@@ -528,15 +529,23 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 			}
 			mf, hasFace := f.(*mockFont)
 			if hasFace && mf.face != nil {
-				// Option B: render glyphs with the real GoMono face.
+				// Render glyphs per-rune, using a CJK fallback face when the primary
+				// face (GoMono) lacks a glyph.  Advance is always fwidth*s so the
+				// monospace grid is maintained regardless of the face's own advance.
 				spt := scalePt(pt, s)
-				drawer := &font.Drawer{
-					Dst:  dstRGBA,
-					Src:  msrc.m,
-					Face: mf.face,
-					Dot:  fixed.P(spt.X, spt.Y+mf.ascent),
+				baselineY := fixed.I(spt.Y + mf.ascent)
+				dotX := fixed.I(spt.X)
+				for _, r := range string(b) {
+					dot := fixed.Point26_6{X: dotX, Y: baselineY}
+					dr, mask, maskp, _, glyphOk := mf.face.Glyph(dot, r)
+					if !glyphOk && mf.fallbackFace != nil {
+						dr, mask, maskp, _, _ = mf.fallbackFace.Glyph(dot, r)
+					}
+					if !dr.Empty() {
+						imagedraw.DrawMask(dstRGBA, dr, msrc.m, image.Point{}, mask, maskp, imagedraw.Over)
+					}
+					dotX += fixed.I(fwidth * s)
 				}
-				drawer.DrawBytes(b)
 			} else {
 				// Option A fallback: fill the bounding box with the source colour.
 				spt := scalePt(pt, s)
@@ -580,7 +589,66 @@ var (
 	goMonoTT        *opentype.Font
 	scaledFaceMu    sync.Mutex
 	scaledFaceCache [8]font.Face
+
+	// cjkFallbackTT is the parsed CJK fallback font, loaded once on first use.
+	cjkFallbackOnce sync.Once
+	cjkFallbackTT   *opentype.Font
+	// cjkFallbackCache caches per-scale faces derived from cjkFallbackTT.
+	// Index is scale-1. Guarded by scaledFaceMu (shared with GoMono cache).
+	cjkFallbackCache [8]font.Face
 )
+
+// cjkFallbackPaths lists system font files with broad Unicode/CJK coverage,
+// in priority order.  The first readable file wins.
+var cjkFallbackPaths = []string{
+	"/System/Library/Fonts/Supplemental/Arial Unicode.ttf", // macOS
+	"/usr/share/fonts/truetype/unifont/unifont.ttf",        // Debian/Ubuntu
+	"/usr/share/fonts/unifont/unifont.ttf",                 // Arch Linux
+}
+
+// scaledCJKFallbackFace returns a CJK fallback font.Face at the given integer
+// scale factor.  Size=8*scale at DPI=72 gives CJK advance=8*scale px = fwidth*scale,
+// matching GoMono's monospace grid at every scale.  Returns nil if no system
+// font is available.
+func scaledCJKFallbackFace(scale int) font.Face {
+	cjkFallbackOnce.Do(func() {
+		for _, p := range cjkFallbackPaths {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				continue
+			}
+			tt, err := opentype.Parse(data)
+			if err != nil {
+				continue
+			}
+			cjkFallbackTT = tt
+			break
+		}
+	})
+	if cjkFallbackTT == nil {
+		return nil
+	}
+	scaledFaceMu.Lock()
+	defer scaledFaceMu.Unlock()
+	idx := scale - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(cjkFallbackCache) {
+		idx = len(cjkFallbackCache) - 1
+	}
+	if cjkFallbackCache[idx] == nil {
+		f, err := opentype.NewFace(cjkFallbackTT, &opentype.FaceOptions{
+			Size: 8.0 * float64(scale),
+			DPI:  72,
+		})
+		if err != nil {
+			return nil
+		}
+		cjkFallbackCache[idx] = f
+	}
+	return cjkFallbackCache[idx]
+}
 
 // scaledGoMonoFace returns a GoMono font.Face scaled by the given integer factor.
 // Size=13*scale at DPI=72 gives advance=8*scale px, ascent=12*scale px, height=15*scale px.
@@ -620,6 +688,7 @@ var _ = draw.Font((*mockFont)(nil))
 type mockFont struct {
 	width, height, ascent int
 	face                  font.Face
+	fallbackFace          font.Face // optional fallback for glyphs missing from face
 }
 
 // NewFont returns a draw.Font that mocks a fixed-width font with no real glyph rendering.
