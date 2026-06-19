@@ -15,14 +15,19 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/math/fixed"
+
 	"github.com/rjkroege/edwood/draw"
 )
 
 var _ = draw.Display((*mockDisplay)(nil))
 
 const (
-	fwidth  = 13
-	fheight = 10
+	fwidth  = 8
+	fheight = 15
 )
 
 // GettableDrawOps display implementations can provide a list of the
@@ -186,10 +191,25 @@ func (d *mockDisplay) Transparent() draw.Image {
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return &draw.Keyboardctl{} }
 func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{} }
 
-// TODO(rjk): Support a richer variety of fonts with better metrics.
-// NB: to make the recorded ops easier to read, I provide them in
-// character multiples based on the fixed font metrics here.
-func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(fwidth, fheight), nil }
+func (d *mockDisplay) OpenFont(name string) (draw.Font, error) {
+	if d.pixscreen != nil {
+		scale := d.dpi / 100
+		if scale < 1 {
+			scale = 1
+		}
+		face := scaledGoMonoFace(scale)
+		m := face.Metrics()
+		// ascent is in scaled pixel space — used by Bytes to position the baseline.
+		ascent := m.Ascent.Ceil()
+		return &mockFont{
+			width:  fwidth,  // frame coordinate space (unscaled)
+			height: fheight, // frame coordinate space (unscaled)
+			ascent: ascent,  // pixel space (scaled) for font.Drawer baseline
+			face:   face,
+		}, nil
+	}
+	return NewFont(fwidth, fheight), nil
+}
 
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
 	mi := &mockImage{
@@ -499,22 +519,33 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 	i.d.svgdrawops = append(i.d.svgdrawops, bytessvg(len(i.d.svgdrawops), pt, b))
 	i.d.annotations = append(i.d.annotations, shortop)
 
-	// Pixel-rendering path: fill the bounding box of the glyph run with the
-	// source colour. This is Option A from the proposal — no real font face
-	// needed, platform-independent, deterministic. The rectangle geometry
-	// matches what the fixed-width mockFont reports, so positions are correct.
+	// Pixel-rendering path.
 	if dstRGBA, ok := i.m.(*image.RGBA); ok {
 		if msrc, ok := src.(*mockImage); ok && msrc.m != nil {
 			s := i.d.dpi / 100
 			if s < 1 {
 				s = 1
 			}
-			spt := scalePt(pt, s)
-			box := image.Rectangle{
-				Min: spt,
-				Max: spt.Add(image.Pt(s*f.BytesWidth(b), s*f.Height())),
+			mf, hasFace := f.(*mockFont)
+			if hasFace && mf.face != nil {
+				// Option B: render glyphs with the real GoMono face.
+				spt := scalePt(pt, s)
+				drawer := &font.Drawer{
+					Dst:  dstRGBA,
+					Src:  msrc.m,
+					Face: mf.face,
+					Dot:  fixed.P(spt.X, spt.Y+mf.ascent),
+				}
+				drawer.DrawBytes(b)
+			} else {
+				// Option A fallback: fill the bounding box with the source colour.
+				spt := scalePt(pt, s)
+				box := image.Rectangle{
+					Min: spt,
+					Max: spt.Add(image.Pt(s*f.BytesWidth(b), s*f.Height())),
+				}
+				imagedraw.Draw(dstRGBA, box, msrc.m, image.Point{}, imagedraw.Src)
 			}
-			imagedraw.Draw(dstRGBA, box, msrc.m, image.Point{}, imagedraw.Src)
 		}
 	}
 
@@ -544,15 +575,54 @@ func (i *mockImage) HtmlString() string {
 	return fmt.Sprintf("#%x", i.c>>8)
 }
 
+var (
+	goMonoOnce      sync.Once
+	goMonoTT        *opentype.Font
+	scaledFaceMu    sync.Mutex
+	scaledFaceCache [8]font.Face
+)
+
+// scaledGoMonoFace returns a GoMono font.Face scaled by the given integer factor.
+// Size=13*scale at DPI=72 gives advance=8*scale px, ascent=12*scale px, height=15*scale px.
+func scaledGoMonoFace(scale int) font.Face {
+	goMonoOnce.Do(func() {
+		var err error
+		goMonoTT, err = opentype.Parse(gomono.TTF)
+		if err != nil {
+			panic("edwoodtest: failed to parse GoMono: " + err.Error())
+		}
+	})
+	scaledFaceMu.Lock()
+	defer scaledFaceMu.Unlock()
+	idx := scale - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(scaledFaceCache) {
+		idx = len(scaledFaceCache) - 1
+	}
+	if scaledFaceCache[idx] == nil {
+		var err error
+		scaledFaceCache[idx], err = opentype.NewFace(goMonoTT, &opentype.FaceOptions{
+			Size: 13.0 * float64(scale),
+			DPI:  72,
+		})
+		if err != nil {
+			panic("edwoodtest: failed to create GoMono face: " + err.Error())
+		}
+	}
+	return scaledFaceCache[idx]
+}
+
 var _ = draw.Font((*mockFont)(nil))
 
 // mockFont implements draw.Font and mocks as a fixed width font.
-// TODO(rjk): Do we need to handle variable widths?
 type mockFont struct {
-	width, height int
+	width, height, ascent int
+	face                  font.Face
 }
 
-// NewFont returns a draw.Font that mocks a fixed-width font.
+// NewFont returns a draw.Font that mocks a fixed-width font with no real glyph rendering.
 func NewFont(width, height int) draw.Font {
 	return &mockFont{
 		width:  width,
