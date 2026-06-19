@@ -7,10 +7,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants) {
+func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(2, 3)
@@ -20,10 +21,11 @@ func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants) {
+func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2)
@@ -33,10 +35,11 @@ func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab\n1cd\n2ef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(len("0ab"), len("0ab\n"))
@@ -46,11 +49,11 @@ func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants) {
+func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab1cd2ef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // a
@@ -60,13 +63,13 @@ func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func deleteTab(t *testing.T, fr Frame, iv *invariants) {
+func deleteTab(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	t.Log(fr.GetMaxtab())
 
-	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0	ab1cd2ef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // the tab
@@ -76,13 +79,13 @@ func deleteTab(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants) {
+func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	t.Log(fr.GetMaxtab())
 
-	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0a	b1cd2ef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // a
@@ -92,11 +95,11 @@ func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants) {
+func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0a\nb1\ncd2\nef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(0, 6) // 0a\nb1\n
@@ -109,7 +112,7 @@ func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants) {
 // deleteEliminatesSoftWrap deletes the character that was causing a soft wrap,
 // so the first logical line now fits on one visual line. "1cd" ripples up from
 // visual line 3 to visual line 2 and a blank line appears at the bottom.
-func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants) {
+func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	// In a narrow frame "0abX\n1cd" lays out as:
@@ -117,6 +120,7 @@ func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants) {
 	//   line 2: "X\n"
 	//   line 3: "1cd"
 	fr.Insert([]rune("0abX\n1cd"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	// Delete X (position 3). Soft wrap disappears: "0ab\n" fits on line 1,
@@ -138,7 +142,7 @@ func TestDelete(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fn          func(t *testing.T, fr Frame, iv *invariants)
+		fn          func(t *testing.T, fr Frame, iv *invariants, name string)
 		want        []string
 		textarea    image.Rectangle
 		knowntofail bool
@@ -267,18 +271,15 @@ func TestDelete(t *testing.T) {
 			fr := setupFrame(t, iv)
 
 			if tc.knowntofail {
-				tc.fn(t, fr, iv)
+				tc.fn(t, fr, iv, tc.name)
 				generateVisualizedOutput(t, fr)
+				snapAfterPNG(t, fr, tc.name)
 				t.Log("known failing: bug not yet fixed")
 				t.Fail()
 				return
 			}
 
-			// TODO(rjk): validate here
-
-			tc.fn(t, fr, iv)
-
-			// TODO(rjk): validate here
+			tc.fn(t, fr, iv, tc.name)
 
 			// Peek inside.
 			got := gdo(t, fr).DrawOps()
@@ -287,6 +288,7 @@ func TestDelete(t *testing.T) {
 			}
 
 			visualizedoutputtest(t, fr)
+			snapAfterPNG(t, fr, tc.name)
 		})
 	}
 }
