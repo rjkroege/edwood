@@ -1,6 +1,8 @@
 package frame
 
 import (
+	"bytes"
+	"flag"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +10,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/edwoodtest"
 )
+
+var updatePNGs = flag.Bool("updatepngs", false, "Overwrite PNG golden baselines with current output")
 
 // Code needed to help write tests.
 
@@ -84,9 +88,8 @@ func generateVisualizedOutput(t *testing.T, fr Frame) {
 	sf.Close()
 }
 
-// pixelPNGPath returns the path for a before/after PNG file.
-// Within a subtest "TestInsert/simpleInsertShortString", name="simpleInsertShortString"
-// and suffix="before" yields "testdata/TestInsert/simpleInsertShortString_before.png".
+// pixelPNGPath returns a path inside testdata/<TestName>/ for a PNG file
+// with the given suffix, e.g. "before_trial" or "after_golden".
 func pixelPNGPath(t *testing.T, name, suffix string) string {
 	t.Helper()
 	dir := filepath.Join("testdata", filepath.Dir(t.Name()))
@@ -96,34 +99,88 @@ func pixelPNGPath(t *testing.T, name, suffix string) string {
 	return filepath.Join(dir, name+"_"+suffix+".png")
 }
 
-// snapBeforePNG writes the current pixel state of the screen as the "before"
-// PNG. Call it before gdo.Clear() and the operation under test.
+// snapBeforePNG writes the current pixel state as a trial "before" PNG,
+// compares it to the committed golden, and fails the test on mismatch.
+// Call it before gdo.Clear() and the operation under test.
 func snapBeforePNG(t *testing.T, fr Frame, name string) {
 	t.Helper()
-	path := pixelPNGPath(t, name, "before")
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatalf("snapBeforePNG create %s: %v", path, err)
-	}
-	defer f.Close()
-	if err := gdo(t, fr).ScreenImageAsPNG(f); err != nil {
-		t.Fatalf("snapBeforePNG write %s: %v", path, err)
-	}
+	writeAndComparePNG(t, fr,
+		pixelPNGPath(t, name, "before_trial"),
+		pixelPNGPath(t, name, "before_golden"),
+	)
 }
 
-// snapAfterPNG writes the current pixel state of the screen (the "after" image)
-// as a PNG file.
+// snapAfterPNG writes the current pixel state as a trial "after" PNG,
+// compares it to the committed golden, and fails the test on mismatch.
 func snapAfterPNG(t *testing.T, fr Frame, name string) {
 	t.Helper()
-	path := pixelPNGPath(t, name, "after")
-	f, err := os.Create(path)
+	writeAndComparePNG(t, fr,
+		pixelPNGPath(t, name, "after_trial"),
+		pixelPNGPath(t, name, "after_golden"),
+	)
+}
+
+// writeAndComparePNG writes the current screen image to trialPath, then
+// compares it byte-for-byte with goldenPath.  On mismatch the test fails
+// and the trial file is left on disk for inspection.  On match the trial
+// file is removed.  When -updatepngs is set the golden is overwritten with
+// the trial instead of being compared.
+func writeAndComparePNG(t *testing.T, fr Frame, trialPath, goldenPath string) {
+	t.Helper()
+
+	f, err := os.Create(trialPath)
 	if err != nil {
-		t.Fatalf("snapAfterPNG create %s: %v", path, err)
+		t.Fatalf("writeAndComparePNG create %s: %v", trialPath, err)
 	}
-	defer f.Close()
 	if err := gdo(t, fr).ScreenImageAsPNG(f); err != nil {
-		t.Fatalf("snapAfterPNG write %s: %v", path, err)
+		f.Close()
+		t.Fatalf("writeAndComparePNG write %s: %v", trialPath, err)
 	}
+	f.Close()
+
+	if *updatePNGs {
+		trial, err := os.ReadFile(trialPath)
+		if err != nil {
+			t.Fatalf("writeAndComparePNG read trial %s: %v", trialPath, err)
+		}
+		if err := os.WriteFile(goldenPath, trial, 0644); err != nil {
+			t.Fatalf("writeAndComparePNG write golden %s: %v", goldenPath, err)
+		}
+		os.Remove(trialPath)
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	if os.IsNotExist(err) {
+		t.Logf("no PNG golden at %s; run with -updatepngs to create", goldenPath)
+		return
+	}
+	if err != nil {
+		t.Fatalf("writeAndComparePNG read golden %s: %v", goldenPath, err)
+	}
+
+	trial, err := os.ReadFile(trialPath)
+	if err != nil {
+		t.Fatalf("writeAndComparePNG read trial %s: %v", trialPath, err)
+	}
+
+	if bytes.Equal(golden, trial) {
+		os.Remove(trialPath)
+		return
+	}
+
+	// Images differ.  Skip the failure when the CJK fallback font is
+	// unavailable: goldens committed from macOS use Arial Unicode for
+	// CJK chars; systems without it produce .notdef boxes and will always
+	// differ from those goldens.
+	if !edwoodtest.HasCJKFallback() {
+		t.Logf("skipping PNG comparison for %s: no system CJK font (golden requires Arial Unicode)", goldenPath)
+		os.Remove(trialPath)
+		return
+	}
+
+	t.Errorf("PNG mismatch: %s differs from golden %s; run with -updatepngs to regenerate",
+		trialPath, goldenPath)
 }
 
 // visualizedoutputtest generates SVG-based graphical output

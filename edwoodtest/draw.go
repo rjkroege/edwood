@@ -650,6 +650,15 @@ func scaledCJKFallbackFace(scale int) font.Face {
 	return cjkFallbackCache[idx]
 }
 
+// HasCJKFallback reports whether a system CJK font was found at init time.
+// Returns false on systems (e.g. Linux CI) that lack Arial Unicode; PNG
+// goldens generated on macOS will not match the .notdef-box output from
+// those systems, so callers should skip PNG comparison when this is false.
+func HasCJKFallback() bool {
+	scaledCJKFallbackFace(1) // trigger the sync.Once load
+	return cjkFallbackTT != nil
+}
+
 // scaledGoMonoFace returns a GoMono font.Face scaled by the given integer factor.
 // Size=13*scale at DPI=72 gives advance=8*scale px, ascent=12*scale px, height=15*scale px.
 func scaledGoMonoFace(scale int) font.Face {
