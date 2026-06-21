@@ -18,6 +18,7 @@ require (
 	github.com/as/cursor v0.6.7 // indirect
 	github.com/as/ms v0.1.0 // indirect
 	github.com/atotto/clipboard v0.1.1 // indirect
+	github.com/client9/misspell v0.3.4 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
 	golang.org/x/exp v0.0.0-20190212162250-21964bba6549 // indirect

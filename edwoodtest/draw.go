@@ -105,7 +105,7 @@ func pixelScale(rectofi image.Rectangle) int {
 	return s
 }
 
-func scalePt(p image.Point, s int) image.Point  { return image.Pt(p.X*s, p.Y*s) }
+func scalePt(p image.Point, s int) image.Point { return image.Pt(p.X*s, p.Y*s) }
 func scaleRect(r image.Rectangle, s int) image.Rectangle {
 	return image.Rectangle{Min: scalePt(r.Min, s), Max: scalePt(r.Max, s)}
 }
@@ -202,9 +202,9 @@ func (d *mockDisplay) OpenFont(name string) (draw.Font, error) {
 		// ascent is in scaled pixel space — used by Bytes to position the baseline.
 		ascent := m.Ascent.Ceil()
 		return &mockFont{
-			width:        fwidth,                       // frame coordinate space (unscaled)
-			height:       fheight,                      // frame coordinate space (unscaled)
-			ascent:       ascent,                       // pixel space (scaled) for baseline
+			width:        fwidth,  // frame coordinate space (unscaled)
+			height:       fheight, // frame coordinate space (unscaled)
+			ascent:       ascent,  // pixel space (scaled) for baseline
 			face:         face,
 			fallbackFace: scaledCJKFallbackFace(scale), // nil if no system font found
 		}, nil
@@ -290,8 +290,8 @@ func (d *mockDisplay) WriteSnarf(data []byte) error {
 
 func (d *mockDisplay) MoveTo(pt image.Point) error    { return nil }
 func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
-func (d *mockDisplay) DrawOps() []string { return d.drawops }
-func (d *mockDisplay) Clear()             { d.drawops = nil }
+func (d *mockDisplay) DrawOps() []string              { return d.drawops }
+func (d *mockDisplay) Clear()                         { d.drawops = nil }
 
 func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
 	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
