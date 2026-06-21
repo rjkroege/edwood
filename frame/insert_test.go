@@ -187,11 +187,10 @@ type invariants struct {
 	textarea  image.Rectangle
 }
 
-// setupFrame makes a Frame object for testing with a recording Display
-// implementation.
+// setupFrame makes a Frame object for testing with a pixel-rendering Display.
 func setupFrame(t *testing.T, iv *invariants) Frame {
 	t.Helper()
-	display := edwoodtest.NewDisplay(iv.textarea)
+	display := edwoodtest.NewDisplayWithDPI(iv.textarea)
 
 	var textcolors [NumColours]draw.Image
 
@@ -213,9 +212,10 @@ func setupFrame(t *testing.T, iv *invariants) Frame {
 	return fr
 }
 
-func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants) {
+func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ab"), 0)
@@ -226,14 +226,15 @@ func simpleInsertShortString(t *testing.T, fr Frame, iv *invariants) {
 	if got, want := fr.Ptofchar(0), image.Pt(0, 0).Add(iv.topcorner); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := fr.Ptofchar(1), image.Pt(13, 0).Add(iv.topcorner); got != want {
+	if got, want := fr.Ptofchar(1), image.Pt(8, 0).Add(iv.topcorner); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
-func multiInsertShortString(t *testing.T, fr Frame, iv *invariants) {
+func multiInsertShortString(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ab\ncd"), 0)
@@ -244,18 +245,19 @@ func multiInsertShortString(t *testing.T, fr Frame, iv *invariants) {
 	if got, want := fr.Ptofchar(0), image.Pt(0, 0).Add(iv.topcorner); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := fr.Ptofchar(1), image.Pt(13, 0).Add(iv.topcorner); got != want {
+	if got, want := fr.Ptofchar(1), image.Pt(8, 0).Add(iv.topcorner); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
-func insertLongLine(t *testing.T, fr Frame, iv *invariants) {
+func insertLongLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
-	bigstring := makereplicatedstring(iv.textarea.Dx() / 10)
+	bigstring := makereplicatedstring(iv.textarea.Dx() / 8)
 	s := fr.Insert([]rune(bigstring), 4)
 
 	if got, want := s, false; got != want {
@@ -263,12 +265,13 @@ func insertLongLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants) {
+func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab\ncd\nef"), 0)
-	bigstring := makereplicatedstring(iv.textarea.Dx() / 10)
+	bigstring := makereplicatedstring(iv.textarea.Dx() / 8)
 	s := fr.Insert([]rune(bigstring), 4)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	fr.Insert([]rune("X"), 4)
@@ -278,10 +281,11 @@ func insertIntoLongLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertTabAndChar(t *testing.T, fr Frame, iv *invariants) {
+func insertTabAndChar(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
 	fr.Insert([]rune("ab"), 0)
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	s := fr.Insert([]rune("\t"), 1)
 	fr.Insert([]rune("X"), 1)
@@ -291,9 +295,10 @@ func insertTabAndChar(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertPastEnd(t *testing.T, fr Frame, iv *invariants) {
+func insertPastEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
+	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 	s := fr.Insert([]rune(makereplicatedstring(6)), 0)
 
@@ -303,13 +308,14 @@ func insertPastEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func splitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+func splitWrappedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	rss := []rune(makereplicatedstring(6))
-
 	fr.Insert(rss, 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
+
 	s := fr.Insert([]rune{'\n'}, 3)
 
 	// I would have expected that this should be true?
@@ -318,31 +324,12 @@ func splitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-// preSplitWrappedLine is a handy test function for generating output.
-func preSplitWrappedLine(t *testing.T, fr Frame, iv *invariants) {
+func insertForcesWrap(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
-	tmparr := []rune(makereplicatedstring(6))
-	rss := make([]rune, 0, len(tmparr)+1)
-
-	rss = append(rss, tmparr[0:3]...)
-	rss = append(rss, '\n')
-	rss = append(rss, tmparr[3:]...)
-
-	s := fr.Insert(rss, 0)
-
-	// I would have expected that this should be true?
-	if got, want := s, false; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-func insertForcesWrap(t *testing.T, fr Frame, iv *invariants) {
-	t.Helper()
-
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune{'X'}, 2)
 
@@ -352,11 +339,12 @@ func insertForcesWrap(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func appendAtEnd(t *testing.T, fr Frame, iv *invariants) {
+func appendAtEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune{'X', 'X'}, len("0ab\n1cd\n2ef\n3gh\n4ij"))
 
@@ -365,11 +353,12 @@ func appendAtEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants) {
+func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0\n1\n2\n3\n4\n"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("XXX"), len("0\n1\n2\n3\n4"))
 
@@ -378,11 +367,12 @@ func appendHangingLongAtEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants) {
+func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0\n1\n2\n3b\n4\n"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ijXX"), len("0\n1\n2\n3"))
 
@@ -391,11 +381,12 @@ func insertWrappedThatForcesRipple(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants) {
+func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n\n"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("X"), 1)
 
@@ -404,11 +395,12 @@ func insertPushesBlankLineOffEnd(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants) {
+func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("\n"), len("0ab\n1cd\n2ef\n"))
 
@@ -417,11 +409,12 @@ func insertsRippledNewLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
+func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab1cd2ef3gh4ij5"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune("ABC"), 0)
 
@@ -435,11 +428,12 @@ func insertForcesRippleOfWrapped(t *testing.T, fr Frame, iv *invariants) {
 // In the aligned frame the inserted character has 0 px of space remaining and
 // must wrap; in the non-aligned frame it has 1 px remaining, which also forces
 // a wrap. Either way the fill left on line 1 differs: 1 px vs 0 px.
-func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants) {
+func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab\n1cd\n2ef\n3gh\n4ij"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune{'X'}, 3)
 
@@ -452,11 +446,12 @@ func insertAtExactWrapBoundary(t *testing.T, fr Frame, iv *invariants) {
 // visual line exactly reach the frame's right edge (from 2 chars to 3 chars =
 // 39 px in the aligned frame, 39 px + 1 px gap in the non-aligned frame).
 // No wrap should be triggered by this insertion.
-func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants) {
+func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants, name string) {
 	t.Helper()
 
-	gdo(t, fr).Clear()
 	fr.Insert([]rune("0a\n1cd\n2ef\n3gh\n4ij"), 0)
+	snapBeforePNG(t, fr, name)
+	gdo(t, fr).Clear()
 
 	s := fr.Insert([]rune{'X'}, 2)
 
@@ -465,8 +460,8 @@ func insertExactlyFillsAlignedLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
-func nop(t *testing.T, _ Frame, _ *invariants) {
-	// t.Log("hi from nop")
+func nop(t *testing.T, fr Frame, _ *invariants, name string) {
+	snapBeforePNG(t, fr, name)
 }
 
 // TODO(rjk): Conceivably the bxscan test can go away once I have written
@@ -480,7 +475,7 @@ func TestInsert(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fn          func(t *testing.T, fr Frame, iv *invariants)
+		fn          func(t *testing.T, fr Frame, iv *invariants, name string)
 		want        []string
 		textarea    image.Rectangle
 		knowntofail bool
@@ -490,20 +485,21 @@ func TestInsert(t *testing.T) {
 		{
 			name: "setupFrame",
 			fn:   nop,
-			want: []string{"fill (0,0)-(3,10) [-,-1],[-,1]",
-				"fill (0,0)-(3,10) [-,-1],[-,1]",
-				"fill (1,0)-(2,10) [-,-1],[-,1]",
-				"fill (0,0)-(3,3) [-,-1],[-,-]",
-				"fill (0,7)-(3,10) [-,-],[-,-]",
+			want: []string{
+				"fill (0,0)-(6,15) [-,-],[-,1]",
+				"fill (0,0)-(6,15) [-,-],[-,1]",
+				"fill (2,0)-(4,15) [-,-],[-,1]",
+				"fill (0,0)-(6,6) [-,-],[-,-]",
+				"fill (0,9)-(6,15) [-,-],[-,-]",
 			},
-			textarea: image.Rect(20, 10, 400, 500),
+			textarea: image.Rect(20, 10, 400, 100),
 		},
 		{
 			// Inserts ab at the start of the line with no wrapping or ripple.
 			name: "simpleInsertShortString",
 			fn:   simpleInsertShortString,
 			want: []string{
-				"fill (20,10)-(46,20) [0,0],[2,1]",
+				"fill (20,10)-(36,25) [0,0],[2,1]",
 				`screen-800x600 <- string "ab" atpoint: (20,10) [0,0] fill: black`,
 			},
 			textarea: image.Rect(20, 10, 400, 100),
@@ -513,10 +509,10 @@ func TestInsert(t *testing.T) {
 			name: "multiInsertShortString",
 			fn:   multiInsertShortString,
 			want: []string{
-				"fill (20,10)-(400,20) [0,0],[-,1]",
-				"fill (20,20)-(46,30) [0,1],[2,1]",
+				"fill (20,10)-(400,25) [0,0],[-,1]",
+				"fill (20,25)-(36,40) [0,1],[2,1]",
 				`screen-800x600 <- string "ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "cd" atpoint: (20,20) [0,1] fill: black`,
+				`screen-800x600 <- string "cd" atpoint: (20,25) [0,1] fill: black`,
 			},
 			textarea: image.Rect(20, 10, 400, 100),
 		},
@@ -526,13 +522,13 @@ func TestInsert(t *testing.T) {
 			name: "insertLongLine",
 			fn:   insertLongLine,
 			want: []string{
-				"blit (20,30)-(46,40) [0,2],[2,1], to (20,40)-(46,50) [0,3],[2,1]",
-				"fill (254,30)-(400,40) [18,2],[-,1]",
-				"blit (33,20)-(46,30) [1,1],[1,1], to (241,30)-(254,40) [17,2],[1,1]",
-				"fill (33,20)-(400,30) [1,1],[-,1]",
-				"fill (20,30)-(241,40) [0,2],[17,1]",
-				`screen-800x600 <- string "a本ポポポポポポポポポポポポポポポポポポポポポポポポポポ" atpoint: (33,20) [1,1] fill: black`,
-				`screen-800x600 <- string "ポポポポポポポポポポポポhello" atpoint: (20,30) [0,2] fill: black`,
+				"blit (20,40)-(36,55) [0,2],[2,1], to (20,55)-(36,70) [0,3],[2,1]",
+				"fill (92,40)-(400,55) [9,2],[-,1]",
+				"blit (28,25)-(36,40) [1,1],[1,1], to (84,40)-(92,55) [8,2],[1,1]",
+				"fill (28,25)-(400,40) [1,1],[-,1]",
+				"fill (20,40)-(84,55) [0,2],[8,1]",
+				`screen-800x600 <- string "a本ポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポポ" atpoint: (28,25) [1,1] fill: black`,
+				`screen-800x600 <- string "ポポポhello" atpoint: (20,40) [0,2] fill: black`,
 			},
 			textarea: image.Rect(20, 10, 400, 100),
 		},
@@ -543,14 +539,14 @@ func TestInsert(t *testing.T) {
 			fn:   insertIntoLongLine,
 			want: []string{
 				// This first blit is a nop.
-				"blit (20,40)-(46,50) [0,3],[2,1], to (20,40)-(46,50) [0,3],[2,1]",
-				"fill (267,30)-(400,40) [19,2],[-,1]",
-				"blit (20,30)-(254,40) [0,2],[18,1], to (33,30)-(267,40) [1,2],[18,1]",
-				"blit (384,20)-(397,30) [28,1],[1,1], to (20,30)-(33,40) [0,2],[1,1]",
-				"blit (33,20)-(384,30) [1,1],[27,1], to (46,20)-(397,30) [2,1],[27,1]",
-				"fill (397,20)-(400,30) [29,1],[-,1]",
-				"fill (33,20)-(46,30) [1,1],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,20) [1,1] fill: black`,
+				"blit (20,55)-(36,70) [0,3],[2,1], to (20,55)-(36,70) [0,3],[2,1]",
+				"fill (100,40)-(400,55) [10,2],[-,1]",
+				"blit (20,40)-(92,55) [0,2],[9,1], to (28,40)-(100,55) [1,2],[9,1]",
+				"blit (388,25)-(396,40) [46,1],[1,1], to (20,40)-(28,55) [0,2],[1,1]",
+				"blit (28,25)-(388,40) [1,1],[45,1], to (36,25)-(396,40) [2,1],[45,1]",
+				"fill (396,25)-(400,40) [47,1],[-,1]",
+				"fill (28,25)-(36,40) [1,1],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (28,25) [1,1] fill: black`,
 			},
 			textarea: image.Rect(20, 10, 400, 100),
 		},
@@ -559,11 +555,11 @@ func TestInsert(t *testing.T) {
 			name: "insertTabAndChar",
 			fn:   insertTabAndChar,
 			want: []string{
-				"blit (33,10)-(46,20) [1,0],[1,1], to (124,10)-(137,20) [8,0],[1,1]",
-				"fill (33,10)-(124,20) [1,0],[7,1]",
-				"fill (46,10)-(124,20) [2,0],[6,1]",
-				"fill (33,10)-(46,20) [1,0],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
+				"blit (28,10)-(36,25) [1,0],[1,1], to (84,10)-(92,25) [8,0],[1,1]",
+				"fill (28,10)-(84,25) [1,0],[7,1]",
+				"fill (36,10)-(84,25) [2,0],[6,1]",
+				"fill (28,10)-(36,25) [1,0],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (28,10) [1,0] fill: black`,
 			},
 			textarea: image.Rect(20, 10, 400, 100),
 		},
@@ -571,22 +567,14 @@ func TestInsert(t *testing.T) {
 			// Split a wrapped line by inserting a newline.
 			name:     "splitWrappedLine",
 			fn:       splitWrappedLine,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(33,60) [0,4],[1,1]",
-				`screen-800x600 <- string "a本ポ" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "ポポポ" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "ポポh" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "ell" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "o" atpoint: (20,50) [0,4] fill: black`,
 				// The previously failing insertion starts here. We didn't have to do
 				// anything in this case. But we still fill blank space at the end of the
 				// line over again. This is (hopefully) harmless.
 				// TODO(rjk): Elide the 0-width draws.
-				"fill (59,10)-(60,20) [3,0],[-,1]",
-				"fill (20,20)-(20,30) [0,1],[0,1]",
+				"fill (44,10)-(45,25) [3,0],[-,1]",
+				"fill (20,25)-(20,40) [0,1],[0,1]",
 			},
 		},
 		{
@@ -594,24 +582,16 @@ func TestInsert(t *testing.T) {
 			// wrapped with wripple to end.
 			name:     "insertForcesWrap",
 			fn:       insertForcesWrap,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
-				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (33,20)-(60,30) [1,1],[-,1]",
-				"blit (46,10)-(59,20) [2,0],[1,1], to (20,20)-(33,30) [0,1],[1,1]",
-				"fill (46,10)-(60,20) [2,0],[-,1]",
-				"fill (20,20)-(20,30) [0,1],[0,1]",
-				`screen-800x600 <- string "X" atpoint: (46,10) [2,0] fill: black`,
+				"blit (20,40)-(45,70) [0,2],[-,2], to (20,55)-(45,85) [0,3],[-,2]",
+				"blit (44,25)-(45,40) [3,1],[-,1], to (44,40)-(45,55) [3,2],[-,1]",
+				"blit (20,25)-(44,40) [0,1],[3,1], to (20,40)-(44,55) [0,2],[3,1]",
+				"fill (28,25)-(45,40) [1,1],[-,1]",
+				"blit (36,10)-(44,25) [2,0],[1,1], to (20,25)-(28,40) [0,1],[1,1]",
+				"fill (36,10)-(45,25) [2,0],[-,1]",
+				"fill (20,25)-(20,40) [0,1],[0,1]",
+				`screen-800x600 <- string "X" atpoint: (36,10) [2,0] fill: black`,
 			},
 		},
 		{
@@ -619,18 +599,10 @@ func TestInsert(t *testing.T) {
 			// area.
 			name:     "appendAtEnd",
 			fn:       appendAtEnd,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"fill (59,50)-(60,60) [3,4],[-,1]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
+				"fill (44,70)-(45,85) [3,4],[-,1]",
+				"fill (20,85)-(20,100) [0,5],[0,1]",
 			},
 		},
 
@@ -638,46 +610,31 @@ func TestInsert(t *testing.T) {
 			// Insert a multibox string that forces ripple past the end.
 			name:     "insertWrappedThatForcesRipple",
 			fn:       insertWrappedThatForcesRipple,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3b" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4" atpoint: (20,50) [0,4] fill: black`,
-				"fill (59,50)-(60,60) [3,4],[-,1]",
-				"blit (33,40)-(46,50) [1,3],[1,1], to (46,50)-(59,60) [2,4],[1,1]",
-				"fill (33,40)-(60,50) [1,3],[-,1]",
-				"fill (20,50)-(46,60) [0,4],[2,1]",
-				`screen-800x600 <- string "ij" atpoint: (33,40) [1,3] fill: black`,
-				`screen-800x600 <- string "XX" atpoint: (20,50) [0,4] fill: black`,
+				"fill (44,70)-(45,85) [3,4],[-,1]",
+				"blit (28,55)-(36,70) [1,3],[1,1], to (36,70)-(44,85) [2,4],[1,1]",
+				"fill (28,55)-(45,70) [1,3],[-,1]",
+				"fill (20,70)-(36,85) [0,4],[2,1]",
+				`screen-800x600 <- string "ij" atpoint: (28,55) [1,3] fill: black`,
+				`screen-800x600 <- string "XX" atpoint: (20,70) [0,4] fill: black`,
 			},
 		},
 		{
 			// Insert a string that pushes a blank line off the end.
 			name:     "insertPushesBlankLineOffEnd",
 			fn:       insertPushesBlankLineOffEnd,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
-				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (33,20)-(60,30) [1,1],[-,1]",
-				"blit (46,10)-(59,20) [2,0],[1,1], to (20,20)-(33,30) [0,1],[1,1]",
-				"blit (33,10)-(46,20) [1,0],[1,1], to (46,10)-(59,20) [2,0],[1,1]",
-				"fill (59,10)-(60,20) [3,0],[-,1]",
-				"fill (33,10)-(46,20) [1,0],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (33,10) [1,0] fill: black`,
+				"blit (20,40)-(45,70) [0,2],[-,2], to (20,55)-(45,85) [0,3],[-,2]",
+				"blit (44,25)-(45,40) [3,1],[-,1], to (44,40)-(45,55) [3,2],[-,1]",
+				"blit (20,25)-(44,40) [0,1],[3,1], to (20,40)-(44,55) [0,2],[3,1]",
+				"fill (28,25)-(45,40) [1,1],[-,1]",
+				"blit (36,10)-(44,25) [2,0],[1,1], to (20,25)-(28,40) [0,1],[1,1]",
+				"blit (28,10)-(36,25) [1,0],[1,1], to (36,10)-(44,25) [2,0],[1,1]",
+				"fill (44,10)-(45,25) [3,0],[-,1]",
+				"fill (28,10)-(36,25) [1,0],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (28,10) [1,0] fill: black`,
 			},
 		},
 		{
@@ -685,13 +642,13 @@ func TestInsert(t *testing.T) {
 			name: "insertPastEnd",
 			fn:   insertPastEnd,
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,40) [0,1],[-,2]",
-				"fill (20,40)-(20,50) [0,3],[0,1]",
+				"fill (20,10)-(45,25) [0,0],[-,1]",
+				"fill (20,25)-(45,55) [0,1],[-,2]",
+				"fill (20,55)-(20,70) [0,3],[0,1]",
 				`screen-800x600 <- string "a本ポ" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "ポポポ" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "ポポh" atpoint: (20,30) [0,2] fill: black`},
-			textarea: image.Rect(20, 10, 60, 40),
+				`screen-800x600 <- string "ポポポ" atpoint: (20,25) [0,1] fill: black`,
+				`screen-800x600 <- string "ポポh" atpoint: (20,40) [0,2] fill: black`},
+			textarea: image.Rect(20, 10, 45, 55),
 		},
 		{
 			// Append a multibox string that hangs off the end. TODO(rjk): Draws a
@@ -699,61 +656,36 @@ func TestInsert(t *testing.T) {
 			// It would (for example) make some drawing stacks unhappy.
 			name:     "appendHangingLongAtEnd",
 			fn:       appendHangingLongAtEnd,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4" atpoint: (20,50) [0,4] fill: black`,
-				"fill (33,50)-(60,60) [1,4],[-,1]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "XX" atpoint: (33,50) [1,4] fill: black`,
+				"fill (28,70)-(45,85) [1,4],[-,1]",
+				"fill (20,85)-(20,100) [0,5],[0,1]",
+				`screen-800x600 <- string "XX" atpoint: (28,70) [1,4] fill: black`,
 			},
 		},
 		{
 			// Insert a new line that pushes another newline down.
 			name:     "insertsRippledNewLine",
 			fn:       insertsRippledNewLine,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(20,60) [0,4],[0,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				"blit (20,40)-(60,50) [0,3],[-,1], to (20,50)-(60,60) [0,4],[-,1]",
-				"fill (20,40)-(60,50) [0,3],[-,1]",
-				"fill (20,50)-(20,60) [0,4],[0,1]",
+				"blit (20,55)-(45,70) [0,3],[-,1], to (20,70)-(45,85) [0,4],[-,1]",
+				"fill (20,55)-(45,70) [0,3],[-,1]",
+				"fill (20,70)-(20,85) [0,4],[0,1]",
 			},
 		},
 		{
 			// Rippled down off edge of frame of wrapped text.
 			name:     "insertForcesRippleOfWrapped",
 			fn:       insertForcesRippleOfWrapped,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,60) [0,1],[-,4]",
-				"fill (20,60)-(20,70) [0,5],[0,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"blit (20,20)-(60,50) [0,1],[-,3], to (20,30)-(60,60) [0,2],[-,3]",
-				"blit (59,10)-(60,20) [3,0],[-,1], to (59,20)-(60,30) [3,1],[-,1]",
-				"blit (20,10)-(59,20) [0,0],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(20,30) [0,1],[0,1]",
+				"blit (20,25)-(45,70) [0,1],[-,3], to (20,40)-(45,85) [0,2],[-,3]",
+				"blit (44,10)-(45,25) [3,0],[-,1], to (44,25)-(45,40) [3,1],[-,1]",
+				"blit (20,10)-(44,25) [0,0],[3,1], to (20,25)-(44,40) [0,1],[3,1]",
+				"fill (20,10)-(45,25) [0,0],[-,1]",
+				"fill (20,10)-(45,25) [0,0],[-,1]",
+				"fill (20,25)-(20,40) [0,1],[0,1]",
 				`screen-800x600 <- string "ABC" atpoint: (20,10) [0,0] fill: black`,
 			},
 
@@ -764,23 +696,15 @@ func TestInsert(t *testing.T) {
 			// first visual line is already full). The character wraps to line 2.
 			name:     "insertAtExactWrapBoundary",
 			fn:       insertAtExactWrapBoundary,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0ab" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"blit (20,30)-(60,50) [0,2],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
-				"blit (59,20)-(60,30) [3,1],[-,1], to (59,30)-(60,40) [3,2],[-,1]",
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
-				"fill (33,20)-(60,30) [1,1],[-,1]",
-				"fill (59,10)-(60,20) [3,0],[-,1]",
-				"fill (20,20)-(33,30) [0,1],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (20,20) [0,1] fill: black`,
+				"blit (20,40)-(45,70) [0,2],[-,2], to (20,55)-(45,85) [0,3],[-,2]",
+				"blit (44,25)-(45,40) [3,1],[-,1], to (44,40)-(45,55) [3,2],[-,1]",
+				"blit (20,25)-(44,40) [0,1],[3,1], to (20,40)-(44,55) [0,2],[3,1]",
+				"fill (28,25)-(45,40) [1,1],[-,1]",
+				"fill (44,10)-(45,25) [3,0],[-,1]",
+				"fill (20,25)-(28,40) [0,1],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (20,25) [0,1] fill: black`,
 			},
 		},
 		{
@@ -788,20 +712,12 @@ func TestInsert(t *testing.T) {
 			// to 3 characters. No wrap should occur.
 			name:     "insertExactlyFillsAlignedLine",
 			fn:       insertExactlyFillsAlignedLine,
-			textarea: image.Rect(20, 10, 60, 60),
+			textarea: image.Rect(20, 10, 45, 85),
 			want: []string{
-				"fill (20,10)-(60,20) [0,0],[-,1]",
-				"fill (20,20)-(60,50) [0,1],[-,3]",
-				"fill (20,50)-(59,60) [0,4],[3,1]",
-				`screen-800x600 <- string "0a" atpoint: (20,10) [0,0] fill: black`,
-				`screen-800x600 <- string "1cd" atpoint: (20,20) [0,1] fill: black`,
-				`screen-800x600 <- string "2ef" atpoint: (20,30) [0,2] fill: black`,
-				`screen-800x600 <- string "3gh" atpoint: (20,40) [0,3] fill: black`,
-				`screen-800x600 <- string "4ij" atpoint: (20,50) [0,4] fill: black`,
-				"blit (20,20)-(59,30) [0,1],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
-				"fill (59,10)-(60,20) [3,0],[-,1]",
-				"fill (46,10)-(59,20) [2,0],[1,1]",
-				`screen-800x600 <- string "X" atpoint: (46,10) [2,0] fill: black`,
+				"blit (20,25)-(44,40) [0,1],[3,1], to (20,25)-(44,40) [0,1],[3,1]",
+				"fill (44,10)-(45,25) [3,0],[-,1]",
+				"fill (36,10)-(44,25) [2,0],[1,1]",
+				`screen-800x600 <- string "X" atpoint: (36,10) [2,0] fill: black`,
 			},
 		},
 	}
@@ -812,8 +728,9 @@ func TestInsert(t *testing.T) {
 			fr := setupFrame(t, iv)
 
 			if tc.knowntofail {
-				tc.fn(t, fr, iv)
+				tc.fn(t, fr, iv, tc.name)
 				generateVisualizedOutput(t, fr)
+				snapAfterPNG(t, fr, tc.name)
 				t.Log("known failing: bug not yet fixed")
 				t.Fail()
 				return
@@ -821,9 +738,13 @@ func TestInsert(t *testing.T) {
 
 			// TODO(rjk): validate here
 
-			tc.fn(t, fr, iv)
+			tc.fn(t, fr, iv, tc.name)
 
 			// TODO(rjk): validate here
+
+			frimpl := fr.(*frameimpl)
+			t.Logf("rect=%v nlines=%d nchars=%d nbox=%d lastlinefull=%v",
+				frimpl.rect, frimpl.nlines, frimpl.nchars, len(frimpl.box), frimpl.lastlinefull)
 
 			// Peek inside.
 			got := gdo(t, fr).DrawOps()
@@ -833,6 +754,7 @@ func TestInsert(t *testing.T) {
 
 			// SVG based output and comparison.
 			visualizedoutputtest(t, fr)
+			snapAfterPNG(t, fr, tc.name)
 		})
 	}
 }
