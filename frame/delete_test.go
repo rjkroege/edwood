@@ -7,11 +7,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(2, 3)
@@ -21,11 +20,10 @@ func deleteSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants, name
 	}
 }
 
-func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2)
@@ -35,11 +33,10 @@ func deleteSingleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants, name 
 	}
 }
 
-func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	fr.Insert([]rune("0ab\n1cd\n2ef"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(len("0ab"), len("0ab\n"))
@@ -49,11 +46,11 @@ func deleteNewlineTocreateWrappedLine(t *testing.T, fr Frame, iv *invariants, na
 	}
 }
 
-func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants, name string) {
+func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
+	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0ab1cd2ef"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // a
@@ -63,13 +60,13 @@ func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants, name string) {
 	}
 }
 
-func deleteTab(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteTab(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	t.Log(fr.GetMaxtab())
 
+	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0	ab1cd2ef"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // the tab
@@ -79,13 +76,13 @@ func deleteTab(t *testing.T, fr Frame, iv *invariants, name string) {
 	}
 }
 
-func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	t.Log(fr.GetMaxtab())
 
+	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0a	b1cd2ef"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(1, 2) // a
@@ -95,11 +92,11 @@ func deleteCharBeforeTab(t *testing.T, fr Frame, iv *invariants, name string) {
 	}
 }
 
-func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants, name string) {
+func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
+	// gdo(t, fr).Clear()
 	fr.Insert([]rune("0a\nb1\ncd2\nef"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	s := fr.Delete(0, 6) // 0a\nb1\n
@@ -112,7 +109,7 @@ func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants, name string) {
 // deleteEliminatesSoftWrap deletes the character that was causing a soft wrap,
 // so the first logical line now fits on one visual line. "1cd" ripples up from
 // visual line 3 to visual line 2 and a blank line appears at the bottom.
-func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants, name string) {
+func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
 	// In a narrow frame "0abX\n1cd" lays out as:
@@ -120,7 +117,6 @@ func deleteEliminatesSoftWrap(t *testing.T, fr Frame, iv *invariants, name strin
 	//   line 2: "X\n"
 	//   line 3: "1cd"
 	fr.Insert([]rune("0abX\n1cd"), 0)
-	snapBeforePNG(t, fr, name)
 	gdo(t, fr).Clear()
 
 	// Delete X (position 3). Soft wrap disappears: "0ab\n" fits on line 1,
@@ -142,7 +138,7 @@ func TestDelete(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fn          func(t *testing.T, fr Frame, iv *invariants, name string)
+		fn          func(t *testing.T, fr Frame, iv *invariants)
 		want        []string
 		textarea    image.Rectangle
 		knowntofail bool
@@ -153,20 +149,20 @@ func TestDelete(t *testing.T) {
 			name: "deleteSingleCharacterAtLineEnd",
 			fn:   deleteSingleCharacterAtLineEnd,
 			want: []string{
-				"fill (36,10)-(44,25) [2,0],[1,1]",
+				"fill (46,10)-(59,20) [2,0],[1,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
 			// Delete a single character in the middle of a terminal line.
 			name: "deleteSingleCharacterInMiddle",
 			fn:   deleteSingleCharacterInMiddle,
 			want: []string{
-				"blit (36,10)-(44,25) [2,0],[1,1], to (28,10)-(36,25) [1,0],[1,1]",
-				"fill (36,10)-(36,25) [2,0],[0,1]",
-				"fill (36,10)-(44,25) [2,0],[1,1]",
+				"blit (46,10)-(59,20) [2,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]",
+				"fill (46,10)-(46,20) [2,0],[0,1]",
+				"fill (46,10)-(59,20) [2,0],[1,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
 			// Delete a newline to create a wrapped line. TODO(rjk): This op blits a
@@ -175,10 +171,10 @@ func TestDelete(t *testing.T) {
 			name: "deleteNewlineTocreateWrappedLine",
 			fn:   deleteNewlineTocreateWrappedLine,
 			want: []string{
-				"blit (20,25)-(44,40) [0,1],[3,1], to (20,25)-(44,40) [0,1],[3,1]",
-				"fill (44,25)-(44,40) [3,1],[0,1]",
+				"blit (20,20)-(59,30) [0,1],[3,1], to (20,20)-(59,30) [0,1],[3,1]",
+				"fill (59,20)-(59,30) [3,1],[0,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 
 		{
@@ -186,19 +182,19 @@ func TestDelete(t *testing.T) {
 			name: "rippleUpDeletedChar",
 			fn:   rippleUpDeletedChar,
 			want: []string{
-				"blit (36,10)-(44,25) [2,0],[1,1], to (28,10)-(36,25) [1,0],[1,1]",
-				"fill (36,10)-(36,25) [2,0],[0,1]",
-				"blit (20,25)-(28,40) [0,1],[1,1], to (36,10)-(44,25) [2,0],[1,1]",
-				"fill (44,10)-(45,25) [3,0],[-,1]",
-				"blit (28,25)-(44,40) [1,1],[2,1], to (20,25)-(36,40) [0,1],[2,1]",
-				"fill (36,25)-(36,40) [2,1],[0,1]",
-				"blit (20,40)-(28,55) [0,2],[1,1], to (36,25)-(44,40) [2,1],[1,1]",
-				"fill (44,25)-(45,40) [3,1],[-,1]",
-				"blit (28,40)-(44,55) [1,2],[2,1], to (20,40)-(36,55) [0,2],[2,1]",
-				"fill (36,40)-(36,55) [2,2],[0,1]",
-				"fill (36,40)-(44,55) [2,2],[1,1]",
+				"blit (46,10)-(59,20) [2,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]",
+				"fill (46,10)-(46,20) [2,0],[0,1]",
+				"blit (20,20)-(33,30) [0,1],[1,1], to (46,10)-(59,20) [2,0],[1,1]",
+				"fill (59,10)-(60,20) [3,0],[-,1]",
+				"blit (33,20)-(59,30) [1,1],[2,1], to (20,20)-(46,30) [0,1],[2,1]",
+				"fill (46,20)-(46,30) [2,1],[0,1]",
+				"blit (20,30)-(33,40) [0,2],[1,1], to (46,20)-(59,30) [2,1],[1,1]",
+				"fill (59,20)-(60,30) [3,1],[-,1]",
+				"blit (33,30)-(59,40) [1,2],[2,1], to (20,30)-(46,40) [0,2],[2,1]",
+				"fill (46,30)-(46,40) [2,2],[0,1]",
+				"fill (46,30)-(59,40) [2,2],[1,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
 			// character followed by tab where character after tab shouldn't move, delete the tab
@@ -206,17 +202,17 @@ func TestDelete(t *testing.T) {
 			name: "deleteTab",
 			fn:   deleteTab,
 			want: []string{
-				"blit (84,10)-(92,25) [8,0],[1,1], to (28,10)-(36,25) [1,0],[1,1]",
-				"fill (36,10)-(36,25) [2,0],[0,1]",
-				"blit (20,25)-(76,40) [0,1],[7,1], to (36,10)-(92,25) [2,0],[7,1]",
-				"fill (92,10)-(92,25) [9,0],[0,1]",
-				"fill (92,10)-(93,25) [9,0],[-,1]",
-				"fill (20,25)-(76,40) [0,1],[7,1]",
-				"fill (92,10)-(93,25) [9,0],[-,1]",
-				"fill (20,25)-(76,40) [0,1],[7,1]",
+				"blit (124,10)-(137,20) [8,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]",
+				"fill (46,10)-(46,20) [2,0],[0,1]",
+				"blit (20,20)-(111,30) [0,1],[7,1], to (46,10)-(137,20) [2,0],[7,1]",
+				"fill (137,10)-(137,20) [9,0],[0,1]",
+				"fill (137,10)-(140,20) [9,0],[-,1]",
+				"fill (20,20)-(111,30) [0,1],[7,1]",
+				"fill (137,10)-(140,20) [9,0],[-,1]",
+				"fill (20,20)-(111,30) [0,1],[7,1]",
 			},
 			// Has to be wide enough to accommodate a tab. Tab is 8 * 13 charwidths = 104.
-			textarea: image.Rect(20, 10, 93, 55),
+			textarea: image.Rect(20, 10, 140, 40),
 		},
 		{
 			// Character followed by tab where character after tab shouldn't move,
@@ -224,23 +220,23 @@ func TestDelete(t *testing.T) {
 			name: "deleteCharBeforeTab",
 			fn:   deleteCharBeforeTab,
 			want: []string{
-				"fill (28,10)-(84,25) [1,0],[7,1]",
+				"fill (33,10)-(124,20) [1,0],[7,1]",
 			},
 			// Has to be wide enough to accommodate a tab. Tab is 8 * 13 charwidths = 104.
-			textarea: image.Rect(20, 10, 93, 55),
+			textarea: image.Rect(20, 10, 140, 40),
 		},
 		{
 			// Ripple up a multiline deletion, text off the bottom.
 			name: "rippleUpMultiLine",
 			fn:   rippleUpMultiLine,
 			want: []string{
-				"blit (20,40)-(45,55) [0,2],[-,1], to (20,10)-(45,25) [0,0],[-,1]",
-				"blit (20,55)-(45,55) [0,3],[-,0], to (20,25)-(45,25) [0,1],[-,0]",
-				"fill (20,25)-(45,40) [0,1],[-,1]",
-				"fill (20,40)-(45,55) [0,2],[-,1]",
-				"fill (20,55)-(20,70) [0,3],[0,1]",
+				"blit (20,30)-(60,40) [0,2],[-,1], to (20,10)-(60,20) [0,0],[-,1]",
+				"blit (20,40)-(60,40) [0,3],[-,0], to (20,20)-(60,20) [0,1],[-,0]",
+				"fill (20,20)-(60,30) [0,1],[-,1]",
+				"fill (20,30)-(60,40) [0,2],[-,1]",
+				"fill (20,40)-(20,50) [0,3],[0,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 		{
 			// Delete the character that causes a soft wrap; the wrap disappears
@@ -248,13 +244,13 @@ func TestDelete(t *testing.T) {
 			name: "deleteEliminatesSoftWrap",
 			fn:   deleteEliminatesSoftWrap,
 			want: []string{
-				"fill (20,25)-(45,40) [0,1],[-,1]",
-				"blit (20,40)-(45,55) [0,2],[-,1], to (20,25)-(45,40) [0,1],[-,1]",
-				"blit (20,55)-(45,55) [0,3],[-,0], to (20,40)-(45,40) [0,2],[-,0]",
-				"fill (44,25)-(45,40) [3,1],[-,1]",
-				"fill (20,40)-(44,55) [0,2],[3,1]",
+				"fill (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
+				"fill (59,20)-(60,30) [3,1],[-,1]",
+				"fill (20,30)-(59,40) [0,2],[3,1]",
 			},
-			textarea: image.Rect(20, 10, 45, 55),
+			textarea: image.Rect(20, 10, 60, 40),
 		},
 		// Rippling tabs
 		// Tabs in narrow columns (what are they even suppose to do?)
@@ -271,15 +267,18 @@ func TestDelete(t *testing.T) {
 			fr := setupFrame(t, iv)
 
 			if tc.knowntofail {
-				tc.fn(t, fr, iv, tc.name)
+				tc.fn(t, fr, iv)
 				generateVisualizedOutput(t, fr)
-				snapAfterPNG(t, fr, tc.name)
 				t.Log("known failing: bug not yet fixed")
 				t.Fail()
 				return
 			}
 
-			tc.fn(t, fr, iv, tc.name)
+			// TODO(rjk): validate here
+
+			tc.fn(t, fr, iv)
+
+			// TODO(rjk): validate here
 
 			// Peek inside.
 			got := gdo(t, fr).DrawOps()
@@ -288,7 +287,6 @@ func TestDelete(t *testing.T) {
 			}
 
 			visualizedoutputtest(t, fr)
-			snapAfterPNG(t, fr, tc.name)
 		})
 	}
 }

@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
-	imagedraw "image/draw"
-	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,19 +12,14 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/opentype"
-	"golang.org/x/image/math/fixed"
-
 	"github.com/rjkroege/edwood/draw"
 )
 
 var _ = draw.Display((*mockDisplay)(nil))
 
 const (
-	fwidth  = 8
-	fheight = 15
+	fwidth  = 13
+	fheight = 10
 )
 
 // GettableDrawOps display implementations can provide a list of the
@@ -39,11 +31,6 @@ type GettableDrawOps interface {
 	// SVGDrawOps writes the accumulated SVG format drawops to w where rect
 	// is the area of interest for the drawops.
 	SVGDrawOps(w io.Writer) error
-
-	// ScreenImageAsPNG writes the current pixel state of the screen image
-	// as a PNG. Only meaningful when the display was created with
-	// NewDisplayWithDPI; returns an error otherwise.
-	ScreenImageAsPNG(w io.Writer) error
 }
 
 // mockDisplay implements draw.Display.
@@ -64,14 +51,6 @@ type mockDisplay struct {
 
 	// roi is the rectangle of interest.
 	rectofi image.Rectangle
-
-	// dpi is non-zero only for displays created with NewDisplayWithDPI.
-	// A zero value means the non-rendering (string-recording only) path.
-	dpi int
-
-	// pixscreen is the backing pixel buffer for the screen image.
-	// Non-nil only when dpi > 0.
-	pixscreen *image.RGBA
 }
 
 // NewDisplay returns a mock draw.Display where visulizations of the output are w.r.t. rectangle rectofi.
@@ -86,150 +65,37 @@ func NewDisplay(rectofi image.Rectangle) draw.Display {
 	return md
 }
 
-// luridPink is the initial fill colour of a rendering display's pixel buffer.
-// Any pixel that is never written by Draw or Bytes will remain this colour,
-// making rendering gaps immediately obvious in PNG output.
-var luridPink = color.RGBA{R: 0xFF, G: 0x00, B: 0xCC, A: 0xFF}
-
-// pixelScale returns the largest integer s such that
-// s*rectofi.Max.X ≤ backW and s*rectofi.Max.Y ≤ backH, with a minimum of 1.
-func pixelScale(rectofi image.Rectangle) int {
-	const backW, backH = 900, 220
-	if rectofi.Max.X == 0 || rectofi.Max.Y == 0 {
-		return 1
-	}
-	s := 1
-	for (s+1)*rectofi.Max.X <= backW && (s+1)*rectofi.Max.Y <= backH {
-		s++
-	}
-	return s
-}
-
-func scalePt(p image.Point, s int) image.Point { return image.Pt(p.X*s, p.Y*s) }
-func scaleRect(r image.Rectangle, s int) image.Rectangle {
-	return image.Rectangle{Min: scalePt(r.Min, s), Max: scalePt(r.Max, s)}
-}
-
-// NewDisplayWithDPI returns a mock draw.Display that renders to a real
-// *image.RGBA in addition to recording draw operations as strings.
-// The backing image is 900×220. The DPI is chosen automatically as the
-// largest integer multiple of 100 (i.e. 200, 300, …) such that rectofi
-// scaled by that factor fits within the backing; pixel drawing is scaled
-// by the same factor so the frame fills the PNG.
-// rectofi controls SVG output as in NewDisplay.
-func NewDisplayWithDPI(rectofi image.Rectangle) draw.Display {
-	const backW, backH = 900, 220
-	scale := pixelScale(rectofi)
-	dpi := scale * 100
-
-	px := image.NewRGBA(image.Rect(0, 0, backW, backH))
-	imagedraw.Draw(px, px.Bounds(), image.NewUniform(luridPink), image.Point{}, imagedraw.Src)
-
-	// Draw a 1-pixel dark green border just outside the scaled frame rectangle.
-	// Any draw operation that escapes the frame boundary will overwrite the
-	// border, making the transgression immediately visible in PNG output.
-	darkGreen := image.NewUniform(color.RGBA{R: 0x00, G: 0x80, B: 0x00, A: 0xFF})
-	sr := scaleRect(rectofi, scale)
-	outer := sr.Inset(-1)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, outer.Min.Y, outer.Max.X, sr.Min.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, sr.Max.Y, outer.Max.X, outer.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(outer.Min.X, sr.Min.Y, sr.Min.X, sr.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
-	imagedraw.Draw(px, image.Rect(sr.Max.X, sr.Min.Y, outer.Max.X, sr.Max.Y), darkGreen, image.Point{}, imagedraw.Src)
-
-	md := &mockDisplay{
-		rectofi:   rectofi,
-		dpi:       dpi,
-		pixscreen: px,
-	}
-	md.screenimage = &mockImage{
-		d: md,
-		r: image.Rect(0, 0, backW, backH),
-		n: "screen-800x600",
-		c: draw.Notacolor,
-		m: px,
-	}
-	md.svgdrawops = append(md.svgdrawops, boundingboxsvg(0, rectofi))
-	md.annotations = append(md.annotations, fmt.Sprintf("target rect %v", rectofi))
-	return md
-}
-
-// drawColorToRGBA converts a draw.Color (0xRRGGBBAA) to color.RGBA.
-func drawColorToRGBA(c draw.Color) color.RGBA {
-	return color.RGBA{
-		R: uint8(c >> 24),
-		G: uint8(c >> 16),
-		B: uint8(c >> 8),
-		A: uint8(c),
-	}
-}
-
-// solidImage returns an image.Uniform for the given draw.Color when the
-// display is in rendering mode, or nil otherwise.
-func (d *mockDisplay) solidImage(c draw.Color) image.Image {
-	if d.pixscreen == nil {
-		return nil
-	}
-	return image.NewUniform(drawColorToRGBA(c))
-}
-
 func (d *mockDisplay) ScreenImage() draw.Image {
 	return d.screenimage
 }
 
 func (d *mockDisplay) White() draw.Image {
-	return &mockImage{d: d, n: "white", c: draw.White, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.White)}
+	return newimageimpl(d, "white", draw.White, image.Rectangle{})
 }
 func (d *mockDisplay) Black() draw.Image {
-	return &mockImage{d: d, n: "black", c: draw.Black, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Black)}
+	return newimageimpl(d, "black", draw.Black, image.Rectangle{})
 }
 func (d *mockDisplay) Opaque() draw.Image {
-	return &mockImage{d: d, n: "opaque", c: draw.Opaque, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Opaque)}
+	return newimageimpl(d, "opaque", draw.Opaque, image.Rectangle{})
 }
 func (d *mockDisplay) Transparent() draw.Image {
-	return &mockImage{d: d, n: "transparent", c: draw.Transparent, r: image.Rect(0, 0, 1, 1), m: d.solidImage(draw.Transparent)}
+	return newimageimpl(d, "transparent", draw.Transparent, image.Rectangle{})
 }
 func (d *mockDisplay) InitKeyboard() *draw.Keyboardctl { return &draw.Keyboardctl{} }
 func (d *mockDisplay) InitMouse() *draw.Mousectl       { return &draw.Mousectl{} }
 
-func (d *mockDisplay) OpenFont(name string) (draw.Font, error) {
-	if d.pixscreen != nil {
-		scale := d.dpi / 100
-		if scale < 1 {
-			scale = 1
-		}
-		face := scaledGoMonoFace(scale)
-		m := face.Metrics()
-		// ascent is in scaled pixel space — used by Bytes to position the baseline.
-		ascent := m.Ascent.Ceil()
-		return &mockFont{
-			width:        fwidth,  // frame coordinate space (unscaled)
-			height:       fheight, // frame coordinate space (unscaled)
-			ascent:       ascent,  // pixel space (scaled) for baseline
-			face:         face,
-			fallbackFace: scaledCJKFallbackFace(scale), // nil if no system font found
-		}, nil
-	}
-	return NewFont(fwidth, fheight), nil
-}
+// TODO(rjk): Support a richer variety of fonts with better metrics.
+// NB: to make the recorded ops easier to read, I provide them in
+// character multiples based on the fixed font metrics here.
+func (d *mockDisplay) OpenFont(name string) (draw.Font, error) { return NewFont(fwidth, fheight), nil }
 
 func (d *mockDisplay) AllocImage(r image.Rectangle, pix draw.Pix, repl bool, val draw.Color) (draw.Image, error) {
-	mi := &mockImage{
+	return &mockImage{
 		d:    d,
 		r:    r,
 		c:    val,
 		repl: repl,
-	}
-	if d.pixscreen != nil {
-		c := drawColorToRGBA(val)
-		if repl && r == image.Rect(0, 0, 1, 1) {
-			mi.m = image.NewUniform(c)
-		} else {
-			px := image.NewRGBA(r)
-			imagedraw.Draw(px, px.Bounds(), image.NewUniform(c), image.Point{}, imagedraw.Src)
-			mi.m = px
-		}
-	}
-	return mi, nil
+	}, nil
 }
 
 func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
@@ -237,31 +103,17 @@ func (d *mockDisplay) AllocImageMix(color1, color3 draw.Color) draw.Image {
 	c3 := draw.WithAlpha(color3, 0xbf) >> 8
 	c := ((c1 + c3) << 8) | 0xff
 
-	mi := &mockImage{
+	return &mockImage{
 		d:    d,
 		r:    image.Rect(0, 0, 1, 1),
 		repl: true,
 		c:    c,
 	}
-	if d.pixscreen != nil {
-		mi.m = image.NewUniform(drawColorToRGBA(c))
-	}
-	return mi
 }
 
 func (d *mockDisplay) Attach(ref int) error { return nil }
 func (d *mockDisplay) Flush() error         { return nil }
-
-func (d *mockDisplay) ScaleSize(n int) int {
-	if d.dpi == 0 {
-		// Preserve existing non-rendering behaviour.
-		return 1
-	}
-	if d.dpi <= 100 {
-		return n
-	}
-	return (n*d.dpi + 50) / 100
-}
+func (d *mockDisplay) ScaleSize(n int) int  { return 1 }
 
 // ReadSnarf reads the snarf buffer into buf, returning the number of bytes read,
 // the total size of the snarf buffer (useful if buf is too short), and any
@@ -297,13 +149,6 @@ func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
 	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
 }
 
-func (d *mockDisplay) ScreenImageAsPNG(w io.Writer) error {
-	if d.pixscreen == nil {
-		return errors.New("ScreenImageAsPNG: display not created with NewDisplayWithDPI")
-	}
-	return png.Encode(w, d.pixscreen)
-}
-
 var _ = draw.Image((*mockImage)(nil))
 
 // mockImage implements draw.Image.
@@ -313,11 +158,6 @@ type mockImage struct {
 	n    string
 	c    draw.Color
 	repl bool
-
-	// m is the pixel backing for this image. Non-nil only in displays created
-	// with NewDisplayWithDPI. For the screen image it is *image.RGBA; for solid
-	// colours it is *image.Uniform.
-	m image.Image
 }
 
 // newimage creates a new mockImage. Use Notacolor for the situation
@@ -449,32 +289,6 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 		}
 	}
 	i.d.drawops = append(i.d.drawops, op)
-
-	// Pixel-rendering path: only when this image has an RGBA backing.
-	dstRGBA, dstOK := i.m.(*image.RGBA)
-	if !dstOK {
-		return
-	}
-	msrc, srcOK := src.(*mockImage)
-	if !srcOK || msrc.m == nil {
-		return
-	}
-	s := i.d.dpi / 100
-	if s < 1 {
-		s = 1
-	}
-	sr := scaleRect(r, s)
-	sp1 := scalePt(p1, s)
-	if mask == nil {
-		imagedraw.Draw(dstRGBA, sr, msrc.m, sp1, imagedraw.Src)
-	} else {
-		mmask, maskOK := mask.(*mockImage)
-		if maskOK && mmask.m != nil {
-			imagedraw.DrawMask(dstRGBA, sr, msrc.m, sp1, mmask.m, sp1, imagedraw.Over)
-		} else {
-			imagedraw.Draw(dstRGBA, sr, msrc.m, sp1, imagedraw.Src)
-		}
-	}
 }
 
 func (i *mockImage) Border(r image.Rectangle, n int, color draw.Image, sp image.Point) {
@@ -520,44 +334,6 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 	i.d.svgdrawops = append(i.d.svgdrawops, bytessvg(len(i.d.svgdrawops), pt, b))
 	i.d.annotations = append(i.d.annotations, shortop)
 
-	// Pixel-rendering path.
-	if dstRGBA, ok := i.m.(*image.RGBA); ok {
-		if msrc, ok := src.(*mockImage); ok && msrc.m != nil {
-			s := i.d.dpi / 100
-			if s < 1 {
-				s = 1
-			}
-			mf, hasFace := f.(*mockFont)
-			if hasFace && mf.face != nil {
-				// Render glyphs per-rune, using a CJK fallback face when the primary
-				// face (GoMono) lacks a glyph.  Advance is always fwidth*s so the
-				// monospace grid is maintained regardless of the face's own advance.
-				spt := scalePt(pt, s)
-				baselineY := fixed.I(spt.Y + mf.ascent)
-				dotX := fixed.I(spt.X)
-				for _, r := range string(b) {
-					dot := fixed.Point26_6{X: dotX, Y: baselineY}
-					dr, mask, maskp, _, glyphOk := mf.face.Glyph(dot, r)
-					if !glyphOk && mf.fallbackFace != nil {
-						dr, mask, maskp, _, _ = mf.fallbackFace.Glyph(dot, r)
-					}
-					if !dr.Empty() {
-						imagedraw.DrawMask(dstRGBA, dr, msrc.m, image.Point{}, mask, maskp, imagedraw.Over)
-					}
-					dotX += fixed.I(fwidth * s)
-				}
-			} else {
-				// Option A fallback: fill the bounding box with the source colour.
-				spt := scalePt(pt, s)
-				box := image.Rectangle{
-					Min: spt,
-					Max: spt.Add(image.Pt(s*f.BytesWidth(b), s*f.Height())),
-				}
-				imagedraw.Draw(dstRGBA, box, msrc.m, image.Point{}, imagedraw.Src)
-			}
-		}
-	}
-
 	// TODO(rjk): This assumes fixed width. Consider generalizing.
 	return pt.Add(image.Pt(f.BytesWidth(b), 0))
 }
@@ -584,123 +360,15 @@ func (i *mockImage) HtmlString() string {
 	return fmt.Sprintf("#%x", i.c>>8)
 }
 
-var (
-	goMonoOnce      sync.Once
-	goMonoTT        *opentype.Font
-	scaledFaceMu    sync.Mutex
-	scaledFaceCache [8]font.Face
-
-	// cjkFallbackTT is the parsed CJK fallback font, loaded once on first use.
-	cjkFallbackOnce sync.Once
-	cjkFallbackTT   *opentype.Font
-	// cjkFallbackCache caches per-scale faces derived from cjkFallbackTT.
-	// Index is scale-1. Guarded by scaledFaceMu (shared with GoMono cache).
-	cjkFallbackCache [8]font.Face
-)
-
-// cjkFallbackPaths lists system font files with broad Unicode/CJK coverage,
-// in priority order.  The first readable file wins.
-var cjkFallbackPaths = []string{
-	"/System/Library/Fonts/Supplemental/Arial Unicode.ttf", // macOS
-	"/usr/share/fonts/truetype/unifont/unifont.ttf",        // Debian/Ubuntu
-	"/usr/share/fonts/unifont/unifont.ttf",                 // Arch Linux
-}
-
-// scaledCJKFallbackFace returns a CJK fallback font.Face at the given integer
-// scale factor.  Size=8*scale at DPI=72 gives CJK advance=8*scale px = fwidth*scale,
-// matching GoMono's monospace grid at every scale.  Returns nil if no system
-// font is available.
-func scaledCJKFallbackFace(scale int) font.Face {
-	cjkFallbackOnce.Do(func() {
-		for _, p := range cjkFallbackPaths {
-			data, err := os.ReadFile(p)
-			if err != nil {
-				continue
-			}
-			tt, err := opentype.Parse(data)
-			if err != nil {
-				continue
-			}
-			cjkFallbackTT = tt
-			break
-		}
-	})
-	if cjkFallbackTT == nil {
-		return nil
-	}
-	scaledFaceMu.Lock()
-	defer scaledFaceMu.Unlock()
-	idx := scale - 1
-	if idx < 0 {
-		idx = 0
-	}
-	if idx >= len(cjkFallbackCache) {
-		idx = len(cjkFallbackCache) - 1
-	}
-	if cjkFallbackCache[idx] == nil {
-		f, err := opentype.NewFace(cjkFallbackTT, &opentype.FaceOptions{
-			Size: 8.0 * float64(scale),
-			DPI:  72,
-		})
-		if err != nil {
-			return nil
-		}
-		cjkFallbackCache[idx] = f
-	}
-	return cjkFallbackCache[idx]
-}
-
-// HasCJKFallback reports whether a system CJK font was found at init time.
-// Returns false on systems (e.g. Linux CI) that lack Arial Unicode; PNG
-// goldens generated on macOS will not match the .notdef-box output from
-// those systems, so callers should skip PNG comparison when this is false.
-func HasCJKFallback() bool {
-	scaledCJKFallbackFace(1) // trigger the sync.Once load
-	return cjkFallbackTT != nil
-}
-
-// scaledGoMonoFace returns a GoMono font.Face scaled by the given integer factor.
-// Size=13*scale at DPI=72 gives advance=8*scale px, ascent=12*scale px, height=15*scale px.
-func scaledGoMonoFace(scale int) font.Face {
-	goMonoOnce.Do(func() {
-		var err error
-		goMonoTT, err = opentype.Parse(gomono.TTF)
-		if err != nil {
-			panic("edwoodtest: failed to parse GoMono: " + err.Error())
-		}
-	})
-	scaledFaceMu.Lock()
-	defer scaledFaceMu.Unlock()
-	idx := scale - 1
-	if idx < 0 {
-		idx = 0
-	}
-	if idx >= len(scaledFaceCache) {
-		idx = len(scaledFaceCache) - 1
-	}
-	if scaledFaceCache[idx] == nil {
-		var err error
-		scaledFaceCache[idx], err = opentype.NewFace(goMonoTT, &opentype.FaceOptions{
-			Size: 13.0 * float64(scale),
-			DPI:  72,
-		})
-		if err != nil {
-			panic("edwoodtest: failed to create GoMono face: " + err.Error())
-		}
-	}
-	return scaledFaceCache[idx]
-}
-
 var _ = draw.Font((*mockFont)(nil))
 
 // mockFont implements draw.Font and mocks as a fixed width font.
+// TODO(rjk): Do we need to handle variable widths?
 type mockFont struct {
-	width, height, ascent int
-	face                  font.Face
-	fallbackFace          font.Face // optional fallback for glyphs missing from face
+	width, height int
 }
 
-// NewFont returns a draw.Font that mocks a fixed-width font with no real glyph rendering.
+// NewFont returns a draw.Font that mocks a fixed-width font.
 func NewFont(width, height int) draw.Font {
 	return &mockFont{
 		width:  width,
