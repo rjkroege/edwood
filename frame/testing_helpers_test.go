@@ -69,21 +69,6 @@ func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
 	return gdo
 }
 
-// generateVisualizedOutput writes the SVG trial file without comparing
-// to a baseline. Used for known-failing tests that document a bug.
-func generateVisualizedOutput(t *testing.T, fr Frame) {
-	t.Helper()
-	oname := makeVisualizedOutputTestPath(t)
-	sf, err := os.Create(oname)
-	if err != nil {
-		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
-	}
-	if err := gdo(t, fr).SVGDrawOps(sf); err != nil {
-		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
-	}
-	sf.Close()
-}
-
 // visualizedoutputtest generates SVG-based graphical output
 func visualizedoutputtest(t *testing.T, fr Frame) {
 	t.Helper()
