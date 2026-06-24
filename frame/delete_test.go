@@ -140,6 +140,23 @@ func deleteMiddleLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// deleteEmptyMiddleLine removes the blank line between two non-empty lines.
+// "abc\n\nghi" has an empty line 2; deleting the '\n' at position 4 should
+// cause "ghi" to ripple up to line 2 and line 3 to be cleared.
+func deleteEmptyMiddleLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\n\nghi"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete the blank line's newline at position 4; one visual line disappears.
+	s := fr.Delete(4, 5)
+
+	if got, want := s, 1; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // deleteEliminatesSoftWrap deletes the character that was causing a soft wrap,
 // so the first logical line now fits on one visual line. "1cd" ripples up from
 // visual line 3 to visual line 2 and a blank line appears at the bottom.
@@ -292,6 +309,18 @@ func TestDelete(t *testing.T) {
 			// line 3 is cleared.
 			name:     "deleteMiddleLine",
 			fn:       deleteMiddleLine,
+			want: []string{
+				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
+				"fill (59,20)-(60,30) [3,1],[-,1]",
+				"fill (20,30)-(59,40) [0,2],[3,1]",
+			},
+			textarea: image.Rect(20, 10, 60, 40),
+		},
+		{
+			// Delete the blank middle line: "ghi" ripples up to line 2, line 3 clears.
+			name:     "deleteEmptyMiddleLine",
+			fn:       deleteEmptyMiddleLine,
 			want: []string{
 				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
 				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
