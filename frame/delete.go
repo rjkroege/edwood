@@ -2,6 +2,8 @@ package frame
 
 import (
 	"image"
+
+	"log"
 )
 
 func (f *frameimpl) Delete(p0, p1 int) int {
@@ -48,14 +50,15 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	 *  - n1, b are box containing beginning of stuff to be kept after deletion
 	 *  - f->p0 and f->p1 are not adjusted until after all deletion is done
 	 */
-	// f.Logboxes("before loop pt0 %v pt1 %v n0 %d n1 %d", pt0, pt1, n0, n1)
+	f.Logboxes("before loop pt0 %v pt1 %v n0 %d n1 %d", pt0, pt1, n0, n1)
 	var r image.Rectangle
 	for pt1.X != pt0.X && n1 < len(f.box) {
-		// f.Logboxes("top of loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1)
+		f.Logboxes("top of loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
 		b := f.box[n1]
 		pt0 = f.cklinewrap0(pt0, b)
 		pt1 = f.cklinewrap(pt1, b)
 		n, fits := f.canfit(pt0, b)
+
 
 		if !fits {
 			panic("Frame.delete, canfit fits is false")
@@ -74,7 +77,8 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 				b = f.box[n1]
 			}
 			r.Max.X += int(b.Wid)
-			// log.Printf("draw rect: %v to pt1: %v", r, pt1)
+			log.Printf("draw rect: %v to pt1: %v", r, pt1)
+/// HERE, we have computed the wrong pt1 on the second loop trip.
 			f.background.Draw(r, f.background, nil, pt1)
 
 			r.Min.X = r.Max.X
@@ -84,7 +88,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 			}
 			// Erase the portion of text at the end of the line that should be blank
 			// now that we've moved the box ending the line over.
-			// log.Printf("draw rect: %v to pt1: %v", r, pt1)
+			log.Printf("fill rect: %v to pt1: %v", r, pt1)
+/// Grow the r to the edge of the rectangle
+// TODO(rjk):
 			f.background.Draw(r, f.cols[ColBack], nil, r.Min)
 		} else {
 			r.Max.X += f.newwid0(pt0, b)
@@ -95,16 +101,20 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 			f.background.Draw(r, col, nil, pt0)
 		}
 
+// did we compute the wrong value here on first pass?
 		pt1 = f.advance(pt1, b)
 		// newwid updates b with the value computed by newwid0.
 		// TODO(rjk): make the code cleaner with a side-effect free version.
 		pt0.X += f.newwid(pt0, b)
 		f.box[n0] = f.box[n1]
+// what if I loop heres and bring box[3] up. note comment about cklinewrap
+// where the nl box can't be handled.
+// no. see: we have a box that's disappearing so we're going to ripple the boxes
 		n0++
 		n1++
 	}
 
-	// log.Printf("after  loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
+	f.Logboxes("after loop pt0 %v pt1 %v n0 %d n1 %d, r %v", pt0, pt1, n0, n1, r)
 	if n1 == len(f.box) && pt0.X != pt1.X {
 		f.fillNonGlyphAreas(pt0, pt1, f.cols[ColBack])
 	}
@@ -168,7 +178,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 	if pt0.X > f.rect.Min.X {
 		f.nlines++
 	}
-	// f.Logboxes("end of delete")
+	f.Logboxes("end of delete")
 
 	return n - f.nlines
 }
