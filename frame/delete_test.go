@@ -122,6 +122,24 @@ func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// deleteMiddleLine removes the middle of three newline-terminated lines.
+// After the delete "ghi" should ripple up from line 3 to line 2 and line 3
+// should be cleared.
+func deleteMiddleLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	// Three lines: "abc\n" on line 1, "def\n" on line 2, "ghi" on line 3.
+	fr.Insert([]rune("abc\ndef\nghi"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete "def\n" (positions 4–8); one visual line should disappear.
+	s := fr.Delete(4, 8)
+
+	if got, want := s, 1; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // deleteEliminatesSoftWrap deletes the character that was causing a soft wrap,
 // so the first logical line now fits on one visual line. "1cd" ripples up from
 // visual line 3 to visual line 2 and a blank line appears at the bottom.
@@ -266,6 +284,19 @@ func TestDelete(t *testing.T) {
 				"fill (20,20)-(60,30) [0,1],[-,1]",
 				"fill (20,30)-(60,40) [0,2],[-,1]",
 				"fill (20,40)-(20,50) [0,3],[0,1]",
+			},
+			textarea: image.Rect(20, 10, 60, 40),
+		},
+		{
+			// Delete the middle of three lines: "ghi" ripples up to line 2,
+			// line 3 is cleared.
+			name:     "deleteMiddleLine",
+			fn:       deleteMiddleLine,
+			want: []string{
+				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
+				"fill (59,20)-(60,30) [3,1],[-,1]",
+				"fill (20,30)-(59,40) [0,2],[3,1]",
 			},
 			textarea: image.Rect(20, 10, 60, 40),
 		},
