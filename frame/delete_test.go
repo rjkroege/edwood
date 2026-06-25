@@ -76,6 +76,19 @@ func rippleUpDeletedChar(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+func rippleUpDeletedCharWithNewline(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("0ab1cd\n2ef"), 0)
+	gdo(t, fr).Clear()
+
+	s := fr.Delete(1, 2) // a
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func deleteTab(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
@@ -259,6 +272,24 @@ func TestDelete(t *testing.T) {
 				"blit (33,30)-(59,40) [1,2],[2,1], to (20,30)-(46,40) [0,2],[2,1]",
 				"fill (46,30)-(46,40) [2,2],[0,1]",
 				"fill (46,30)-(59,40) [2,2],[1,1]",
+			},
+			textarea: image.Rect(20, 10, 60, 40),
+		},
+		{
+			// Like rippleUpDeletedChar but the init string contains an explicit
+			// newline after the soft-wrapped content.
+			name: "rippleUpDeletedCharWithNewline",
+			fn:   rippleUpDeletedCharWithNewline,
+			want: []string{
+				"blit (46,10)-(59,20) [2,0],[1,1], to (33,10)-(46,20) [1,0],[1,1]",
+				"fill (46,10)-(46,20) [2,0],[0,1]",
+				"blit (20,20)-(33,30) [0,1],[1,1], to (46,10)-(59,20) [2,0],[1,1]",
+				"fill (59,10)-(60,20) [3,0],[-,1]",
+				"blit (33,20)-(59,30) [1,1],[2,1], to (20,20)-(46,30) [0,1],[2,1]",
+				"fill (46,20)-(46,30) [2,1],[0,1]",
+				"fill (46,20)-(60,30) [2,1],[-,1]",
+				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
+				"fill (59,30)-(59,40) [3,2],[0,1]",
 			},
 			textarea: image.Rect(20, 10, 60, 40),
 		},
