@@ -43,6 +43,9 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 	f.modified = true
 
+
+	// This first loop is over the motion that may cross linebreak boundaries (either
+	// hard or soft?)
 	/*
 	 * Invariants:
 	 *  - pt0 points to beginning, pt1 points to end
