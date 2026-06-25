@@ -112,7 +112,7 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 		// For a newline box, advance only resets X to the left margin.
 		// Y stays put so the pt1.Y != pt0.Y block below can blit remaining
 		// lines upward by the correct amount.
-		if b.Nrune < 0 && b.Bc == '\n' {
+		if b.Nrune < 0 && b.Bc == '\n' && pt0.X == f.rect.Min.X {
 			pt0.X = f.rect.Min.X
 		} else {
 			pt0.X += f.newwid(pt0, b)
