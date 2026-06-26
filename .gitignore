@@ -32,3 +32,6 @@ _testmain.go
 # Mac stuffs
 .DS_Store
 /.gemini
+
+# Test artifacts
+frame/count.out
