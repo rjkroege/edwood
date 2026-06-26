@@ -51,12 +51,12 @@ func (fp *FramePalette) Colors(display draw.Display) [frame.NumColours]draw.Imag
 		return fp.imgs
 	}
 	fp.display = display
-	fp.imgs[frame.ColBack]  = AllocOne(display, fp.Back)
-	fp.imgs[frame.ColHigh]  = AllocOne(display, fp.High)
-	fp.imgs[frame.ColBord]  = AllocOne(display, fp.Bord)
-	fp.imgs[frame.ColText]  = AllocOne(display, fp.Text)
+	fp.imgs[frame.ColBack] = AllocOne(display, fp.Back)
+	fp.imgs[frame.ColHigh] = AllocOne(display, fp.High)
+	fp.imgs[frame.ColBord] = AllocOne(display, fp.Bord)
+	fp.imgs[frame.ColText] = AllocOne(display, fp.Text)
 	fp.imgs[frame.ColHText] = AllocOne(display, fp.HText)
-	fp.imgs[frame.ColTick]  = AllocOne(display, fp.Tick)
+	fp.imgs[frame.ColTick] = AllocOne(display, fp.Tick)
 	return fp.imgs
 }
 
