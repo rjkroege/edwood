@@ -21,10 +21,10 @@ const (
 	TextHText
 	TextTick
 	// Application chrome.
-	ChromeModButton
-	ChromeColButton
-	ChromeBut2
-	ChromeBut3
+	ModButton
+	ColButton
+	But2
+	But3
 	NumCols
 )
 
@@ -58,10 +58,10 @@ var Light = Palette{
 	TextHText: solid(draw.Black),
 	TextTick:  solid(draw.Black),
 
-	ChromeModButton: solid(draw.Medblue),
-	ChromeColButton: solid(draw.Purpleblue),
-	ChromeBut2:      solid(0xAA0000FF),
-	ChromeBut3:      solid(0x006600FF),
+	ModButton: solid(draw.Medblue),
+	ColButton: solid(draw.Purpleblue),
+	But2:      solid(0xAA0000FF),
+	But3:      solid(0x006600FF),
 }
 
 // Dark is the built-in dark (Vampira) mode palette.
@@ -80,8 +80,8 @@ var Dark = Palette{
 	TextHText: solid(draw.White),
 	TextTick:  solid(draw.White),
 
-	ChromeModButton: solid(0x666666FF),
-	ChromeColButton: solid(0x666666FF),
-	ChromeBut2:      solid(0xAA0000FF),
-	ChromeBut3:      solid(0x006600FF),
+	ModButton: solid(0x666666FF),
+	ColButton: solid(0x666666FF),
+	But2:      solid(0xAA0000FF),
+	But3:      solid(0x006600FF),
 }
