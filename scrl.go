@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rjkroege/edwood/draw"
-	"github.com/rjkroege/edwood/frame"
 )
 
 var scrtmp draw.Image
@@ -85,11 +84,10 @@ func (t *Text) ScrDraw(nchars int) {
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.
-		text := global.palette.Text.Colors(t.display)
-		b.Draw(r1, text[frame.ColBord], nil, image.Point{})
-		b.Draw(r2, text[frame.ColBack], nil, image.Point{})
+		b.Draw(r1, global.palette.TextBord(), nil, image.Point{})
+		b.Draw(r2, global.palette.TextBack(), nil, image.Point{})
 		r2.Min.X = r2.Max.X - 1
-		b.Draw(r2, text[frame.ColBord], nil, image.Point{})
+		b.Draw(r2, global.palette.TextBord(), nil, image.Point{})
 		global.row.display.ScreenImage().Draw(r, b, nil, image.Pt(0, r1.Min.Y))
 		// flushimage(display, 1); // BUG?
 	}

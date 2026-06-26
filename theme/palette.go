@@ -75,6 +75,38 @@ type Palette struct {
 	Ui   UiPalette
 }
 
+// tagImg returns the image for the given slot from the Tag palette.
+// Panics if Tag.Colors has not been called yet.
+func (p *Palette) tagImg(slot int) draw.Image {
+	if p.Tag.display == nil {
+		panic("theme: Palette.Tag not initialized; call Tag.Colors first")
+	}
+	return p.Tag.Colors(p.Tag.display)[slot]
+}
+
+// textImg returns the image for the given slot from the Text palette.
+// Panics if Text.Colors has not been called yet.
+func (p *Palette) textImg(slot int) draw.Image {
+	if p.Text.display == nil {
+		panic("theme: Palette.Text not initialized; call Text.Colors first")
+	}
+	return p.Text.Colors(p.Text.display)[slot]
+}
+
+func (p *Palette) TagBack() draw.Image  { return p.tagImg(frame.ColBack) }
+func (p *Palette) TagHigh() draw.Image  { return p.tagImg(frame.ColHigh) }
+func (p *Palette) TagBord() draw.Image  { return p.tagImg(frame.ColBord) }
+func (p *Palette) TagText() draw.Image  { return p.tagImg(frame.ColText) }
+func (p *Palette) TagHText() draw.Image { return p.tagImg(frame.ColHText) }
+func (p *Palette) TagTick() draw.Image  { return p.tagImg(frame.ColTick) }
+
+func (p *Palette) TextBack() draw.Image  { return p.textImg(frame.ColBack) }
+func (p *Palette) TextHigh() draw.Image  { return p.textImg(frame.ColHigh) }
+func (p *Palette) TextBord() draw.Image  { return p.textImg(frame.ColBord) }
+func (p *Palette) TextText() draw.Image  { return p.textImg(frame.ColText) }
+func (p *Palette) TextHText() draw.Image { return p.textImg(frame.ColHText) }
+func (p *Palette) TextTick() draw.Image  { return p.textImg(frame.ColTick) }
+
 // Light is the built-in light-mode palette.
 var Light = Palette{
 	Tag: FramePalette{

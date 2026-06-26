@@ -7,7 +7,6 @@ import (
 
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/file"
-	"github.com/rjkroege/edwood/frame"
 )
 
 var (
@@ -161,7 +160,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		r = v.r
 		r.Max.Y = ymax
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, global.palette.Text.Colors(c.display)[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.palette.TextBack(), nil, image.Point{})
 		}
 		r1 := r
 		y = min(y, ymax-(v.tag.fr.DefaultFontHeight()*v.taglines+v.body.fr.DefaultFontHeight()+c.display.ScaleSize(Border)+1))
@@ -181,7 +180,7 @@ func (c *Column) Add(w, clone *Window, y int) *Window {
 		w = NewWindow()
 		w.col = c
 		if c.display != nil {
-			c.display.ScreenImage().Draw(r, global.palette.Text.Colors(c.display)[frame.ColBack], nil, image.Point{})
+			c.display.ScreenImage().Draw(r, global.palette.TextBack(), nil, image.Point{})
 		}
 		w.Init(clone, r, c.display)
 	} else {
@@ -258,7 +257,7 @@ Found:
 		r.Max.Y = w.r.Max.Y
 	}
 	if c.display != nil {
-		c.display.ScreenImage().Draw(r, global.palette.Text.Colors(c.display)[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(r, global.palette.TextBack(), nil, image.Point{})
 	}
 	if c.safe && !c.fortest {
 		if !didmouse && up {
@@ -326,7 +325,7 @@ func (c *Column) Sort() {
 
 	r := c.r
 	r.Min.Y = c.tag.fr.Rect().Max.Y
-	c.display.ScreenImage().Draw(r, global.palette.Text.Colors(c.display)[frame.ColBack], nil, image.Point{})
+	c.display.ScreenImage().Draw(r, global.palette.TextBack(), nil, image.Point{})
 	y := r.Min.Y
 	for i := 0; i < len(c.w); i++ {
 		w := c.w[i]
@@ -378,7 +377,7 @@ func (c *Column) Grow(w *Window, but int) {
 			c.w[0] = w
 			c.w[windex] = v
 		}
-		c.display.ScreenImage().Draw(cr, global.palette.Text.Colors(c.display)[frame.ColBack], nil, image.Point{})
+		c.display.ScreenImage().Draw(cr, global.palette.TextBack(), nil, image.Point{})
 		w.Resize(cr, false, true)
 		for i := 1; i < c.nw(); i++ {
 			ffs := c.w[i].body.fr.GetFrameFillStatus()
