@@ -40,14 +40,14 @@ type globals struct {
 	typetext  *Text // global because Text.Close needs to clear it
 	barttext  *Text // shared between mousethread and keyboardthread
 
-	activewin  *Window
-	activecol  *Column
-	snarfbuf   []byte
-	home       string
-	acmeshell  string
-	palette    theme.Palette
-	wdir       string
-	editing    int
+	activewin *Window
+	activecol *Column
+	snarfbuf  []byte
+	home      string
+	acmeshell string
+	palette   theme.Palette
+	wdir      string
+	editing   int
 
 	cplumb     chan *plumb.Message
 	cwait      chan ProcessState

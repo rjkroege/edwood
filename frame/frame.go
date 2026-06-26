@@ -14,7 +14,7 @@ const (
 	ColBord
 	ColText
 	ColHText
-	ColTick    // colour of the insertion-point tick
+	ColTick // colour of the insertion-point tick
 	NumColours
 
 	frtickw = 3
