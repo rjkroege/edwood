@@ -24,14 +24,22 @@ const (
 	Exec                      // Exec is a window controlled by an outside process
 )
 
+// ColorSpec encodes one palette entry as a pair of RGBA values.
+// If Mix is non-zero the entry is rendered via AllocImageMix(Color, Mix).
+type ColorSpec struct {
+	Color uint32 `json:"color"`
+	Mix   uint32 `json:"mix,omitempty"`
+}
+
 // Content stores the state of Edwood.
 type Content struct {
-	CurrentDir string    // Edwood's current working directory
-	VarFont    string    // Variable width font
-	FixedFont  string    // Fixed width font
-	RowTag     Text      // Top-most tag (usually "Newcol ... Exit")
-	Columns    []Column  // List of columns
-	Windows    []*Window // List of windows across all columns
+	CurrentDir string      // Edwood's current working directory
+	VarFont    string      // Variable width font
+	FixedFont  string      // Fixed width font
+	RowTag     Text        // Top-most tag (usually "Newcol ... Exit")
+	Columns    []Column    // List of columns
+	Windows    []*Window   // List of windows across all columns
+	Palette    []ColorSpec `json:",omitempty"` // nil → built-in Light or Dark
 }
 
 // Column stores the state of a column in Edwood.

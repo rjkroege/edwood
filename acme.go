@@ -157,6 +157,22 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 	os.Exit(0)
 }
 
+// paletteFromDump returns a Palette from the dump file if one was saved,
+// falling back to the built-in Light or Dark palette based on the flag.
+func paletteFromDump(dump *dumpfile.Content, dark bool) theme.Palette {
+	if dump != nil && len(dump.Palette) == int(theme.NumCols) {
+		var p theme.Palette
+		for i, cs := range dump.Palette {
+			p[i] = theme.ColorSpec{Color: draw.Color(cs.Color), Mix: draw.Color(cs.Mix)}
+		}
+		return p
+	}
+	if dark {
+		return theme.Dark
+	}
+	return theme.Light
+}
+
 func main() {
 	dump := predrawInit()
 	// Make the display here in the wrapper to make it possible to provide a
@@ -168,8 +184,7 @@ func main() {
 			log.Fatalf("can't open display: %v\n", err)
 		}
 
-		// Set dark mode state in theme package with display
-		theme.SetDarkMode(*darkMode, display)
+		global.palette = paletteFromDump(dump, *darkMode)
 		mainWithDisplay(global, dump, display)
 	})
 }
