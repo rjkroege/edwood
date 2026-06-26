@@ -31,15 +31,40 @@ type ColorSpec struct {
 	Mix   uint32 `json:"mix,omitempty"`
 }
 
+// FramePaletteSpec encodes the six colour slots for one frame role (tag or text).
+type FramePaletteSpec struct {
+	Back  ColorSpec
+	High  ColorSpec
+	Bord  ColorSpec
+	Text  ColorSpec
+	HText ColorSpec
+	Tick  ColorSpec
+}
+
+// UiPaletteSpec encodes application chrome colours.
+type UiPaletteSpec struct {
+	ModButton ColorSpec
+	ColButton ColorSpec
+	But2      ColorSpec
+	But3      ColorSpec
+}
+
+// PaletteSpec encodes a complete colour palette for save/restore.
+type PaletteSpec struct {
+	Tag  FramePaletteSpec
+	Text FramePaletteSpec
+	Ui   UiPaletteSpec
+}
+
 // Content stores the state of Edwood.
 type Content struct {
-	CurrentDir string      // Edwood's current working directory
-	VarFont    string      // Variable width font
-	FixedFont  string      // Fixed width font
-	RowTag     Text        // Top-most tag (usually "Newcol ... Exit")
-	Columns    []Column    // List of columns
-	Windows    []*Window   // List of windows across all columns
-	Palette    []ColorSpec `json:",omitempty"` // nil → built-in Light or Dark
+	CurrentDir string       // Edwood's current working directory
+	VarFont    string       // Variable width font
+	FixedFont  string       // Fixed width font
+	RowTag     Text         // Top-most tag (usually "Newcol ... Exit")
+	Columns    []Column     // List of columns
+	Windows    []*Window    // List of windows across all columns
+	Palette    *PaletteSpec `json:",omitempty"` // nil → built-in Light or Dark
 }
 
 // Column stores the state of a column in Edwood.

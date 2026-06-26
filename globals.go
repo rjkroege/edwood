@@ -143,19 +143,19 @@ func (g *globals) allocColor(display draw.Display, cs theme.ColorSpec) draw.Imag
 // No mode conditionals — the palette already encodes the chosen theme.
 func (g *globals) applyMode(display draw.Display) {
 	p := g.palette
-	g.tagcolors[frame.ColBack]  = g.allocColor(display, p[theme.TagBack])
-	g.tagcolors[frame.ColHigh]  = g.allocColor(display, p[theme.TagHigh])
-	g.tagcolors[frame.ColBord]  = g.allocColor(display, p[theme.TagBord])
-	g.tagcolors[frame.ColText]  = g.allocColor(display, p[theme.TagText])
-	g.tagcolors[frame.ColHText] = g.allocColor(display, p[theme.TagHText])
-	g.tagcolors[frame.ColTick]  = g.allocColor(display, p[theme.TagTick])
+	g.tagcolors[frame.ColBack]  = g.allocColor(display, p.Tag.Back)
+	g.tagcolors[frame.ColHigh]  = g.allocColor(display, p.Tag.High)
+	g.tagcolors[frame.ColBord]  = g.allocColor(display, p.Tag.Bord)
+	g.tagcolors[frame.ColText]  = g.allocColor(display, p.Tag.Text)
+	g.tagcolors[frame.ColHText] = g.allocColor(display, p.Tag.HText)
+	g.tagcolors[frame.ColTick]  = g.allocColor(display, p.Tag.Tick)
 
-	g.textcolors[frame.ColBack]  = g.allocColor(display, p[theme.TextBack])
-	g.textcolors[frame.ColHigh]  = g.allocColor(display, p[theme.TextHigh])
-	g.textcolors[frame.ColBord]  = g.allocColor(display, p[theme.TextBord])
-	g.textcolors[frame.ColText]  = g.allocColor(display, p[theme.TextText])
-	g.textcolors[frame.ColHText] = g.allocColor(display, p[theme.TextHText])
-	g.textcolors[frame.ColTick]  = g.allocColor(display, p[theme.TextTick])
+	g.textcolors[frame.ColBack]  = g.allocColor(display, p.Text.Back)
+	g.textcolors[frame.ColHigh]  = g.allocColor(display, p.Text.High)
+	g.textcolors[frame.ColBord]  = g.allocColor(display, p.Text.Bord)
+	g.textcolors[frame.ColText]  = g.allocColor(display, p.Text.Text)
+	g.textcolors[frame.ColHText] = g.allocColor(display, p.Text.HText)
+	g.textcolors[frame.ColTick]  = g.allocColor(display, p.Text.Tick)
 }
 
 // TODO(rjk): Can separate this out even better.
@@ -172,12 +172,12 @@ func (g *globals) iconinit(display draw.Display) {
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	tmp := g.allocColor(display, g.palette[theme.ModButton])
+	tmp := g.allocColor(display, g.palette.Ui.ModButton)
 	g.modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = g.button.R()
-	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette[theme.ColButton].Color)
+	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette.Ui.ColButton.Color)
 
-	g.but2col = g.allocColor(display, g.palette[theme.But2])
-	g.but3col = g.allocColor(display, g.palette[theme.But3])
+	g.but2col = g.allocColor(display, g.palette.Ui.But2)
+	g.but3col = g.allocColor(display, g.palette.Ui.But3)
 }

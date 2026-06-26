@@ -160,12 +160,31 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 // paletteFromDump returns a Palette from the dump file if one was saved,
 // falling back to the built-in Light or Dark palette based on the flag.
 func paletteFromDump(dump *dumpfile.Content, dark bool) theme.Palette {
-	if dump != nil && len(dump.Palette) == int(theme.NumCols) {
-		var p theme.Palette
-		for i, cs := range dump.Palette {
-			p[i] = theme.ColorSpec{Color: draw.Color(cs.Color), Mix: draw.Color(cs.Mix)}
+	if dump != nil && dump.Palette != nil {
+		dp := dump.Palette
+		cs := func(s dumpfile.ColorSpec) theme.ColorSpec {
+			return theme.ColorSpec{Color: draw.Color(s.Color), Mix: draw.Color(s.Mix)}
 		}
-		return p
+		fp := func(s dumpfile.FramePaletteSpec) theme.FramePalette {
+			return theme.FramePalette{
+				Back:  cs(s.Back),
+				High:  cs(s.High),
+				Bord:  cs(s.Bord),
+				Text:  cs(s.Text),
+				HText: cs(s.HText),
+				Tick:  cs(s.Tick),
+			}
+		}
+		return theme.Palette{
+			Tag:  fp(dp.Tag),
+			Text: fp(dp.Text),
+			Ui: theme.UiPalette{
+				ModButton: cs(dp.Ui.ModButton),
+				ColButton: cs(dp.Ui.ColButton),
+				But2:      cs(dp.Ui.But2),
+				But3:      cs(dp.Ui.But3),
+			},
+		}
 	}
 	if dark {
 		return theme.Dark
