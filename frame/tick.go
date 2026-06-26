@@ -1,10 +1,11 @@
 package frame
 
 import (
-	"github.com/rjkroege/edwood/draw"
-	"github.com/rjkroege/edwood/theme"
 	"image"
 	"log"
+
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/theme"
 )
 
 // drawTick is a centralised function to render a tick with consistent logic.
