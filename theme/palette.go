@@ -107,6 +107,26 @@ func (p *Palette) TextText() draw.Image  { return p.textImg(frame.ColText) }
 func (p *Palette) TextHText() draw.Image { return p.textImg(frame.ColHText) }
 func (p *Palette) TextTick() draw.Image  { return p.textImg(frame.ColTick) }
 
+// palettes is the registry of built-in named palettes.
+var palettes map[string]Palette
+
+func init() {
+	palettes = map[string]Palette{
+		"acme":    Light,
+		"vampira": Dark,
+	}
+}
+
+// PaletteByName returns the named palette and true, or the zero Palette
+// and false if the name is not registered.
+func PaletteByName(name string) (Palette, bool) {
+	p, ok := palettes[name]
+	return p, ok
+}
+
+// DefaultPaletteName is the name of the palette used when none is specified.
+const DefaultPaletteName = "acme"
+
 // Light is the built-in light-mode palette.
 var Light = Palette{
 	Tag: FramePalette{
