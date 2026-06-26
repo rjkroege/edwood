@@ -112,8 +112,10 @@ var palettes map[string]Palette
 
 func init() {
 	palettes = map[string]Palette{
-		"acme":    Light,
-		"vampira": Dark,
+		"acme":           Light,
+		"vampira":        Dark,
+		"solarizedlight": SolarizedLight,
+		"solarizeddark":  SolarizedDark,
 	}
 }
 
@@ -176,5 +178,79 @@ var Dark = Palette{
 		ColButton: solid(0x666666FF),
 		But2:      solid(0xAA0000FF),
 		But3:      solid(0x006600FF),
+	},
+}
+
+// Solarized colour constants (Ethan Schoonover, https://ethanschoonover.com/solarized/).
+// Monotones (light → dark duals: base3↔base03, base2↔base02, base1↔base01, base00↔base0).
+const (
+	solBase03 draw.Color = 0x002b36FF
+	solBase02 draw.Color = 0x073642FF
+	solBase01 draw.Color = 0x586e75FF
+	solBase00 draw.Color = 0x657b83FF
+	solBase0  draw.Color = 0x839496FF
+	solBase1  draw.Color = 0x93a1a1FF
+	solBase2  draw.Color = 0xeee8d5FF
+	solBase3  draw.Color = 0xfdf6e3FF
+	solYellow draw.Color = 0xb58900FF
+	solRed    draw.Color = 0xdc322fFF
+	solViolet draw.Color = 0x6c71c4FF
+	solBlue   draw.Color = 0x268bd2FF
+	solGreen  draw.Color = 0x859900FF
+)
+
+// SolarizedLight is the Solarized light palette mapped onto edwood's colour roles.
+// Background slots use the closest solarized monotone; accent slots use the
+// closest solarized accent colour by Euclidean RGB distance.
+var SolarizedLight = Palette{
+	Tag: FramePalette{
+		Back:  solid(solBase2),  // #eee8d5 — tag-strip background (highlighted bg)
+		High:  solid(solBase1),  // #93a1a1 — selection highlight in tag
+		Bord:  solid(solViolet), // #6c71c4 — closest to Purpleblue
+		Text:  solid(solBase00), // #657b83 — body text (light mode)
+		HText: solid(solBase01), // #586e75 — emphasised text
+		Tick:  solid(solBase01),
+	},
+	Text: FramePalette{
+		Back:  solid(solBase3),  // #fdf6e3 — main content background
+		High:  solid(solYellow), // #b58900 — selection highlight
+		Bord:  solid(solGreen),  // #859900 — closest to Yellowgreen
+		Text:  solid(solBase00),
+		HText: solid(solBase01),
+		Tick:  solid(solBase01),
+	},
+	Ui: UiPalette{
+		ModButton: solid(solBlue),   // #268bd2 — closest to Medblue
+		ColButton: solid(solViolet), // #6c71c4 — closest to Purpleblue
+		But2:      solid(solRed),    // #dc322f — closest to 0xAA0000
+		But3:      solid(solGreen),  // #859900 — closest to 0x006600
+	},
+}
+
+// SolarizedDark is the Solarized dark palette, the light/dark dual of SolarizedLight.
+// Each monotone is swapped to its dual (base3↔base03, base2↔base02, etc.);
+// accent colours are unchanged.
+var SolarizedDark = Palette{
+	Tag: FramePalette{
+		Back:  solid(solBase02), // #073642 — dark highlighted bg (dual of base2)
+		High:  solid(solBase01), // #586e75 — dual of base1
+		Bord:  solid(solViolet),
+		Text:  solid(solBase0), // #839496 — dark body text (dual of base00)
+		HText: solid(solBase1), // #93a1a1 — dual of base01
+		Tick:  solid(solBase1),
+	},
+	Text: FramePalette{
+		Back:  solid(solBase03), // #002b36 — dark main bg (dual of base3)
+		High:  solid(solYellow),
+		Bord:  solid(solGreen),
+		Text:  solid(solBase0),
+		HText: solid(solBase1),
+		Tick:  solid(solBase1),
+	},
+	Ui: UiPalette{
+		ModButton: solid(solBlue),
+		ColButton: solid(solViolet),
+		But2:      solid(solRed),
+		But3:      solid(solGreen),
 	},
 }
