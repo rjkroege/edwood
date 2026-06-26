@@ -128,6 +128,7 @@ func makeglobals() *globals {
 
 // TODO(rjk): Can separate this out even better.
 func (g *globals) iconinit(display draw.Display) {
+	g.palette.Text.Colors(display)
 	tag := g.palette.Tag.Colors(display)
 
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
