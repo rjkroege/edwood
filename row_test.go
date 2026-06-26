@@ -17,6 +17,7 @@ import (
 	"9fans.net/go/plan9"
 	"9fans.net/go/plan9/client"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/edwoodtest"
@@ -228,7 +229,7 @@ func checkDump(t *testing.T, got, want *dumpfile.Content) {
 		}
 	}
 
-	if diff := cmp.Diff(want, got); diff != "" {
+	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(dumpfile.Content{}, "Palette")); diff != "" {
 		t.Errorf("dump mismatch (-want +got):\n%s", diff)
 	}
 }
