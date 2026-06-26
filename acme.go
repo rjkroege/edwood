@@ -159,30 +159,7 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 // if the name is not recognised).
 func paletteFromDump(dump *dumpfile.Content, name string) theme.Palette {
 	if dump != nil && dump.Palette != nil {
-		dp := dump.Palette
-		cs := func(s dumpfile.ColorSpec) theme.ColorSpec {
-			return theme.ColorSpec{Color: draw.Color(s.Color), Mix: draw.Color(s.Mix)}
-		}
-		fp := func(s dumpfile.FramePaletteSpec) theme.FramePalette {
-			return theme.FramePalette{
-				Back:  cs(s.Back),
-				High:  cs(s.High),
-				Bord:  cs(s.Bord),
-				Text:  cs(s.Text),
-				HText: cs(s.HText),
-				Tick:  cs(s.Tick),
-			}
-		}
-		return theme.Palette{
-			Tag:  fp(dp.Tag),
-			Text: fp(dp.Text),
-			Ui: theme.UiPalette{
-				ModButton: cs(dp.Ui.ModButton),
-				ColButton: cs(dp.Ui.ColButton),
-				But2:      cs(dp.Ui.But2),
-				But3:      cs(dp.Ui.But3),
-			},
-		}
+		return paletteFromSpec(dump.Palette)
 	}
 	p, ok := theme.PaletteByName(name)
 	if !ok {
