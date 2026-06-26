@@ -137,7 +137,7 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	w.tagtop.Max.Y = r.Min.Y + fontget(global.tagfont, w.display).Height()
 	r1.Max.Y = r1.Min.Y + w.taglines*fontget(global.tagfont, w.display).Height()
 
-	w.tag.Init(r1, global.tagfont, global.tagcolors, w.display)
+	w.tag.Init(r1, global.tagfont, global.palette.Tag.Colors(w.display), w.display)
 	w.tag.what = Tag
 
 	// When cloning, we copy the tag so that the tag contents can evolve
@@ -157,12 +157,12 @@ func (w *Window) Init(clone *Window, r image.Rectangle, dis draw.Display) {
 	} else {
 		rf = global.tagfont
 	}
-	w.body.Init(r1, rf, global.textcolors, w.display)
+	w.body.Init(r1, rf, global.palette.Text.Colors(w.display), w.display)
 	w.body.what = Body
 	r1.Min.Y--
 	r1.Max.Y = r1.Min.Y + 1
 	if w.display != nil {
-		w.display.ScreenImage().Draw(r1, global.tagcolors[frame.ColBord], nil, image.Point{})
+		w.display.ScreenImage().Draw(r1, global.palette.Tag.Colors(w.display)[frame.ColBord], nil, image.Point{})
 	}
 	w.body.ScrDraw(w.body.fr.GetFrameFillStatus().Nchars)
 	w.r = r
@@ -310,7 +310,7 @@ func (w *Window) Resize(r image.Rectangle, safe, keepextra bool) int {
 			r1.Min.Y = y
 			r1.Max.Y = y + 1
 			if w.display != nil {
-				w.display.ScreenImage().Draw(r1, global.tagcolors[frame.ColBord], nil, image.Point{})
+				w.display.ScreenImage().Draw(r1, global.palette.Tag.Colors(w.display)[frame.ColBord], nil, image.Point{})
 			}
 			y++
 			r1.Min.Y = min(y, r.Max.Y)

@@ -85,10 +85,11 @@ func (t *Text) ScrDraw(nchars int) {
 	if !r2.Eq(t.lastsr) {
 		t.lastsr = r2
 		// rjk is assuming that only body Text instances have scrollers.
-		b.Draw(r1, global.textcolors[frame.ColBord], nil, image.Point{})
-		b.Draw(r2, global.textcolors[frame.ColBack], nil, image.Point{})
+		text := global.palette.Text.Colors(t.display)
+		b.Draw(r1, text[frame.ColBord], nil, image.Point{})
+		b.Draw(r2, text[frame.ColBack], nil, image.Point{})
 		r2.Min.X = r2.Max.X - 1
-		b.Draw(r2, global.textcolors[frame.ColBord], nil, image.Point{})
+		b.Draw(r2, text[frame.ColBord], nil, image.Point{})
 		global.row.display.ScreenImage().Draw(r, b, nil, image.Pt(0, r1.Min.Y))
 		// flushimage(display, 1); // BUG?
 	}

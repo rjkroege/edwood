@@ -40,7 +40,7 @@ func (row *Row) Init(r image.Rectangle, dis draw.Display) *Row {
 	f := file.MakeObservableEditableBuffer("", nil)
 	f.AddObserver(t)
 	t.file = f
-	t.Init(r1, global.tagfont, global.tagcolors, row.display)
+	t.Init(r1, global.tagfont, global.palette.Tag.Colors(row.display), row.display)
 	t.what = Rowtag
 	t.row = row
 	t.w = nil
