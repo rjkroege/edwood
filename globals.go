@@ -47,6 +47,7 @@ type globals struct {
 	acmeshell  string
 	tagcolors  [frame.NumColours]draw.Image
 	textcolors [frame.NumColours]draw.Image
+	palette    theme.Palette
 	wdir       string
 	editing    int
 
@@ -127,22 +128,38 @@ func makeglobals() *globals {
 	return g
 }
 
+// allocColor allocates a single-pixel replicating image for a ColorSpec.
+// If cs.Mix is non-zero, AllocImageMix is used; otherwise AllocImage.
+func (g *globals) allocColor(display draw.Display, cs theme.ColorSpec) draw.Image {
+	if cs.Mix != 0 {
+		return display.AllocImageMix(cs.Color, cs.Mix)
+	}
+	img, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, cs.Color)
+	return img
+}
+
+// applyMode allocates all colour images from g.palette and stores them in
+// g.tagcolors, g.textcolors, and the chrome button images.
+// No mode conditionals — the palette already encodes the chosen theme.
+func (g *globals) applyMode(display draw.Display) {
+	p := g.palette
+	g.tagcolors[frame.ColBack]  = g.allocColor(display, p[theme.TagBack])
+	g.tagcolors[frame.ColHigh]  = g.allocColor(display, p[theme.TagHigh])
+	g.tagcolors[frame.ColBord]  = g.allocColor(display, p[theme.TagBord])
+	g.tagcolors[frame.ColText]  = g.allocColor(display, p[theme.TagText])
+	g.tagcolors[frame.ColHText] = g.allocColor(display, p[theme.TagHText])
+	g.tagcolors[frame.ColTick]  = g.allocColor(display, p[theme.TagTick])
+
+	g.textcolors[frame.ColBack]  = g.allocColor(display, p[theme.TextBack])
+	g.textcolors[frame.ColHigh]  = g.allocColor(display, p[theme.TextHigh])
+	g.textcolors[frame.ColBord]  = g.allocColor(display, p[theme.TextBord])
+	g.textcolors[frame.ColText]  = g.allocColor(display, p[theme.TextText])
+	g.textcolors[frame.ColHText] = g.allocColor(display, p[theme.TextHText])
+	g.textcolors[frame.ColTick]  = g.allocColor(display, p[theme.TextTick])
+}
+
 // TODO(rjk): Can separate this out even better.
 func (g *globals) iconinit(display draw.Display) {
-	if g.tagcolors[frame.ColBack] == nil {
-		g.tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palegreygreen)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Purpleblue)
-		g.tagcolors[frame.ColText] = display.Black()
-		g.tagcolors[frame.ColHText] = display.Black()
-		g.textcolors[frame.ColBack] = display.AllocImageMix(draw.Paleyellow, draw.White)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Darkyellow)
-		g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Yellowgreen)
-		g.textcolors[frame.ColText] = display.Black()
-		g.textcolors[frame.ColHText] = display.Black()
-	}
-
-	// ...
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
 	g.button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
 	g.button.Draw(r, g.tagcolors[frame.ColBack], nil, r.Min)
@@ -155,59 +172,12 @@ func (g *globals) iconinit(display draw.Display) {
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	if *darkMode {
-		tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.ModButton)
-		g.modbutton.Draw(r, tmp, nil, image.Point{})
-	} else {
-		tmp, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Medblue)
-		g.modbutton.Draw(r, tmp, nil, image.Point{})
-	}
+	tmp := g.allocColor(display, g.palette[theme.ChromeModButton])
+	g.modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = g.button.R()
-	if *darkMode {
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, theme.ColButton)
-	} else {
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Purpleblue)
-	}
+	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette[theme.ChromeColButton].Color)
 
-	// These are the highlight colors for mouse buttons 2 and 3 functions
-	g.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
-	g.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
-}
-
-func (g *globals) applyMode(display draw.Display) {
-	if *darkMode {
-		// Apply dark mode colours
-		g.tagcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColBack)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColHigh)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TagColBord)
-		g.tagcolors[frame.ColText] = display.White()
-		g.tagcolors[frame.ColHText] = display.White()
-
-		g.textcolors[frame.ColBack], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TextColBack)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, theme.TextColHigh)
-		g.textcolors[frame.ColText] = display.White()
-		g.textcolors[frame.ColHText] = display.White()
-
-		r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
-		g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, 0xAA0000FF)
-
-		// These are the highlight colors for mouse buttons 2 and 3 functions
-		g.but2col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0xAA0000FF)
-		g.but3col, _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, 0x006600FF)
-
-	} else {
-		// Apply light mode colours (default)
-		g.tagcolors[frame.ColBack] = display.AllocImageMix(draw.Palebluegreen, draw.White)
-		g.tagcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Palegreygreen)
-		g.tagcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Purpleblue)
-		g.tagcolors[frame.ColText] = display.Black()
-		g.tagcolors[frame.ColHText] = display.Black()
-
-		g.textcolors[frame.ColBack] = display.AllocImageMix(draw.Paleyellow, draw.White)
-		g.textcolors[frame.ColHigh], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Darkyellow)
-		g.textcolors[frame.ColBord], _ = display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, draw.Yellowgreen)
-		g.textcolors[frame.ColText] = display.Black()
-		g.textcolors[frame.ColHText] = display.Black()
-	}
+	g.but2col = g.allocColor(display, g.palette[theme.ChromeBut2])
+	g.but3col = g.allocColor(display, g.palette[theme.ChromeBut3])
 }
