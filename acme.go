@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"github.com/rjkroege/edwood/theme"
 	"image"
 	"log"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"9fans.net/go/plumb"
 	"github.com/rjkroege/edwood/draw"
 	"github.com/rjkroege/edwood/dumpfile"
+	"github.com/rjkroege/edwood/theme"
 )
 
 var (

@@ -1,8 +1,9 @@
 package theme
 
 import (
-	"github.com/rjkroege/edwood/draw"
 	"image"
+
+	"github.com/rjkroege/edwood/draw"
 )
 
 var darkMode bool
