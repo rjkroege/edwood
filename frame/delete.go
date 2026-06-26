@@ -41,7 +41,6 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 
 	f.modified = true
 
-
 	// This first loop is over the motion that may cross linebreak boundaries (either
 	// hard or soft?)
 	/*
@@ -57,7 +56,6 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 		pt0 = f.cklinewrap0(pt0, b)
 		pt1 = f.cklinewrap(pt1, b)
 		n, fits := f.canfit(pt0, b)
-
 
 		if !fits {
 			panic("Frame.delete, canfit fits is false")

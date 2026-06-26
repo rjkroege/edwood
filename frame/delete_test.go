@@ -42,7 +42,7 @@ func deleteMultipleCharacterInMiddle(t *testing.T, fr Frame, iv *invariants) {
 
 	// Delete "hello world and foo\nmore t" (10 chars bounded by spaces).
 	p0 := len("hello world and foo\nmore ")
-	s := fr.Delete(p0, p0 + len("text"))
+	s := fr.Delete(p0, p0+len("text"))
 
 	if got, want := s, 0; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -338,8 +338,8 @@ func TestDelete(t *testing.T) {
 		{
 			// Delete the middle of three lines: "ghi" ripples up to line 2,
 			// line 3 is cleared.
-			name:     "deleteMiddleLine",
-			fn:       deleteMiddleLine,
+			name: "deleteMiddleLine",
+			fn:   deleteMiddleLine,
 			want: []string{
 				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
 				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
@@ -350,8 +350,8 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			// Delete the blank middle line: "ghi" ripples up to line 2, line 3 clears.
-			name:     "deleteEmptyMiddleLine",
-			fn:       deleteEmptyMiddleLine,
+			name: "deleteEmptyMiddleLine",
+			fn:   deleteEmptyMiddleLine,
 			want: []string{
 				"blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]",
 				"blit (20,40)-(60,40) [0,3],[-,0], to (20,30)-(60,30) [0,2],[-,0]",
