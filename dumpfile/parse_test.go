@@ -31,6 +31,36 @@ var testTab = []Content{
 		},
 		Windows: []*Window{},
 	},
+	{
+		CurrentDir: "/home/gopher",
+		RowTag:     Text{Buffer: "Newcol Kill Putall Dump Exit"},
+		Columns:    []Column{{Position: 0}},
+		Windows:    []*Window{},
+		Palette: &PaletteSpec{
+			Tag: FramePaletteSpec{
+				Back:  ColorSpec{Color: 0xeee8d5FF},
+				High:  ColorSpec{Color: 0x93a1a1FF},
+				Bord:  ColorSpec{Color: 0x6c71c4FF},
+				Text:  ColorSpec{Color: 0x657b83FF},
+				HText: ColorSpec{Color: 0x586e75FF},
+				Tick:  ColorSpec{Color: 0x586e75FF},
+			},
+			Text: FramePaletteSpec{
+				Back:  ColorSpec{Color: 0xfdf6e3FF},
+				High:  ColorSpec{Color: 0xb58900FF},
+				Bord:  ColorSpec{Color: 0x859900FF},
+				Text:  ColorSpec{Color: 0x657b83FF},
+				HText: ColorSpec{Color: 0x586e75FF},
+				Tick:  ColorSpec{Color: 0x586e75FF},
+			},
+			Ui: UiPaletteSpec{
+				ModButton: ColorSpec{Color: 0x268bd2FF},
+				ColButton: ColorSpec{Color: 0x6c71c4FF},
+				But2:      ColorSpec{Color: 0xdc322fFF},
+				But3:      ColorSpec{Color: 0x859900FF},
+			},
+		},
+	},
 }
 
 func TestEncodeDecode(t *testing.T) {
@@ -50,7 +80,7 @@ func TestEncodeDecode(t *testing.T) {
 			t.Errorf("Unmarshal failed: %v\n", err)
 			continue
 		}
-		if reflect.DeepEqual(tc, c) {
+		if !reflect.DeepEqual(tc, *c) {
 			t.Logf("Dump file:\n%s\n", dump)
 			t.Errorf("content is %#v; expected %#v\n", c, tc)
 		}
