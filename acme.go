@@ -32,7 +32,7 @@ var (
 	winsize           = flag.String("W", "1024x768", "Window size and position as WidthxHeight[@X,Y]")
 	ncol              = flag.Int("c", 2, "Number of columns at startup")
 	loadfile          = flag.String("l", "", "Load state from file generated with Dump command")
-	darkMode          = flag.Bool("v", false, "Enable dark (Vampira) mode colour scheme") // Added dark mode flag
+	paletteName       = flag.String("palette", theme.DefaultPaletteName, "Colour palette name (acme, vampira)")
 )
 
 func predrawInit() *dumpfile.Content {
@@ -155,8 +155,9 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 }
 
 // paletteFromDump returns a Palette from the dump file if one was saved,
-// falling back to the built-in Light or Dark palette based on the flag.
-func paletteFromDump(dump *dumpfile.Content, dark bool) theme.Palette {
+// falling back to the named built-in palette (warning and defaulting to "acme"
+// if the name is not recognised).
+func paletteFromDump(dump *dumpfile.Content, name string) theme.Palette {
 	if dump != nil && dump.Palette != nil {
 		dp := dump.Palette
 		cs := func(s dumpfile.ColorSpec) theme.ColorSpec {
@@ -183,10 +184,12 @@ func paletteFromDump(dump *dumpfile.Content, dark bool) theme.Palette {
 			},
 		}
 	}
-	if dark {
-		return theme.Dark
+	p, ok := theme.PaletteByName(name)
+	if !ok {
+		log.Printf("unknown palette %q; using default", name)
+		return theme.Light
 	}
-	return theme.Light
+	return p
 }
 
 func main() {
@@ -200,7 +203,7 @@ func main() {
 			log.Fatalf("can't open display: %v\n", err)
 		}
 
-		global.palette = paletteFromDump(dump, *darkMode)
+		global.palette = paletteFromDump(dump, *paletteName)
 		mainWithDisplay(global, dump, display)
 	})
 }
