@@ -352,6 +352,7 @@ func (r *Row) dump() (*dumpfile.Content, error) {
 		},
 		Columns: make([]dumpfile.Column, len(r.col)),
 		Windows: nil,
+		Palette: paletteToSpec(global.palette),
 	}
 
 	dumpid := make(map[*file.ObservableEditableBuffer]int)
