@@ -1,6 +1,11 @@
 package theme
 
-import "github.com/rjkroege/edwood/draw"
+import (
+	"image"
+
+	"github.com/rjkroege/edwood/draw"
+	"github.com/rjkroege/edwood/frame"
+)
 
 // ColorSpec describes a single colour entry.
 // If Mix is non-zero the colour is produced by AllocImageMix(Color, Mix);
@@ -14,7 +19,8 @@ func solid(c draw.Color) ColorSpec    { return ColorSpec{Color: c} }
 func mixed(c, m draw.Color) ColorSpec { return ColorSpec{Color: c, Mix: m} }
 
 // FramePalette holds the six colour slots used by a single frame
-// (tag strip or text body).
+// (tag strip or text body).  The imgs cache is populated lazily on the
+// first call to Colors; subsequent calls with the same display are free.
 type FramePalette struct {
 	Back  ColorSpec // background
 	High  ColorSpec // selection highlight
@@ -22,6 +28,36 @@ type FramePalette struct {
 	Text  ColorSpec // foreground text
 	HText ColorSpec // highlighted text
 	Tick  ColorSpec // insertion-point tick
+
+	// cached allocated images — valid when display != nil
+	display draw.Display
+	imgs    [frame.NumColours]draw.Image
+}
+
+// allocOne allocates one image from a ColorSpec against display.
+func allocOne(display draw.Display, cs ColorSpec) draw.Image {
+	if cs.Mix != 0 {
+		return display.AllocImageMix(cs.Color, cs.Mix)
+	}
+	img, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, cs.Color)
+	return img
+}
+
+// Colors returns the [frame.NumColours]draw.Image array for this palette,
+// allocating images on the first call and returning the cached result
+// on subsequent calls with the same display.
+func (fp *FramePalette) Colors(display draw.Display) [frame.NumColours]draw.Image {
+	if fp.display == display && fp.imgs[frame.ColBack] != nil {
+		return fp.imgs
+	}
+	fp.display = display
+	fp.imgs[frame.ColBack]  = allocOne(display, fp.Back)
+	fp.imgs[frame.ColHigh]  = allocOne(display, fp.High)
+	fp.imgs[frame.ColBord]  = allocOne(display, fp.Bord)
+	fp.imgs[frame.ColText]  = allocOne(display, fp.Text)
+	fp.imgs[frame.ColHText] = allocOne(display, fp.HText)
+	fp.imgs[frame.ColTick]  = allocOne(display, fp.Tick)
+	return fp.imgs
 }
 
 // UiPalette holds colours used for application chrome elements.
