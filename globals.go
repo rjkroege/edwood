@@ -172,12 +172,12 @@ func (g *globals) iconinit(display draw.Display) {
 	r.Max.X -= display.ScaleSize(ButtonBorder)
 	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	tmp := g.allocColor(display, g.palette[theme.ChromeModButton])
+	tmp := g.allocColor(display, g.palette[theme.ModButton])
 	g.modbutton.Draw(r, tmp, nil, image.Point{})
 
 	r = g.button.R()
-	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette[theme.ChromeColButton].Color)
+	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette[theme.ColButton].Color)
 
-	g.but2col = g.allocColor(display, g.palette[theme.ChromeBut2])
-	g.but3col = g.allocColor(display, g.palette[theme.ChromeBut3])
+	g.but2col = g.allocColor(display, g.palette[theme.But2])
+	g.but3col = g.allocColor(display, g.palette[theme.But3])
 }
