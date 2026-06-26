@@ -79,9 +79,6 @@ func mainWithDisplay(g *globals, dump *dumpfile.Content, display draw.Display) {
 		log.Fatalf("failed to attach to window %v\n", err)
 	}
 
-	// Apply the appropriate mode based on the flag
-	g.applyMode(display)
-
 	display.ScreenImage().Draw(display.ScreenImage().R(), display.White(), nil, image.Point{})
 
 	g.mousectl = display.InitMouse()

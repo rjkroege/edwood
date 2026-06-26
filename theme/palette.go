@@ -34,8 +34,8 @@ type FramePalette struct {
 	imgs    [frame.NumColours]draw.Image
 }
 
-// allocOne allocates one image from a ColorSpec against display.
-func allocOne(display draw.Display, cs ColorSpec) draw.Image {
+// AllocOne allocates one image from a ColorSpec against display.
+func AllocOne(display draw.Display, cs ColorSpec) draw.Image {
 	if cs.Mix != 0 {
 		return display.AllocImageMix(cs.Color, cs.Mix)
 	}
@@ -51,12 +51,12 @@ func (fp *FramePalette) Colors(display draw.Display) [frame.NumColours]draw.Imag
 		return fp.imgs
 	}
 	fp.display = display
-	fp.imgs[frame.ColBack]  = allocOne(display, fp.Back)
-	fp.imgs[frame.ColHigh]  = allocOne(display, fp.High)
-	fp.imgs[frame.ColBord]  = allocOne(display, fp.Bord)
-	fp.imgs[frame.ColText]  = allocOne(display, fp.Text)
-	fp.imgs[frame.ColHText] = allocOne(display, fp.HText)
-	fp.imgs[frame.ColTick]  = allocOne(display, fp.Tick)
+	fp.imgs[frame.ColBack]  = AllocOne(display, fp.Back)
+	fp.imgs[frame.ColHigh]  = AllocOne(display, fp.High)
+	fp.imgs[frame.ColBord]  = AllocOne(display, fp.Bord)
+	fp.imgs[frame.ColText]  = AllocOne(display, fp.Text)
+	fp.imgs[frame.ColHText] = AllocOne(display, fp.HText)
+	fp.imgs[frame.ColTick]  = AllocOne(display, fp.Tick)
 	return fp.imgs
 }
 

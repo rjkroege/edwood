@@ -45,8 +45,6 @@ type globals struct {
 	snarfbuf   []byte
 	home       string
 	acmeshell  string
-	tagcolors  [frame.NumColours]draw.Image
-	textcolors [frame.NumColours]draw.Image
 	palette    theme.Palette
 	wdir       string
 	editing    int
@@ -128,56 +126,27 @@ func makeglobals() *globals {
 	return g
 }
 
-// allocColor allocates a single-pixel replicating image for a ColorSpec.
-// If cs.Mix is non-zero, AllocImageMix is used; otherwise AllocImage.
-func (g *globals) allocColor(display draw.Display, cs theme.ColorSpec) draw.Image {
-	if cs.Mix != 0 {
-		return display.AllocImageMix(cs.Color, cs.Mix)
-	}
-	img, _ := display.AllocImage(image.Rect(0, 0, 1, 1), display.ScreenImage().Pix(), true, cs.Color)
-	return img
-}
-
-// applyMode allocates all colour images from g.palette and stores them in
-// g.tagcolors, g.textcolors, and the chrome button images.
-// No mode conditionals — the palette already encodes the chosen theme.
-func (g *globals) applyMode(display draw.Display) {
-	p := g.palette
-	g.tagcolors[frame.ColBack]  = g.allocColor(display, p.Tag.Back)
-	g.tagcolors[frame.ColHigh]  = g.allocColor(display, p.Tag.High)
-	g.tagcolors[frame.ColBord]  = g.allocColor(display, p.Tag.Bord)
-	g.tagcolors[frame.ColText]  = g.allocColor(display, p.Tag.Text)
-	g.tagcolors[frame.ColHText] = g.allocColor(display, p.Tag.HText)
-	g.tagcolors[frame.ColTick]  = g.allocColor(display, p.Tag.Tick)
-
-	g.textcolors[frame.ColBack]  = g.allocColor(display, p.Text.Back)
-	g.textcolors[frame.ColHigh]  = g.allocColor(display, p.Text.High)
-	g.textcolors[frame.ColBord]  = g.allocColor(display, p.Text.Bord)
-	g.textcolors[frame.ColText]  = g.allocColor(display, p.Text.Text)
-	g.textcolors[frame.ColHText] = g.allocColor(display, p.Text.HText)
-	g.textcolors[frame.ColTick]  = g.allocColor(display, p.Text.Tick)
-}
-
 // TODO(rjk): Can separate this out even better.
 func (g *globals) iconinit(display draw.Display) {
+	tag := g.palette.Tag.Colors(display)
+
 	r := image.Rect(0, 0, display.ScaleSize(Scrollwid+ButtonBorder), fontget(g.tagfont, display).Height()+1)
 	g.button, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
-	g.button.Draw(r, g.tagcolors[frame.ColBack], nil, r.Min)
+	g.button.Draw(r, tag[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	g.button.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
+	g.button.Border(r, display.ScaleSize(ButtonBorder), tag[frame.ColBord], image.Point{})
 
 	r = g.button.R()
 	g.modbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, draw.Notacolor)
-	g.modbutton.Draw(r, g.tagcolors[frame.ColBack], nil, r.Min)
+	g.modbutton.Draw(r, tag[frame.ColBack], nil, r.Min)
 	r.Max.X -= display.ScaleSize(ButtonBorder)
-	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), g.tagcolors[frame.ColBord], image.Point{})
+	g.modbutton.Border(r, display.ScaleSize(ButtonBorder), tag[frame.ColBord], image.Point{})
 	r = r.Inset(display.ScaleSize(ButtonBorder))
-	tmp := g.allocColor(display, g.palette.Ui.ModButton)
-	g.modbutton.Draw(r, tmp, nil, image.Point{})
+	g.modbutton.Draw(r, theme.AllocOne(display, g.palette.Ui.ModButton), nil, image.Point{})
 
 	r = g.button.R()
 	g.colbutton, _ = display.AllocImage(r, display.ScreenImage().Pix(), false, g.palette.Ui.ColButton.Color)
 
-	g.but2col = g.allocColor(display, g.palette.Ui.But2)
-	g.but3col = g.allocColor(display, g.palette.Ui.But3)
+	g.but2col = theme.AllocOne(display, g.palette.Ui.But2)
+	g.but3col = theme.AllocOne(display, g.palette.Ui.But3)
 }
