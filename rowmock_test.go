@@ -14,6 +14,7 @@ import (
 	"github.com/rjkroege/edwood/dumpfile"
 	"github.com/rjkroege/edwood/edwoodtest"
 	"github.com/rjkroege/edwood/file"
+	"github.com/rjkroege/edwood/theme"
 )
 
 // configureGlobals setups global variables so that Edwood can operate on
@@ -23,6 +24,12 @@ func (g *globals) configureGlobals(d draw.Display) {
 	g.button = edwoodtest.NewImage(d, "button", image.Rect(0, 0, 10, 10))
 	g.modbutton = edwoodtest.NewImage(d, "modbutton", image.Rect(0, 0, 10, 10))
 	g.colbutton = edwoodtest.NewImage(d, "colbutton", image.Rect(0, 0, 10, 10))
+
+	// Initialise the palette so that convenience accessors (TextBack etc.)
+	// don't panic when tests exercise display-path code.
+	g.palette = theme.Light
+	g.palette.Tag.Colors(d)
+	g.palette.Text.Colors(d)
 
 	// Set up Undo to make sure that we see undoable results.
 	// By default, post-load, file.seq, file.putseq = 0, 0.

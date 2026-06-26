@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rjkroege/edwood/dumpfile"
 )
 
@@ -287,7 +288,7 @@ func TestFilenameChangeUndo(t *testing.T) {
 				t.Fatalf("dump failed: %v", err)
 			}
 
-			if diff := cmp.Diff(tc.want, got); diff != "" {
+			if diff := cmp.Diff(tc.want, got, cmpopts.IgnoreFields(dumpfile.Content{}, "Palette")); diff != "" {
 				t.Errorf("dump mismatch (-want +got):\n%s", diff)
 			}
 
