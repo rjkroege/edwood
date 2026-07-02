@@ -135,6 +135,24 @@ func rippleUpMultiLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// deleteOnlyCharFromLine removes "c", the only visible character on line 2 of
+// "ab\nc\nef". The trailing '\n' is kept, so line 2 becomes empty but no
+// visual line disappears and the return value is 0.
+func deleteOnlyCharFromLine(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("ab\nc\nef"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete 'c' at position 3; '\n' at position 4 stays, keeping line 2
+	// as a distinct (empty) visual line.
+	s := fr.Delete(3, 4)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // deleteMiddleLine removes the middle of three newline-terminated lines.
 // After the delete "ghi" should ripple up from line 3 to line 2 and line 3
 // should be cleared.
@@ -334,6 +352,16 @@ func TestDelete(t *testing.T) {
 				"fill (20,40)-(20,50) [0,3],[0,1]",
 			},
 			textarea: image.Rect(20, 10, 60, 40),
+		},
+		{
+			// Delete the only visible character on line 2 of "ab\nc\nef"; the
+			// trailing '\n' stays so no visual line disappears.
+			name:     "deleteOnlyCharFromLine",
+			fn:       deleteOnlyCharFromLine,
+			textarea: image.Rect(20, 10, 60, 40),
+			want: []string{
+				"fill (20,20)-(60,30) [0,1],[-,1]",
+			},
 		},
 		{
 			// Delete the middle of three lines: "ghi" ripples up to line 2,
