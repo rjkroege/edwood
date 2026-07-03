@@ -1,6 +1,7 @@
 package frame
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rjkroege/edwood/edwoodtest"
 )
+
+var rebase = flag.Bool("rebase", false, "overwrite SVG baselines with the current trial output")
 
 // Code needed to help write tests.
 
@@ -97,7 +100,14 @@ func visualizedoutputtest(t *testing.T, fr Frame) {
 	}
 	sf.Close()
 
+	if *rebase {
+		baseline := testName(t, "")
+		if err := os.Rename(oname, baseline); err != nil {
+			t.Fatalf("rebase: can't promote %s to %s: %v", oname, baseline, err)
+		}
+		return
+	}
+
 	// Compare the generated SVG to the baseline.
 	compareVisualizedOutputTestToBaseline(t)
-
 }
