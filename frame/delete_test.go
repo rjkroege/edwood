@@ -211,6 +211,132 @@ func deleteDefAndTrailingNewline(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// deleteEfFromBetweenBlanks removes "ef" from "abc\n\ndef\n\nghi\n".
+// "def" shrinks to "d" on row 3; surrounding blank lines stay and no
+// visual line disappears.
+func deleteEfFromBetweenBlanks(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	// 6-row frame: rows are "abc\n", "\n", "def\n", "\n", "ghi\n".
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'e' is at pos 6, 'f' at pos 7. Delete(6, 8).
+	s := fr.Delete(6, 8)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteFFromBetweenBlanks removes "f" from "abc\n\ndef\n\nghi\n".
+// "def" shrinks to "de" on row 3; surrounding blank lines stay and no
+// visual line disappears.
+func deleteFFromBetweenBlanks(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'f' is at pos 7. Delete(7, 8).
+	s := fr.Delete(7, 8)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteEfFromDefBlankGhi removes "ef" from "abc\ndef\n\nghi\n".
+// "def" shrinks to "d" on row 2; trailing blank and "ghi" stay, no
+// visual line disappears.
+func deleteEfFromDefBlankGhi(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	// 5-row frame holds all of "abc\ndef\n\nghi\n" (13 chars).
+	//   row 1: "abc\n"
+	//   row 2: "def\n"
+	//   row 3: "\n"       (blank line)
+	//   row 4: "ghi\n"
+	fr.Insert([]rune("abc\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'e' is at pos 5, 'f' at pos 6. Delete(5, 7).
+	s := fr.Delete(5, 7)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteFFromDefBlankGhi removes "f" from "abc\ndef\n\nghi\n".
+// "def" shrinks to "de" on row 2; trailing blank and "ghi" stay, no
+// visual line disappears.
+func deleteFFromDefBlankGhi(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'f' is at pos 6. Delete(6, 7).
+	s := fr.Delete(6, 7)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteEfFromDefGhi removes "ef" from "abc\ndef\nghi\n".
+// "def" shrinks to "d" on row 2; "ghi" stays on row 3, no line disappears.
+func deleteEfFromDefGhi(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	// 4-row frame holds all of "abc\ndef\nghi\n" (12 chars).
+	//   row 1: "abc\n"
+	//   row 2: "def\n"
+	//   row 3: "ghi\n"
+	fr.Insert([]rune("abc\ndef\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'e' is at pos 5, 'f' at pos 6. Delete(5, 7).
+	s := fr.Delete(5, 7)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteFFromDefGhi removes "f" from "abc\ndef\nghi\n".
+// "def" shrinks to "de" on row 2; "ghi" stays on row 3, no line disappears.
+func deleteFFromDefGhi(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\ndef\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// 'f' is at pos 6. Delete(6, 7).
+	s := fr.Delete(6, 7)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteFirstLineBeforeBlank removes "abc\n" from "abc\n\ndef\n\nghi\n".
+// The blank line ripples up to row 1 and one visual line disappears.
+func deleteFirstLineBeforeBlank(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete "abc\n" (positions 0–3); '\n' at pos 4 becomes the new row 1.
+	s := fr.Delete(0, 4)
+
+	if got, want := s, 1; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // deleteMiddleLine removes the middle of three newline-terminated lines.
 // After the delete "ghi" should ripple up from line 3 to line 2 and line 3
 // should be cleared.
@@ -454,6 +580,97 @@ func TestDelete(t *testing.T) {
 			want: []string{
 				"blit (20,40)-(60,50) [0,3],[-,1], to (20,30)-(60,40) [0,2],[-,1]",
 				"blit (20,50)-(60,70) [0,4],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
+				"fill (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
+			},
+		},
+		{
+			// Delete "ef" (pos 6-7) from "abc\n\ndef\n\nghi\n"; "def"→"d", no line disappears.
+			name:     "deleteEfFromBetweenBlanks",
+			fn:       deleteEfFromBetweenBlanks,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"fill (33,30)-(60,40) [1,2],[-,1]",
+				"fill (20,40)-(60,50) [0,3],[-,1]",
+				"blit (20,50)-(60,60) [0,4],[-,1], to (20,40)-(60,50) [0,3],[-,1]",
+				"blit (20,60)-(60,70) [0,5],[-,1], to (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
+			},
+		},
+		{
+			// Delete "f" (pos 7) from "abc\n\ndef\n\nghi\n"; "def"→"de", no line disappears.
+			name:     "deleteFFromBetweenBlanks",
+			fn:       deleteFFromBetweenBlanks,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"fill (46,30)-(60,40) [2,2],[-,1]",
+				"fill (20,40)-(60,50) [0,3],[-,1]",
+				"blit (20,50)-(60,60) [0,4],[-,1], to (20,40)-(60,50) [0,3],[-,1]",
+				"blit (20,60)-(60,70) [0,5],[-,1], to (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
+			},
+		},
+		{
+			// Delete "ef" (pos 5-6) from "abc\ndef\n\nghi\n"; "def"→"d", no line disappears.
+			name:     "deleteEfFromDefBlankGhi",
+			fn:       deleteEfFromDefBlankGhi,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+				"fill (33,20)-(60,30) [1,1],[-,1]",
+				"fill (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,40)-(60,50) [0,3],[-,1], to (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,50)-(60,60) [0,4],[-,1], to (20,40)-(60,50) [0,3],[-,1]",
+				"fill (20,40)-(60,50) [0,3],[-,1]",
+				"fill (20,50)-(20,60) [0,4],[0,1]",
+			},
+		},
+		{
+			// Delete "f" (pos 6) from "abc\ndef\n\nghi\n"; "def"→"de", no line disappears.
+			name:     "deleteFFromDefBlankGhi",
+			fn:       deleteFFromDefBlankGhi,
+			textarea: image.Rect(20, 10, 60, 60),
+			want: []string{
+				"fill (46,20)-(60,30) [2,1],[-,1]",
+				"fill (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,40)-(60,50) [0,3],[-,1], to (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,50)-(60,60) [0,4],[-,1], to (20,40)-(60,50) [0,3],[-,1]",
+				"fill (20,40)-(60,50) [0,3],[-,1]",
+				"fill (20,50)-(20,60) [0,4],[0,1]",
+			},
+		},
+		{
+			// Delete "ef" (pos 5-6) from "abc\ndef\nghi\n"; "def"→"d", no line disappears.
+			name:     "deleteEfFromDefGhi",
+			fn:       deleteEfFromDefGhi,
+			textarea: image.Rect(20, 10, 60, 50),
+			want: []string{
+				"fill (33,20)-(60,30) [1,1],[-,1]",
+				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
+				"fill (59,30)-(59,40) [3,2],[0,1]",
+			},
+		},
+		{
+			// Delete "f" (pos 6) from "abc\ndef\nghi\n"; "def"→"de", no line disappears.
+			name:     "deleteFFromDefGhi",
+			fn:       deleteFFromDefGhi,
+			textarea: image.Rect(20, 10, 60, 50),
+			want: []string{
+				"fill (46,20)-(60,30) [2,1],[-,1]",
+				"blit (20,30)-(59,40) [0,2],[3,1], to (20,30)-(59,40) [0,2],[3,1]",
+				"fill (59,30)-(59,40) [3,2],[0,1]",
+			},
+		},
+		{
+			// Delete "abc\n" (pos 0-3) from "abc\n\ndef\n\nghi\n"; blank ripples to
+			// row 1, one visual line disappears.
+			name:     "deleteFirstLineBeforeBlank",
+			fn:       deleteFirstLineBeforeBlank,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"blit (20,20)-(60,30) [0,1],[-,1], to (20,10)-(60,20) [0,0],[-,1]",
+				"blit (20,30)-(60,70) [0,2],[-,4], to (20,20)-(60,60) [0,1],[-,4]",
 				"fill (20,50)-(60,60) [0,4],[-,1]",
 				"fill (20,60)-(20,70) [0,5],[0,1]",
 			},
