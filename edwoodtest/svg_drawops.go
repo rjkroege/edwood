@@ -120,6 +120,7 @@ type Blitargs struct {
 	BlitOffset int
 	Src        image.Rectangle
 	Dest       image.Point
+	DestRect   image.Rectangle
 }
 
 const blittemplate = `<use href="#draw{{.SrcId}}" />
@@ -132,6 +133,7 @@ const blittemplate = `<use href="#draw{{.SrcId}}" />
 			<rect x="{{.Src.Min.X}}" y="{{.Src.Min.Y}}" width="{{.Src.Dx}}" height="{{.Src.Dy}}" />
 		</clipPath>
 		<use href="#draw{{.SrcId}}" clip-path="url(#draw{{.Id}}_blitsource)" x="{{.Dest.X}}" y="{{.Dest.Y}}" />
+		<rect x="{{.DestRect.Min.X}}" y="{{.DestRect.Min.Y}}" width="{{.DestRect.Dx}}" height="{{.DestRect.Dy}}" fill="none" stroke="green"/>
 	</g>
 </g>
 `
@@ -144,6 +146,7 @@ func blitsvg(id int, src image.Rectangle, pt image.Point, offset int) string {
 		Src:        src,
 		Dest:       pt.Sub(src.Min),
 		BlitOffset: offset,
+		DestRect:   image.Rectangle{Min: pt, Max: pt.Add(src.Size())},
 	}
 
 	swr := new(strings.Builder)
