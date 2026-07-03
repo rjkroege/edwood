@@ -25,10 +25,14 @@
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,10)-(59,20) [0,0],[3,1]</text>
 	</g>
-	<g id="draw1">
+	<defs>
+<g id="draw1">
 	<use href="#draw0" />
-	<rect x="20" y="10" width="39" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="10" width="39" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw1" />
+<rect x="20" y="10" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 <g transform="translate(0, 140)">
@@ -47,10 +51,14 @@
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (46,10)-(59,20) [2,0],[1,1]</text>
 	</g>
-	<g id="draw3">
+	<defs>
+<g id="draw3">
 	<use href="#draw2" />
-	<rect x="46" y="10" width="13" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="46" y="10" width="13" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw3" />
+<rect x="46" y="10" width="13" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 </svg>

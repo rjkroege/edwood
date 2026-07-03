@@ -25,30 +25,42 @@
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,10)-(60,20) [0,0],[-,1]</text>
 	</g>
-	<g id="draw1">
+	<defs>
+<g id="draw1">
 	<use href="#draw0" />
-	<rect x="20" y="10" width="40" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="10" width="40" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw1" />
+<rect x="20" y="10" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 <g transform="translate(0, 180)">
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,20)-(60,50) [0,1],[-,3]</text>
 	</g>
-	<g id="draw2">
+	<defs>
+<g id="draw2">
 	<use href="#draw1" />
-	<rect x="20" y="20" width="40" height="30" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="20" width="40" height="30" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw2" />
+<rect x="20" y="20" width="40" height="30" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 <g transform="translate(0, 270)">
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,50)-(20,60) [0,4],[0,1]</text>
 	</g>
-	<g id="draw3">
+	<defs>
+<g id="draw3">
 	<use href="#draw2" />
-	<rect x="20" y="50" width="0" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="50" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw3" />
+<rect x="20" y="50" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 <g transform="translate(0, 360)">
@@ -103,18 +115,20 @@
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">blit (20,40)-(60,50) [0,3],[-,1], to (20,50)-(60,60) [0,4],[-,1]</text>
 	</g>
+	<defs>
+<g id="draw8">
 	<use href="#draw7" />
+	<clipPath id="draw8_blitsource">
+		<rect x="20" y="40" width="40" height="10" />
+	</clipPath>
+	<use href="#draw7" clip-path="url(#draw8_blitsource)" x="0" y="10" />
+</g>
+</defs>
+<use href="#draw7" />
 <rect x="20" y="40" width="40" height="10" fill="none" stroke="red"/>
 <g transform="translate(70, 0)">
-	<g id="draw8">
-		<use href="#draw7" />
-		<clipPath id="draw8_blitsource">
-			
-			<rect x="20" y="40" width="40" height="10" />
-		</clipPath>
-		<use href="#draw7" clip-path="url(#draw8_blitsource)" x="0" y="10" />
-		<rect x="20" y="50" width="40" height="10" fill="none" stroke="green"/>
-	</g>
+	<use href="#draw8" />
+	<rect x="20" y="50" width="40" height="10" fill="none" stroke="green"/>
 </g>
 
 </g>
@@ -123,20 +137,28 @@
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,40)-(60,50) [0,3],[-,1]</text>
 	</g>
-	<g id="draw9">
+	<defs>
+<g id="draw9">
 	<use href="#draw8" />
-	<rect x="20" y="40" width="40" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="40" width="40" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw9" />
+<rect x="20" y="40" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 <g transform="translate(0, 900)">
 	<g transform="translate(0, -2)">
 		<text x="0" y="0" fill="black" class="small">fill (20,50)-(20,60) [0,4],[0,1]</text>
 	</g>
-	<g id="draw10">
+	<defs>
+<g id="draw10">
 	<use href="#draw9" />
-	<rect x="20" y="50" width="0" height="10" fill="#fefee9" stroke="navy" stroke-width="1"/>
-	</g>
+	<rect x="20" y="50" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw10" />
+<rect x="20" y="50" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 </svg>

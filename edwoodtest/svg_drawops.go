@@ -89,10 +89,14 @@ type Fillargs struct {
 	Fillcolhtml string
 }
 
-const filltemplate = `<g id="draw{{.Id}}">
+const filltemplate = `<defs>
+<g id="draw{{.Id}}">
 	<use href="#draw{{.SrcId}}" />
-	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="{{.Fillcolhtml}}" stroke="navy" stroke-width="1"/>
-	</g>`
+	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="{{.Fillcolhtml}}"/>
+</g>
+</defs>
+<use href="#draw{{.Id}}" />
+<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="none" stroke="navy" stroke-width="1"/>`
 
 func fillsvg(id int, rect, box image.Rectangle, img draw.Image) string {
 	ai := img.(*mockImage)
@@ -123,18 +127,20 @@ type Blitargs struct {
 	DestRect   image.Rectangle
 }
 
-const blittemplate = `<use href="#draw{{.SrcId}}" />
+const blittemplate = `<defs>
+<g id="draw{{.Id}}">
+	<use href="#draw{{.SrcId}}" />
+	<clipPath id="draw{{.Id}}_blitsource">
+		<rect x="{{.Src.Min.X}}" y="{{.Src.Min.Y}}" width="{{.Src.Dx}}" height="{{.Src.Dy}}" />
+	</clipPath>
+	<use href="#draw{{.SrcId}}" clip-path="url(#draw{{.Id}}_blitsource)" x="{{.Dest.X}}" y="{{.Dest.Y}}" />
+</g>
+</defs>
+<use href="#draw{{.SrcId}}" />
 <rect x="{{.Src.Min.X}}" y="{{.Src.Min.Y}}" width="{{.Src.Dx}}" height="{{.Src.Dy}}" fill="none" stroke="red"/>
 <g transform="translate({{.BlitOffset}}, 0)">
-	<g id="draw{{.Id}}">
-		<use href="#draw{{.SrcId}}" />
-		<clipPath id="draw{{.Id}}_blitsource">
-			<!-- This is the rectangle corresponding to the blit source -->
-			<rect x="{{.Src.Min.X}}" y="{{.Src.Min.Y}}" width="{{.Src.Dx}}" height="{{.Src.Dy}}" />
-		</clipPath>
-		<use href="#draw{{.SrcId}}" clip-path="url(#draw{{.Id}}_blitsource)" x="{{.Dest.X}}" y="{{.Dest.Y}}" />
-		<rect x="{{.DestRect.Min.X}}" y="{{.DestRect.Min.Y}}" width="{{.DestRect.Dx}}" height="{{.DestRect.Dy}}" fill="none" stroke="green"/>
-	</g>
+	<use href="#draw{{.Id}}" />
+	<rect x="{{.DestRect.Min.X}}" y="{{.DestRect.Min.Y}}" width="{{.DestRect.Dx}}" height="{{.DestRect.Dy}}" fill="none" stroke="green"/>
 </g>
 `
 
