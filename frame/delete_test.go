@@ -153,6 +153,64 @@ func deleteOnlyCharFromLine(t *testing.T, fr Frame, iv *invariants) {
 	}
 }
 
+// deleteDefBetweenEmptyLines removes "def" from "abc\n\ndef\n\nghi\n".
+// The preceding and following blank lines both stay; "def"'s visual row
+// becomes empty and "ghi" ripples up, but no visual line count changes.
+func deleteDefBetweenEmptyLines(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	// 6-row frame holds all of "abc\n\ndef\n\nghi\n" (14 chars).
+	//   row 1: "abc\n"
+	//   row 2: "\n"       (blank line)
+	//   row 3: "def\n"
+	//   row 4: "\n"       (blank line)
+	//   row 5: "ghi\n"
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete "def" (positions 5–7); the surrounding newlines stay intact.
+	s := fr.Delete(5, 8)
+
+	if got, want := s, 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteLeadingNewlineAndDef removes "\ndef" from "abc\n\ndef\n\nghi\n".
+// The blank line ('\n' at pos 4) and "def" (pos 5-7) are deleted; the '\n'
+// that terminated "def" and the remaining "\nghi\n" stay, so "ghi" ripples
+// up and one visual line disappears.
+func deleteLeadingNewlineAndDef(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete "\ndef" (positions 4–7); keeps the '\n' at position 8 onward.
+	s := fr.Delete(4, 8)
+
+	if got, want := s, 1; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// deleteDefAndTrailingNewline removes "def\n" from "abc\n\ndef\n\nghi\n".
+// "def" (pos 5-7) and its '\n' (pos 8) are deleted; the preceding blank line
+// and "\nghi\n" remain, so "ghi" ripples up and one visual line disappears.
+func deleteDefAndTrailingNewline(t *testing.T, fr Frame, iv *invariants) {
+	t.Helper()
+
+	fr.Insert([]rune("abc\n\ndef\n\nghi\n"), 0)
+	gdo(t, fr).Clear()
+
+	// Delete "def\n" (positions 5–8); the '\n' at position 9 and "ghi\n" stay.
+	s := fr.Delete(5, 9)
+
+	if got, want := s, 1; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // deleteMiddleLine removes the middle of three newline-terminated lines.
 // After the delete "ghi" should ripple up from line 3 to line 2 and line 3
 // should be cleared.
@@ -361,6 +419,43 @@ func TestDelete(t *testing.T) {
 			textarea: image.Rect(20, 10, 60, 40),
 			want: []string{
 				"fill (20,20)-(60,30) [0,1],[-,1]",
+			},
+		},
+		{
+			// Delete "def" (pos 5-7) from "abc\n\ndef\n\nghi\n"; row 3 becomes
+			// empty, surrounding blank lines absorb the change, no line disappears.
+			name:     "deleteDefBetweenEmptyLines",
+			fn:       deleteDefBetweenEmptyLines,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"fill (20,30)-(60,40) [0,2],[-,1]",
+			},
+		},
+		{
+			// Delete "\ndef" (pos 4-7) from "abc\n\ndef\n\nghi\n"; blank line and
+			// "def" removed, "ghi" ripples up — one visual line disappears.
+			name:     "deleteLeadingNewlineAndDef",
+			fn:       deleteLeadingNewlineAndDef,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"fill (20,20)-(60,30) [0,1],[-,1]",
+				"blit (20,40)-(60,50) [0,3],[-,1], to (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,50)-(60,70) [0,4],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
+				"fill (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
+			},
+		},
+		{
+			// Delete "def\n" (pos 5-8) from "abc\n\ndef\n\nghi\n"; "def" and its
+			// newline removed, "ghi" ripples up — one visual line disappears.
+			name:     "deleteDefAndTrailingNewline",
+			fn:       deleteDefAndTrailingNewline,
+			textarea: image.Rect(20, 10, 60, 70),
+			want: []string{
+				"blit (20,40)-(60,50) [0,3],[-,1], to (20,30)-(60,40) [0,2],[-,1]",
+				"blit (20,50)-(60,70) [0,4],[-,2], to (20,40)-(60,60) [0,3],[-,2]",
+				"fill (20,50)-(60,60) [0,4],[-,1]",
+				"fill (20,60)-(20,70) [0,5],[0,1]",
 			},
 		},
 		{
