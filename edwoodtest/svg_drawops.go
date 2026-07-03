@@ -195,8 +195,12 @@ const finalfiletemplate = `<html lang="en-US">
 
 <style>
 	.small { font: 8px sans-serif; }
+	.title { font: bold 16px sans-serif; }
 </style>
 
+{{- if .Title}}
+<text x="{{.ScreenBox.Min.X}}" y="{{.TitleY}}" fill="black" class="title">{{.Title}}</text>
+{{- end}}
 {{- $boxsize := .ScreenBox.Dy -}}
 {{- $vertfunc := .VertOffset }}
 {{range $index, $element := .Fragments}}
@@ -234,6 +238,12 @@ type Finalfileargs struct {
 	// Helper function used to move down in the visualization between
 	// successive draw operations.
 	VertOffset func(int, int) int
+
+	// Title is rendered as a large heading above the draw-op sequence.
+	Title string
+
+	// TitleY is the SVG y-coordinate for the title text baseline.
+	TitleY int
 }
 
 type AnnotatedFragments struct {
@@ -251,7 +261,8 @@ const (
 
 // singlesvgfile writes a single HTML file to w containing a scrollable
 // sequence of subops. rectofi is the rectangle of interest to consider.
-func singlesvgfile(w io.Writer, subops, annotations []string, rectofi image.Rectangle) error {
+// title is rendered as a large heading above the draw-op sequence.
+func singlesvgfile(w io.Writer, subops, annotations []string, rectofi image.Rectangle, title string) error {
 	annotatedfrags := make([]AnnotatedFragments, 0, len(subops))
 
 	for i, s := range subops {
@@ -271,6 +282,8 @@ func singlesvgfile(w io.Writer, subops, annotations []string, rectofi image.Rect
 		Fragments:  annotatedfrags,
 		ScreenBox:  rectofi,
 		VertOffset: verticaloffset,
+		Title:      title,
+		TitleY:     rectofi.Min.Y - padding/2,
 	}
 
 	return tmpl.ExecuteTemplate(w, "Final", finalargs)

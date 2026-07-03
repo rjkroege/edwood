@@ -81,7 +81,7 @@ func generateVisualizedOutput(t *testing.T, fr Frame) {
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name()); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()
@@ -95,7 +95,7 @@ func visualizedoutputtest(t *testing.T, fr Frame) {
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name()); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()

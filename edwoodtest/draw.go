@@ -29,8 +29,9 @@ type GettableDrawOps interface {
 	Clear()
 
 	// SVGDrawOps writes the accumulated SVG format drawops to w where rect
-	// is the area of interest for the drawops.
-	SVGDrawOps(w io.Writer) error
+	// is the area of interest for the drawops. title is rendered as a large
+	// heading at the top of the output (use t.Name() in tests).
+	SVGDrawOps(w io.Writer, title string) error
 }
 
 // mockDisplay implements draw.Display.
@@ -145,8 +146,8 @@ func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
 func (d *mockDisplay) DrawOps() []string              { return d.drawops }
 func (d *mockDisplay) Clear()                         { d.drawops = nil }
 
-func (d *mockDisplay) SVGDrawOps(w io.Writer) error {
-	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi)
+func (d *mockDisplay) SVGDrawOps(w io.Writer, title string) error {
+	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi, title)
 }
 
 var _ = draw.Image((*mockImage)(nil))
