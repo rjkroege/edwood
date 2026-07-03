@@ -48,6 +48,7 @@ type mockDisplay struct {
 	// testdata SVG out.
 	annotations []string
 	svgdrawops  []string
+	redundant   []bool
 	screenimage draw.Image
 
 	// roi is the rectangle of interest.
@@ -63,6 +64,7 @@ func NewDisplay(rectofi image.Rectangle) draw.Display {
 	md.screenimage = newimageimpl(md, "screen-800x600", draw.Notacolor, image.Rect(0, 0, 800, 600))
 	md.svgdrawops = append(md.svgdrawops, boundingboxsvg(0, rectofi))
 	md.annotations = append(md.annotations, fmt.Sprintf("target rect %v", rectofi))
+	md.redundant = append(md.redundant, false)
 	return md
 }
 
@@ -147,7 +149,7 @@ func (d *mockDisplay) DrawOps() []string              { return d.drawops }
 func (d *mockDisplay) Clear()                         { d.drawops = nil }
 
 func (d *mockDisplay) SVGDrawOps(w io.Writer, title string) error {
-	return singlesvgfile(w, d.svgdrawops, d.annotations, d.rectofi, title)
+	return singlesvgfile(w, d.svgdrawops, d.annotations, d.redundant, d.rectofi, title)
 }
 
 var _ = draw.Image((*mockImage)(nil))
@@ -270,6 +272,7 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 				blitspace+i.d.rectofi.Dx(),
 			))
 			i.d.annotations = append(i.d.annotations, op)
+			i.d.redundant = append(i.d.redundant, sr.Dx() == 0 || sr == r)
 		}
 	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname:
 		op = fmt.Sprintf("fill %v %s",
@@ -287,6 +290,7 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 				src,
 			))
 			i.d.annotations = append(i.d.annotations, op)
+			i.d.redundant = append(i.d.redundant, r.Dx() == 0)
 		}
 	}
 	i.d.drawops = append(i.d.drawops, op)
@@ -334,6 +338,7 @@ func (i *mockImage) Bytes(pt image.Point, src draw.Image, sp image.Point, f draw
 
 	i.d.svgdrawops = append(i.d.svgdrawops, bytessvg(len(i.d.svgdrawops), pt, b))
 	i.d.annotations = append(i.d.annotations, shortop)
+	i.d.redundant = append(i.d.redundant, false)
 
 	// TODO(rjk): This assumes fixed width. Consider generalizing.
 	return pt.Add(image.Pt(f.BytesWidth(b), 0))

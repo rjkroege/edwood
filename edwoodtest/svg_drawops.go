@@ -215,7 +215,7 @@ const finalfiletemplate = `<html lang="en-US">
 {{range $index, $element := .Fragments}}
 <g transform="translate(0, {{call $vertfunc $index $boxsize}})">
 	<g transform="translate(0, -2)">
-		<text x="0" y="0" fill="black" class="small">{{$element.Annotation}}</text>
+		<text x="0" y="0" fill="black" class="small">{{$element.Annotation}}{{if $element.Redundant}} <tspan font-style="italic">redundant?</tspan>{{end}}</text>
 	</g>
 	{{$element.SVG}}
 </g>
@@ -261,6 +261,10 @@ type AnnotatedFragments struct {
 
 	// The chunk of SVG corresponding to this fragment.
 	SVG template.HTML
+
+	// Redundant is true when the op is a no-op: 0-width fill, 0-width blit,
+	// or a blit whose source and destination rectangles are identical.
+	Redundant bool
 }
 
 const (
@@ -271,13 +275,14 @@ const (
 // singlesvgfile writes a single HTML file to w containing a scrollable
 // sequence of subops. rectofi is the rectangle of interest to consider.
 // title is rendered as a large heading above the draw-op sequence.
-func singlesvgfile(w io.Writer, subops, annotations []string, rectofi image.Rectangle, title string) error {
+func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, rectofi image.Rectangle, title string) error {
 	annotatedfrags := make([]AnnotatedFragments, 0, len(subops))
 
 	for i, s := range subops {
 		annotatedfrags = append(annotatedfrags, AnnotatedFragments{
 			Annotation: annotations[i],
 			SVG:        template.HTML(s),
+			Redundant:  redundant[i],
 		})
 	}
 
