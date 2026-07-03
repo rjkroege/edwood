@@ -197,10 +197,15 @@ func boundingboxsvg(id int, box image.Rectangle) string {
 const finalfiletemplate = `<html lang="en-US">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; }
+</style>
 </head>
 <body>
-<svg viewBox="{{.ViewBox.Min.X}} {{.ViewBox.Min.Y}} {{.ViewBox.Max.X}} {{.ViewBox.Max.Y}}" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="{{.ViewBox.Min.X}} {{.ViewBox.Min.Y}} {{.ViewBox.Max.X}} {{.ViewBox.Max.Y}}"
+     width="{{.ViewBox.Max.X}}" height="{{.ViewBox.Max.Y}}"
+     xmlns="http://www.w3.org/2000/svg">
 
 <style>
 	.small { font: 8px sans-serif; }
@@ -221,6 +226,33 @@ const finalfiletemplate = `<html lang="en-US">
 </g>
 {{end}}
 </svg>
+<script>
+(function () {
+	var svg = document.querySelector('svg');
+	var w = parseInt(svg.getAttribute('width'), 10);
+	var h = parseInt(svg.getAttribute('height'), 10);
+	function fitZoom() {
+		return Math.min(window.innerWidth / w, window.innerHeight / h);
+	}
+	var zoom = fitZoom();
+	svg.style.zoom = zoom;
+
+	document.addEventListener('keydown', function (e) {
+		if (!e.metaKey && !e.ctrlKey) { return; }
+		if (e.key === '=' || e.key === '+') {
+			zoom *= 1.2;
+		} else if (e.key === '-') {
+			zoom /= 1.2;
+		} else if (e.key === '0') {
+			zoom = fitZoom();
+		} else {
+			return;
+		}
+		e.preventDefault();
+		svg.style.zoom = zoom;
+	});
+}());
+</script>
 </body>
 </html>
 `
