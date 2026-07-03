@@ -91,7 +91,7 @@ type Fillargs struct {
 
 const filltemplate = `<g id="draw{{.Id}}">
 	<use href="#draw{{.SrcId}}" />
-	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="{{.Fillcolhtml}}"/>
+	<rect x="{{.Rect.Min.X}}" y="{{.Rect.Min.Y}}" width="{{.Rect.Dx}}" height="{{.Rect.Dy}}" fill="{{.Fillcolhtml}}" stroke="navy" stroke-width="1"/>
 	</g>`
 
 func fillsvg(id int, rect, box image.Rectangle, img draw.Image) string {
