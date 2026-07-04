@@ -203,18 +203,15 @@ body { margin: 0; }
 </style>
 </head>
 <body>
+{{- if .Title}}<h1>{{.Title}}</h1>{{end}}
 <svg viewBox="{{.ViewBox.Min.X}} {{.ViewBox.Min.Y}} {{.ViewBox.Max.X}} {{.ViewBox.Max.Y}}"
      width="{{.ViewBox.Max.X}}" height="{{.ViewBox.Max.Y}}"
      xmlns="http://www.w3.org/2000/svg">
 
 <style>
 	.small { font: 8px sans-serif; }
-	.title { font: bold 16px sans-serif; }
 </style>
 
-{{- if .Title}}
-<text x="{{.ScreenBox.Min.X}}" y="{{.TitleY}}" fill="black" class="title">{{.Title}}</text>
-{{- end}}
 {{- $boxsize := .ScreenBox.Dy -}}
 {{- $vertfunc := .VertOffset }}
 {{range $index, $element := .Fragments}}
@@ -280,11 +277,8 @@ type Finalfileargs struct {
 	// successive draw operations.
 	VertOffset func(int, int) int
 
-	// Title is rendered as a large heading above the draw-op sequence.
+	// Title is rendered as an <h1> above the SVG.
 	Title string
-
-	// TitleY is the SVG y-coordinate for the title text baseline.
-	TitleY int
 }
 
 type AnnotatedFragments struct {
@@ -328,8 +322,7 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 		Fragments:  annotatedfrags,
 		ScreenBox:  rectofi,
 		VertOffset: verticaloffset,
-		Title:      title,
-		TitleY:     rectofi.Min.Y - padding/2,
+		Title: title,
 	}
 
 	return tmpl.ExecuteTemplate(w, "Final", finalargs)
