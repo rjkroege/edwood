@@ -323,7 +323,7 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 		Fragments:  annotatedfrags,
 		ScreenBox:  rectofi,
 		VertOffset: verticaloffset,
-		Title: title,
+		Title:      title,
 	}
 
 	return tmpl.ExecuteTemplate(w, "Final", finalargs)
