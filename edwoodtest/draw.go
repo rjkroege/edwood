@@ -31,7 +31,9 @@ type GettableDrawOps interface {
 	// SVGDrawOps writes the accumulated SVG format drawops to w where rect
 	// is the area of interest for the drawops. title is rendered as a large
 	// heading at the top of the output (use t.Name() in tests).
-	SVGDrawOps(w io.Writer, title string) error
+	// sourceFile is the absolute path of the Go source file that defines
+	// the test function (used to generate a plumb: link in the heading).
+	SVGDrawOps(w io.Writer, title, sourceFile string) error
 }
 
 // mockDisplay implements draw.Display.
@@ -148,8 +150,8 @@ func (d *mockDisplay) SetCursor(c *draw.Cursor) error { return nil }
 func (d *mockDisplay) DrawOps() []string              { return d.drawops }
 func (d *mockDisplay) Clear()                         { d.drawops = nil }
 
-func (d *mockDisplay) SVGDrawOps(w io.Writer, title string) error {
-	return singlesvgfile(w, d.svgdrawops, d.annotations, d.redundant, d.rectofi, title)
+func (d *mockDisplay) SVGDrawOps(w io.Writer, title, sourceFile string) error {
+	return singlesvgfile(w, d.svgdrawops, d.annotations, d.redundant, d.rectofi, title, sourceFile)
 }
 
 var _ = draw.Image((*mockImage)(nil))

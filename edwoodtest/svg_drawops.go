@@ -204,7 +204,7 @@ h1 { font-family: sans-serif; }
 </style>
 </head>
 <body>
-{{- if .Title}}<h1>{{.Title}}</h1>{{end}}
+{{- if .Title}}<h1>{{if .PlumbURL}}<a href="{{.PlumbURL}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}</h1>{{end}}
 <svg viewBox="{{.ViewBox.Min.X}} {{.ViewBox.Min.Y}} {{.ViewBox.Max.X}} {{.ViewBox.Max.Y}}"
      width="{{.ViewBox.Max.X}}" height="{{.ViewBox.Max.Y}}"
      xmlns="http://www.w3.org/2000/svg">
@@ -280,6 +280,9 @@ type Finalfileargs struct {
 
 	// Title is rendered as an <h1> above the SVG.
 	Title string
+
+	// PlumbURL is the href for the title link (plumb: scheme), empty if unavailable.
+	PlumbURL template.URL
 }
 
 type AnnotatedFragments struct {
@@ -302,7 +305,9 @@ const (
 // singlesvgfile writes a single HTML file to w containing a scrollable
 // sequence of subops. rectofi is the rectangle of interest to consider.
 // title is rendered as a large heading above the draw-op sequence.
-func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, rectofi image.Rectangle, title string) error {
+// sourceFile is the absolute path of the Go source file that defines the
+// test (used to build a plumb: link); empty string disables the link.
+func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, rectofi image.Rectangle, title, sourceFile string) error {
 	annotatedfrags := make([]AnnotatedFragments, 0, len(subops))
 
 	for i, s := range subops {
@@ -311,6 +316,15 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 			SVG:        template.HTML(s),
 			Redundant:  redundant[i],
 		})
+	}
+
+	var plumbURL template.URL
+	if title != "" && sourceFile != "" {
+		subtestName := title
+		if i := strings.LastIndex(title, "/"); i >= 0 {
+			subtestName = title[i+1:]
+		}
+		plumbURL = template.URL("plumb:" + sourceFile + ":/" + subtestName)
 	}
 
 	finalargs := Finalfileargs{
@@ -324,6 +338,7 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 		ScreenBox:  rectofi,
 		VertOffset: verticaloffset,
 		Title:      title,
+		PlumbURL:   plumbURL,
 	}
 
 	return tmpl.ExecuteTemplate(w, "Final", finalargs)

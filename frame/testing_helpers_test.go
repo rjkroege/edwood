@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -76,12 +77,13 @@ func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
 // to a baseline. Used for known-failing tests that document a bug.
 func generateVisualizedOutput(t *testing.T, fr Frame) {
 	t.Helper()
+	_, sourceFile, _, _ := runtime.Caller(1)
 	oname := makeVisualizedOutputTestPath(t)
 	sf, err := os.Create(oname)
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf, t.Name()); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceFile); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()
@@ -90,12 +92,13 @@ func generateVisualizedOutput(t *testing.T, fr Frame) {
 // visualizedoutputtest generates SVG-based graphical output
 func visualizedoutputtest(t *testing.T, fr Frame) {
 	t.Helper()
+	_, sourceFile, _, _ := runtime.Caller(1)
 	oname := makeVisualizedOutputTestPath(t)
 	sf, err := os.Create(oname)
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf, t.Name()); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceFile); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()
