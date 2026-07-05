@@ -258,9 +258,9 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 	switch {
 	case i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname && srcname == i.n:
 		sr := r.Sub(r.Min).Add(p1)
-		op = fmt.Sprintf("blit %v %s, to %v %s",
-			sr, rectochars(sr),
-			r, rectochars(r),
+		op = fmt.Sprintf("blit %v, to %v",
+			sr,
+			r,
 		)
 
 		// TODO(rjk): If this is right, fold it out and make an improved case statement.
@@ -277,8 +277,8 @@ func (i *mockImage) Draw(r image.Rectangle, src, mask draw.Image, p1 image.Point
 			i.d.redundant = append(i.d.redundant, sr.Dx() == 0 || sr == r)
 		}
 	case src != nil && i.r.Dx() > 0 && i.r.Dy() > 0 && maskname == srcname:
-		op = fmt.Sprintf("fill %v %s",
-			r, rectochars(r),
+		op = fmt.Sprintf("fill %v",
+			r,
 		)
 
 		// TODO(rjk): If this is right, fold it out and make an improved case statement.
