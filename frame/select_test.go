@@ -8,6 +8,11 @@ import (
 	"github.com/rjkroege/edwood/draw"
 )
 
+// selectSingleCharacterAtLineEnd selects 'b', the last character of "0ab",
+// in a single-line frame.
+//
+// 'b' = char 2 at (46,10); right edge of 'b' = (59,10).
+// Selection: [2, 3) = "b".
 func selectSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants) {
 	t.Helper()
 
@@ -17,8 +22,6 @@ func selectSingleCharacterAtLineEnd(t *testing.T, fr Frame, iv *invariants) {
 	ch := make(chan draw.Mouse, 1)
 	mc := &draw.Mousectl{C: ch}
 	downevent := draw.Mouse{Point: image.Pt(46, 10), Buttons: 1}
-
-	// Pre-load a single event: release at right edge of 'b' → selects chars [2, 3)
 	ch <- draw.Mouse{Point: image.Pt(59, 10), Buttons: 0}
 
 	p0, p1 := fr.Select(mc, &downevent, func(SelectScrollUpdater, int) {})
