@@ -7,7 +7,7 @@ body { margin: 0; }
 h1 { font-family: sans-serif; }
 </style>
 </head>
-<body><h1><a href="plumb:/Users/rjkroege/tools/edwood/frame/insert_test.go:/splitWrappedLine">TestInsert/splitWrappedLine</a></h1>
+<body><h1 data-source="frame/insert_test.go" data-fn="splitWrappedLine">TestInsert/splitWrappedLine</h1>
 <svg viewBox="-20 -30 190 990"
      width="190" height="990"
      xmlns="http://www.w3.org/2000/svg">
@@ -179,6 +179,23 @@ h1 { font-family: sans-serif; }
 		e.preventDefault();
 		svg.style.zoom = zoom;
 	});
+}());
+</script>
+<script>
+(function () {
+	var h1 = document.querySelector('h1[data-source]');
+	if (!h1) { return; }
+	var src = h1.getAttribute('data-source');
+	var fn = h1.getAttribute('data-fn');
+	var filePath = window.location.pathname;
+	var sourceDir = src.split('/')[0];
+	var m = filePath.match(new RegExp('^(.*?)/' + sourceDir + '/testdata/'));
+	if (!m) { return; }
+	var a = document.createElement('a');
+	a.href = 'plumb:' + m[1] + '/' + src + ':/' + fn;
+	a.textContent = h1.textContent;
+	h1.textContent = '';
+	h1.appendChild(a);
 }());
 </script>
 </body>

@@ -204,7 +204,7 @@ h1 { font-family: sans-serif; }
 </style>
 </head>
 <body>
-{{- if .Title}}<h1>{{if .PlumbURL}}<a href="{{.PlumbURL}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}</h1>{{end}}
+{{- if .Title}}<h1{{if .DataSource}} data-source="{{.DataSource}}" data-fn="{{.DataFn}}"{{end}}>{{.Title}}</h1>{{end}}
 <svg viewBox="{{.ViewBox.Min.X}} {{.ViewBox.Min.Y}} {{.ViewBox.Max.X}} {{.ViewBox.Max.Y}}"
      width="{{.ViewBox.Max.X}}" height="{{.ViewBox.Max.Y}}"
      xmlns="http://www.w3.org/2000/svg">
@@ -251,6 +251,23 @@ h1 { font-family: sans-serif; }
 	});
 }());
 </script>
+<script>
+(function () {
+	var h1 = document.querySelector('h1[data-source]');
+	if (!h1) { return; }
+	var src = h1.getAttribute('data-source');
+	var fn = h1.getAttribute('data-fn');
+	var filePath = window.location.pathname;
+	var sourceDir = src.split('/')[0];
+	var m = filePath.match(new RegExp('^(.*?)/' + sourceDir + '/testdata/'));
+	if (!m) { return; }
+	var a = document.createElement('a');
+	a.href = 'plumb:' + m[1] + '/' + src + ':/' + fn;
+	a.textContent = h1.textContent;
+	h1.textContent = '';
+	h1.appendChild(a);
+}());
+</script>
 </body>
 </html>
 `
@@ -281,8 +298,13 @@ type Finalfileargs struct {
 	// Title is rendered as an <h1> above the SVG.
 	Title string
 
-	// PlumbURL is the href for the title link (plumb: scheme), empty if unavailable.
-	PlumbURL template.URL
+	// DataSource is the repo-relative slash path of the Go source file that
+	// defines the test (e.g. "frame/delete_test.go"). Used by JS to build a
+	// plumb: link at display time so no machine-specific path is stored.
+	DataSource string
+
+	// DataFn is the subtest function name (the part of Title after the last "/").
+	DataFn string
 }
 
 type AnnotatedFragments struct {
@@ -305,8 +327,9 @@ const (
 // singlesvgfile writes a single HTML file to w containing a scrollable
 // sequence of subops. rectofi is the rectangle of interest to consider.
 // title is rendered as a large heading above the draw-op sequence.
-// sourceFile is the absolute path of the Go source file that defines the
-// test (used to build a plumb: link); empty string disables the link.
+// sourceFile is the repo-relative slash path of the Go source file that
+// defines the test (e.g. "frame/delete_test.go"); used by JS at display
+// time to construct a plumb: link. Empty string disables the link.
 func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, rectofi image.Rectangle, title, sourceFile string) error {
 	annotatedfrags := make([]AnnotatedFragments, 0, len(subops))
 
@@ -318,13 +341,9 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 		})
 	}
 
-	var plumbURL template.URL
-	if title != "" && sourceFile != "" {
-		subtestName := title
-		if i := strings.LastIndex(title, "/"); i >= 0 {
-			subtestName = title[i+1:]
-		}
-		plumbURL = template.URL("plumb:" + sourceFile + ":/" + subtestName)
+	dataFn := title
+	if i := strings.LastIndex(title, "/"); i >= 0 {
+		dataFn = title[i+1:]
 	}
 
 	finalargs := Finalfileargs{
@@ -338,7 +357,8 @@ func singlesvgfile(w io.Writer, subops, annotations []string, redundant []bool, 
 		ScreenBox:  rectofi,
 		VertOffset: verticaloffset,
 		Title:      title,
-		PlumbURL:   plumbURL,
+		DataSource: sourceFile,
+		DataFn:     dataFn,
 	}
 
 	return tmpl.ExecuteTemplate(w, "Final", finalargs)

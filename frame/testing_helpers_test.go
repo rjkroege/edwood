@@ -73,17 +73,48 @@ func gdo(t *testing.T, fr Frame) edwoodtest.GettableDrawOps {
 	return gdo
 }
 
+// findModuleRoot walks up from dir until it finds a go.mod file.
+func findModuleRoot(dir string) string {
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+// sourceRelFile returns the repo-relative slash path of the file at the
+// given runtime.Caller skip depth, relative to the module root.
+func sourceRelFile(skip int) string {
+	_, absFile, _, ok := runtime.Caller(skip)
+	if !ok {
+		return ""
+	}
+	root := findModuleRoot(filepath.Dir(absFile))
+	if root == "" {
+		return absFile
+	}
+	rel, err := filepath.Rel(root, absFile)
+	if err != nil {
+		return absFile
+	}
+	return filepath.ToSlash(rel)
+}
+
 // generateVisualizedOutput writes the SVG trial file without comparing
 // to a baseline. Used for known-failing tests that document a bug.
 func generateVisualizedOutput(t *testing.T, fr Frame) {
 	t.Helper()
-	_, sourceFile, _, _ := runtime.Caller(1)
 	oname := makeVisualizedOutputTestPath(t)
 	sf, err := os.Create(oname)
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceFile); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceRelFile(2)); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()
@@ -92,13 +123,12 @@ func generateVisualizedOutput(t *testing.T, fr Frame) {
 // visualizedoutputtest generates SVG-based graphical output
 func visualizedoutputtest(t *testing.T, fr Frame) {
 	t.Helper()
-	_, sourceFile, _, _ := runtime.Caller(1)
 	oname := makeVisualizedOutputTestPath(t)
 	sf, err := os.Create(oname)
 	if err != nil {
 		t.Fatalf("can't make a file for the test output %s: %v", oname, err)
 	}
-	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceFile); err != nil {
+	if err := gdo(t, fr).SVGDrawOps(sf, t.Name(), sourceRelFile(2)); err != nil {
 		t.Fatalf("can't write a file for the test output %s: %v", oname, err)
 	}
 	sf.Close()
