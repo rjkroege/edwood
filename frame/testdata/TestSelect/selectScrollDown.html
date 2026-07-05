@@ -1,0 +1,558 @@
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; }
+h1 { font-family: sans-serif; }
+</style>
+</head>
+<body><h1 data-source="frame/select_test.go" data-fn="selectScrollDown">TestSelect/selectScrollDown</h1>
+<svg viewBox="-20 -30 190 2520"
+     width="190" height="2520"
+     xmlns="http://www.w3.org/2000/svg">
+
+<style>
+	.small { font: 8px sans-serif; }
+</style>
+
+<g transform="translate(0, 0)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">target rect (20,10)-(60,40)</text>
+	</g>
+	<g id="draw0">
+	<rect x="20" y="10" width="40" height="30" fill="none" stroke="black"/>
+	</g>
+</g>
+
+<g transform="translate(0, 70)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,10)-(60,20) [0,0],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw1">
+	<use href="#draw0" />
+	<rect x="20" y="10" width="40" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw1" />
+<rect x="20" y="10" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 140)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(60,40) [0,1],[-,2]</text>
+	</g>
+	<defs>
+<g id="draw2">
+	<use href="#draw1" />
+	<rect x="20" y="20" width="40" height="20" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw2" />
+<rect x="20" y="20" width="40" height="20" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 210)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,40)-(20,50) [0,3],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw3">
+	<use href="#draw2" />
+	<rect x="20" y="40" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw3" />
+<rect x="20" y="40" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 280)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;abc&#34; atpoint: (20,10) [0,0] fill: black</text>
+	</g>
+	<g id="draw4">
+	<use href="#draw3" />
+	<text x="22" y="18" fill="black" class="small">a</text>
+	<text x="35" y="18" fill="black" class="small">b</text>
+	<text x="48" y="18" fill="black" class="small">c</text>
+	</g>
+</g>
+
+<g transform="translate(0, 350)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;def&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw5">
+	<use href="#draw4" />
+	<text x="22" y="28" fill="black" class="small">d</text>
+	<text x="35" y="28" fill="black" class="small">e</text>
+	<text x="48" y="28" fill="black" class="small">f</text>
+	</g>
+</g>
+
+<g transform="translate(0, 420)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ghi&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw6">
+	<use href="#draw5" />
+	<text x="22" y="38" fill="black" class="small">g</text>
+	<text x="35" y="38" fill="black" class="small">h</text>
+	<text x="48" y="38" fill="black" class="small">i</text>
+	</g>
+</g>
+
+<g transform="translate(0, 490)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (19,30)-(22,40) [-,2],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw7">
+	<use href="#draw6" />
+	<rect x="19" y="30" width="3" height="10" fill="#ffffff"/>
+</g>
+</defs>
+<use href="#draw7" />
+<rect x="19" y="30" width="3" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 560)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (20,20)-(60,30) [0,1],[-,1], to (20,10)-(60,20) [0,0],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw8">
+	<use href="#draw7" />
+	<clipPath id="draw8_blitsource">
+		<rect x="20" y="20" width="40" height="10" />
+	</clipPath>
+	<use href="#draw7" clip-path="url(#draw8_blitsource)" x="0" y="-10" />
+</g>
+</defs>
+<use href="#draw7" />
+<rect x="20" y="20" width="40" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<use href="#draw8" />
+	<rect x="20" y="10" width="40" height="10" fill="none" stroke="green"/>
+</g>
+
+</g>
+
+<g transform="translate(0, 630)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">blit (20,30)-(60,40) [0,2],[-,1], to (20,20)-(60,30) [0,1],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw9">
+	<use href="#draw8" />
+	<clipPath id="draw9_blitsource">
+		<rect x="20" y="30" width="40" height="10" />
+	</clipPath>
+	<use href="#draw8" clip-path="url(#draw9_blitsource)" x="0" y="-10" />
+</g>
+</defs>
+<use href="#draw8" />
+<rect x="20" y="30" width="40" height="10" fill="none" stroke="red"/>
+<g transform="translate(70, 0)">
+	<use href="#draw9" />
+	<rect x="20" y="20" width="40" height="10" fill="none" stroke="green"/>
+</g>
+
+</g>
+
+<g transform="translate(0, 700)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(60,40) [0,2],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw10">
+	<use href="#draw9" />
+	<rect x="20" y="30" width="40" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw10" />
+<rect x="20" y="30" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 770)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,40)-(20,50) [0,3],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw11">
+	<use href="#draw10" />
+	<rect x="20" y="40" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw11" />
+<rect x="20" y="40" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 840)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (19,20)-(22,30) [-,1],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw12">
+	<use href="#draw11" />
+	<rect x="19" y="20" width="3" height="10" fill="#ffffff"/>
+</g>
+</defs>
+<use href="#draw12" />
+<rect x="19" y="20" width="3" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 910)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(60,40) [0,2],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw13">
+	<use href="#draw12" />
+	<rect x="20" y="30" width="40" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw13" />
+<rect x="20" y="30" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 980)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,40)-(20,50) [0,3],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw14">
+	<use href="#draw13" />
+	<rect x="20" y="40" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw14" />
+<rect x="20" y="40" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1050)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;012&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw15">
+	<use href="#draw14" />
+	<text x="22" y="38" fill="black" class="small">0</text>
+	<text x="35" y="38" fill="black" class="small">1</text>
+	<text x="48" y="38" fill="black" class="small">2</text>
+	</g>
+</g>
+
+<g transform="translate(0, 1120)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(59,30) [0,1],[3,1]</text>
+	</g>
+	<defs>
+<g id="draw16">
+	<use href="#draw15" />
+	<rect x="20" y="20" width="39" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw16" />
+<rect x="20" y="20" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1190)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ghi&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw17">
+	<use href="#draw16" />
+	<text x="22" y="28" fill="black" class="small">g</text>
+	<text x="35" y="28" fill="black" class="small">h</text>
+	<text x="48" y="28" fill="black" class="small">i</text>
+	</g>
+</g>
+
+<g transform="translate(0, 1260)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,20)-(60,30) [3,1],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw18">
+	<use href="#draw17" />
+	<rect x="59" y="20" width="1" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw18" />
+<rect x="59" y="20" width="1" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1330)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (60,20)-(60,30) [-,1],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw19">
+	<use href="#draw18" />
+	<rect x="60" y="20" width="0" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw19" />
+<rect x="60" y="20" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1400)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(59,40) [0,2],[3,1]</text>
+	</g>
+	<defs>
+<g id="draw20">
+	<use href="#draw19" />
+	<rect x="20" y="30" width="39" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw20" />
+<rect x="20" y="30" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1470)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;012&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw21">
+	<use href="#draw20" />
+	<text x="22" y="38" fill="black" class="small">0</text>
+	<text x="35" y="38" fill="black" class="small">1</text>
+	<text x="48" y="38" fill="black" class="small">2</text>
+	</g>
+</g>
+
+<g transform="translate(0, 1540)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,30)-(60,40) [3,2],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw22">
+	<use href="#draw21" />
+	<rect x="59" y="30" width="1" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw22" />
+<rect x="59" y="30" width="1" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1610)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(59,30) [0,1],[3,1]</text>
+	</g>
+	<defs>
+<g id="draw23">
+	<use href="#draw22" />
+	<rect x="20" y="20" width="39" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw23" />
+<rect x="20" y="20" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1680)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ghi&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw24">
+	<use href="#draw23" />
+	<text x="22" y="28" fill="black" class="small">g</text>
+	<text x="35" y="28" fill="black" class="small">h</text>
+	<text x="48" y="28" fill="black" class="small">i</text>
+	</g>
+</g>
+
+<g transform="translate(0, 1750)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,20)-(60,30) [3,1],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw25">
+	<use href="#draw24" />
+	<rect x="59" y="20" width="1" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw25" />
+<rect x="59" y="20" width="1" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1820)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (60,20)-(60,30) [-,1],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw26">
+	<use href="#draw25" />
+	<rect x="60" y="20" width="0" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw26" />
+<rect x="60" y="20" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1890)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(59,40) [0,2],[3,1]</text>
+	</g>
+	<defs>
+<g id="draw27">
+	<use href="#draw26" />
+	<rect x="20" y="30" width="39" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw27" />
+<rect x="20" y="30" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 1960)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;012&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw28">
+	<use href="#draw27" />
+	<text x="22" y="38" fill="black" class="small">0</text>
+	<text x="35" y="38" fill="black" class="small">1</text>
+	<text x="48" y="38" fill="black" class="small">2</text>
+	</g>
+</g>
+
+<g transform="translate(0, 2030)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,30)-(60,40) [3,2],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw29">
+	<use href="#draw28" />
+	<rect x="59" y="30" width="1" height="10" fill="#fefee9"/>
+</g>
+</defs>
+<use href="#draw29" />
+<rect x="59" y="30" width="1" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 2100)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,20)-(59,30) [0,1],[3,1]</text>
+	</g>
+	<defs>
+<g id="draw30">
+	<use href="#draw29" />
+	<rect x="20" y="20" width="39" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw30" />
+<rect x="20" y="20" width="39" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 2170)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;ghi&#34; atpoint: (20,20) [0,1] fill: black</text>
+	</g>
+	<g id="draw31">
+	<use href="#draw30" />
+	<text x="22" y="28" fill="black" class="small">g</text>
+	<text x="35" y="28" fill="black" class="small">h</text>
+	<text x="48" y="28" fill="black" class="small">i</text>
+	</g>
+</g>
+
+<g transform="translate(0, 2240)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (59,20)-(60,30) [3,1],[-,1]</text>
+	</g>
+	<defs>
+<g id="draw32">
+	<use href="#draw31" />
+	<rect x="59" y="20" width="1" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw32" />
+<rect x="59" y="20" width="1" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 2310)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (60,20)-(60,30) [-,1],[0,1] <tspan font-style="italic">redundant?</tspan></text>
+	</g>
+	<defs>
+<g id="draw33">
+	<use href="#draw32" />
+	<rect x="60" y="20" width="0" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw33" />
+<rect x="60" y="20" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 2380)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">fill (20,30)-(33,40) [0,2],[1,1]</text>
+	</g>
+	<defs>
+<g id="draw34">
+	<use href="#draw33" />
+	<rect x="20" y="30" width="13" height="10" fill="#eeee9e"/>
+</g>
+</defs>
+<use href="#draw34" />
+<rect x="20" y="30" width="13" height="10" fill="none" stroke="navy" stroke-width="1"/>
+</g>
+
+<g transform="translate(0, 2450)">
+	<g transform="translate(0, -2)">
+		<text x="0" y="0" fill="black" class="small">string &#34;0&#34; atpoint: (20,30) [0,2] fill: black</text>
+	</g>
+	<g id="draw35">
+	<use href="#draw34" />
+	<text x="22" y="38" fill="black" class="small">0</text>
+	</g>
+</g>
+
+</svg>
+<script>
+(function () {
+	var svg = document.querySelector('svg');
+	var w = parseInt(svg.getAttribute('width'), 10);
+	var h = parseInt(svg.getAttribute('height'), 10);
+	function fitZoom() {
+		return Math.min(window.innerWidth / w, window.innerHeight / h);
+	}
+	var zoom = fitZoom();
+	svg.style.zoom = zoom;
+
+	document.addEventListener('keydown', function (e) {
+		if (!e.metaKey && !e.ctrlKey) { return; }
+		if (e.key === '=' || e.key === '+') {
+			zoom *= 1.2;
+		} else if (e.key === '-') {
+			zoom /= 1.2;
+		} else if (e.key === '0') {
+			zoom = fitZoom();
+		} else {
+			return;
+		}
+		e.preventDefault();
+		svg.style.zoom = zoom;
+	});
+}());
+</script>
+<script>
+(function () {
+	var h1 = document.querySelector('h1[data-source]');
+	if (!h1) { return; }
+	var src = h1.getAttribute('data-source');
+	var fn = h1.getAttribute('data-fn');
+	var filePath = window.location.pathname;
+	var sourceDir = src.split('/')[0];
+	var m = filePath.match(new RegExp('^(.*?)/' + sourceDir + '/testdata/'));
+	if (!m) { return; }
+	var a = document.createElement('a');
+	a.href = 'plumb:' + m[1] + '/' + src + ':/' + fn;
+	a.textContent = h1.textContent;
+	h1.textContent = '';
+	h1.appendChild(a);
+}());
+</script>
+</body>
+</html>
