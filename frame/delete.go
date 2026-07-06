@@ -101,15 +101,19 @@ func (f *frameimpl) deleteimpl(p0, p1 int) int {
 		// Y stays put so the pt1.Y != pt0.Y block below can blit remaining
 		// lines upward by the correct amount.
 		if b.Nrune < 0 && b.Bc == '\n' && pt0.X == f.rect.Min.X {
-			// pt0 is at the left margin because the deletion started at a
-			// visual-line start. If that start was a hard '\n' (or frame
-			// beginning), the '\n' we just placed fills an empty visual line
-			// and the next content is already correctly positioned — advance
-			// pt0.Y so the post-loop blit block sees no Y difference.
-			// If the start was a soft wrap (non-'\n' predecessor), the post-loop
-			// blit must ripple the next visual line upward, so leave pt0.Y alone.
-			prevIsNL := n0 == nn0 && (nn0 == 0 || (f.box[nn0-1].Nrune < 0 && f.box[nn0-1].Bc == '\n'))
-			if prevIsNL {
+			// pt0 is at the left margin for one of two reasons:
+			//   (a) First iteration: the deletion began at a visual-line start.
+			//       Advance pt0.Y only if that line was newline-initiated (hard '\n'
+			//       or frame start). If it was a soft wrap, the next visual line must
+			//       be blitted up to fill the vacated space, so leave pt0.Y alone.
+			//   (b) Later iteration: the loop wrapped pt0 here after processing a
+			//       preceding '\n'. The '\n' now fills a complete visual row with
+			//       nothing displaced below it, so always advance pt0.Y.
+			// In other words, skip the advance only when it is the first iteration
+			// and the predecessor was a soft wrap (not a '\n').
+			prevIsSoftWrap := n0 == nn0 && nn0 > 0 &&
+				!(f.box[nn0-1].Nrune < 0 && f.box[nn0-1].Bc == '\n')
+			if !prevIsSoftWrap {
 				pt0.Y += f.defaultfontheight
 				if pt0.Y > f.rect.Max.Y {
 					pt0.Y = f.rect.Max.Y

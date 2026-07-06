@@ -8,8 +8,8 @@ h1 { font-family: sans-serif; }
 </style>
 </head>
 <body><h1 data-source="frame/delete_test.go" data-fn="deleteFFromBetweenBlanks">TestDelete/deleteFFromBetweenBlanks</h1>
-<svg viewBox="-20 -30 190 1300"
-     width="190" height="1300"
+<svg viewBox="-20 -30 190 900"
+     width="190" height="900"
      xmlns="http://www.w3.org/2000/svg">
 
 <style>
@@ -129,78 +129,6 @@ h1 { font-family: sans-serif; }
 </defs>
 <use href="#draw8" />
 <rect x="20" y="40" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
-</g>
-
-<g transform="translate(0, 900)">
-	<g transform="translate(0, -2)">
-		<text x="0" y="0" fill="black" class="small">blit (20,50)-(60,60), to (20,40)-(60,50)</text>
-	</g>
-	<defs>
-<g id="draw9">
-	<use href="#draw8" />
-	<clipPath id="draw9_blitsource">
-		<rect x="20" y="50" width="40" height="10" />
-	</clipPath>
-	<use href="#draw8" clip-path="url(#draw9_blitsource)" x="0" y="-10" />
-</g>
-</defs>
-<use href="#draw8" />
-<rect x="20" y="50" width="40" height="10" fill="none" stroke="red"/>
-<g transform="translate(70, 0)">
-	<use href="#draw9" />
-	<rect x="20" y="40" width="40" height="10" fill="none" stroke="green"/>
-</g>
-
-</g>
-
-<g transform="translate(0, 1000)">
-	<g transform="translate(0, -2)">
-		<text x="0" y="0" fill="black" class="small">blit (20,60)-(60,70), to (20,50)-(60,60)</text>
-	</g>
-	<defs>
-<g id="draw10">
-	<use href="#draw9" />
-	<clipPath id="draw10_blitsource">
-		<rect x="20" y="60" width="40" height="10" />
-	</clipPath>
-	<use href="#draw9" clip-path="url(#draw10_blitsource)" x="0" y="-10" />
-</g>
-</defs>
-<use href="#draw9" />
-<rect x="20" y="60" width="40" height="10" fill="none" stroke="red"/>
-<g transform="translate(70, 0)">
-	<use href="#draw10" />
-	<rect x="20" y="50" width="40" height="10" fill="none" stroke="green"/>
-</g>
-
-</g>
-
-<g transform="translate(0, 1100)">
-	<g transform="translate(0, -2)">
-		<text x="0" y="0" fill="black" class="small">fill (20,50)-(60,60)</text>
-	</g>
-	<defs>
-<g id="draw11">
-	<use href="#draw10" />
-	<rect x="20" y="50" width="40" height="10" fill="#fefee9"/>
-</g>
-</defs>
-<use href="#draw11" />
-<rect x="20" y="50" width="40" height="10" fill="none" stroke="navy" stroke-width="1"/>
-</g>
-
-<g transform="translate(0, 1200)">
-	<g transform="translate(0, -2)">
-		<text x="0" y="0" fill="black" class="small">fill (20,60)-(20,70) <tspan font-style="italic">redundant?</tspan></text>
-	</g>
-	<defs>
-<g id="draw12">
-	<use href="#draw11" />
-	<rect x="20" y="60" width="0" height="10" fill="#fefee9"/>
-</g>
-</defs>
-<use href="#draw12" />
-<rect x="20" y="60" width="0" height="10" fill="none" stroke="navy" stroke-width="1"/>
 </g>
 
 </svg>
